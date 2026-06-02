@@ -2,6 +2,7 @@
   "name": "emit-infra",
   "version": "0.0.1",
   "private": true,
+  "type": "module",
   "scripts": {
     "build": "nx run-many -t build",
     "lint": "nx run-many -t lint",
@@ -18,6 +19,7 @@
     "eslint": "^9.0.0",
     "nx": "^21.0.0",
     "prettier": "^3.0.0",
+    "tsx": "^4.22.4",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"
   }

@@ -2,7 +2,7 @@ import { Command } from 'commander'
 import { join } from 'node:path'
 import { existsSync } from 'node:fs'
 import chalk from 'chalk'
-import { loadConfig, runAnsible, runTerraform } from '@emit-infra/core'
+import { loadConfig, runAnsible } from '@emit-infra/core'
 
 export function registerConfigure(program: Command): void {
   program

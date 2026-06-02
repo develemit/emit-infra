@@ -1,0 +1,10 @@
+{
+  "name": "@emit-infra/api",
+  "version": "0.0.1",
+  "type": "module",
+  "dependencies": {
+    "@emit-infra/core": "workspace:*",
+    "@fastify/cors": "^9.0.0",
+    "fastify": "^4.28.0"
+  }
+}
