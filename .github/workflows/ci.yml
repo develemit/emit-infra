@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: Node.js version
+        type: string
+        default: "24"
+      pnpm-version:
+        description: pnpm version
+        type: string
+        default: "10.30.2"
+      nx-affected:
+        description: Run only affected projects (requires fetch-depth 0)
+        type: boolean
+        default: false
+    secrets:
+      NX_CLOUD_ACCESS_TOKEN:
+        description: Nx Cloud access token for remote caching
+        required: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ inputs.pnpm-version }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: |
+          if [ "${{ inputs.nx-affected }}" = "true" ]; then
+            pnpm nx affected -t build --base=origin/main
+          else
+            pnpm nx run-many -t build
+          fi
+
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test

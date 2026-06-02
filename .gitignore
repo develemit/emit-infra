@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+build/
+tmp/
+.nx/cache
+.nx/workspace-data
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfstate.lock.info
+.terraform.lock.hcl
+terraform.tfvars
+*.auto.tfvars
+
+# Ansible
+*.retry
+ansible/inventory/*.ini
+ansible/inventory/dynamic/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Project configs (contain real domains/names — keep templates, not instances)
+.emit-infra.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo

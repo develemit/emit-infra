@@ -1,0 +1,38 @@
+---
+- name: Create app directory
+  file:
+    path: "{{ app_dir }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0755"
+
+- name: Copy docker-compose.yml
+  copy:
+    src: "{{ compose_src | default('docker-compose.yml') }}"
+    dest: "{{ app_dir }}/docker-compose.yml"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0644"
+
+- name: Copy .env file
+  copy:
+    src: "{{ env_src | default('.env') }}"
+    dest: "{{ app_dir }}/.env"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0600"
+  when: copy_env | default(false)
+
+- name: Pull latest images
+  command: docker compose pull
+  args:
+    chdir: "{{ app_dir }}"
+
+- name: Start or restart app stack
+  command: docker compose up -d --remove-orphans
+  args:
+    chdir: "{{ app_dir }}"
+
+- name: Remove dangling images
+  command: docker image prune -f

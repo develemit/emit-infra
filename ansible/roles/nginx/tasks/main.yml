@@ -1,0 +1,56 @@
+---
+- name: Install nginx and certbot
+  apt:
+    name:
+      - nginx
+      - certbot
+      - python3-certbot-nginx
+    state: present
+    update_cache: true
+
+- name: Start and enable nginx
+  service:
+    name: nginx
+    state: started
+    enabled: true
+
+- name: Write nginx site config
+  template:
+    src: site.conf.j2
+    dest: "/etc/nginx/sites-available/{{ project_name }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload nginx
+
+- name: Enable nginx site
+  file:
+    src: "/etc/nginx/sites-available/{{ project_name }}"
+    dest: "/etc/nginx/sites-enabled/{{ project_name }}"
+    state: link
+  notify: reload nginx
+
+- name: Remove nginx default site
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: reload nginx
+
+- name: Obtain SSL certificate
+  command: >
+    certbot --nginx
+    --non-interactive
+    --agree-tos
+    --email {{ certbot_email }}
+    -d {{ domain }}
+    -d www.{{ domain }}
+  args:
+    creates: "/etc/letsencrypt/live/{{ domain }}/fullchain.pem"
+
+- name: Set up certbot auto-renewal
+  cron:
+    name: certbot-renew
+    job: "certbot renew --quiet"
+    hour: "3"
+    minute: "30"
+    weekday: "1"

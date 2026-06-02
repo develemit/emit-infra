@@ -1,0 +1,14 @@
+{
+  "name": "@emit-infra/cli",
+  "version": "0.0.1",
+  "type": "module",
+  "bin": {
+    "emit-infra": "./dist/index.js"
+  },
+  "dependencies": {
+    "@emit-infra/core": "workspace:*",
+    "commander": "^12.0.0",
+    "chalk": "^5.0.0",
+    "ora": "^8.0.0"
+  }
+}

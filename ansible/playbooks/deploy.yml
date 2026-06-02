@@ -1,0 +1,11 @@
+---
+- name: Deploy application
+  hosts: all
+  become: true
+  gather_facts: false
+
+  vars:
+    app_dir: "/opt/{{ project_name }}"
+
+  roles:
+    - app-deploy

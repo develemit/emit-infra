@@ -1,0 +1,14 @@
+---
+- name: Full server provisioning
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    app_dir: "/opt/{{ project_name }}"
+    certbot_email: "{{ lookup('env', 'CERTBOT_EMAIL') | default('ops@' + domain) }}"
+
+  roles:
+    - common
+    - docker
+    - nginx

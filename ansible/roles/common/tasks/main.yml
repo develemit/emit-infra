@@ -1,0 +1,89 @@
+---
+- name: Update apt cache
+  apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install base packages
+  apt:
+    name:
+      - curl
+      - git
+      - unzip
+      - htop
+      - ufw
+      - fail2ban
+      - ca-certificates
+      - gnupg
+    state: present
+
+- name: Configure swap (2G)
+  block:
+    - name: Check if swap exists
+      stat:
+        path: /swapfile
+      register: swap_file
+
+    - name: Create swapfile
+      command: fallocate -l 2G /swapfile
+      when: not swap_file.stat.exists
+
+    - name: Set swapfile permissions
+      file:
+        path: /swapfile
+        mode: "0600"
+      when: not swap_file.stat.exists
+
+    - name: Format swap
+      command: mkswap /swapfile
+      when: not swap_file.stat.exists
+
+    - name: Enable swap
+      command: swapon /swapfile
+      when: not swap_file.stat.exists
+
+    - name: Persist swap in fstab
+      lineinfile:
+        path: /etc/fstab
+        line: "/swapfile none swap sw 0 0"
+        state: present
+
+- name: Harden SSH
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    state: present
+  loop:
+    - { regexp: "^#?PermitRootLogin", line: "PermitRootLogin prohibit-password" }
+    - { regexp: "^#?PasswordAuthentication", line: "PasswordAuthentication no" }
+    - { regexp: "^#?X11Forwarding", line: "X11Forwarding no" }
+  notify: restart sshd
+
+- name: Configure UFW defaults
+  ufw:
+    direction: "{{ item.direction }}"
+    policy: "{{ item.policy }}"
+  loop:
+    - { direction: incoming, policy: deny }
+    - { direction: outgoing, policy: allow }
+
+- name: Allow SSH, HTTP, HTTPS through UFW
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - "22"
+    - "80"
+    - "443"
+
+- name: Enable UFW
+  ufw:
+    state: enabled
+
+- name: Enable fail2ban
+  service:
+    name: fail2ban
+    state: started
+    enabled: true

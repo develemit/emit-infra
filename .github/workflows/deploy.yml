@@ -1,0 +1,49 @@
+name: Deploy
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: Deployment environment (staging or production)
+        type: string
+        default: production
+      app-dir:
+        description: Directory on the server where docker-compose.yml lives
+        type: string
+        default: /opt/app
+      compose-file:
+        description: Docker Compose file name
+        type: string
+        default: docker-compose.yml
+    secrets:
+      SSH_PRIVATE_KEY:
+        description: SSH private key for the deploy user
+        required: true
+      SERVER_IP:
+        description: Target server IP address
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.SERVER_IP }}" >> ~/.ssh/known_hosts
+
+      - name: Pull latest images and restart
+        run: |
+          ssh -i ~/.ssh/deploy_key root@${{ secrets.SERVER_IP }} \
+            "cd ${{ inputs.app-dir }} && \
+             docker compose -f ${{ inputs.compose-file }} pull && \
+             docker compose -f ${{ inputs.compose-file }} up -d --remove-orphans && \
+             docker image prune -f"
+
+      - name: Verify deployment
+        run: |
+          ssh -i ~/.ssh/deploy_key root@${{ secrets.SERVER_IP }} \
+            "docker compose -f ${{ inputs.app-dir }}/${{ inputs.compose-file }} ps"
