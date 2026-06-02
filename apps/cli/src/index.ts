@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command } from 'commander'
+import { registerSetup } from './commands/setup.js'
 import { registerInit } from './commands/init.js'
 import { registerProvision } from './commands/provision.js'
 import { registerConfigure } from './commands/configure.js'
@@ -15,6 +16,7 @@ program
   .description('Infrastructure CLI for the emit project stack')
   .version('0.0.1')
 
+registerSetup(program)
 registerInit(program)
 registerProvision(program)
 registerConfigure(program)

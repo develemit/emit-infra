@@ -5,8 +5,10 @@ export async function runTerraform(
   args: string[],
   cwd: string,
 ): Promise<void> {
-  await execa('terraform', [cmd, ...args], {
-    cwd,
-    stdio: 'inherit',
-  })
+  await execa('terraform', [cmd, ...args], { cwd, stdio: 'inherit' })
+}
+
+export async function getTerraformOutput(key: string, cwd: string): Promise<string> {
+  const result = await execa('terraform', ['output', '-raw', key], { cwd })
+  return result.stdout.trim()
 }
