@@ -50,6 +50,7 @@ jobs:
           context: ${{ inputs.context }}
           file: ${{ matrix.image.dockerfile }}
           push: true
+          build-args: ${{ matrix.image.build_args || '' }}
           tags: |
             ${{ inputs.registry }}/${{ github.repository_owner }}/${{ matrix.image.name }}:latest
             ${{ inputs.registry }}/${{ github.repository_owner }}/${{ matrix.image.name }}:${{ github.sha }}
