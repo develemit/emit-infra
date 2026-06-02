@@ -11,8 +11,8 @@ on:
         description: pnpm version
         type: string
         default: "10.30.2"
-      nx-affected:
-        description: Run only affected projects (requires fetch-depth 0)
+      run-e2e:
+        description: Run e2e tests (opt-in — requires Playwright setup in the calling project)
         type: boolean
         default: false
     secrets:
@@ -22,6 +22,7 @@ on:
 
 jobs:
   validate:
+    name: Lint · Typecheck · Test · Build
     runs-on: ubuntu-latest
     env:
       NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
@@ -41,14 +42,31 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Build
-        run: |
-          if [ "${{ inputs.nx-affected }}" = "true" ]; then
-            pnpm nx affected -t build --base=origin/main
-          else
-            pnpm nx run-many -t build
-          fi
+      - run: pnpm nx affected -t lint typecheck test build --parallel=3
 
-      - run: pnpm lint
-      - run: pnpm typecheck
-      - run: pnpm test
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    if: ${{ inputs.run-e2e == true }}
+    env:
+      NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ inputs.pnpm-version }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - run: pnpm nx affected -t e2e --parallel=1
