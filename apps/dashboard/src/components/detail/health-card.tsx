@@ -33,10 +33,12 @@ interface HealthCardProps {
 }
 
 export function HealthCard({ project, status, polledAgo }: HealthCardProps) {
-  const disk = status.disk ? parseInt(status.disk, 10) : 0
-  const mem = status.memory ? parseInt(status.memory, 10) : 0
+  const disk = status.disk ?? 0
+  const mem = status.memory ?? 0
   const uptime = status.uptime?.replace('up ', '') ?? '—'
-  const region = project.config.region
+  const region = status.region ?? project.config.region
+  const serverType = status.serverType ?? '—'
+  const ip = status.ip ?? '—'
 
   return (
     <div className="rounded-xl border border-border bg-card" style={{ padding: 18 }}>
@@ -60,8 +62,8 @@ export function HealthCard({ project, status, polledAgo }: HealthCardProps) {
       <div className="hidden lg:grid grid-cols-4 gap-4 mb-5">
         <StatTile icon="clock" label="Uptime" value={uptime} mono={false} />
         <StatTile icon="globe" label="Region" value={region} />
-        <StatTile icon="cpu" label="Server" value="—" />
-        <StatTile icon="link" label="Public IP" value="—" />
+        <StatTile icon="cpu" label="Server" value={serverType} />
+        <StatTile icon="link" label="Public IP" value={ip} />
       </div>
 
       {/* Mobile: 2-col stat grid */}

@@ -1,6 +1,9 @@
+'use client'
+import { useEffect, useState } from 'react'
 import { Icon } from '@/components/icon'
 import { ChipInput } from '@/components/ui/chip-input'
 import { Switch } from '@/components/ui/switch'
+import { getSshKeys } from '@/lib/api'
 import type { FormValues } from './types'
 
 const REGIONS = ['nbg1', 'fsn1', 'hel1', 'ash', 'hil']
@@ -39,6 +42,14 @@ function Select({ value, onChange, children }: { value: string; onChange: (v: st
 }
 
 export function StepInfrastructure({ values, onChange, onNext, onBack }: Props) {
+  const [sshKeys, setSshKeys] = useState<string[]>(['emit-deploy'])
+
+  useEffect(() => {
+    getSshKeys().then((keys) => {
+      if (keys.length > 0) setSshKeys(keys)
+    }).catch(() => undefined)
+  }, [])
+
   return (
     <div className="flex flex-col gap-[18px]">
       {/* Region + SSH key row */}
@@ -52,7 +63,7 @@ export function StepInfrastructure({ values, onChange, onNext, onBack }: Props) 
         <div>
           <FieldLabel>SSH key</FieldLabel>
           <Select value={values.sshKey} onChange={v => onChange({ sshKey: v })}>
-            <option value="emit-deploy">emit-deploy</option>
+            {sshKeys.map(k => <option key={k} value={k}>{k}</option>)}
           </Select>
         </div>
       </div>

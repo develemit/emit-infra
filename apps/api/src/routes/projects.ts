@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { readFile, readdir } from 'node:fs/promises'
 import { sshExec } from '@emit-infra/core'
 import { discoverProjects } from '../lib/discover-projects.js'
 
@@ -14,6 +15,15 @@ function findProject(name: string) {
   return discoverProjects().find((p) => p.config.name === name) ?? null
 }
 
+async function readProjectConfig(name: string): Promise<Record<string, unknown> | null> {
+  try {
+    const raw = await readFile(join(homedir(), 'projects', name, '.emit-infra.json'), 'utf8')
+    return JSON.parse(raw) as Record<string, unknown>
+  } catch {
+    return null
+  }
+}
+
 export async function projectRoutes(app: FastifyInstance) {
   app.get('/projects', async () => {
     return discoverProjects().map(({ config, configPath, projectDir }) => ({
@@ -23,23 +33,41 @@ export async function projectRoutes(app: FastifyInstance) {
     }))
   })
 
+  app.get('/projects/ssh-keys', async () => {
+    const sshDir = join(homedir(), '.ssh')
+    try {
+      const files = await readdir(sshDir)
+      return files.filter(
+        (f) => !f.endsWith('.pub') && (f.startsWith('emit-') || f.startsWith('deploy-')),
+      )
+    } catch {
+      return []
+    }
+  })
+
   app.get<{ Params: { name: string } }>('/projects/:name/status', async (req, reply) => {
     const project = findProject(req.params.name)
     if (!project) return reply.status(404).send({ error: 'not found' })
 
     const key = sshKeyPath()
     const host = project.config.domain
+    const projectConfig = await readProjectConfig(req.params.name)
 
     try {
-      const [uptime, disk, mem] = await Promise.all([
+      const [uptime, disk, mem, containerCount] = await Promise.all([
         sshExec(host, 'uptime -p', key),
         sshExec(host, "df -h / | tail -1 | awk '{print $5}'", key),
         sshExec(host, "free -m | awk 'NR==2{printf \"%.0f\", $3/$2*100}'", key),
+        sshExec(host, 'docker ps -q | wc -l', key),
       ])
       return {
         uptime: uptime.trim(),
         disk: parseInt(disk.trim().replace('%', ''), 10),
         memory: parseInt(mem.trim(), 10),
+        containerCount: parseInt(containerCount.trim(), 10),
+        serverType: projectConfig?.['serverType'] as string | undefined,
+        region: projectConfig?.['region'] as string | undefined,
+        ip: host,
       }
     } catch {
       return reply.status(503).send({ error: 'unreachable' })

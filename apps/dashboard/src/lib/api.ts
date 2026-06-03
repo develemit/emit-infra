@@ -23,8 +23,12 @@ export interface ProjectSummary {
 
 export interface ProjectStatus {
   uptime?: string
-  disk?: string
-  memory?: string
+  disk?: number
+  memory?: number
+  containerCount?: number
+  serverType?: string
+  region?: string
+  ip?: string
   error?: string
 }
 
@@ -54,6 +58,10 @@ export async function getContainers(name: string): Promise<Container[]> {
     `/projects/${encodeURIComponent(name)}/containers`,
   )
   return Array.isArray(data) ? data : []
+}
+
+export function getSshKeys(): Promise<string[]> {
+  return apiFetch<string[]>('/projects/ssh-keys')
 }
 
 export function openSseStream(path: string): EventSource {

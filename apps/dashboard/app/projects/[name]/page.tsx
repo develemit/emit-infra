@@ -14,8 +14,8 @@ import { DestroyModal } from '@/components/destroy-modal'
 function deriveVariant(status: ProjectStatus | null): BadgeVariant {
   if (status === null) return 'muted'
   if (status.error) return 'err'
-  const disk = parseInt(status.disk ?? '0', 10)
-  const mem = parseInt(status.memory ?? '0', 10)
+  const disk = status.disk ?? 0
+  const mem = status.memory ?? 0
   if (disk >= 80 || mem >= 80) return 'warn'
   return 'ok'
 }

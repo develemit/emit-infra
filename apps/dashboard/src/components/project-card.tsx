@@ -14,8 +14,8 @@ interface Props {
 function deriveVariant(status: ProjectStatus | null): BadgeVariant {
   if (status === null) return 'muted'
   if (status.error) return 'err'
-  const disk = parseInt(status.disk ?? '0', 10)
-  const mem = parseInt(status.memory ?? '0', 10)
+  const disk = status.disk ?? 0
+  const mem = status.memory ?? 0
   if (disk >= 80 || mem >= 80) return 'warn'
   return 'ok'
 }
@@ -34,8 +34,8 @@ export function ProjectCard({ project, status }: Props) {
   const variant = deriveVariant(status)
   const reachable = variant === 'ok' || variant === 'warn'
   const loading = status === null
-  const disk = status?.disk ? parseInt(status.disk, 10) : 0
-  const mem = status?.memory ? parseInt(status.memory, 10) : 0
+  const disk = status?.disk ?? 0
+  const mem = status?.memory ?? 0
 
   return (
     <Link
@@ -93,7 +93,7 @@ export function ProjectCard({ project, status }: Props) {
         </span>
         <span className="text-[12px] font-mono text-subtle flex items-center gap-1.5 whitespace-nowrap">
           <Icon name="box" size={13} />
-          {loading ? '— running' : '— running'}
+          {status?.containerCount != null ? `${status.containerCount} running` : '— running'}
         </span>
       </div>
     </Link>
