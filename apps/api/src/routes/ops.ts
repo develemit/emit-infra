@@ -118,7 +118,23 @@ export async function opsRoutes(app: FastifyInstance) {
     }
 
     if (pendingConfirmation) {
-      return reply.send({ reply: '', pendingConfirmation })
+      if (toolResultContent.length > 0) {
+        appendMessage(sessionId, { role: 'user', content: toolResultContent })
+        const intermediate = await anthropic.messages.create({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 1024,
+          system: SYSTEM,
+          tools,
+          messages: getHistory(sessionId),
+        })
+        const summaryText = intermediate.content
+          .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+          .map((b) => b.text)
+          .join('')
+        appendMessage(sessionId, { role: 'assistant', content: intermediate.content })
+        return reply.send({ reply: summaryText, toolResults, pendingConfirmation })
+      }
+      return reply.send({ reply: '', toolResults: [], pendingConfirmation })
     }
 
     // Follow-up with tool results
