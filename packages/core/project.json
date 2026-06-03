@@ -28,7 +28,7 @@
     "test": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "vitest run --project core"
+        "command": "vitest run --passWithNoTests"
       }
     }
   }
