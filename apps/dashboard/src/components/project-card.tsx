@@ -1,94 +1,101 @@
 'use client'
 import Link from 'next/link'
 import type { ProjectSummary, ProjectStatus } from '@/lib/api'
-import { cn } from '@/lib/utils'
+import { Icon } from '@/components/icon'
+import { Badge, type BadgeVariant } from '@/components/ui/badge'
+import { Meter } from '@/components/ui/meter'
+import { Skeleton } from '@/components/ui/skeleton'
 
 interface Props {
   project: ProjectSummary
   status: ProjectStatus | null
 }
 
-function StatusBadge({ status }: { status: ProjectStatus | null }) {
-  if (!status) {
-    return (
-      <span className="text-xs text-gray-400 animate-pulse">checking</span>
-    )
-  }
-  if (status.error) {
-    return (
-      <span className="text-xs font-medium text-red-500">unreachable</span>
-    )
-  }
-  return (
-    <span className="text-xs font-medium text-emerald-500">healthy</span>
-  )
+function deriveVariant(status: ProjectStatus | null): BadgeVariant {
+  if (status === null) return 'muted'
+  if (status.error) return 'err'
+  const disk = parseInt(status.disk ?? '0', 10)
+  const mem = parseInt(status.memory ?? '0', 10)
+  if (disk >= 80 || mem >= 80) return 'warn'
+  return 'ok'
 }
 
-function ProgressBar({ value }: { value: number }) {
-  const pct = Math.min(100, Math.max(0, value))
-  const color =
-    pct > 85
-      ? 'bg-red-500'
-      : pct > 70
-        ? 'bg-yellow-500'
-        : 'bg-emerald-500'
-  return (
-    <div className="h-1.5 w-full rounded-full bg-gray-100 dark:bg-gray-800">
-      <div
-        className={cn('h-full rounded-full transition-all', color)}
-        style={{ width: `${pct}%` }}
-      />
-    </div>
-  )
+const variantLabel: Record<BadgeVariant, string> = {
+  ok: 'Healthy',
+  warn: 'Degraded',
+  err: 'Unreachable',
+  muted: 'Loading',
+  accent: 'Accent',
+  region: 'Region',
 }
 
 export function ProjectCard({ project, status }: Props) {
   const { name, domain, region } = project.config
-  const disk = status?.disk ? parseInt(status.disk, 10) : null
-  const memory = status?.memory ? parseInt(status.memory, 10) : null
+  const variant = deriveVariant(status)
+  const reachable = variant === 'ok' || variant === 'warn'
+  const loading = status === null
+  const disk = status?.disk ? parseInt(status.disk, 10) : 0
+  const mem = status?.memory ? parseInt(status.memory, 10) : 0
 
   return (
     <Link
       href={`/projects/${encodeURIComponent(name)}`}
-      className="block rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 hover:shadow-md hover:border-gray-300 dark:hover:border-gray-700 transition-all"
+      className="flex flex-col rounded-xl border border-border bg-card hover:bg-card-hover hover:border-strong transition-[background-color,border-color] duration-150"
+      style={{ padding: 16, gap: 13 }}
     >
-      <div className="flex items-start justify-between mb-3">
-        <div className="min-w-0 mr-2">
-          <h2 className="font-semibold text-sm truncate">{name}</h2>
-          <p className="text-xs text-gray-500 mt-0.5 truncate">{domain}</p>
+      {/* Header */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-[16px] font-semibold text-fg truncate">{name}</div>
+          <div className="text-[12px] font-mono text-muted flex items-center gap-1.5 mt-0.5">
+            <Icon name="globe" size={12} style={{ opacity: 0.6 }} />
+            <span className="truncate">{domain}</span>
+          </div>
         </div>
-        <StatusBadge status={status} />
+        <Badge variant={variant} dot loading={loading}>
+          {variantLabel[variant]}
+        </Badge>
       </div>
 
-      {status && !status.error ? (
-        <div className="space-y-2.5">
-          {status.uptime && (
-            <p className="text-xs text-gray-500 truncate">{status.uptime}</p>
-          )}
-          {disk !== null && (
-            <div>
-              <div className="flex justify-between text-xs text-gray-500 mb-1">
-                <span>Disk</span>
-                <span>{disk}%</span>
-              </div>
-              <ProgressBar value={disk} />
-            </div>
-          )}
-          {memory !== null && (
-            <div>
-              <div className="flex justify-between text-xs text-gray-500 mb-1">
-                <span>Memory</span>
-                <span>{memory}%</span>
-              </div>
-              <ProgressBar value={memory} />
-            </div>
-          )}
+      {/* Region badge */}
+      <div className="flex gap-1.5">
+        <Badge variant="region">{region}</Badge>
+      </div>
+
+      {/* Meters / skeleton / unreachable */}
+      {reachable ? (
+        <div className="flex gap-4">
+          <div className="flex-1"><Meter label="Disk" value={disk} /></div>
+          <div className="flex-1"><Meter label="Mem" value={mem} /></div>
+        </div>
+      ) : loading ? (
+        <div className="flex gap-4">
+          <Skeleton className="h-[34px] flex-1" />
+          <Skeleton className="h-[34px] flex-1" />
         </div>
       ) : (
-        <div className="h-10" />
+        <div
+          className="flex items-center gap-2 rounded-lg px-3 py-2 text-[12px] text-err border border-err-line bg-err-soft"
+        >
+          <Icon name="alert" size={15} style={{ color: 'var(--err)', flexShrink: 0 }} />
+          <span>SSH unreachable — last seen 2h ago</span>
+        </div>
       )}
 
-      <p className="text-xs text-gray-400 mt-3">{region}</p>
+      {/* Divider */}
+      <div style={{ height: 1, background: 'var(--border)' }} />
+
+      {/* Footer */}
+      <div className="flex items-center justify-between">
+        <span className="text-[12px] font-mono text-subtle flex items-center gap-1.5 whitespace-nowrap">
+          <Icon name="clock" size={13} />
+          {status?.uptime ?? '—'}
+        </span>
+        <span className="text-[12px] font-mono text-subtle flex items-center gap-1.5 whitespace-nowrap">
+          <Icon name="box" size={13} />
+          {loading ? '— running' : '— running'}
+        </span>
+      </div>
     </Link>
   )
 }

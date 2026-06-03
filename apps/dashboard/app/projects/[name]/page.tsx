@@ -2,20 +2,27 @@
 import { useParams } from 'next/navigation'
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
-import { getStatus, getContainers, getApiBase, type ProjectStatus, type Container } from '@/lib/api'
+import { getStatus, getContainers, getProjects, getApiBase, type ProjectSummary, type ProjectStatus, type Container } from '@/lib/api'
+import { Icon } from '@/components/icon'
+import { Badge, type BadgeVariant } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
+import { HealthCard } from '@/components/detail/health-card'
+import { ContainerTable } from '@/components/detail/container-table'
 import { SseOutputPanel } from '@/components/sse-output-panel'
 import { DestroyModal } from '@/components/destroy-modal'
-import { cn } from '@/lib/utils'
 
-function ProgressBar({ value }: { value: number }) {
-  const pct = Math.min(100, Math.max(0, value))
-  const color = pct > 85 ? 'bg-red-500' : pct > 70 ? 'bg-yellow-500' : 'bg-emerald-500'
-  return (
-    <div className="h-2 w-full rounded-full bg-gray-100 dark:bg-gray-800">
-      <div className={cn('h-full rounded-full transition-all', color)} style={{ width: `${pct}%` }} />
-    </div>
-  )
+function deriveVariant(status: ProjectStatus | null): BadgeVariant {
+  if (status === null) return 'muted'
+  if (status.error) return 'err'
+  const disk = parseInt(status.disk ?? '0', 10)
+  const mem = parseInt(status.memory ?? '0', 10)
+  if (disk >= 80 || mem >= 80) return 'warn'
+  return 'ok'
+}
+
+const variantLabel: Record<BadgeVariant, string> = {
+  ok: 'Healthy', warn: 'Degraded', err: 'Unreachable',
+  muted: 'Loading', accent: 'Accent', region: 'Region',
 }
 
 export default function ProjectDetailPage() {
@@ -23,6 +30,7 @@ export default function ProjectDetailPage() {
   const name = typeof params['name'] === 'string' ? decodeURIComponent(params['name']) : ''
   const apiBase = getApiBase()
 
+  const [project, setProject] = useState<ProjectSummary | null>(null)
   const [status, setStatus] = useState<ProjectStatus | null>(null)
   const [containers, setContainers] = useState<Container[] | null>(null)
   const [deploying, setDeploying] = useState(false)
@@ -31,7 +39,8 @@ export default function ProjectDetailPage() {
   const deployUrl = `${apiBase}/projects/${encodeURIComponent(name)}/deploy`
 
   const fetchData = useCallback(async () => {
-    const [s, c] = await Promise.all([getStatus(name), getContainers(name)])
+    const [ps, s, c] = await Promise.all([getProjects(), getStatus(name), getContainers(name)])
+    setProject(ps.find(p => p.config.name === name) ?? null)
     setStatus(s)
     setContainers(c)
   }, [name])
@@ -42,141 +51,125 @@ export default function ProjectDetailPage() {
     return () => clearInterval(interval)
   }, [fetchData])
 
-  const disk = status?.disk ? parseInt(status.disk, 10) : null
-  const memory = status?.memory ? parseInt(status.memory, 10) : null
+  const variant = deriveVariant(status)
+  const domain = project?.config.domain ?? ''
+  const loading = status === null
 
   return (
-    <div className="p-4 sm:p-6 max-w-3xl">
-      <Link
-        href="/"
-        className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 mb-5"
+    <div className="flex flex-col min-h-full">
+      {/* Desktop topbar */}
+      <div
+        className="hidden lg:flex items-center gap-3 px-6 border-b border-border shrink-0"
+        style={{ height: 56 }}
       >
-        <ArrowLeft size={14} />
-        Back
-      </Link>
+        <Link href="/" className="text-subtle hover:text-fg transition-colors">
+          <Icon name="arrowLeft" size={16} />
+        </Link>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[15px] font-semibold text-fg">{name}</span>
+          {domain && <span className="text-[11px] font-mono text-subtle">{domain}</span>}
+        </div>
+        <div className="flex-1" />
+        <Badge variant={variant} dot loading={variant === 'muted'}>{variantLabel[variant]}</Badge>
+        <div style={{ width: 1, height: 22, background: 'var(--border)' }} />
+        <Link
+          href={`/projects/${encodeURIComponent(name)}/logs`}
+          className="inline-flex items-center gap-1.5 px-3 h-[32px] rounded-lg text-[12px] font-medium text-fg border border-border hover:bg-card-hover transition-colors"
+        >
+          <Icon name="file" size={13} />Logs
+        </Link>
+        <button
+          onClick={() => setDeploying(true)}
+          disabled={deploying}
+          className="inline-flex items-center gap-1.5 px-3 h-[32px] rounded-lg text-[12px] font-medium text-accent-fg bg-accent hover:opacity-90 disabled:opacity-50 transition-opacity"
+        >
+          <Icon name="deploy" size={13} />{deploying ? 'Running…' : 'Deploy'}
+        </button>
+        <button
+          onClick={() => setShowDestroy(true)}
+          className="inline-flex items-center gap-1.5 px-3 h-[32px] rounded-lg text-[12px] font-medium text-err border border-err-line hover:bg-err-soft transition-colors"
+        >
+          <Icon name="trash" size={13} />Destroy
+        </button>
+      </div>
 
-      <div className="flex items-center justify-between mb-5">
-        <h1 className="text-2xl font-semibold">{name}</h1>
-        <div className="flex items-center gap-2">
-          <Link
-            href={`/projects/${encodeURIComponent(name)}/logs`}
-            className="text-sm px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
-          >
-            Logs
-          </Link>
-          <button
-            onClick={() => setShowDestroy(true)}
-            className="text-sm px-3 py-1.5 rounded-lg border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
-          >
-            Destroy
-          </button>
+      {/* Mobile sticky header */}
+      <div
+        className="lg:hidden sticky top-0 z-40 flex items-center gap-2.5 px-4 border-b border-border bg-elev"
+        style={{ height: 52 }}
+      >
+        <Link href="/" className="text-subtle"><Icon name="arrowLeft" size={18} /></Link>
+        <div className="min-w-0">
+          <div className="text-[15px] font-semibold text-fg truncate">{name}</div>
+          {domain && <div className="text-[10.5px] font-mono text-subtle truncate">{domain}</div>}
+        </div>
+        <div className="flex-1" />
+        <Badge variant={variant} dot loading={variant === 'muted'}>{variantLabel[variant]}</Badge>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 p-4 lg:p-6 pb-[160px] lg:pb-6">
+        <div className="flex flex-col gap-4 max-w-[1000px]">
+          {loading ? (
+            <>
+              <Skeleton className="h-[200px]" />
+              <Skeleton className="h-[220px]" />
+            </>
+          ) : status?.error ? (
+            <div className="flex items-center gap-2 rounded-xl px-4 py-3 text-sm text-err border border-err-line bg-err-soft">
+              <Icon name="alert" size={16} />
+              SSH unreachable — the server did not respond
+            </div>
+          ) : (
+            <>
+              {project && status && (
+                <HealthCard project={project} status={status} polledAgo="polled 30s ago" />
+              )}
+              {containers !== null && (
+                <ContainerTable containers={containers} />
+              )}
+              {deploying && (
+                <SseOutputPanel
+                  url={deployUrl}
+                  method="POST"
+                  active={deploying}
+                  onComplete={() => setDeploying(false)}
+                />
+              )}
+            </>
+          )}
         </div>
       </div>
 
-      {status === null ? (
-        <div className="space-y-4 animate-pulse">
-          <div className="h-28 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900" />
-          <div className="h-40 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900" />
+      {/* Mobile sticky footer (above tab bar) */}
+      <div
+        className="lg:hidden fixed bottom-16 left-0 right-0 z-40 flex flex-col gap-2 px-4 py-3 border-t border-border bg-elev"
+      >
+        <button
+          onClick={() => setDeploying(true)}
+          disabled={deploying}
+          className="flex w-full items-center justify-center gap-2 rounded-xl text-[14px] font-medium text-accent-fg bg-accent hover:opacity-90 disabled:opacity-50 transition-opacity"
+          style={{ height: 48 }}
+        >
+          <Icon name="deploy" size={16} />{deploying ? 'Running…' : 'Deploy'}
+        </button>
+        <div className="flex gap-2">
+          <Link
+            href={`/projects/${encodeURIComponent(name)}/logs`}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl text-[13px] font-medium text-fg border border-border hover:bg-card-hover transition-colors"
+            style={{ height: 44 }}
+          >
+            <Icon name="file" size={14} />Logs
+          </Link>
+          <button
+            onClick={() => setShowDestroy(true)}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl text-[13px] font-medium text-err border border-err-line hover:bg-err-soft transition-colors"
+            style={{ height: 44 }}
+          >
+            <Icon name="trash" size={14} />Destroy
+          </button>
         </div>
-      ) : (
-        <>
-          <section className="rounded-xl border border-gray-200 dark:border-gray-800 p-4 mb-4">
-            <h2 className="text-sm font-semibold mb-3">Server</h2>
-            {status?.error ? (
-              <p className="text-sm text-red-500">Unreachable</p>
-            ) : (
-              <div className="space-y-3">
-                {status?.uptime && (
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Uptime: {status.uptime}</p>
-                )}
-                {disk !== null && (
-                  <div>
-                    <div className="flex justify-between text-xs text-gray-500 mb-1.5">
-                      <span>Disk</span><span>{disk}%</span>
-                    </div>
-                    <ProgressBar value={disk} />
-                  </div>
-                )}
-                {memory !== null && (
-                  <div>
-                    <div className="flex justify-between text-xs text-gray-500 mb-1.5">
-                      <span>Memory</span><span>{memory}%</span>
-                    </div>
-                    <ProgressBar value={memory} />
-                  </div>
-                )}
-              </div>
-            )}
-          </section>
-
-          <section className="rounded-xl border border-gray-200 dark:border-gray-800 p-4 mb-4">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold">Deploy</h2>
-              <button
-                onClick={() => setDeploying(true)}
-                disabled={deploying}
-                className={cn(
-                  'text-sm px-3 py-1.5 rounded-lg font-medium',
-                  deploying
-                    ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
-                    : 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 hover:opacity-90',
-                )}
-              >
-                {deploying ? 'Running...' : 'Deploy'}
-              </button>
-            </div>
-            <SseOutputPanel
-              url={deployUrl}
-              method="POST"
-              active={deploying}
-              onComplete={() => setDeploying(false)}
-            />
-          </section>
-
-          <section className="rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800">
-              <h2 className="text-sm font-semibold">Containers</h2>
-            </div>
-            {!containers || containers.length === 0 ? (
-              <p className="p-4 text-sm text-gray-500">No containers found</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm min-w-[360px]">
-                  <thead className="bg-gray-50 dark:bg-gray-800/50">
-                    <tr>
-                      <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500">Name</th>
-                      <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 hidden sm:table-cell">Image</th>
-                      <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500">State</th>
-                      <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 hidden sm:table-cell">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
-                    {containers.map((c) => (
-                      <tr key={c.name}>
-                        <td className="px-4 py-3 font-mono text-xs">{c.name}</td>
-                        <td className="px-4 py-3 text-xs text-gray-500 hidden sm:table-cell truncate max-w-[200px]">{c.image}</td>
-                        <td className="px-4 py-3">
-                          <span
-                            className={cn(
-                              'inline-block text-xs px-2 py-0.5 rounded-full font-medium',
-                              c.state === 'running'
-                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                                : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-                            )}
-                          >
-                            {c.state}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-xs text-gray-500 hidden sm:table-cell">{c.status}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
-        </>
-      )}
+      </div>
 
       {showDestroy && (
         <DestroyModal

@@ -131,3 +131,6 @@ body {
   border-radius: 6px;
 }
 @keyframes ec-shimmer { to { background-position: -200% 0; } }
+
+/* ── Pulse (loading dot) ─────────────────────────────────────── */
+@keyframes ec-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }

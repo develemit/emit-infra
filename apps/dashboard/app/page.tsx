@@ -3,28 +3,13 @@ import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { getProjects, getStatus, type ProjectSummary, type ProjectStatus } from '@/lib/api'
 import { ProjectCard } from '@/components/project-card'
-
-function SkeletonCard() {
-  return (
-    <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-4 animate-pulse">
-      <div className="flex justify-between mb-3">
-        <div className="space-y-2">
-          <div className="h-4 w-28 rounded bg-gray-200 dark:bg-gray-700" />
-          <div className="h-3 w-20 rounded bg-gray-100 dark:bg-gray-800" />
-        </div>
-        <div className="h-3 w-14 rounded bg-gray-100 dark:bg-gray-800" />
-      </div>
-      <div className="space-y-2.5">
-        <div className="h-1.5 w-full rounded-full bg-gray-100 dark:bg-gray-800" />
-        <div className="h-1.5 w-full rounded-full bg-gray-100 dark:bg-gray-800" />
-      </div>
-    </div>
-  )
-}
+import { Skeleton } from '@/components/ui/skeleton'
+import { Icon } from '@/components/icon'
 
 export default function HomePage() {
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null)
   const [statuses, setStatuses] = useState<Record<string, ProjectStatus>>({})
+  const [search, setSearch] = useState('')
 
   const fetchAll = useCallback(async () => {
     const ps = await getProjects()
@@ -44,42 +29,83 @@ export default function HomePage() {
     return () => clearInterval(interval)
   }, [fetchAll])
 
+  const filtered = projects?.filter(p =>
+    !search || p.config.name.includes(search) || p.config.domain.includes(search),
+  )
+
   return (
-    <div className="p-4 sm:p-6">
-      <div className="flex items-center justify-between mb-5">
-        <h1 className="text-xl font-semibold">Overview</h1>
+    <div className="flex flex-col h-full">
+      {/* Desktop topbar */}
+      <div
+        className="hidden lg:flex items-center gap-3 px-6 border-b border-border shrink-0"
+        style={{ height: 56 }}
+      >
+        <span className="text-[15px] font-semibold text-fg">Projects</span>
+        <div className="text-[12px] font-mono text-subtle">
+          {projects ? `${projects.length} managed` : '—'}
+        </div>
+        <div className="flex-1" />
+        {/* Search */}
+        <div className="relative flex items-center" style={{ width: 200, height: 34 }}>
+          <span className="absolute left-2.5 text-subtle pointer-events-none">
+            <Icon name="search" size={14} />
+          </span>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="filter…"
+            className="w-full h-full rounded-lg pl-8 pr-3 text-[12px] font-mono text-fg bg-card border border-border focus:outline-none focus:border-accent"
+          />
+        </div>
+        {/* New Project */}
         <Link
           href="/provision"
-          className="text-sm px-3 py-1.5 rounded-lg bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 hover:opacity-90"
+          className="inline-flex items-center gap-1.5 px-3 h-[34px] rounded-lg text-[13px] font-medium text-accent-fg bg-accent hover:opacity-90 transition-opacity"
         >
+          <Icon name="plus" size={15} />
           New Project
         </Link>
       </div>
-      {projects === null ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <SkeletonCard key={i} />
-          ))}
-        </div>
-      ) : projects.length === 0 ? (
-        <p className="text-sm text-gray-500">
-          No projects found. Add a{' '}
-          <code className="text-xs bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">
-            .emit-infra.json
-          </code>{' '}
-          file to a project under <code className="text-xs bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">~/projects/</code>.
-        </p>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {projects.map((p) => (
-            <ProjectCard
-              key={p.config.name}
-              project={p}
-              status={statuses[p.config.name] ?? null}
-            />
-          ))}
-        </div>
-      )}
+
+      {/* Mobile header */}
+      <div
+        className="lg:hidden flex items-center justify-between px-4 border-b border-border shrink-0"
+        style={{ height: 52 }}
+      >
+        <span className="text-[17px] font-semibold text-fg">Projects</span>
+        <Link
+          href="/provision"
+          className="inline-flex items-center gap-1 px-2.5 h-[30px] rounded-lg text-[12px] font-medium text-accent-fg bg-accent hover:opacity-90 transition-opacity"
+        >
+          <Icon name="plus" size={13} />
+          New
+        </Link>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-auto p-4 lg:p-6">
+        {projects === null ? (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-4">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-[180px]" />
+            ))}
+          </div>
+        ) : (filtered ?? []).length === 0 ? (
+          <p className="text-sm text-subtle">
+            {search ? 'No projects match your filter.' : 'No projects found. Add a .emit-infra.json file to a project under ~/projects/.'}
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-4">
+            {(filtered ?? []).map((p) => (
+              <ProjectCard
+                key={p.config.name}
+                project={p}
+                status={statuses[p.config.name] ?? null}
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
