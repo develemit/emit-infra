@@ -1,176 +1,133 @@
 'use client'
-import { useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
-import { z } from 'zod'
+import { useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
 import { provisionProject } from '@/lib/api'
-import { SseOutputPanel } from '@/components/sse-output-panel'
-import { cn } from '@/lib/utils'
+import { Icon } from '@/components/icon'
+import { Stepper } from '@/components/ui/stepper'
+import { MobileStepper } from '@/components/ui/mobile-stepper'
+import { StepBasics } from '@/components/provision/step-basics'
+import { StepInfrastructure } from '@/components/provision/step-infrastructure'
+import { StepReview } from '@/components/provision/step-review'
+import { StepRunning } from '@/components/provision/step-running'
+import type { FormValues } from '@/components/provision/types'
 
-const REGIONS = ['nbg1', 'fsn1', 'hel1', 'ash', 'hil'] as const
+const STEPS = ['Basics', 'Infrastructure', 'Review', 'Provision']
+const SUBTITLES = [
+  'Identify the project and where it lives.',
+  'Pick the server size and optional resources.',
+  'Confirm everything before anything is created.',
+  'Terraform then Ansible — streaming live.',
+]
 
-const Step1Schema = z.object({
-  name: z.string().min(1, 'Required').regex(/^[a-z0-9-]+$/, 'Lowercase letters, numbers, hyphens'),
-  domain: z.string().min(1, 'Required'),
-  githubRepo: z.string().regex(/^[^/]+\/[^/]+$/, 'Must be owner/repo format'),
-})
-
-const Step2Schema = z.object({
-  region: z.enum(REGIONS),
-  serverType: z.string().min(1, 'Required'),
-  r2Buckets: z.string(),
-  upstashRegion: z.string(),
-})
-
-type Step1 = z.infer<typeof Step1Schema>
-type Step2 = z.infer<typeof Step2Schema>
-type Errors = Record<string, string>
-
-function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="block text-sm font-medium mb-1.5 text-gray-700 dark:text-gray-300">{label}</label>
-      {children}
-      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
-    </div>
-  )
-}
-
-function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
-  return (
-    <input
-      {...props}
-      className={cn(
-        'w-full px-3 py-2 rounded-lg border text-sm',
-        'border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800',
-        props.className,
-      )}
-    />
-  )
+const DEFAULT_VALUES: FormValues = {
+  name: '', domain: '', githubRepo: '',
+  region: 'nbg1', serverType: 'cx22', sshKey: 'emit-deploy',
+  r2Buckets: [], redis: false,
 }
 
 export default function ProvisionPage() {
-  const router = useRouter()
-  const [step, setStep] = useState<1 | 2 | 3>(1)
-  const [step1, setStep1] = useState<Step1>({ name: '', domain: '', githubRepo: '' })
-  const [step2, setStep2] = useState<Step2>({ region: 'nbg1', serverType: 'cx22', r2Buckets: '', upstashRegion: '' })
-  const [errors, setErrors] = useState<Errors>({})
-  const [provisioning, setProvisioning] = useState(false)
-  const [done, setDone] = useState(false)
+  const [step, setStep] = useState(1)
+  const [values, setValues] = useState<FormValues>(DEFAULT_VALUES)
+  const [errors, setErrors] = useState<Record<string, string>>({})
 
-  const validateStep1 = useCallback((): boolean => {
-    const result = Step1Schema.safeParse(step1)
-    if (!result.success) {
-      const errs: Errors = {}
-      result.error.issues.forEach((i) => { errs[i.path[0] as string] = i.message })
-      setErrors(errs)
-      return false
-    }
-    setErrors({})
-    return true
-  }, [step1])
-
-  const validateStep2 = useCallback((): boolean => {
-    const result = Step2Schema.safeParse(step2)
-    if (!result.success) {
-      const errs: Errors = {}
-      result.error.issues.forEach((i) => { errs[i.path[0] as string] = i.message })
-      setErrors(errs)
-      return false
-    }
-    setErrors({})
-    return true
-  }, [step2])
-
-  const config = {
-    name: step1.name,
-    domain: step1.domain,
-    github: { repo: step1.githubRepo },
-    region: step2.region,
-    serverType: step2.serverType,
-    ...(step2.r2Buckets ? { r2: { buckets: step2.r2Buckets.split(',').map((s) => s.trim()).filter(Boolean) } } : {}),
-    ...(step2.upstashRegion ? { upstash: { region: step2.upstashRegion } } : {}),
+  function patch(p: Partial<FormValues>) {
+    setValues(v => ({ ...v, ...p }))
   }
 
-  const { url: streamUrl, body: streamBody } = provisionProject(step1.name, config)
+  const config = {
+    name: values.name,
+    domain: values.domain,
+    github: { repo: values.githubRepo },
+    region: values.region,
+    serverType: values.serverType,
+    ...(values.r2Buckets.length > 0 ? { r2: { buckets: values.r2Buckets } } : {}),
+    ...(values.redis ? { upstash: { region: 'eu-central-1' } } : {}),
+  }
+
+  const { url: streamUrl, body: streamBody } = provisionProject(values.name || 'project', config)
+
+  const stepBody =
+    step === 1 ? <StepBasics values={values} onChange={patch} onNext={() => setStep(2)} errors={errors} setErrors={setErrors} />
+    : step === 2 ? <StepInfrastructure values={values} onChange={patch} onNext={() => setStep(3)} onBack={() => setStep(1)} />
+    : step === 3 ? <StepReview values={values} onNext={() => setStep(4)} onBack={() => setStep(2)} />
+    : <StepRunning url={streamUrl} body={streamBody} name={values.name} />
+
+  const isRunning = step === 4
+
+  // Mobile nav footer
+  function handleMobileNext() {
+    if (step === 1) {
+      const errs: Record<string, string> = {}
+      if (!values.name || !/^[a-z0-9-]+$/.test(values.name)) errs['name'] = 'Invalid name'
+      if (!values.domain || !values.domain.includes('.')) errs['domain'] = 'Invalid domain'
+      if (!values.githubRepo || !/^[^/]+\/[^/]+$/.test(values.githubRepo)) errs['githubRepo'] = 'Must be owner/repo'
+      if (Object.keys(errs).length > 0) { setErrors(errs); return }
+      setErrors({})
+      setStep(2)
+    } else if (step === 2) {
+      setStep(3)
+    } else if (step === 3) {
+      setStep(4)
+    }
+  }
 
   return (
-    <div className="p-4 sm:p-6 max-w-lg">
-      <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 mb-5">
-        <ArrowLeft size={14} />
-        Back
-      </Link>
+    <div className="flex flex-col h-full">
+      {/* Desktop topbar */}
+      <div className="hidden lg:flex items-center gap-3 px-6 border-b border-border shrink-0" style={{ height: 56 }}>
+        <Link href="/" className="text-subtle hover:text-fg transition-colors"><Icon name="arrowLeft" size={16} /></Link>
+        <span className="text-[15px] font-semibold text-fg">New Project</span>
+        <span className="text-[12px] font-mono text-subtle">Step {step} of 4</span>
+      </div>
 
-      <h1 className="text-2xl font-semibold mb-1">New Project</h1>
-      <p className="text-sm text-gray-500 mb-6">Step {step} of 3</p>
+      {/* Mobile header */}
+      <div className="lg:hidden flex items-center gap-2.5 px-4 border-b border-border shrink-0" style={{ height: 52 }}>
+        <Link href="/" className="text-subtle"><Icon name="x" size={18} /></Link>
+        <span className="text-[15px] font-semibold text-fg">New Project</span>
+        <div className="flex-1" />
+        <span className="text-[11.5px] font-mono text-subtle">{step}/4</span>
+      </div>
 
-      {step === 1 && (
-        <div className="space-y-4">
-          <Field label="Project name" error={errors['name']}>
-            <Input value={step1.name} onChange={(e) => setStep1((s) => ({ ...s, name: e.target.value }))} placeholder="my-project" />
-          </Field>
-          <Field label="Domain" error={errors['domain']}>
-            <Input value={step1.domain} onChange={(e) => setStep1((s) => ({ ...s, domain: e.target.value }))} placeholder="app.example.com" />
-          </Field>
-          <Field label="GitHub repo" error={errors['githubRepo']}>
-            <Input value={step1.githubRepo} onChange={(e) => setStep1((s) => ({ ...s, githubRepo: e.target.value }))} placeholder="owner/repo" />
-          </Field>
-          <button onClick={() => validateStep1() && setStep(2)} className="w-full py-2.5 rounded-lg bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-sm font-medium hover:opacity-90">
-            Next
-          </button>
-        </div>
-      )}
-
-      {step === 2 && (
-        <div className="space-y-4">
-          <Field label="Region" error={errors['region']}>
-            <select value={step2.region} onChange={(e) => setStep2((s) => ({ ...s, region: e.target.value as typeof REGIONS[number] }))} className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm">
-              {REGIONS.map((r) => <option key={r} value={r}>{r}</option>)}
-            </select>
-          </Field>
-          <Field label="Server type" error={errors['serverType']}>
-            <Input value={step2.serverType} onChange={(e) => setStep2((s) => ({ ...s, serverType: e.target.value }))} placeholder="cx22" />
-          </Field>
-          <Field label="R2 buckets (comma-separated, optional)" error={errors['r2Buckets']}>
-            <Input value={step2.r2Buckets} onChange={(e) => setStep2((s) => ({ ...s, r2Buckets: e.target.value }))} placeholder="uploads, backups" />
-          </Field>
-          <Field label="Upstash region (optional)" error={errors['upstashRegion']}>
-            <Input value={step2.upstashRegion} onChange={(e) => setStep2((s) => ({ ...s, upstashRegion: e.target.value }))} placeholder="us-east-1" />
-          </Field>
-          <div className="flex gap-2">
-            <button onClick={() => setStep(1)} className="flex-1 py-2.5 rounded-lg border border-gray-300 dark:border-gray-700 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800">Back</button>
-            <button onClick={() => validateStep2() && setStep(3)} className="flex-1 py-2.5 rounded-lg bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-sm font-medium hover:opacity-90">Review</button>
-          </div>
-        </div>
-      )}
-
-      {step === 3 && (
-        <div className="space-y-4">
-          <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-4 text-sm space-y-1.5">
-            <div className="flex justify-between"><span className="text-gray-500">Name</span><span className="font-mono">{step1.name}</span></div>
-            <div className="flex justify-between"><span className="text-gray-500">Domain</span><span>{step1.domain}</span></div>
-            <div className="flex justify-between"><span className="text-gray-500">Repo</span><span>{step1.githubRepo}</span></div>
-            <div className="flex justify-between"><span className="text-gray-500">Region</span><span>{step2.region}</span></div>
-            <div className="flex justify-between"><span className="text-gray-500">Server</span><span>{step2.serverType}</span></div>
-          </div>
-
-          {!provisioning && !done && (
-            <div className="flex gap-2">
-              <button onClick={() => setStep(2)} className="flex-1 py-2.5 rounded-lg border border-gray-300 dark:border-gray-700 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800">Back</button>
-              <button onClick={() => setProvisioning(true)} className="flex-1 py-2.5 rounded-lg bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-sm font-medium hover:opacity-90">Provision</button>
+      {/* Content */}
+      <div className="flex-1 overflow-auto">
+        {/* Desktop: centered card with stepper */}
+        <div className="hidden lg:block p-6">
+          <div style={{ maxWidth: 600, margin: '0 auto' }}>
+            <div className="mb-7 px-1"><Stepper steps={STEPS} current={step} /></div>
+            <div className="rounded-2xl border border-border bg-card" style={{ padding: 24 }}>
+              <div className="text-[17px] font-semibold text-fg mb-1">{STEPS[step - 1]}</div>
+              <div className="text-[12.5px] text-muted mb-6">{SUBTITLES[step - 1]}</div>
+              {stepBody}
             </div>
-          )}
+          </div>
+        </div>
 
-          {provisioning && (
-            <SseOutputPanel url={streamUrl} method="POST" body={streamBody} active={!done} onComplete={() => setDone(true)} />
-          )}
+        {/* Mobile: full-width content with progress bars */}
+        <div className="lg:hidden px-4 pb-[120px]">
+          <div className="pt-4 mb-5"><MobileStepper steps={4} current={step} /></div>
+          <div className="text-[18px] font-semibold text-fg mb-1">{STEPS[step - 1]}</div>
+          <div className="text-[12.5px] text-muted mb-6">{SUBTITLES[step - 1]}</div>
+          {stepBody}
+        </div>
+      </div>
 
-          {done && (
-            <button onClick={() => router.push('/')} className="w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium">
-              Done — view projects
+      {/* Mobile sticky footer */}
+      {!isRunning && (
+        <div className="lg:hidden fixed bottom-16 left-0 right-0 z-40 flex gap-2 px-4 py-3 border-t border-border bg-elev">
+          {step > 1 && (
+            <button
+              onClick={() => setStep(s => s - 1)}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-[13px] font-medium text-fg border border-border hover:bg-card-hover transition-colors"
+            >
+              <Icon name="arrowLeft" size={14} />Back
             </button>
           )}
+          <button
+            onClick={handleMobileNext}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[13px] font-medium text-accent-fg bg-accent hover:opacity-90 transition-opacity"
+          >
+            {step === 3 ? <><Icon name="deploy" size={14} />Provision</> : <>Continue <Icon name="chevRight" size={14} /></>}
+          </button>
         </div>
       )}
     </div>
