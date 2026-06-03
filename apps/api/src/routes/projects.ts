@@ -5,11 +5,23 @@ import { readFile, readdir, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { sshExec } from '@emit-infra/core'
 import { discoverProjects, discoverUnregistered } from '../lib/discover-projects.js'
+import { createTtlCache } from '../lib/ttl-cache.js'
 
-const DEFAULT_SSH_KEY = join(homedir(), '.ssh', 'emit-deploy')
+// Concurrent dashboard pollers (multiple tabs/instances) hit these on the same
+// interval. Cache the SSH result briefly so they share one round-trip per
+// project; null = "unreachable" (negative cache) so a down host isn't re-probed
+// on every poll. TTL stays under the dashboard's 30s poll cadence.
+const STATUS_TTL = 20_000
+type StatusData = {
+  uptime: string; disk: number; memory: number; containerCount: number
+  serverType: string | undefined; region: string | undefined; ip: string
+}
+type Container = { name: string; image: string; status: string; state: string }
+const statusCache = createTtlCache<StatusData | null>(STATUS_TTL)
+const containersCache = createTtlCache<Container[] | null>(STATUS_TTL)
 
-function sshKeyPath(): string {
-  return process.env['EMIT_SSH_KEY_PATH'] ?? DEFAULT_SSH_KEY
+function sshKeyPath(keyName: string): string {
+  return process.env['EMIT_SSH_KEY_PATH'] ?? join(homedir(), '.ssh', keyName)
 }
 
 function findProject(name: string) {
@@ -72,27 +84,35 @@ export async function projectRoutes(app: FastifyInstance) {
     const project = findProject(req.params.name)
     if (!project) return reply.status(404).send({ error: 'not found' })
 
-    const key = sshKeyPath()
-    const host = project.config.domain
+    const cached = statusCache.get(req.params.name)
+    if (cached !== undefined) {
+      return cached ?? reply.status(503).send({ error: 'unreachable' })
+    }
+
+    const key = sshKeyPath(project.config.sshKeyName)
+    const host = project.config.serverIp ?? project.config.domain
     const projectConfig = await readProjectConfig(req.params.name)
 
     try {
-      const [uptime, disk, mem, containerCount] = await Promise.all([
-        sshExec(host, 'uptime -p', key),
-        sshExec(host, "df -h / | tail -1 | awk '{print $5}'", key),
-        sshExec(host, "free -m | awk 'NR==2{printf \"%.0f\", $3/$2*100}'", key),
-        sshExec(host, 'docker ps -q | wc -l', key),
-      ])
-      return {
-        uptime: uptime.trim(),
-        disk: parseInt(disk.trim().replace('%', ''), 10),
-        memory: parseInt(mem.trim(), 10),
-        containerCount: parseInt(containerCount.trim(), 10),
+      const raw = await sshExec(
+        host,
+        "uptime -p; df -h / | tail -1 | awk '{print $5}'; free -m | awk 'NR==2{printf \"%.0f\\n\", $3/$2*100}'; docker ps -q | wc -l",
+        key,
+      )
+      const [uptimeLine, diskLine, memLine, containerLine] = raw.split('\n').map(l => l.trim())
+      const data: StatusData = {
+        uptime: uptimeLine ?? '',
+        disk: parseInt((diskLine ?? '').replace('%', ''), 10),
+        memory: parseInt(memLine ?? '', 10),
+        containerCount: parseInt(containerLine ?? '', 10),
         serverType: projectConfig?.['serverType'] as string | undefined,
         region: projectConfig?.['region'] as string | undefined,
         ip: host,
       }
+      statusCache.set(req.params.name, data)
+      return data
     } catch {
+      statusCache.set(req.params.name, null)
       return reply.status(503).send({ error: 'unreachable' })
     }
   })
@@ -101,8 +121,13 @@ export async function projectRoutes(app: FastifyInstance) {
     const project = findProject(req.params.name)
     if (!project) return reply.status(404).send({ error: 'not found' })
 
-    const key = sshKeyPath()
-    const host = project.config.domain
+    const cached = containersCache.get(req.params.name)
+    if (cached !== undefined) {
+      return cached ?? reply.status(503).send({ error: 'unreachable' })
+    }
+
+    const key = sshKeyPath(project.config.sshKeyName)
+    const host = project.config.serverIp ?? project.config.domain
     const fmt = '{"name":"{{.Names}}","image":"{{.Image}}","status":"{{.Status}}","state":"{{.State}}"}'
 
     try {
@@ -111,9 +136,11 @@ export async function projectRoutes(app: FastifyInstance) {
         .split('\n')
         .map((line: string) => line.trim())
         .filter(Boolean)
-        .map((line: string) => JSON.parse(line) as { name: string; image: string; status: string; state: string })
+        .map((line: string) => JSON.parse(line) as Container)
+      containersCache.set(req.params.name, containers)
       return containers
     } catch {
+      containersCache.set(req.params.name, null)
       return reply.status(503).send({ error: 'unreachable' })
     }
   })

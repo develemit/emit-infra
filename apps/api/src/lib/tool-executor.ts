@@ -1,6 +1,6 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { sshExec } from '@emit-infra/core'
+import { sshExec, sshMuxArgs } from '@emit-infra/core'
 import { discoverProjects } from './discover-projects.js'
 import { streamProcess } from './stream-process.js'
 
@@ -25,6 +25,7 @@ async function collectLogs(host: string, service: string): Promise<string> {
   const cmd = service ? `docker compose logs --tail=200 ${service}` : 'docker compose logs --tail=200'
   const args = [
     '-i', key, '-o', 'StrictHostKeyChecking=no', '-o', 'ConnectTimeout=10',
+    ...sshMuxArgs(),
     `root@${host}`, cmd,
   ]
   const controller = new AbortController()
