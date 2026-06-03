@@ -88,7 +88,12 @@ export default function OpsPage() {
   }, [sessionId, apiBase, loading, push])
 
   function handleCancel() {
-    setMessages(prev => prev.filter(m => m.type !== 'confirm'))
+    setMessages(prev => {
+      const idx = [...prev].reverse().findIndex(m => m.type === 'confirm')
+      if (idx === -1) return prev
+      const realIdx = prev.length - 1 - idx
+      return prev.filter((_, i) => i !== realIdx)
+    })
     void submit('Cancel that.')
   }
 
