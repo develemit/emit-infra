@@ -1,3 +1,133 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ── Terminal tokens (always dark, both themes) ─────────────────── */
+:root {
+  --font-sans: var(--font-geist-sans, -apple-system, BlinkMacSystemFont, system-ui, sans-serif);
+  --font-mono: var(--font-geist-mono, ui-monospace, "SF Mono", Menlo, monospace);
+  --term-bg: #0a0d0c;
+  --term-fg: #c7d0cb;
+  --term-dim: #6b7669;
+  --t-green: #4ade80;
+  --t-red: #f87171;
+  --t-yellow: #fcd34d;
+  --t-blue: #7dd3fc;
+  --t-cyan: #5eead4;
+  --t-magenta: #c4b5fd;
+}
+
+/* ── Dark theme (default) ────────────────────────────────────────── */
+:root[data-theme="dark"] {
+  --bg: #0a0a0b;
+  --bg-elev: #100f12;
+  --card: #110f13;
+  --card-2: #16141a;
+  --card-hover: #1a181f;
+  --border: #232228;
+  --border-strong: #312f37;
+  --fg: #f4f4f5;
+  --fg-muted: #a1a1aa;
+  --fg-subtle: #71717a;
+  --fg-faint: #52525b;
+  --accent: #10b981;
+  --accent-bright: #34d399;
+  --accent-fg: #022c22;
+  --accent-soft: rgba(16, 185, 129, 0.13);
+  --accent-line: rgba(16, 185, 129, 0.32);
+  --ok: #34d399;
+  --ok-soft: rgba(52, 211, 153, 0.13);
+  --warn: #fbbf24;
+  --warn-soft: rgba(251, 191, 36, 0.13);
+  --err: #f87171;
+  --err-soft: rgba(248, 113, 113, 0.13);
+  --err-line: rgba(248, 113, 113, 0.38);
+  --muted-dot: #52525b;
+  --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.35);
+  --shadow-lg: 0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04);
+  --ring: rgba(16, 185, 129, 0.5);
+  color-scheme: dark;
+}
+
+/* ── Light theme ─────────────────────────────────────────────────── */
+:root[data-theme="light"] {
+  --bg: #fafaf9;
+  --bg-elev: #f4f4f5;
+  --card: #ffffff;
+  --card-2: #fafafa;
+  --card-hover: #f7f7f8;
+  --border: #e6e6e9;
+  --border-strong: #d4d4d8;
+  --fg: #18181b;
+  --fg-muted: #52525b;
+  --fg-subtle: #71717a;
+  --fg-faint: #a1a1aa;
+  --accent: #059669;
+  --accent-bright: #047857;
+  --accent-fg: #ffffff;
+  --accent-soft: rgba(5, 150, 105, 0.1);
+  --accent-line: rgba(5, 150, 105, 0.28);
+  --ok: #16a34a;
+  --ok-soft: rgba(22, 163, 74, 0.1);
+  --warn: #d97706;
+  --warn-soft: rgba(217, 119, 6, 0.1);
+  --err: #dc2626;
+  --err-soft: rgba(220, 38, 38, 0.08);
+  --err-line: rgba(220, 38, 38, 0.3);
+  --muted-dot: #a1a1aa;
+  --shadow: 0 1px 2px rgba(0,0,0,0.05), 0 4px 16px rgba(0,0,0,0.06);
+  --shadow-lg: 0 24px 64px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.04);
+  --ring: rgba(5, 150, 105, 0.45);
+  color-scheme: light;
+}
+
+/* ── Base ────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  font-family: var(--font-sans);
+  color: var(--fg);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  letter-spacing: -0.011em;
+}
+
+::selection { background: var(--accent-soft); }
+
+/* ── Scrollbar ───────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 99px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* ── Terminal panel ──────────────────────────────────────────────── */
+.ec-term {
+  background: var(--term-bg);
+  border: 1px solid #1c241f;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: inset 0 0 60px rgba(16,185,129,0.05), inset 0 1px 0 rgba(255,255,255,0.03);
+}
+.ec-term-body {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--term-fg);
+  text-shadow: 0 0 3px rgba(120,255,190,0.08);
+}
+.ec-caret {
+  display: inline-block; width: 8px; height: 15px; vertical-align: text-bottom;
+  background: var(--t-green); margin-left: 2px;
+  animation: ec-blink 1.05s step-end infinite;
+  box-shadow: 0 0 6px rgba(74,222,128,.7);
+}
+@keyframes ec-blink { 50% { opacity: 0; } }
+
+/* ── Skeleton shimmer ────────────────────────────────────────────── */
+.ec-skel {
+  background: linear-gradient(90deg, var(--bg-elev) 0%, var(--card-hover) 50%, var(--bg-elev) 100%);
+  background-size: 200% 100%;
+  animation: ec-shimmer 1.4s linear infinite;
+  border-radius: 6px;
+}
+@keyframes ec-shimmer { to { background-position: -200% 0; } }

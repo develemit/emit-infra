@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
+import { GeistSans } from 'geist/font/sans'
+import { GeistMono } from 'geist/font/mono'
 import './globals.css'
-import { Shell } from '@/components/shell'
+import { Shell } from '@/components/shell/shell'
 
 export const metadata: Metadata = {
   title: 'emit-infra',
@@ -13,8 +15,13 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className="bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100 antialiased">
+    <html
+      lang="en"
+      data-theme="dark"
+      className={`${GeistSans.variable} ${GeistMono.variable}`}
+      suppressHydrationWarning
+    >
+      <body>
         <Shell>{children}</Shell>
       </body>
     </html>
