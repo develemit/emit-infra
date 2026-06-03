@@ -2,7 +2,8 @@ import type { FastifyInstance } from 'fastify'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { access, mkdir, writeFile } from 'node:fs/promises'
-import { runAnsible, runTerraform } from '@emit-infra/core'
+import { runAnsible, runTerraform, getTerraformOutput } from '@emit-infra/core'
+import { scaffoldProject, writeInventory } from '../lib/scaffold-project.js'
 import { discoverProjects } from '../lib/discover-projects.js'
 import { writeEvent } from '../lib/write-sse.js'
 import { streamProcess } from '../lib/stream-process.js'
@@ -77,13 +78,23 @@ export async function operationRoutes(app: FastifyInstance) {
     async (req, reply) => {
     const name = req.params.name
     const existing = findProject(name)
+    const config = req.body?.config
 
     if (!existing) {
-      const config = req.body?.config
       if (!config) return reply.status(404).send({ error: 'not found' })
       const projectDir = join(homedir(), 'projects', name)
       await mkdir(projectDir, { recursive: true })
       await writeFile(join(projectDir, '.emit-infra.json'), JSON.stringify(config, null, 2))
+    }
+
+    if (config) {
+      await scaffoldProject({
+        name,
+        domain: (config['domain'] as string) ?? '',
+        ...(config['region'] ? { region: config['region'] as string } : {}),
+        ...(config['serverType'] ? { serverType: config['serverType'] as string } : {}),
+        ...(config['sshKey'] ? { sshKey: config['sshKey'] as string } : {}),
+      })
     }
 
     const terraformDir = join(homedir(), 'projects', name, 'terraform')
@@ -106,6 +117,15 @@ export async function operationRoutes(app: FastifyInstance) {
       exitCode = 1
       if (err instanceof Error && err.message === 'timeout') {
         writeEvent(reply.raw, { type: 'error', message: 'Operation timed out after 15 minutes' })
+      }
+    }
+
+    if (exitCode === 0) {
+      try {
+        const ip = await getTerraformOutput('server_ip', terraformDir)
+        await writeInventory(name, ip)
+      } catch {
+        // inventory.ini can be written manually if terraform output fails
       }
     }
 
