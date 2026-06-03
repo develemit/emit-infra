@@ -6,6 +6,7 @@ export const ProjectConfigSchema = z.object({
   region: z.enum(['nbg1', 'fsn1', 'hel1', 'ash', 'hil']).default('nbg1'),
   serverType: z.string().default('cx22'),
   sshKeyName: z.string().default('emit-deploy'),
+  serverIp: z.string().optional(),
   github: z.object({
     repo: z.string().regex(/^[^/]+\/[^/]+$/, 'Must be in owner/repo format'),
   }),

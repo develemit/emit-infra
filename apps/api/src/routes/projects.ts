@@ -24,8 +24,8 @@ function sshKeyPath(keyName: string): string {
   return process.env['EMIT_SSH_KEY_PATH'] ?? join(homedir(), '.ssh', keyName)
 }
 
-function findProject(name: string) {
-  return discoverProjects().find((p) => p.config.name === name) ?? null
+async function findProject(name: string) {
+  return (await discoverProjects()).find((p) => p.config.name === name) ?? null
 }
 
 async function readProjectConfig(name: string): Promise<Record<string, unknown> | null> {
@@ -39,7 +39,7 @@ async function readProjectConfig(name: string): Promise<Record<string, unknown> 
 
 export async function projectRoutes(app: FastifyInstance) {
   app.get('/projects', async () => {
-    return discoverProjects().map(({ config, configPath, projectDir }) => ({
+    return (await discoverProjects()).map(({ config, configPath, projectDir }) => ({
       config,
       configPath,
       projectDir,
@@ -81,7 +81,7 @@ export async function projectRoutes(app: FastifyInstance) {
   })
 
   app.get<{ Params: { name: string } }>('/projects/:name/status', async (req, reply) => {
-    const project = findProject(req.params.name)
+    const project = await findProject(req.params.name)
     if (!project) return reply.status(404).send({ error: 'not found' })
 
     const cached = statusCache.get(req.params.name)
@@ -118,7 +118,7 @@ export async function projectRoutes(app: FastifyInstance) {
   })
 
   app.get<{ Params: { name: string } }>('/projects/:name/containers', async (req, reply) => {
-    const project = findProject(req.params.name)
+    const project = await findProject(req.params.name)
     if (!project) return reply.status(404).send({ error: 'not found' })
 
     const cached = containersCache.get(req.params.name)
@@ -131,7 +131,7 @@ export async function projectRoutes(app: FastifyInstance) {
     const fmt = '{"name":"{{.Names}}","image":"{{.Image}}","status":"{{.Status}}","state":"{{.State}}"}'
 
     try {
-      const output = await sshExec(host, `docker ps --format '${fmt}'`, key)
+      const output = await sshExec(host, `docker ps -a --format '${fmt}'`, key)
       const containers = output
         .split('\n')
         .map((line: string) => line.trim())

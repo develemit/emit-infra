@@ -17,7 +17,7 @@ interface TabBarProps {
 export function TabBar({ active }: TabBarProps) {
   return (
     <nav
-      className="lg:hidden fixed bottom-0 left-0 right-0 z-50 flex border-t border-border bg-elev"
+      className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex border-t border-border bg-elev"
       style={{ height: 64 }}
     >
       {NAV.map(item => (

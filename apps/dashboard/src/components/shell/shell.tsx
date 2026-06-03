@@ -26,7 +26,7 @@ export function Shell({ children }: ShellProps) {
     <div className="flex h-screen overflow-hidden">
       <Sidebar active={active} theme={theme} onToggleTheme={toggleTheme} />
 
-      <main className="flex-1 min-w-0 overflow-auto pb-16 lg:pb-0">
+      <main className="flex-1 min-w-0 overflow-auto pb-16 md:pb-0">
         {children}
       </main>
 

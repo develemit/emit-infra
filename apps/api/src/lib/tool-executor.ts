@@ -12,16 +12,16 @@ export interface PendingConfirmation {
 
 const DESTRUCTIVE = new Set(['deploy', 'provision', 'destroy'])
 
-function sshKeyPath(): string {
-  return process.env['EMIT_SSH_KEY_PATH'] ?? join(homedir(), '.ssh', 'emit-deploy')
+function sshKeyPath(keyName = 'emit-deploy'): string {
+  return process.env['EMIT_SSH_KEY_PATH'] ?? join(homedir(), '.ssh', keyName)
 }
 
-function findProject(name: string) {
-  return discoverProjects().find((p) => p.config.name === name) ?? null
+async function findProject(name: string) {
+  return (await discoverProjects()).find((p) => p.config.name === name) ?? null
 }
 
-async function collectLogs(host: string, service: string): Promise<string> {
-  const key = sshKeyPath()
+async function collectLogs(host: string, service: string, keyName?: string): Promise<string> {
+  const key = sshKeyPath(keyName)
   const cmd = service ? `docker compose logs --tail=200 ${service}` : 'docker compose logs --tail=200'
   const args = [
     '-i', key, '-o', 'StrictHostKeyChecking=no', '-o', 'ConnectTimeout=10',
@@ -56,36 +56,38 @@ export async function executeTool(
 
   switch (toolName) {
     case 'list_projects':
-      return discoverProjects().map((p) => ({
+      return (await discoverProjects()).map((p) => ({
         name: p.config.name,
         domain: p.config.domain,
         region: p.config.region,
       }))
 
     case 'get_status': {
-      const project = findProject(input['name'] as string)
+      const project = await findProject(input['name'] as string)
       if (!project) return { error: 'project not found' }
-      const key = sshKeyPath()
-      const host = project.config.domain
+      const key = sshKeyPath(project.config.sshKeyName)
+      const host = project.config.serverIp ?? project.config.domain
       try {
-        const [uptime, disk, mem] = await Promise.all([
-          sshExec(host, 'uptime -p', key),
-          sshExec(host, "df -h / | tail -1 | awk '{print $5}'", key),
-          sshExec(host, "free -m | awk 'NR==2{printf \"%.0f\", $3/$2*100}'", key),
-        ])
-        return { uptime: uptime.trim(), disk: disk.trim(), memory: `${mem.trim()}%` }
+        const raw = await sshExec(
+          host,
+          "uptime -p; df -h / | tail -1 | awk '{print $5}'; free -m | awk 'NR==2{printf \"%.0f\\n\", $3/$2*100}'",
+          key,
+        )
+        const [uptime, disk, mem] = raw.split('\n').map(l => l.trim())
+        return { uptime: uptime ?? '', disk: disk ?? '', memory: `${mem ?? '0'}%` }
       } catch {
         return { error: 'unreachable' }
       }
     }
 
     case 'get_containers': {
-      const project = findProject(input['name'] as string)
+      const project = await findProject(input['name'] as string)
       if (!project) return { error: 'project not found' }
-      const key = sshKeyPath()
+      const key = sshKeyPath(project.config.sshKeyName)
+      const host = project.config.serverIp ?? project.config.domain
       const fmt = '{"name":"{{.Names}}","image":"{{.Image}}","status":"{{.Status}}","state":"{{.State}}"}'
       try {
-        const out = await sshExec(project.config.domain, `docker ps --format '${fmt}'`, key)
+        const out = await sshExec(host, `docker ps -a --format '${fmt}'`, key)
         return out.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => JSON.parse(l))
       } catch {
         return { error: 'unreachable' }
@@ -93,9 +95,10 @@ export async function executeTool(
     }
 
     case 'get_logs': {
-      const project = findProject(input['name'] as string)
+      const project = await findProject(input['name'] as string)
       if (!project) return { error: 'project not found' }
-      const logs = await collectLogs(project.config.domain, (input['service'] as string) ?? '')
+      const host = project.config.serverIp ?? project.config.domain
+      const logs = await collectLogs(host, (input['service'] as string) ?? '', project.config.sshKeyName)
       return { logs: logs.slice(-4000) }
     }
 

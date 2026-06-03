@@ -14,16 +14,12 @@ export default function HomePage() {
   const fetchAll = useCallback(async () => {
     const ps = await getProjects()
     setProjects(ps)
-    const pairs = await Promise.allSettled(
-      ps.map(async (p) => {
-        const s = await getStatus(p.config.name)
-        return [p.config.name, s] as const
-      }),
-    )
-    const entries = pairs
-      .filter((r): r is PromiseFulfilledResult<readonly [string, ProjectStatus]> => r.status === 'fulfilled')
-      .map(r => r.value)
-    setStatuses(Object.fromEntries(entries))
+    ps.forEach((p) => {
+      void getStatus(p.config.name).then(
+        (s) => setStatuses((prev) => ({ ...prev, [p.config.name]: s })),
+        () => setStatuses((prev) => ({ ...prev, [p.config.name]: { error: 'unreachable' } })),
+      )
+    })
   }, [])
 
   useEffect(() => {
@@ -40,7 +36,7 @@ export default function HomePage() {
     <div className="flex flex-col h-full">
       {/* Desktop topbar */}
       <div
-        className="hidden lg:flex items-center gap-3 px-6 border-b border-border shrink-0"
+        className="hidden md:flex items-center gap-3 px-6 border-b border-border shrink-0"
         style={{ height: 56 }}
       >
         <span className="text-[15px] font-semibold text-fg">Projects</span>
@@ -65,7 +61,7 @@ export default function HomePage() {
 
       {/* Mobile header */}
       <div
-        className="lg:hidden flex items-center justify-between px-4 border-b border-border shrink-0"
+        className="md:hidden flex items-center justify-between px-4 border-b border-border shrink-0"
         style={{ height: 52 }}
       >
         <span className="text-[17px] font-semibold text-fg">Projects</span>
@@ -73,9 +69,9 @@ export default function HomePage() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto p-4 lg:p-6">
+      <div className="flex-1 overflow-auto p-4 md:p-6">
         {projects === null ? (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
             {Array.from({ length: 3 }).map((_, i) => (
               <Skeleton key={i} className="h-[180px]" />
             ))}
@@ -85,7 +81,7 @@ export default function HomePage() {
             {search ? 'No projects match your filter.' : 'No projects found. Add a .emit-infra.json file to a project under ~/projects/.'}
           </p>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
             {(filtered ?? []).map((p) => (
               <ProjectCard
                 key={p.config.name}

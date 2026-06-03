@@ -49,8 +49,11 @@ export function getProjects(): Promise<ProjectSummary[]> {
   return apiFetch<ProjectSummary[]>('/projects')
 }
 
-export function getStatus(name: string): Promise<ProjectStatus> {
-  return apiFetch<ProjectStatus>(`/projects/${encodeURIComponent(name)}/status`)
+export async function getStatus(name: string): Promise<ProjectStatus> {
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/status`, { cache: 'no-store' })
+  if (res.status === 503) return res.json() as Promise<ProjectStatus>
+  if (!res.ok) throw new Error(`API error ${res.status}`)
+  return res.json() as Promise<ProjectStatus>
 }
 
 export async function getContainers(name: string): Promise<Container[]> {

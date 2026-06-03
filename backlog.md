@@ -3,8 +3,8 @@
 Deferred follow-ups from completed sprints. Run `/plan-sprint` referencing this
 file to promote items into proper sprints when the list grows worth addressing.
 
-<!-- follow-up-scan: date=2026-06-03 through=11 clean=false -->
-> _Sprint scan: full scan completed 2026-06-03 through sprint-11. 4 orphans found in sprints 07-09 (added below)._
+<!-- follow-up-scan: date=2026-06-03 through=17 clean=false -->
+> _Sprint scan: incremental scan completed 2026-06-03 through sprint-17. Sprints 12–16 clean; sprint-17 defer promoted to sprint-18._
 
 - (sprint 04, 2026-06-03) `pnpm build` fails on `/_error` and `/500` static pre-render — `<Html>` outside pages/_document error in Next.js 15.5.19 (upstream bug; dev server and typecheck/lint are clean) `[hold]`
 - (sprint 04, 2026-06-03) Provision wizard uses local Zod schema mirroring `ProjectConfigSchema` — consider extracting shared browser-safe types into `@emit-infra/types`; run `/plan-sprint "shared types package"` to plan `[hold]`
@@ -14,9 +14,11 @@ file to promote items into proper sprints when the list grows worth addressing.
 - (sprint 11, 2026-06-03) Service worker cache name is hardcoded `emit-infra-v1` — bump the key after static asset changes `[hold]`
 - (sprint 10, 2026-06-03) ConfirmCard onConfirm callback is a no-op in ChatThread — wire it up if the page needs to track transitions `[hold]`
 - (sprint 13, 2026-06-03) `disk` and `memory` in `ProjectStatus` were typed as `string` but the API always returned integers — the fix changed both to `number`; any client code outside this repo that depended on the string type would need updating
-- (sprint 17, 2026-06-03) Dashboard provision page doesn't include `sshKey` in the config object passed to `provisionProject` — scaffoldProject defaults to `emit-deploy`; add `sshKey: values.sshKey` to config in `apps/dashboard/app/provision/page.tsx` to make the SSH key dropdown selection take effect
+- (session 2026-06-03) `diner-decider` and `test-smoke` show SSH unreachable — neither has a provisioned Hetzner server yet (`test-smoke` uses TEST-NET `192.0.2.1`, `diner-decider` DNS doesn't resolve). Both need provisioning via the wizard before status monitoring will work. `diner-decider` also uses `sshKeyName: "emit-deploy"` which doesn't exist locally — update the config to match whatever key is used once provisioned.
 
 ## ✅ Converted to Sprints
+
+- ~~(sprint 17, 2026-06-03) Dashboard provision page doesn't include `sshKey` in config passed to `provisionProject`~~ → sprint-18 (2026-06-03)
 
 - ~~(sprint 01) status endpoint returns HTTP 200 for unreachable~~ → sprint-12 (2026-06-03)
 - ~~(sprint 02) deploy/provision don't validate paths before SSE~~ → sprint-12 (2026-06-03)

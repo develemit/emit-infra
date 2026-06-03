@@ -32,6 +32,13 @@
           "apps/dashboard/**/*.tsx"
         ]
       }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "vitest run",
+        "cwd": "apps/dashboard"
+      }
     }
   }
 }

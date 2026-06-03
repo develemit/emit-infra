@@ -11,6 +11,8 @@ const COLOR_PALETTE = [
   'var(--t-green)', 'var(--t-yellow)',
 ]
 
+const MAX_LOG_LINES = 5000
+
 type LogLine = { svc: string; svcColor: string; text: string }
 
 type SseParsed =
@@ -63,7 +65,10 @@ export default function LogsPage() {
         const pipeIdx = raw.indexOf(' | ')
         const svc = pipeIdx > 0 ? raw.slice(0, pipeIdx).trim() : ''
         const text = pipeIdx > 0 ? raw.slice(pipeIdx + 3) : raw
-        setLines(prev => [...prev, { svc, svcColor: svc ? svcColor(svc) : 'var(--term-fg)', text }])
+        setLines(prev => {
+          const next = [...prev, { svc, svcColor: svc ? svcColor(svc) : 'var(--term-fg)', text }]
+          return next.length > MAX_LOG_LINES ? next.slice(-MAX_LOG_LINES) : next
+        })
       } else {
         stop()
       }

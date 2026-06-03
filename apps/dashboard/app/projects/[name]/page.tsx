@@ -126,7 +126,7 @@ export default function ProjectDetailPage() {
                 <HealthCard project={project} status={status} polledAgo="polled 30s ago" />
               )}
               {containers !== null && (
-                <ContainerTable containers={containers} />
+                <ContainerTable containers={containers} projectName={name} />
               )}
               {deploying && (
                 <DeployPanel

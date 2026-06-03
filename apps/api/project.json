@@ -17,6 +17,7 @@
     },
     "dev": {
       "executor": "nx:run-commands",
+      "dependsOn": ["^build"],
       "options": {
         "command": "tsx --watch apps/api/src/index.ts",
         "env": {
@@ -34,6 +35,13 @@
       "executor": "@nx/eslint:lint",
       "options": {
         "lintFilePatterns": ["apps/api/**/*.ts"]
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "vitest run",
+        "cwd": "apps/api"
       }
     }
   }

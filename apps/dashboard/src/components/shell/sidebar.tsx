@@ -19,7 +19,7 @@ interface SidebarProps {
 export function Sidebar({ active, theme, onToggleTheme }: SidebarProps) {
   return (
     <aside
-      className="hidden lg:flex flex-col shrink-0 border-r border-border bg-elev"
+      className="hidden md:flex flex-col shrink-0 border-r border-border bg-elev"
       style={{ width: 232 }}
     >
       {/* Brand */}

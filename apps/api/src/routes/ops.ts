@@ -37,7 +37,7 @@ export async function opsRoutes(app: FastifyInstance) {
     if (confirmationFor) {
       const [toolName, ...parts] = confirmationFor.split(':')
       const projectName = parts.join(':')
-      const project = discoverProjects().find((p) => p.config.name === projectName) ?? null
+      const project = (await discoverProjects()).find((p) => p.config.name === projectName) ?? null
       const projectDir = join(homedir(), 'projects', projectName)
 
       reply.hijack()
