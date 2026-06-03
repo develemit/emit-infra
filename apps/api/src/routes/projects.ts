@@ -42,7 +42,7 @@ export async function projectRoutes(app: FastifyInstance) {
         memory: parseInt(mem.trim(), 10),
       }
     } catch {
-      return { error: 'unreachable' }
+      return reply.status(503).send({ error: 'unreachable' })
     }
   })
 
@@ -63,7 +63,7 @@ export async function projectRoutes(app: FastifyInstance) {
         .map((line: string) => JSON.parse(line) as { name: string; image: string; status: string; state: string })
       return containers
     } catch {
-      return { error: 'unreachable' }
+      return reply.status(503).send({ error: 'unreachable' })
     }
   })
 }
