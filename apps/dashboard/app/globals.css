@@ -102,19 +102,64 @@ body {
 
 /* ── Terminal panel ──────────────────────────────────────────────── */
 .ec-term {
+  position: relative;
+  display: flex;
+  flex-direction: column;
   background: var(--term-bg);
   border: 1px solid #1c241f;
   border-radius: 10px;
   overflow: hidden;
   box-shadow: inset 0 0 60px rgba(16,185,129,0.05), inset 0 1px 0 rgba(255,255,255,0.03);
 }
+.ec-term::after {
+  content: '';
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: repeating-linear-gradient(to bottom, rgba(180,255,220,0.022) 0 1px, transparent 1px 3px);
+  mix-blend-mode: overlay;
+  z-index: 1;
+}
+.ec-term-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  background: rgba(255,255,255,0.02);
+  flex-shrink: 0;
+}
+.ec-term-lights { display: flex; gap: 6px; }
+.ec-term-lights span { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+.ec-term-title {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--term-dim);
+}
+.ec-term-live { margin-left: auto; font-family: var(--font-mono); font-size: 11.5px; color: var(--t-green); }
 .ec-term-body {
   font-family: var(--font-mono);
   font-size: 12.5px;
   line-height: 1.65;
   color: var(--term-fg);
   text-shadow: 0 0 3px rgba(120,255,190,0.08);
+  padding: 14px;
+  overflow-y: auto;
+  flex: 1;
 }
+.ec-ln { display: flex; }
+.ec-ts { color: var(--term-dim); margin-right: 10px; white-space: nowrap; }
+.ec-exit {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 11.5px;
+  padding: 3px 10px; border-radius: 6px;
+}
+.ec-exit.ok { background: rgba(52,211,153,0.1); color: var(--t-green); border: 1px solid rgba(52,211,153,0.3); }
+.ec-exit.err { background: rgba(248,113,113,0.1); color: var(--t-red); border: 1px solid rgba(248,113,113,0.3); }
+.ec-exit.streaming { background: rgba(125,211,252,0.1); color: var(--t-blue); border: 1px solid rgba(125,211,252,0.3); }
+.ec-spinner { width: 10px; height: 10px; border: 1.5px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: ec-spin 0.6s linear infinite; display: inline-block; }
+@keyframes ec-spin { to { transform: rotate(360deg); } }
 .ec-caret {
   display: inline-block; width: 8px; height: 15px; vertical-align: text-bottom;
   background: var(--t-green); margin-left: 2px;

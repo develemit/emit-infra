@@ -8,7 +8,7 @@ import { Badge, type BadgeVariant } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { HealthCard } from '@/components/detail/health-card'
 import { ContainerTable } from '@/components/detail/container-table'
-import { SseOutputPanel } from '@/components/sse-output-panel'
+import { DeployPanel } from '@/components/deploy-panel'
 import { DestroyModal } from '@/components/destroy-modal'
 
 function deriveVariant(status: ProjectStatus | null): BadgeVariant {
@@ -129,11 +129,10 @@ export default function ProjectDetailPage() {
                 <ContainerTable containers={containers} />
               )}
               {deploying && (
-                <SseOutputPanel
+                <DeployPanel
                   url={deployUrl}
-                  method="POST"
-                  active={deploying}
-                  onComplete={() => setDeploying(false)}
+                  name={name}
+                  onClose={() => setDeploying(false)}
                 />
               )}
             </>
