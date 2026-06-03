@@ -14,13 +14,16 @@ export default function HomePage() {
   const fetchAll = useCallback(async () => {
     const ps = await getProjects()
     setProjects(ps)
-    const pairs = await Promise.all(
+    const pairs = await Promise.allSettled(
       ps.map(async (p) => {
         const s = await getStatus(p.config.name)
         return [p.config.name, s] as const
       }),
     )
-    setStatuses(Object.fromEntries(pairs))
+    const entries = pairs
+      .filter((r): r is PromiseFulfilledResult<readonly [string, ProjectStatus]> => r.status === 'fulfilled')
+      .map(r => r.value)
+    setStatuses(Object.fromEntries(entries))
   }, [])
 
   useEffect(() => {

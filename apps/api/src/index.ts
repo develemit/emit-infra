@@ -15,5 +15,5 @@ await app.register(projectRoutes)
 await app.register(operationRoutes)
 await app.register(opsRoutes)
 
-const port = Number(process.env['PORT'] ?? 3001)
+const port = Number(process.env['PORT'] ?? 7001)
 await app.listen({ port, host: '0.0.0.0' })
