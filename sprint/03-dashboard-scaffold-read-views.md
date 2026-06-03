@@ -98,6 +98,7 @@ Scaffolded `apps/dashboard` as a Next.js 15 (App Router) application with Tailwi
 - `pnpm lint`: clean (all 4 projects)
 
 ### Follow-ups
+- `[address-next]` `pnpm test` exits non-zero: `core:test` runs `vitest run --project core` but no vitest workspace config exists defining a "core" project, and no test files exist. Fix: either remove the test target from `packages/core/project.json` or add a `vitest.config.ts` workspace config. This is pre-existing and blocks the auto-loop.
 - `[defer]` The `app/page.tsx` project list also lives at `/` — the "Projects" nav item redirects to `/` rather than having its own `/projects` page. If the two views diverge later, extract them properly.
 - `[defer]` No error boundary — if `getProjects()` throws (API down), the page shows nothing rather than an error message
 
