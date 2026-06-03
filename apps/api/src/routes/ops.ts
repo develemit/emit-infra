@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import Anthropic from '@anthropic-ai/sdk'
 import { runTerraform, runAnsible } from '@emit-infra/core'
 import { tools } from '../lib/claude-tools.js'
-import { getHistory, appendMessage } from '../lib/claude-session.js'
+import { getHistory, appendMessage, clearHistory } from '../lib/claude-session.js'
 import { executeTool, type PendingConfirmation } from '../lib/tool-executor.js'
 import { discoverProjects } from '../lib/discover-projects.js'
 import { writeEvent } from '../lib/write-sse.js'
@@ -23,6 +23,11 @@ export async function opsRoutes(app: FastifyInstance) {
   const anthropic = new Anthropic({ apiKey: process.env['ANTHROPIC_API_KEY'] })
 
   app.get('/ops/session', async () => ({ sessionId: randomUUID() }))
+
+  app.delete<{ Params: { id: string } }>('/ops/session/:id', async (req, reply) => {
+    clearHistory(req.params.id)
+    return reply.send({ ok: true })
+  })
 
   app.post<{ Body: ChatBody }>('/ops/chat', async (req, reply) => {
     const { sessionId, message, confirmationFor } = req.body
@@ -98,7 +103,7 @@ export async function opsRoutes(app: FastifyInstance) {
     appendMessage(sessionId, { role: 'assistant', content: first.content })
     let pendingConfirmation: PendingConfirmation | undefined
     const toolResultContent: Anthropic.ToolResultBlockParam[] = []
-    const toolResults: Array<{ toolName: string; result: unknown }> = []
+    const toolResults: Array<{ toolName: string; target: string; result: unknown }> = []
 
     for (const block of first.content) {
       if (block.type !== 'tool_use') continue
@@ -107,7 +112,8 @@ export async function opsRoutes(app: FastifyInstance) {
         pendingConfirmation = result as PendingConfirmation
         break
       }
-      toolResults.push({ toolName: block.name, result })
+      const target = (block.input as Record<string, unknown>)['name'] as string | undefined
+      toolResults.push({ toolName: block.name, target: target ?? 'all', result })
       toolResultContent.push({ type: 'tool_result', tool_use_id: block.id, content: JSON.stringify(result) })
     }
 
