@@ -1,10 +1,10 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
-import Link from 'next/link'
 import { getProjects, getStatus, type ProjectSummary, type ProjectStatus } from '@/lib/api'
 import { ProjectCard } from '@/components/project-card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Icon } from '@/components/icon'
+import { AddProjectDropdown } from '@/components/add-project-dropdown'
 
 export default function HomePage() {
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null)
@@ -60,14 +60,7 @@ export default function HomePage() {
             className="w-full h-full rounded-lg pl-8 pr-3 text-[12px] font-mono text-fg bg-card border border-border focus:outline-none focus:border-accent"
           />
         </div>
-        {/* New Project */}
-        <Link
-          href="/provision"
-          className="inline-flex items-center gap-1.5 px-3 h-[34px] rounded-lg text-[13px] font-medium text-accent-fg bg-accent hover:opacity-90 transition-opacity"
-        >
-          <Icon name="plus" size={15} />
-          New Project
-        </Link>
+        <AddProjectDropdown onRegistered={() => void fetchAll()} />
       </div>
 
       {/* Mobile header */}
@@ -76,13 +69,7 @@ export default function HomePage() {
         style={{ height: 52 }}
       >
         <span className="text-[17px] font-semibold text-fg">Projects</span>
-        <Link
-          href="/provision"
-          className="inline-flex items-center gap-1 px-2.5 h-[30px] rounded-lg text-[12px] font-medium text-accent-fg bg-accent hover:opacity-90 transition-opacity"
-        >
-          <Icon name="plus" size={13} />
-          New
-        </Link>
+        <AddProjectDropdown onRegistered={() => void fetchAll()} />
       </div>
 
       {/* Content */}

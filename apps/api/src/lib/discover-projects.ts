@@ -44,3 +44,18 @@ export function discoverProjects(): DiscoveredProject[] {
 
   return results
 }
+
+export function discoverUnregistered(): string[] {
+  if (!existsSync(PROJECTS_ROOT)) return []
+
+  const entries = readdirSync(PROJECTS_ROOT, { withFileTypes: true })
+  const names: string[] = []
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue
+    const configPath = join(PROJECTS_ROOT, entry.name, '.emit-infra.json')
+    if (!existsSync(configPath)) names.push(entry.name)
+  }
+
+  return names.sort()
+}

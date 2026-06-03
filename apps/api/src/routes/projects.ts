@@ -1,9 +1,10 @@
 import type { FastifyInstance } from 'fastify'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { readFile, readdir } from 'node:fs/promises'
+import { readFile, readdir, writeFile } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import { sshExec } from '@emit-infra/core'
-import { discoverProjects } from '../lib/discover-projects.js'
+import { discoverProjects, discoverUnregistered } from '../lib/discover-projects.js'
 
 const DEFAULT_SSH_KEY = join(homedir(), '.ssh', 'emit-deploy')
 
@@ -32,6 +33,28 @@ export async function projectRoutes(app: FastifyInstance) {
       projectDir,
     }))
   })
+
+  app.get('/projects/unregistered', async () => {
+    return discoverUnregistered()
+  })
+
+  app.post<{ Params: { name: string }; Body: { config: Record<string, unknown> } }>(
+    '/projects/:name/register',
+    async (req, reply) => {
+      const { name } = req.params
+      const projectDir = join(homedir(), 'projects', name)
+      if (!existsSync(projectDir)) {
+        return reply.status(404).send({ error: 'directory not found' })
+      }
+      const configPath = join(projectDir, '.emit-infra.json')
+      if (existsSync(configPath)) {
+        return reply.status(409).send({ error: 'already registered' })
+      }
+      const config = { name, ...req.body.config }
+      await writeFile(configPath, JSON.stringify(config, null, 2) + '\n')
+      return { ok: true, configPath }
+    },
+  )
 
   app.get('/projects/ssh-keys', async () => {
     const sshDir = join(homedir(), '.ssh')

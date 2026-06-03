@@ -64,6 +64,22 @@ export function getSshKeys(): Promise<string[]> {
   return apiFetch<string[]>('/projects/ssh-keys')
 }
 
+export function getUnregistered(): Promise<string[]> {
+  return apiFetch<string[]>('/projects/unregistered')
+}
+
+export async function registerProject(
+  name: string,
+  config: { domain: string; github: { repo: string }; region?: string },
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ config }),
+  })
+  if (!res.ok) throw new Error(`Register failed: ${res.status}`)
+}
+
 export function openSseStream(path: string): EventSource {
   return new EventSource(`${API_BASE}${path}`)
 }
