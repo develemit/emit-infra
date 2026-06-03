@@ -1,15 +1,12 @@
-import type Anthropic from '@anthropic-ai/sdk'
+// Maps our session IDs → Agent SDK session IDs for conversation resumption
+const sessions = new Map<string, string>()
 
-const sessions = new Map<string, Anthropic.MessageParam[]>()
-
-export function getHistory(sessionId: string): Anthropic.MessageParam[] {
-  return [...(sessions.get(sessionId) ?? [])]
+export function getAgentSessionId(sessionId: string): string | undefined {
+  return sessions.get(sessionId)
 }
 
-export function appendMessage(sessionId: string, message: Anthropic.MessageParam): void {
-  const history = sessions.get(sessionId) ?? []
-  history.push(message)
-  sessions.set(sessionId, history)
+export function setAgentSessionId(sessionId: string, agentSessionId: string): void {
+  sessions.set(sessionId, agentSessionId)
 }
 
 export function clearHistory(sessionId: string): void {

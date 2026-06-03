@@ -4,10 +4,6 @@ import { projectRoutes } from './routes/projects.js'
 import { operationRoutes } from './routes/operations.js'
 import { opsRoutes } from './routes/ops.js'
 
-if (!process.env['ANTHROPIC_API_KEY']) {
-  console.error('[startup] ANTHROPIC_API_KEY is not set — Claude ops panel will be unavailable')
-}
-
 const app = Fastify({ logger: true })
 
 await app.register(cors, { origin: '*' })

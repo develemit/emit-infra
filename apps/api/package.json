@@ -3,10 +3,12 @@
   "version": "0.0.1",
   "type": "module",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.54.0",
+    "@anthropic-ai/claude-agent-sdk": "latest",
+    "@anthropic-ai/sdk": "^0.100.0",
     "@emit-infra/core": "workspace:*",
     "@fastify/cors": "^9.0.0",
     "execa": "^9.0.0",
-    "fastify": "^4.28.0"
+    "fastify": "^4.28.0",
+    "zod": "^4.0.0"
   }
 }

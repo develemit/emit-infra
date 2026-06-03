@@ -2,16 +2,16 @@ import type { FastifyInstance } from 'fastify'
 import { randomUUID } from 'node:crypto'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import Anthropic from '@anthropic-ai/sdk'
+import { query, tool, createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk'
+import { z } from 'zod'
 import { runTerraform, runAnsible } from '@emit-infra/core'
-import { tools } from '../lib/claude-tools.js'
-import { getHistory, appendMessage, clearHistory } from '../lib/claude-session.js'
-import { executeTool, type PendingConfirmation } from '../lib/tool-executor.js'
 import { discoverProjects } from '../lib/discover-projects.js'
+import { executeTool } from '../lib/tool-executor.js'
+import { getAgentSessionId, setAgentSessionId, clearHistory } from '../lib/claude-session.js'
 import { writeEvent } from '../lib/write-sse.js'
 
 const SYSTEM =
-  'You are an infrastructure operations assistant for emit-infra. Use the provided tools to answer questions and take actions. For deploy, provision, and destroy, always use the tool — never describe the action without calling it. Be concise.'
+  'You are an infrastructure operations assistant for emit-infra. Use the provided tools to answer questions and take actions. For deploy, provision, and destroy, always call the tool — never describe the action without calling it. Inform the user a confirmation card will appear. Be concise.'
 
 interface ChatBody {
   sessionId: string
@@ -19,9 +19,10 @@ interface ChatBody {
   confirmationFor?: string
 }
 
-export async function opsRoutes(app: FastifyInstance) {
-  const anthropic = new Anthropic({ apiKey: process.env['ANTHROPIC_API_KEY'] })
+type PendingConf = { toolName: string; projectName: string }
+type ToolResult = { toolName: string; target: string; result: unknown }
 
+export async function opsRoutes(app: FastifyInstance) {
   app.get('/ops/session', async () => ({ sessionId: randomUUID() }))
 
   app.delete<{ Params: { id: string } }>('/ops/session/:id', async (req, reply) => {
@@ -32,6 +33,7 @@ export async function opsRoutes(app: FastifyInstance) {
   app.post<{ Body: ChatBody }>('/ops/chat', async (req, reply) => {
     const { sessionId, message, confirmationFor } = req.body
 
+    // SSE execution path — runs Ansible/Terraform after user confirms
     if (confirmationFor) {
       const [toolName, ...parts] = confirmationFor.split(':')
       const projectName = parts.join(':')
@@ -73,81 +75,122 @@ export async function opsRoutes(app: FastifyInstance) {
 
       writeEvent(reply.raw, { type: 'done', exitCode })
       reply.raw.end()
-      appendMessage(sessionId, { role: 'user', content: `Confirmed ${toolName} for ${projectName}.` })
-      appendMessage(sessionId, {
-        role: 'assistant',
-        content: `${toolName} for ${projectName} completed (exit ${exitCode}).`,
-      })
       return
     }
 
-    // Normal chat path
-    appendMessage(sessionId, { role: 'user', content: message })
-    const messages = getHistory(sessionId)
+    // Chat path — Agent SDK with in-process MCP tools
+    let pendingConfirmation: PendingConf | undefined
+    const toolResults: ToolResult[] = []
 
-    const first = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1024,
-      system: SYSTEM,
-      tools,
-      messages,
+    const listProjects = tool('list_projects', 'List all managed infrastructure projects.', {}, async () => {
+      const result = await executeTool('list_projects', {})
+      toolResults.push({ toolName: 'list_projects', target: 'all', result })
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] }
     })
 
-    if (first.stop_reason !== 'tool_use') {
-      const text = first.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('')
-      appendMessage(sessionId, { role: 'assistant', content: first.content })
-      return reply.send({ reply: text })
-    }
+    const getStatus = tool(
+      'get_status',
+      'Get server status (uptime, disk %, memory %) for a project.',
+      { name: z.string().describe('Project name') },
+      async ({ name }) => {
+        const result = await executeTool('get_status', { name })
+        toolResults.push({ toolName: 'get_status', target: name, result })
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] }
+      },
+    )
 
-    // Tool use path
-    appendMessage(sessionId, { role: 'assistant', content: first.content })
-    let pendingConfirmation: PendingConfirmation | undefined
-    const toolResultContent: Anthropic.ToolResultBlockParam[] = []
-    const toolResults: Array<{ toolName: string; target: string; result: unknown }> = []
+    const getContainers = tool(
+      'get_containers',
+      'List running Docker containers for a project.',
+      { name: z.string().describe('Project name') },
+      async ({ name }) => {
+        const result = await executeTool('get_containers', { name })
+        toolResults.push({ toolName: 'get_containers', target: name, result })
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] }
+      },
+    )
 
-    for (const block of first.content) {
-      if (block.type !== 'tool_use') continue
-      const result = await executeTool(block.name, block.input as Record<string, unknown>)
-      if (result && typeof result === 'object' && 'requiresConfirmation' in result) {
-        pendingConfirmation = result as PendingConfirmation
-        break
-      }
-      const target = (block.input as Record<string, unknown>)['name'] as string | undefined
-      toolResults.push({ toolName: block.name, target: target ?? 'all', result })
-      toolResultContent.push({ type: 'tool_result', tool_use_id: block.id, content: JSON.stringify(result) })
-    }
+    const getLogs = tool(
+      'get_logs',
+      'Collect Docker Compose logs for a project.',
+      {
+        name: z.string().describe('Project name'),
+        service: z.string().optional().describe('Optional service name filter'),
+      },
+      async ({ name, service }) => {
+        const result = await executeTool('get_logs', { name, service })
+        toolResults.push({ toolName: 'get_logs', target: name, result })
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] }
+      },
+    )
 
-    if (pendingConfirmation) {
-      if (toolResultContent.length > 0) {
-        appendMessage(sessionId, { role: 'user', content: toolResultContent })
-        const intermediate = await anthropic.messages.create({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 1024,
-          system: SYSTEM,
-          tools,
-          messages: getHistory(sessionId),
-        })
-        const summaryText = intermediate.content
-          .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-          .map((b) => b.text)
-          .join('')
-        appendMessage(sessionId, { role: 'assistant', content: intermediate.content })
-        return reply.send({ reply: summaryText, toolResults, pendingConfirmation })
-      }
-      return reply.send({ reply: '', toolResults: [], pendingConfirmation })
-    }
+    const deploy = tool(
+      'deploy',
+      'Deploy a project via Ansible. Requires user confirmation.',
+      { name: z.string().describe('Project name') },
+      async ({ name }) => {
+        pendingConfirmation = { toolName: 'deploy', projectName: name }
+        return { content: [{ type: 'text' as const, text: `Confirmation required to deploy "${name}". Tell the user a confirmation card will appear in the UI.` }] }
+      },
+    )
 
-    // Follow-up with tool results
-    appendMessage(sessionId, { role: 'user', content: toolResultContent })
-    const second = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1024,
-      system: SYSTEM,
-      tools,
-      messages: getHistory(sessionId),
+    const provision = tool(
+      'provision',
+      'Provision infrastructure with Terraform. Requires user confirmation.',
+      { name: z.string().describe('Project name') },
+      async ({ name }) => {
+        pendingConfirmation = { toolName: 'provision', projectName: name }
+        return { content: [{ type: 'text' as const, text: `Confirmation required to provision "${name}". Tell the user a confirmation card will appear in the UI.` }] }
+      },
+    )
+
+    const destroy = tool(
+      'destroy',
+      'Destroy all infrastructure for a project. IRREVERSIBLE. Requires user confirmation.',
+      { name: z.string().describe('Project name') },
+      async ({ name }) => {
+        pendingConfirmation = { toolName: 'destroy', projectName: name }
+        return { content: [{ type: 'text' as const, text: `Confirmation required to destroy "${name}". Tell the user a confirmation card will appear in the UI. This action is IRREVERSIBLE.` }] }
+      },
+    )
+
+    const server = createSdkMcpServer({
+      name: 'emit-infra',
+      tools: [listProjects, getStatus, getContainers, getLogs, deploy, provision, destroy],
     })
-    const text = second.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('')
-    appendMessage(sessionId, { role: 'assistant', content: second.content })
-    return reply.send({ reply: text, toolResults })
+
+    const agentSessionId = getAgentSessionId(sessionId)
+    const textParts: string[] = []
+    let capturedAgentSessionId: string | undefined
+
+    try {
+      for await (const msg of query({
+        prompt: message,
+        options: {
+          systemPrompt: SYSTEM,
+          ...(agentSessionId ? { resume: agentSessionId } : {}),
+          mcpServers: { emitInfra: server },
+          maxTurns: 10,
+        },
+      })) {
+        if (msg.type === 'system' && msg.subtype === 'init') {
+          capturedAgentSessionId = (msg as Record<string, unknown>)['session_id'] as string | undefined
+        }
+        if ('result' in msg && typeof msg.result === 'string') {
+          textParts.push(msg.result)
+        }
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      return reply.status(503).send({ error: `Agent unavailable: ${message}` })
+    }
+
+    if (capturedAgentSessionId) setAgentSessionId(sessionId, capturedAgentSessionId)
+
+    return reply.send({
+      reply: textParts.join(''),
+      pendingConfirmation,
+      toolResults,
+    })
   })
 }
