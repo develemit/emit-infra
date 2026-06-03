@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
+import Link from 'next/link'
 import { getProjects, getStatus, type ProjectSummary, type ProjectStatus } from '@/lib/api'
 import { ProjectCard } from '@/components/project-card'
 
@@ -45,7 +46,15 @@ export default function HomePage() {
 
   return (
     <div className="p-4 sm:p-6">
-      <h1 className="text-xl font-semibold mb-5">Overview</h1>
+      <div className="flex items-center justify-between mb-5">
+        <h1 className="text-xl font-semibold">Overview</h1>
+        <Link
+          href="/provision"
+          className="text-sm px-3 py-1.5 rounded-lg bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 hover:opacity-90"
+        >
+          New Project
+        </Link>
+      </div>
       {projects === null ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 3 }).map((_, i) => (

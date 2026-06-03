@@ -1,5 +1,14 @@
 const API_BASE = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3001'
 
+export function getApiBase(): string {
+  return API_BASE
+}
+
+export type SseEvent =
+  | { type: 'line'; stream: 'stdout' | 'stderr'; text: string }
+  | { type: 'done'; exitCode: number }
+  | { type: 'error'; message: string }
+
 export interface ProjectConfig {
   name: string
   domain: string
@@ -45,4 +54,18 @@ export async function getContainers(name: string): Promise<Container[]> {
     `/projects/${encodeURIComponent(name)}/containers`,
   )
   return Array.isArray(data) ? data : []
+}
+
+export function openSseStream(path: string): EventSource {
+  return new EventSource(`${API_BASE}${path}`)
+}
+
+export function provisionProject(
+  name: string,
+  config: Record<string, unknown>,
+): { url: string; body: string } {
+  return {
+    url: `${API_BASE}/projects/${encodeURIComponent(name)}/provision`,
+    body: JSON.stringify({ config }),
+  }
 }

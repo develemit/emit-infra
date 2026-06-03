@@ -21,6 +21,6 @@ export default [
     },
   },
   {
-    ignores: ['dist/**', '**/dist/**', 'node_modules/**', '.nx/**', '**/.next/**'],
+    ignores: ['dist/**', '**/dist/**', 'node_modules/**', '.nx/**', '**/.next/**', '**/next-env.d.ts'],
   },
 ]

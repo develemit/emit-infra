@@ -3,7 +3,9 @@ import { useParams } from 'next/navigation'
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
-import { getStatus, getContainers, type ProjectStatus, type Container } from '@/lib/api'
+import { getStatus, getContainers, getApiBase, type ProjectStatus, type Container } from '@/lib/api'
+import { SseOutputPanel } from '@/components/sse-output-panel'
+import { DestroyModal } from '@/components/destroy-modal'
 import { cn } from '@/lib/utils'
 
 function ProgressBar({ value }: { value: number }) {
@@ -19,9 +21,14 @@ function ProgressBar({ value }: { value: number }) {
 export default function ProjectDetailPage() {
   const params = useParams()
   const name = typeof params['name'] === 'string' ? decodeURIComponent(params['name']) : ''
+  const apiBase = getApiBase()
 
   const [status, setStatus] = useState<ProjectStatus | null>(null)
   const [containers, setContainers] = useState<Container[] | null>(null)
+  const [deploying, setDeploying] = useState(false)
+  const [showDestroy, setShowDestroy] = useState(false)
+
+  const deployUrl = `${apiBase}/projects/${encodeURIComponent(name)}/deploy`
 
   const fetchData = useCallback(async () => {
     const [s, c] = await Promise.all([getStatus(name), getContainers(name)])
@@ -37,7 +44,6 @@ export default function ProjectDetailPage() {
 
   const disk = status?.disk ? parseInt(status.disk, 10) : null
   const memory = status?.memory ? parseInt(status.memory, 10) : null
-  const loading = status === null
 
   return (
     <div className="p-4 sm:p-6 max-w-3xl">
@@ -49,9 +55,25 @@ export default function ProjectDetailPage() {
         Back
       </Link>
 
-      <h1 className="text-2xl font-semibold mb-5">{name}</h1>
+      <div className="flex items-center justify-between mb-5">
+        <h1 className="text-2xl font-semibold">{name}</h1>
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/projects/${encodeURIComponent(name)}/logs`}
+            className="text-sm px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+          >
+            Logs
+          </Link>
+          <button
+            onClick={() => setShowDestroy(true)}
+            className="text-sm px-3 py-1.5 rounded-lg border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+          >
+            Destroy
+          </button>
+        </div>
+      </div>
 
-      {loading ? (
+      {status === null ? (
         <div className="space-y-4 animate-pulse">
           <div className="h-28 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900" />
           <div className="h-40 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900" />
@@ -65,15 +87,12 @@ export default function ProjectDetailPage() {
             ) : (
               <div className="space-y-3">
                 {status?.uptime && (
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Uptime: {status.uptime}
-                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Uptime: {status.uptime}</p>
                 )}
                 {disk !== null && (
                   <div>
                     <div className="flex justify-between text-xs text-gray-500 mb-1.5">
-                      <span>Disk</span>
-                      <span>{disk}%</span>
+                      <span>Disk</span><span>{disk}%</span>
                     </div>
                     <ProgressBar value={disk} />
                   </div>
@@ -81,14 +100,37 @@ export default function ProjectDetailPage() {
                 {memory !== null && (
                   <div>
                     <div className="flex justify-between text-xs text-gray-500 mb-1.5">
-                      <span>Memory</span>
-                      <span>{memory}%</span>
+                      <span>Memory</span><span>{memory}%</span>
                     </div>
                     <ProgressBar value={memory} />
                   </div>
                 )}
               </div>
             )}
+          </section>
+
+          <section className="rounded-xl border border-gray-200 dark:border-gray-800 p-4 mb-4">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold">Deploy</h2>
+              <button
+                onClick={() => setDeploying(true)}
+                disabled={deploying}
+                className={cn(
+                  'text-sm px-3 py-1.5 rounded-lg font-medium',
+                  deploying
+                    ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
+                    : 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 hover:opacity-90',
+                )}
+              >
+                {deploying ? 'Running...' : 'Deploy'}
+              </button>
+            </div>
+            <SseOutputPanel
+              url={deployUrl}
+              method="POST"
+              active={deploying}
+              onComplete={() => setDeploying(false)}
+            />
           </section>
 
           <section className="rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
@@ -134,6 +176,14 @@ export default function ProjectDetailPage() {
             )}
           </section>
         </>
+      )}
+
+      {showDestroy && (
+        <DestroyModal
+          projectName={name}
+          apiBase={apiBase}
+          onClose={() => setShowDestroy(false)}
+        />
       )}
     </div>
   )
