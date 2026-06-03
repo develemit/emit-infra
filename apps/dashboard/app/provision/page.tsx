@@ -40,6 +40,7 @@ export default function ProvisionPage() {
     github: { repo: values.githubRepo },
     region: values.region,
     serverType: values.serverType,
+    sshKeyName: values.sshKey,
     ...(values.r2Buckets.length > 0 ? { r2: { buckets: values.r2Buckets } } : {}),
     ...(values.redis ? { upstash: { region: 'eu-central-1' } } : {}),
   }
