@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 3, "column": 0}, "map": {"version":3,"sources":["file:///Users/emitdutcher/projects/emit-infra/node_modules/.pnpm/next%4015.5.19_%40babel%2Bcore%407.29.7_react-dom%4018.3.1_react%4018.3.1__react%4018.3.1/node_modules/next/navigation.js"],"sourcesContent":["module.exports = require('./dist/client/components/navigation')\n"],"names":[],"mappings":"AAAA,OAAO,OAAO","ignoreList":[0],"debugId":null}}]
-}
