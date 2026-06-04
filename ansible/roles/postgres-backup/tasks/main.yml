@@ -1,0 +1,21 @@
+---
+- name: Install awscli for R2 backups
+  apt:
+    name: awscli
+    state: present
+    update_cache: false
+
+- name: Write db-backup script
+  template:
+    src: db-backup.sh.j2
+    dest: /usr/local/bin/emit-db-backup-{{ project_name }}
+    owner: root
+    group: root
+    mode: "0750"
+
+- name: Schedule daily backup at 2 AM
+  cron:
+    name: "emit-db-backup-{{ project_name }}"
+    job: "/usr/local/bin/emit-db-backup-{{ project_name }} >> /var/log/emit-db-backup-{{ project_name }}.log 2>&1"
+    hour: "2"
+    minute: "0"

@@ -29,6 +29,19 @@ export function registerSetup(program: Command): void {
         process.exit(1)
       }
 
+      // ── Pre-flight: required env vars ────────────────────────────────────────
+      const requiredTfVars = ['TF_VAR_hcloud_token', 'TF_VAR_cloudflare_api_token', 'TF_VAR_cloudflare_zone_id']
+      const missingVars = requiredTfVars.filter((v) => !process.env[v])
+      if (missingVars.length > 0) {
+        console.error(chalk.red('\nMissing required env vars for Terraform:'))
+        missingVars.forEach((v) => console.error(chalk.red(`  ${v}`)))
+        console.error(chalk.yellow('\nExport them before running setup, e.g.:'))
+        console.error(chalk.gray('  export TF_VAR_hcloud_token="<hetzner token>"'))
+        console.error(chalk.gray('  export TF_VAR_cloudflare_api_token="<cf token>"'))
+        console.error(chalk.gray('  export TF_VAR_cloudflare_zone_id="<zone id>"'))
+        process.exit(1)
+      }
+
       console.log(chalk.bold(`\nSetting up ${chalk.cyan(config.name)}\n`))
 
       // ── Step 1: SSH key ──────────────────────────────────────────────────────
@@ -68,10 +81,22 @@ export function registerSetup(program: Command): void {
         step(5, 5, 'Configuring server (this takes a few minutes)')
         const inventoryPath = join(process.cwd(), 'ansible-inventory.ini')
         writeFileSync(inventoryPath, `[${config.name}]\n${serverIp}\n`)
-        await runAnsible('provision', inventoryPath, {
+
+        const ansibleVars: Record<string, unknown> = {
           project_name: config.name,
           domain: config.domain,
-        })
+          app_dir: config.deploy?.appDir ?? '/app',
+          nginx_wildcard_cert: config.nginx?.wildcardCert ?? false,
+          cloudflare_api_token: process.env.TF_VAR_cloudflare_api_token ?? '',
+        }
+        if (config.nginx?.customConfigSrc) {
+          ansibleVars.nginx_custom_config_src = join(process.cwd(), config.nginx.customConfigSrc)
+        }
+        if (config.deploy?.composeDest) {
+          ansibleVars.compose_file = config.deploy.composeDest
+        }
+
+        await runAnsible('provision', inventoryPath, ansibleVars)
         ok('Server configured')
       }
 

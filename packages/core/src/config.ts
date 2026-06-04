@@ -20,6 +20,31 @@ export const ProjectConfigSchema = z.object({
       region: z.string().default('us-east-1'),
     })
     .optional(),
+  postgres: z
+    .object({
+      version: z.string().default('16'),
+      backupBucket: z.string().optional(),
+    })
+    .optional(),
+  nginx: z
+    .object({
+      wildcardCert: z.boolean().default(false),
+      customConfigSrc: z.string().optional(),
+    })
+    .optional(),
+  deploy: z
+    .object({
+      appDir: z.string().default('/app'),
+      composeSrc: z.string().default('docker-compose.yml'),
+      composeDest: z.string().default('docker-compose.yml'),
+      extraFiles: z
+        .array(z.object({ src: z.string(), dest: z.string() }))
+        .default([]),
+      postDeployExec: z
+        .array(z.object({ service: z.string(), command: z.string() }))
+        .default([]),
+    })
+    .optional(),
 })
 
 export type ProjectConfig = z.infer<typeof ProjectConfigSchema>

@@ -8,19 +8,36 @@
     state: present
     update_cache: true
 
+- name: Install certbot Cloudflare DNS plugin (wildcard certs)
+  apt:
+    name: python3-certbot-dns-cloudflare
+    state: present
+  when: nginx_wildcard_cert | default(false)
+
 - name: Start and enable nginx
   service:
     name: nginx
     state: started
     enabled: true
 
-- name: Write nginx site config
+- name: Copy custom nginx site config
+  copy:
+    src: "{{ nginx_custom_config_src }}"
+    dest: "/etc/nginx/sites-available/{{ project_name }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when: nginx_custom_config_src is defined
+  notify: reload nginx
+
+- name: Write nginx site config from template
   template:
     src: site.conf.j2
     dest: "/etc/nginx/sites-available/{{ project_name }}"
     owner: root
     group: root
     mode: "0644"
+  when: nginx_custom_config_src is not defined
   notify: reload nginx
 
 - name: Enable nginx site
@@ -36,7 +53,38 @@
     state: absent
   notify: reload nginx
 
-- name: Obtain SSL certificate
+- name: Ensure Cloudflare credentials dir exists
+  file:
+    path: /etc/letsencrypt/cloudflare
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  when: nginx_wildcard_cert | default(false)
+
+- name: Write Cloudflare credentials for certbot DNS-01
+  copy:
+    content: "dns_cloudflare_api_token = {{ cloudflare_api_token }}\n"
+    dest: /etc/letsencrypt/cloudflare/credentials.ini
+    owner: root
+    group: root
+    mode: "0600"
+  when: nginx_wildcard_cert | default(false)
+
+- name: Obtain wildcard SSL certificate (DNS-01)
+  command: >
+    certbot certonly --dns-cloudflare
+    --dns-cloudflare-credentials /etc/letsencrypt/cloudflare/credentials.ini
+    --non-interactive
+    --agree-tos
+    --email {{ certbot_email }}
+    -d {{ domain }}
+    -d *.{{ domain }}
+  args:
+    creates: "/etc/letsencrypt/live/{{ domain }}/fullchain.pem"
+  when: nginx_wildcard_cert | default(false)
+
+- name: Obtain standard SSL certificate (HTTP-01)
   command: >
     certbot --nginx
     --non-interactive
@@ -46,6 +94,7 @@
     -d www.{{ domain }}
   args:
     creates: "/etc/letsencrypt/live/{{ domain }}/fullchain.pem"
+  when: not (nginx_wildcard_cert | default(false))
 
 - name: Set up certbot auto-renewal
   cron:

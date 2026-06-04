@@ -1,0 +1,57 @@
+#!/bin/bash
+# Daily Postgres backup to Cloudflare R2 for {{ project_name }}
+# Managed by emit-infra — do not edit manually
+set -euo pipefail
+
+APP_DIR="{{ app_dir | default('/app') }}"
+COMPOSE_FILE="{{ compose_file | default('docker-compose.prod.yml') }}"
+BUCKET="{{ postgres_backup_bucket }}"
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+BACKUP_FILE="{{ project_name }}_${TIMESTAMP}.dump"
+LOG_PREFIX="[$(date '+%Y-%m-%d %H:%M:%S')] {{ project_name }}"
+
+# Load project env for DB credentials and R2 keys
+if [ -f "${APP_DIR}/.env" ]; then
+  set -a; source "${APP_DIR}/.env"; set +a
+fi
+
+: "${CF_ACCOUNT_ID:?CF_ACCOUNT_ID must be set in ${APP_DIR}/.env}"
+: "${R2_ACCESS_KEY_ID:?R2_ACCESS_KEY_ID must be set in ${APP_DIR}/.env}"
+: "${R2_SECRET_ACCESS_KEY:?R2_SECRET_ACCESS_KEY must be set in ${APP_DIR}/.env}"
+
+ENDPOINT="https://${CF_ACCOUNT_ID}.r2.cloudflarestorage.com"
+
+echo "${LOG_PREFIX} — starting backup: ${BACKUP_FILE}"
+
+docker compose -f "${APP_DIR}/${COMPOSE_FILE}" exec -T db \
+  pg_dump -U "${POSTGRES_USER:-postgres}" -Fc "${POSTGRES_DB:-app}" \
+  | AWS_ACCESS_KEY_ID="${R2_ACCESS_KEY_ID}" \
+    AWS_SECRET_ACCESS_KEY="${R2_SECRET_ACCESS_KEY}" \
+    AWS_DEFAULT_REGION="auto" \
+    aws s3 cp - "s3://${BUCKET}/${BACKUP_FILE}" \
+    --endpoint-url "${ENDPOINT}"
+
+echo "${LOG_PREFIX} — upload complete: ${BACKUP_FILE}"
+
+# Retain last 7 daily backups
+KEEP=7
+TO_DELETE=$(
+  AWS_ACCESS_KEY_ID="${R2_ACCESS_KEY_ID}" \
+  AWS_SECRET_ACCESS_KEY="${R2_SECRET_ACCESS_KEY}" \
+  AWS_DEFAULT_REGION="auto" \
+  aws s3 ls "s3://${BUCKET}/" --endpoint-url "${ENDPOINT}" \
+  | grep "\.dump$" | sort | head -n "-${KEEP}" | awk '{print $4}'
+)
+
+if [ -n "${TO_DELETE}" ]; then
+  echo "${LOG_PREFIX} — pruning old backups"
+  echo "${TO_DELETE}" | while read -r key; do
+    AWS_ACCESS_KEY_ID="${R2_ACCESS_KEY_ID}" \
+    AWS_SECRET_ACCESS_KEY="${R2_SECRET_ACCESS_KEY}" \
+    AWS_DEFAULT_REGION="auto" \
+    aws s3 rm "s3://${BUCKET}/${key}" --endpoint-url "${ENDPOINT}"
+    echo "${LOG_PREFIX} — deleted ${key}"
+  done
+fi
+
+echo "${LOG_PREFIX} — done"
