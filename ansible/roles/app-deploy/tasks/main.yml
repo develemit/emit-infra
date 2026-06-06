@@ -52,6 +52,23 @@
   when: not (zero_downtime | default(false))
 
 # ── Post-deploy ──────────────────────────────────────────────────
+- name: Read deployed build number from container label
+  shell: >
+    docker inspect --format '{{"{{"}}index .Config.Labels "build.number"{{"}}"}}' \
+      $(docker compose -f {{ compose_dest | default('docker-compose.yml') }} ps -q | head -1) 2>/dev/null || echo ""
+  args:
+    chdir: "{{ app_dir }}"
+  register: deployed_build_number
+  changed_when: false
+  ignore_errors: true
+
+- name: Write deployed version file
+  copy:
+    content: "{{ deployed_build_number.stdout | trim }}"
+    dest: "{{ app_dir }}/.deployed-version"
+    mode: "0644"
+  when: deployed_build_number.stdout | default('') | trim | length > 0
+
 - name: Run post-deploy commands
   command: docker compose -f {{ compose_dest | default('docker-compose.yml') }} exec -T {{ item.service }} {{ item.command }}
   args:

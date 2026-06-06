@@ -1,4 +1,4 @@
-const API_BASE = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:7001'
+const API_BASE = process.env['NEXT_PUBLIC_API_URL'] ?? '/api'
 
 export function getApiBase(): string {
   return API_BASE
@@ -24,11 +24,19 @@ export interface ProjectSummary {
 export interface ProjectStatus {
   uptime?: string
   disk?: number
+  diskUsed?: string
+  diskTotal?: string
   memory?: number
+  memUsed?: string
+  memTotal?: string
   containerCount?: number
+  containerTotal?: number
+  containerUnhealthy?: number
+  httpStatus?: number | null
   serverType?: string
   region?: string
   ip?: string
+  buildNumber?: string | null
   error?: string
 }
 
@@ -81,6 +89,27 @@ export async function registerProject(
     body: JSON.stringify({ config }),
   })
   if (!res.ok) throw new Error(`Register failed: ${res.status}`)
+}
+
+export interface DockerUsageRow {
+  type: string
+  total: number
+  active: number
+  size: string
+  reclaimable: string
+}
+
+export function getDockerUsage(name: string): Promise<DockerUsageRow[]> {
+  return apiFetch<DockerUsageRow[]>(`/projects/${encodeURIComponent(name)}/docker-usage`)
+}
+
+export async function pruneDocker(name: string): Promise<{ ok: boolean; output: string }> {
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/prune`, {
+    method: 'POST',
+    cache: 'no-store',
+  })
+  if (!res.ok) throw new Error(`Prune failed: ${res.status}`)
+  return res.json() as Promise<{ ok: boolean; output: string }>
 }
 
 export function openSseStream(path: string): EventSource {

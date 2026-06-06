@@ -13,8 +13,26 @@ import { createTtlCache } from '../lib/ttl-cache.js'
 // on every poll. TTL stays under the dashboard's 30s poll cadence.
 const STATUS_TTL = 20_000
 type StatusData = {
-  uptime: string; disk: number; memory: number; containerCount: number
+  uptime: string
+  disk: number; diskUsed: string; diskTotal: string
+  memory: number; memUsed: string; memTotal: string
+  containerCount: number; containerTotal: number; containerUnhealthy: number
+  httpStatus: number | null
   serverType: string | undefined; region: string | undefined; ip: string
+  buildNumber: string | null
+}
+
+async function checkHttp(domain: string): Promise<number | null> {
+  try {
+    const res = await fetch(`https://${domain}`, {
+      method: 'HEAD',
+      redirect: 'follow',
+      signal: AbortSignal.timeout(5000),
+    })
+    return res.status
+  } catch {
+    return null
+  }
 }
 type Container = { name: string; image: string; status: string; state: string }
 const statusCache = createTtlCache<StatusData | null>(STATUS_TTL)
@@ -93,26 +111,80 @@ export async function projectRoutes(app: FastifyInstance) {
     const host = project.config.serverIp ?? project.config.domain
     const projectConfig = await readProjectConfig(req.params.name)
 
+    const domain = project.config.domain
+
     try {
-      const raw = await sshExec(
-        host,
-        "uptime -p; df -h / | tail -1 | awk '{print $5}'; free -m | awk 'NR==2{printf \"%.0f\\n\", $3/$2*100}'; docker ps -q | wc -l",
-        key,
-      )
-      const [uptimeLine, diskLine, memLine, containerLine] = raw.split('\n').map(l => l.trim())
+      const [raw, httpStatus] = await Promise.all([
+        sshExec(
+          host,
+          `uptime -p; df -h / | tail -1 | awk '{print $5, $3, $2}'; free -m | awk 'NR==2{printf "%.0f %dM %dM\\n", $3/$2*100, $3, $2}'; docker ps -q --filter status=running | wc -l; docker ps -aq | wc -l; docker ps -q --filter status=restarting --filter status=dead | wc -l; cat /opt/${req.params.name}/.deployed-version 2>/dev/null || echo ""`,
+          key,
+        ),
+        checkHttp(domain),
+      ])
+      const [uptimeLine, diskLine, memLine, containerLine, totalLine, unhealthyLine, buildNumberLine] = raw.split('\n').map(l => l.trim())
+      const diskParts = (diskLine ?? '').split(' ')
+      const memParts = (memLine ?? '').split(' ')
       const data: StatusData = {
         uptime: uptimeLine ?? '',
-        disk: parseInt((diskLine ?? '').replace('%', ''), 10),
-        memory: parseInt(memLine ?? '', 10),
+        disk: parseInt((diskParts[0] ?? '').replace('%', ''), 10),
+        diskUsed: diskParts[1] ?? '',
+        diskTotal: diskParts[2] ?? '',
+        memory: parseInt(memParts[0] ?? '', 10),
+        memUsed: memParts[1] ?? '',
+        memTotal: memParts[2] ?? '',
         containerCount: parseInt(containerLine ?? '', 10),
+        containerTotal: parseInt(totalLine ?? '', 10),
+        containerUnhealthy: parseInt(unhealthyLine ?? '', 10),
+        httpStatus,
         serverType: projectConfig?.['serverType'] as string | undefined,
         region: projectConfig?.['region'] as string | undefined,
         ip: host,
+        buildNumber: buildNumberLine || null,
       }
       statusCache.set(req.params.name, data)
       return data
     } catch {
       statusCache.set(req.params.name, null)
+      return reply.status(503).send({ error: 'unreachable' })
+    }
+  })
+
+  app.get<{ Params: { name: string } }>('/projects/:name/docker-usage', async (req, reply) => {
+    const project = await findProject(req.params.name)
+    if (!project) return reply.status(404).send({ error: 'not found' })
+
+    const key = sshKeyPath(project.config.sshKeyName)
+    const host = project.config.serverIp ?? project.config.domain
+
+    try {
+      const raw = await sshExec(
+        host,
+        "docker system df --format '{{.Type}}\\t{{.TotalCount}}\\t{{.Active}}\\t{{.Size}}\\t{{.Reclaimable}}'",
+        key,
+      )
+      const rows = raw.split('\n').filter(l => l.trim()).map(line => {
+        const [type, total, active, size, reclaimable] = line.split('\t')
+        return { type: type ?? '', total: parseInt(total ?? '0', 10), active: parseInt(active ?? '0', 10), size: size ?? '', reclaimable: reclaimable ?? '' }
+      })
+      return rows
+    } catch {
+      return reply.status(503).send({ error: 'unreachable' })
+    }
+  })
+
+  app.post<{ Params: { name: string } }>('/projects/:name/prune', async (req, reply) => {
+    const project = await findProject(req.params.name)
+    if (!project) return reply.status(404).send({ error: 'not found' })
+
+    const key = sshKeyPath(project.config.sshKeyName)
+    const host = project.config.serverIp ?? project.config.domain
+
+    try {
+      const result = await sshExec(host, 'docker system prune -af 2>&1; echo "---"; docker system df', key)
+      statusCache.invalidate(req.params.name)
+      return { ok: true, output: result }
+    } catch {
       return reply.status(503).send({ error: 'unreachable' })
     }
   })
