@@ -28,7 +28,7 @@ export function registerSetup(program: Command): void {
       const tfDir = join(process.cwd(), 'terraform')
       const hasBuckets = (config.r2?.buckets?.length ?? 0) > 0
       const hasBackupBucket = !!config.postgres?.backupBucket
-      const total = hasBuckets || hasBackupBucket ? 6 : 5
+      const total = hasBuckets || hasBackupBucket ? 7 : 6
 
       if (!existsSync(tfDir)) {
         console.error(chalk.red(`No terraform/ directory found. Run "emit-infra init ${config.name}" first.`))
@@ -66,18 +66,46 @@ export function registerSetup(program: Command): void {
       else if (hetznerResult === 'created') ok(`Registered successfully`)
       else warn(`Fingerprint already exists under a different name — continuing`)
 
-      // ── Step 3: Terraform ─────────────────────────────────────────────────────
-      step(3, total, 'Provisioning infrastructure')
-      await runTerraform('init', ['-input=false'], tfDir)
+      // ── Step 3: Remote state bucket ──────────────────────────────────────────
+      step(3, total, 'Preparing remote state bucket')
+      const cfToken = process.env.TF_VAR_cloudflare_api_token!
+      const stateAccountId = await resolveAccountId(cfToken)
+      const stateBucket = `${config.name}-tfstate`
+      await ensureR2Bucket(stateAccountId, stateBucket, cfToken)
+      const stateToken = await createR2Token(stateAccountId, stateBucket, cfToken)
+      ok(`State bucket ready: ${stateBucket}`)
+
+      const backendTf = `terraform {
+  backend "s3" {
+    bucket                      = "${stateBucket}"
+    key                         = "terraform.tfstate"
+    region                      = "auto"
+    endpoint                    = "https://${stateAccountId}.r2.cloudflarestorage.com"
+    skip_credentials_validation = true
+    skip_metadata_api_check     = true
+    skip_region_validation      = true
+    force_path_style            = true
+  }
+}
+`
+      writeFileSync(join(tfDir, 'backend.tf'), backendTf)
+      ok('Wrote terraform/backend.tf')
+
+      // ── Step 4: Terraform ─────────────────────────────────────────────────────
+      step(4, total, 'Provisioning infrastructure')
+      await runTerraform('init', [
+        '-input=false',
+        `-backend-config=access_key=${stateToken.accessKeyId}`,
+        `-backend-config=secret_key=${stateToken.secretAccessKey}`,
+      ], tfDir)
       await runTerraform('apply', ['-auto-approve', '-input=false'], tfDir)
       ok('Infrastructure provisioned')
 
-      // ── Step 4 (conditional): R2 buckets + tokens ─────────────────────────────
+      // ── Step 5 (conditional): R2 buckets + tokens ─────────────────────────────
       const r2Secrets: Record<string, string> = {}
       if (hasBuckets || hasBackupBucket) {
-        step(4, total, 'Provisioning R2 buckets and tokens')
-        const cfToken = process.env.TF_VAR_cloudflare_api_token!
-        const accountId = await resolveAccountId(cfToken)
+        step(5, total, 'Provisioning R2 buckets and tokens')
+        const accountId = stateAccountId
 
         if (hasBackupBucket) {
           const bucket = config.postgres!.backupBucket!
@@ -99,10 +127,10 @@ export function registerSetup(program: Command): void {
         ok(`Provisioned ${Object.keys(r2Secrets).length} R2 credentials`)
       }
 
-      const ghStep = hasBuckets || hasBackupBucket ? 5 : 4
-      const ansibleStep = hasBuckets || hasBackupBucket ? 6 : 5
+      const ghStep = hasBuckets || hasBackupBucket ? 6 : 5
+      const ansibleStep = hasBuckets || hasBackupBucket ? 7 : 6
 
-      // ── Step 4/5: GitHub secrets ──────────────────────────────────────────────
+      // ── Step 5/6: GitHub secrets ──────────────────────────────────────────────
       step(ghStep, total, `Syncing secrets to ${config.github.repo}`)
       const serverIp = await getTerraformOutput('server_ip', tfDir)
       const privateKeyContent = readFileSync(key.privateKey, 'utf-8')
@@ -117,7 +145,7 @@ export function registerSetup(program: Command): void {
         ok(`R2 secrets pushed: ${Object.keys(r2Secrets).join(', ')}`)
       }
 
-      // ── Step 5/6: Ansible ─────────────────────────────────────────────────────
+      // ── Step 6/7: Ansible ─────────────────────────────────────────────────────
       if (opts.skipConfigure) {
         console.log(chalk.gray(`\n[${ansibleStep}/${total}] Skipping Ansible configuration (--skip-configure)`))
       } else {
