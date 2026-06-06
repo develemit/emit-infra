@@ -20,6 +20,20 @@
     state: present
     update_cache: true
 
+- name: Configure Docker log rotation
+  copy:
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-size": "10m",
+          "max-file": "5"
+        }
+      }
+    dest: /etc/docker/daemon.json
+    mode: "0644"
+  notify: restart docker
+
 - name: Start and enable Docker
   service:
     name: docker
