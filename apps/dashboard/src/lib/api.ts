@@ -40,6 +40,7 @@ export interface ProjectStatus {
   nginxStatus?: string | null
   nginxConfigured?: boolean
   sslExpiry?: string | null
+  redisStatus?: string | null
   error?: string
 }
 

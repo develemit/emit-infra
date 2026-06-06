@@ -43,6 +43,12 @@ function nginxLabel(status: string | null | undefined): { value: string; color?:
   return { value: 'Down', color: 'var(--err)' }
 }
 
+function redisLabel(status: string | null | undefined): { value: string; color?: string } {
+  if (!status) return { value: '—' }
+  if (status === 'healthy') return { value: 'Healthy', color: 'var(--ok, #22c55e)' }
+  return { value: 'Down', color: 'var(--err)' }
+}
+
 interface HealthCardProps {
   project: ProjectSummary
   status: ProjectStatus
@@ -65,6 +71,7 @@ export function HealthCard({ project, status, polledAgo }: HealthCardProps) {
   const ip = status.ip ?? '—'
   const nginx = nginxLabel(status.nginxStatus)
   const ssl = sslDaysLeft(status.sslExpiry)
+  const redis = redisLabel(status.redisStatus)
 
   return (
     <div className="rounded-xl border border-border bg-card" style={{ padding: 18 }}>
@@ -93,6 +100,7 @@ export function HealthCard({ project, status, polledAgo }: HealthCardProps) {
         <StatTile icon="hash" label="Build" value={status.buildNumber ?? '—'} />
         <StatTile icon="shield" label="Nginx" value={nginx.value} color={nginx.color} />
         <StatTile icon="lock" label="SSL" value={ssl.value} color={ssl.color} />
+        {status.redisStatus && <StatTile icon="database" label="Redis" value={redis.value} color={redis.color} />}
       </div>
 
       {/* Mobile: 2-col stat grid */}
@@ -101,6 +109,7 @@ export function HealthCard({ project, status, polledAgo }: HealthCardProps) {
         <StatTile icon="globe" label="Region" value={region} />
         <StatTile icon="hash" label="Build" value={status.buildNumber ?? '—'} />
         <StatTile icon="shield" label="Nginx" value={nginx.value} color={nginx.color} />
+        {status.redisStatus && <StatTile icon="database" label="Redis" value={redis.value} color={redis.color} />}
       </div>
 
       {/* Desktop: side-by-side lg meters */}
