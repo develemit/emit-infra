@@ -37,6 +37,7 @@ export const ProjectConfigSchema = z.object({
       appDir: z.string().default('/app'),
       composeSrc: z.string().default('docker-compose.yml'),
       composeDest: z.string().default('docker-compose.yml'),
+      appPort: z.coerce.string().optional(),
       extraFiles: z
         .array(z.object({ src: z.string(), dest: z.string() }))
         .default([]),

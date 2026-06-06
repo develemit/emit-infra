@@ -10,12 +10,14 @@ export function registerRollback(program: Command): void {
     .description('Restore :rollback-tagged images and restart the app stack')
     .option('--config <path>', 'Path to .emit-infra.json')
     .option('--version <N>', 'Roll back to a specific build number from the registry')
-    .action(async (_name: string | undefined, opts: { config?: string; version?: string }) => {
+    .option('--port <port>', 'Override health-check port')
+    .action(async (_name: string | undefined, opts: { config?: string; version?: string; port?: string }) => {
       const config = loadConfig(opts.config)
       const host = config.serverIp ?? config.domain
       const key = join(homedir(), '.ssh', config.sshKeyName)
       const appDir = config.deploy?.appDir ?? '/app'
       const composeFile = config.deploy?.composeDest ?? 'docker-compose.yml'
+      const port = opts.port ?? config.deploy?.appPort ?? '3000'
 
       console.log(chalk.cyan(`Rolling back ${chalk.bold(config.name)} on ${host}...\n`))
 
@@ -32,16 +34,16 @@ export function registerRollback(program: Command): void {
       }
 
       if (opts.version) {
-        await rollbackToVersion(host, key, appDir, composeFile, imageList, opts.version)
+        await rollbackToVersion(host, key, appDir, composeFile, imageList, opts.version, port)
       } else {
-        await rollbackToTag(host, key, appDir, composeFile, imageList)
+        await rollbackToTag(host, key, appDir, composeFile, imageList, port)
       }
     })
 }
 
 async function rollbackToVersion(
   host: string, key: string, appDir: string, composeFile: string,
-  imageList: string[], version: string,
+  imageList: string[], version: string, port: string,
 ): Promise<void> {
   console.log(chalk.dim(`Pulling build ${version} from registry...`))
 
@@ -60,12 +62,12 @@ async function rollbackToVersion(
   }
 
   console.log(chalk.dim(`Tagged build ${version} as :latest`))
-  await restartAndHealthCheck(host, key, appDir, composeFile)
+  await restartAndHealthCheck(host, key, appDir, composeFile, port)
 }
 
 async function rollbackToTag(
   host: string, key: string, appDir: string, composeFile: string,
-  imageList: string[],
+  imageList: string[], port: string,
 ): Promise<void> {
   const checkScript = imageList
     .map(img => `docker image inspect "${img.split(':')[0]}:rollback" > /dev/null 2>&1`)
@@ -87,11 +89,11 @@ async function rollbackToTag(
 
   await sshExec(host, tagScript, key)
   console.log(chalk.dim('Restored :rollback tags to :latest'))
-  await restartAndHealthCheck(host, key, appDir, composeFile)
+  await restartAndHealthCheck(host, key, appDir, composeFile, port)
 }
 
 async function restartAndHealthCheck(
-  host: string, key: string, appDir: string, composeFile: string,
+  host: string, key: string, appDir: string, composeFile: string, port: string,
 ): Promise<void> {
   await sshExec(
     host,
@@ -101,7 +103,7 @@ async function restartAndHealthCheck(
   console.log(chalk.dim('Restarted app stack'))
 
   try {
-    const result = await sshExec(host, `${appDir}/health-check.sh 3000 10`, key)
+    const result = await sshExec(host, `${appDir}/health-check.sh ${port} 10`, key)
     console.log(chalk.dim(result))
     console.log(chalk.green('\nRollback successful. Previous version is now serving traffic.'))
   } catch {
