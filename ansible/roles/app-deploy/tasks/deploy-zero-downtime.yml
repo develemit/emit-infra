@@ -86,6 +86,12 @@
   shell: docker rm -f app-standby 2>/dev/null || true
   when: standby_health.rc != 0
 
+- name: Clean up standby env on failure
+  file:
+    path: "{{ app_dir }}/.standby.env"
+    state: absent
+  when: standby_health.rc != 0
+
 - name: Fail on unhealthy standby
   fail:
     msg: >-
@@ -94,6 +100,8 @@
   when: standby_health.rc != 0
 
 # ── On success: swap nginx → restart compose → swap back ────────
+
+# --- Template-based nginx swap ---
 - name: Point nginx to standby port
   template:
     src: "{{ playbook_dir }}/../roles/nginx/templates/upstream-site.conf.j2"
@@ -101,6 +109,21 @@
   vars:
     active_backend_port: "{{ zd_standby_port }}"
   when: nginx_custom_config_src is not defined
+
+# --- Custom nginx config swap ---
+- name: Back up custom nginx config
+  copy:
+    src: "/etc/nginx/sites-available/{{ project_name }}"
+    dest: "/etc/nginx/sites-available/{{ project_name }}.zd-backup"
+    remote_src: true
+  when: nginx_custom_config_src is defined
+
+- name: Swap proxy_pass port to standby in custom nginx config
+  shell: >
+    sed -i
+    's|proxy_pass http://127\.0\.0\.1:{{ zd_app_port }};|proxy_pass http://127.0.0.1:{{ zd_standby_port }};|g'
+    /etc/nginx/sites-available/{{ project_name }}
+  when: nginx_custom_config_src is defined
 
 - name: Reload nginx (traffic now served by standby)
   service:
@@ -115,6 +138,7 @@
 - name: Health-check compose on original port {{ zd_app_port }}
   command: "{{ app_dir }}/health-check.sh {{ zd_app_port }} {{ health_check_retries | default(10) }} {{ health_check_path | default('/') }} {{ health_check_backoff | default(3) }}"
 
+# --- Template-based nginx restore ---
 - name: Point nginx back to compose port
   template:
     src: "{{ playbook_dir }}/../roles/nginx/templates/upstream-site.conf.j2"
@@ -123,6 +147,20 @@
     active_backend_port: "{{ zd_app_port }}"
   when: nginx_custom_config_src is not defined
 
+# --- Custom nginx config restore ---
+- name: Restore custom nginx config from backup
+  copy:
+    src: "/etc/nginx/sites-available/{{ project_name }}.zd-backup"
+    dest: "/etc/nginx/sites-available/{{ project_name }}"
+    remote_src: true
+  when: nginx_custom_config_src is defined
+
+- name: Remove custom nginx config backup
+  file:
+    path: "/etc/nginx/sites-available/{{ project_name }}.zd-backup"
+    state: absent
+  when: nginx_custom_config_src is defined
+
 - name: Reload nginx (traffic now served by compose)
   service:
     name: nginx
@@ -130,3 +168,8 @@
 
 - name: Remove standby container
   shell: docker rm -f app-standby 2>/dev/null || true
+
+- name: Clean up standby env file
+  file:
+    path: "{{ app_dir }}/.standby.env"
+    state: absent
