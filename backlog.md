@@ -14,6 +14,12 @@ file to promote items into proper sprints when the list grows worth addressing.
 - (sprint 11, 2026-06-03) Service worker cache name is hardcoded `emit-infra-v1` — bump the key after static asset changes `[hold]`
 - (sprint 10, 2026-06-03) ConfirmCard onConfirm callback is a no-op in ChatThread — wire it up if the page needs to track transitions `[hold]`
 - (sprint 13, 2026-06-03) `disk` and `memory` in `ProjectStatus` were typed as `string` but the API always returned integers — the fix changed both to `number`; any client code outside this repo that depended on the string type would need updating
+- (sprint 01, 2026-06-06) The health-check script could optionally support a custom health endpoint path (e.g. `/health`) for apps that have one, rather than always checking `/`
+- (sprint 01, 2026-06-06) Consider adding a `health_check_backoff` variable for projects that take longer to start (e.g. Java apps with long JVM warmup)
+- (sprint 02, 2026-06-06) A manual `emit-infra rollback <project>` CLI command would be useful for rolling back without redeploying
+- (sprint 02, 2026-06-06) The `:rollback` tag approach only keeps one rollback point — consider timestamped tags if multi-version history is needed later
+- (sprint 03, 2026-06-06) Projects with custom nginx configs (`nginx_custom_config_src`) can't use zero-downtime without manual upstream config adaptation
+- (sprint 03, 2026-06-06) The standby container doesn't receive environment variables from the compose file — for apps that need env vars at runtime, the zero-downtime flow would need to extract and pass them
 - (session 2026-06-03) `diner-decider` and `test-smoke` show SSH unreachable — neither has a provisioned Hetzner server yet (`test-smoke` uses TEST-NET `192.0.2.1`, `diner-decider` DNS doesn't resolve). Both need provisioning via the wizard before status monitoring will work. `diner-decider` also uses `sshKeyName: "emit-deploy"` which doesn't exist locally — update the config to match whatever key is used once provisioned.
 
 ## ✅ Converted to Sprints
