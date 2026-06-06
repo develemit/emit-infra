@@ -169,6 +169,9 @@ export function registerSetup(program: Command): void {
         if (Object.keys(r2Secrets).length > 0) {
           ansibleVars.r2_credentials = r2Secrets
         }
+        if (config.postgres?.backupBucket) {
+          ansibleVars.postgres_backup_bucket = config.postgres.backupBucket
+        }
 
         await runAnsible('provision', inventoryPath, ansibleVars)
         ok('Server configured')
