@@ -8,6 +8,8 @@ import { registerDeploy } from './commands/deploy.js'
 import { registerStatus } from './commands/status.js'
 import { registerSecretsSync } from './commands/secrets-sync.js'
 import { registerDestroy } from './commands/destroy.js'
+import { registerAudit } from './commands/audit.js'
+import { registerRollback } from './commands/rollback.js'
 
 const program = new Command()
 
@@ -24,6 +26,8 @@ registerDeploy(program)
 registerStatus(program)
 registerSecretsSync(program)
 registerDestroy(program)
+registerAudit(program)
+registerRollback(program)
 
 program.parseAsync(process.argv).catch((err: unknown) => {
   console.error(err instanceof Error ? err.message : String(err))
