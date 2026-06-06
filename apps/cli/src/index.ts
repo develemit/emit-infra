@@ -10,6 +10,7 @@ import { registerSecretsSync } from './commands/secrets-sync.js'
 import { registerDestroy } from './commands/destroy.js'
 import { registerAudit } from './commands/audit.js'
 import { registerRollback } from './commands/rollback.js'
+import { registerVersions } from './commands/versions.js'
 
 const program = new Command()
 
@@ -28,6 +29,7 @@ registerSecretsSync(program)
 registerDestroy(program)
 registerAudit(program)
 registerRollback(program)
+registerVersions(program)
 
 program.parseAsync(process.argv).catch((err: unknown) => {
   console.error(err instanceof Error ? err.message : String(err))
