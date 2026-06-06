@@ -1,0 +1,109 @@
+---
+# Zero-downtime deploy: start standby container on a spare port, health-check
+# it, swap nginx, then restart compose while standby serves traffic.
+
+- name: Set port variables
+  set_fact:
+    zd_app_port: "{{ app_port | default(3000) | int }}"
+    zd_standby_port: "{{ app_port_standby | default((app_port | default(3000) | int) + 1) }}"
+    zd_internal_port: "{{ app_internal_port | default(app_port | default(3000)) | int }}"
+    zd_compose_file: "{{ compose_dest | default('docker-compose.yml') }}"
+
+# ── Snapshot current images for rollback ──────────────────────────
+- name: Get current image list
+  shell: docker compose -f {{ zd_compose_file }} config --images 2>/dev/null || true
+  args:
+    chdir: "{{ app_dir }}"
+  register: current_images
+
+- name: Tag current images as :rollback
+  shell: |
+    docker tag "{{ item }}:latest" "{{ item }}:rollback" 2>/dev/null || \
+    docker tag "{{ item }}" "{{ item.split(':')[0] }}:rollback" 2>/dev/null || true
+  loop: "{{ current_images.stdout_lines | default([]) }}"
+
+# ── Pull new images ──────────────────────────────────────────────
+- name: Pull latest images
+  command: docker compose -f {{ zd_compose_file }} pull
+  args:
+    chdir: "{{ app_dir }}"
+
+# ── Start standby container ─────────────────────────────────────
+- name: Get web service image name
+  shell: docker compose -f {{ zd_compose_file }} config --images | head -1
+  args:
+    chdir: "{{ app_dir }}"
+  register: web_image
+
+- name: Get compose network name
+  shell: docker network ls --filter "name={{ compose_project | default('app') }}" --format '{{ '{{' }}.Name{{ '}}' }}' | head -1
+  register: compose_network
+  changed_when: false
+
+- name: Remove any leftover standby container
+  shell: docker rm -f app-standby 2>/dev/null || true
+  changed_when: false
+
+- name: Start standby container on port {{ zd_standby_port }}
+  shell: >
+    docker run -d
+    --name app-standby
+    --network {{ compose_network.stdout | trim }}
+    -p 127.0.0.1:{{ zd_standby_port }}:{{ zd_internal_port }}
+    --restart no
+    {{ web_image.stdout | trim }}
+
+- name: Health-check standby on port {{ zd_standby_port }}
+  command: "{{ app_dir }}/health-check.sh {{ zd_standby_port }} {{ health_check_retries | default(10) }}"
+  register: standby_health
+  ignore_errors: true
+
+# ── On failure: clean up standby and fail ────────────────────────
+- name: Remove standby on health-check failure
+  shell: docker rm -f app-standby 2>/dev/null || true
+  when: standby_health.rc != 0
+
+- name: Fail on unhealthy standby
+  fail:
+    msg: >-
+      Zero-downtime deploy failed: new container did not pass health check
+      on port {{ zd_standby_port }}. Old containers are still serving traffic.
+  when: standby_health.rc != 0
+
+# ── On success: swap nginx → restart compose → swap back ────────
+- name: Point nginx to standby port
+  template:
+    src: "{{ playbook_dir }}/../roles/nginx/templates/upstream-site.conf.j2"
+    dest: "/etc/nginx/sites-available/{{ project_name }}"
+  vars:
+    active_backend_port: "{{ zd_standby_port }}"
+  when: nginx_custom_config_src is not defined
+
+- name: Reload nginx (traffic now served by standby)
+  service:
+    name: nginx
+    state: reloaded
+
+- name: Restart compose stack with new images
+  command: docker compose -f {{ zd_compose_file }} up -d --remove-orphans
+  args:
+    chdir: "{{ app_dir }}"
+
+- name: Health-check compose on original port {{ zd_app_port }}
+  command: "{{ app_dir }}/health-check.sh {{ zd_app_port }} {{ health_check_retries | default(10) }}"
+
+- name: Point nginx back to compose port
+  template:
+    src: "{{ playbook_dir }}/../roles/nginx/templates/upstream-site.conf.j2"
+    dest: "/etc/nginx/sites-available/{{ project_name }}"
+  vars:
+    active_backend_port: "{{ zd_app_port }}"
+  when: nginx_custom_config_src is not defined
+
+- name: Reload nginx (traffic now served by compose)
+  service:
+    name: nginx
+    state: reloaded
+
+- name: Remove standby container
+  shell: docker rm -f app-standby 2>/dev/null || true

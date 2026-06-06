@@ -1,0 +1,57 @@
+---
+# Standard deploy: pull → up → health check with rollback support.
+
+# ── Snapshot current images for rollback ──────────────────────────
+- name: Get current image list
+  shell: docker compose -f {{ compose_dest | default('docker-compose.yml') }} config --images 2>/dev/null || true
+  args:
+    chdir: "{{ app_dir }}"
+  register: current_images
+  when: rollback_enabled | default(true)
+
+- name: Tag current images as :rollback
+  shell: |
+    docker tag "{{ item }}:latest" "{{ item }}:rollback" 2>/dev/null || \
+    docker tag "{{ item }}" "{{ item.split(':')[0] }}:rollback" 2>/dev/null || true
+  loop: "{{ current_images.stdout_lines | default([]) }}"
+  when: rollback_enabled | default(true)
+
+# ── Pull and deploy ──────────────────────────────────────────────
+- name: Pull latest images
+  command: docker compose -f {{ compose_dest | default('docker-compose.yml') }} pull
+  args:
+    chdir: "{{ app_dir }}"
+
+- name: Start or restart app stack
+  command: docker compose -f {{ compose_dest | default('docker-compose.yml') }} up -d --remove-orphans
+  args:
+    chdir: "{{ app_dir }}"
+
+# ── Health check with rollback on failure ────────────────────────
+- name: Health check and rollback
+  when: rollback_enabled | default(true)
+  block:
+    - name: Verify app is serving traffic
+      command: "{{ app_dir }}/health-check.sh {{ app_port | default(3000) }} {{ health_check_retries | default(10) }}"
+
+  rescue:
+    - name: "ROLLBACK: Restore previous images"
+      shell: |
+        docker tag "{{ item.split(':')[0] }}:rollback" "{{ item.split(':')[0] }}:latest" 2>/dev/null || true
+      loop: "{{ current_images.stdout_lines | default([]) }}"
+
+    - name: "ROLLBACK: Restart app stack with previous images"
+      command: docker compose -f {{ compose_dest | default('docker-compose.yml') }} up -d --remove-orphans
+      args:
+        chdir: "{{ app_dir }}"
+
+    - name: "ROLLBACK: Verify rollback is serving traffic"
+      command: "{{ app_dir }}/health-check.sh {{ app_port | default(3000) }} {{ health_check_retries | default(10) }}"
+
+    - name: "ROLLBACK: Fail with descriptive message"
+      fail:
+        msg: "Deploy failed, rolled back to previous image. The previous version is now serving traffic."
+
+- name: Verify app is serving traffic (without rollback)
+  command: "{{ app_dir }}/health-check.sh {{ app_port | default(3000) }} {{ health_check_retries | default(10) }}"
+  when: not (rollback_enabled | default(true))
