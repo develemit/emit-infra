@@ -10,6 +10,9 @@ import {
   runAnsible,
   ensureSshKey,
   ensureHetznerKey,
+  resolveAccountId,
+  ensureR2Bucket,
+  createR2Token,
 } from '@emit-infra/core'
 
 export function registerSetup(program: Command): void {
@@ -23,6 +26,9 @@ export function registerSetup(program: Command): void {
     .action(async (_name: string | undefined, opts: { config?: string; skipConfigure?: boolean }) => {
       const config = loadConfig(opts.config)
       const tfDir = join(process.cwd(), 'terraform')
+      const hasBuckets = (config.r2?.buckets?.length ?? 0) > 0
+      const hasBackupBucket = !!config.postgres?.backupBucket
+      const total = hasBuckets || hasBackupBucket ? 6 : 5
 
       if (!existsSync(tfDir)) {
         console.error(chalk.red(`No terraform/ directory found. Run "emit-infra init ${config.name}" first.`))
@@ -45,7 +51,7 @@ export function registerSetup(program: Command): void {
       console.log(chalk.bold(`\nSetting up ${chalk.cyan(config.name)}\n`))
 
       // ── Step 1: SSH key ──────────────────────────────────────────────────────
-      step(1, 5, 'Checking SSH key')
+      step(1, total, 'Checking SSH key')
       const key = await ensureSshKey(config.sshKeyName)
       if (key.wasCreated) {
         ok(`Generated new key at ${key.privateKey}`)
@@ -54,31 +60,68 @@ export function registerSetup(program: Command): void {
       }
 
       // ── Step 2: Hetzner registration ─────────────────────────────────────────
-      step(2, 5, `Registering key in Hetzner as "${config.sshKeyName}"`)
+      step(2, total, `Registering key in Hetzner as "${config.sshKeyName}"`)
       const hetznerResult = await ensureHetznerKey(config.sshKeyName, key.publicKey)
       if (hetznerResult === 'found') ok(`Already registered`)
       else if (hetznerResult === 'created') ok(`Registered successfully`)
       else warn(`Fingerprint already exists under a different name — continuing`)
 
       // ── Step 3: Terraform ─────────────────────────────────────────────────────
-      step(3, 5, 'Provisioning infrastructure')
+      step(3, total, 'Provisioning infrastructure')
       await runTerraform('init', ['-input=false'], tfDir)
       await runTerraform('apply', ['-auto-approve', '-input=false'], tfDir)
       ok('Infrastructure provisioned')
 
-      // ── Step 4: GitHub secrets ────────────────────────────────────────────────
-      step(4, 5, `Syncing secrets to ${config.github.repo}`)
+      // ── Step 4 (conditional): R2 buckets + tokens ─────────────────────────────
+      const r2Secrets: Record<string, string> = {}
+      if (hasBuckets || hasBackupBucket) {
+        step(4, total, 'Provisioning R2 buckets and tokens')
+        const cfToken = process.env.TF_VAR_cloudflare_api_token!
+        const accountId = await resolveAccountId(cfToken)
+
+        if (hasBackupBucket) {
+          const bucket = config.postgres!.backupBucket!
+          await ensureR2Bucket(accountId, bucket, cfToken)
+          const creds = await createR2Token(accountId, bucket, cfToken)
+          r2Secrets['CF_ACCOUNT_ID'] = accountId
+          r2Secrets['R2_ACCESS_KEY_ID'] = creds.accessKeyId
+          r2Secrets['R2_SECRET_ACCESS_KEY'] = creds.secretAccessKey
+        }
+
+        for (const bucket of config.r2?.buckets ?? []) {
+          await ensureR2Bucket(accountId, bucket, cfToken)
+          const creds = await createR2Token(accountId, bucket, cfToken)
+          const prefix = bucket.toUpperCase().replace(/-/g, '_')
+          r2Secrets[`R2_${prefix}_ACCESS_KEY_ID`] = creds.accessKeyId
+          r2Secrets[`R2_${prefix}_SECRET_ACCESS_KEY`] = creds.secretAccessKey
+        }
+
+        ok(`Provisioned ${Object.keys(r2Secrets).length} R2 credentials`)
+      }
+
+      const ghStep = hasBuckets || hasBackupBucket ? 5 : 4
+      const ansibleStep = hasBuckets || hasBackupBucket ? 6 : 5
+
+      // ── Step 4/5: GitHub secrets ──────────────────────────────────────────────
+      step(ghStep, total, `Syncing secrets to ${config.github.repo}`)
       const serverIp = await getTerraformOutput('server_ip', tfDir)
       const privateKeyContent = readFileSync(key.privateKey, 'utf-8')
       await execa('gh', ['secret', 'set', 'SERVER_IP', '--repo', config.github.repo, '--body', serverIp])
       await execa('gh', ['secret', 'set', 'SSH_PRIVATE_KEY', '--repo', config.github.repo, '--body', privateKeyContent])
       ok(`SERVER_IP (${serverIp}) and SSH_PRIVATE_KEY pushed`)
 
-      // ── Step 5: Ansible ───────────────────────────────────────────────────────
+      for (const [secretKey, secretValue] of Object.entries(r2Secrets)) {
+        await execa('gh', ['secret', 'set', secretKey, '--repo', config.github.repo, '--body', secretValue])
+      }
+      if (Object.keys(r2Secrets).length > 0) {
+        ok(`R2 secrets pushed: ${Object.keys(r2Secrets).join(', ')}`)
+      }
+
+      // ── Step 5/6: Ansible ─────────────────────────────────────────────────────
       if (opts.skipConfigure) {
-        console.log(chalk.gray(`\n[5/5] Skipping Ansible configuration (--skip-configure)`))
+        console.log(chalk.gray(`\n[${ansibleStep}/${total}] Skipping Ansible configuration (--skip-configure)`))
       } else {
-        step(5, 5, 'Configuring server (this takes a few minutes)')
+        step(ansibleStep, total, 'Configuring server (this takes a few minutes)')
         const inventoryPath = join(process.cwd(), 'ansible-inventory.ini')
         writeFileSync(inventoryPath, `[${config.name}]\n${serverIp}\n`)
 
