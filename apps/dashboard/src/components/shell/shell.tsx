@@ -1,6 +1,7 @@
 'use client'
 import { usePathname } from 'next/navigation'
 import { useTheme } from '@/hooks/use-theme'
+import { useSwipeBack } from '@/hooks/use-swipe-back'
 import { Sidebar } from './sidebar'
 import { TabBar } from './tab-bar'
 
@@ -20,6 +21,7 @@ interface ShellProps {
 export function Shell({ children }: ShellProps) {
   const pathname = usePathname()
   const { theme, toggleTheme } = useTheme()
+  useSwipeBack()
   const active = pathToActive(pathname)
 
   return (
