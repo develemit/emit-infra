@@ -48,6 +48,12 @@ export function registerSetup(program: Command): void {
         process.exit(1)
       }
 
+      if (config.stripe && !process.env.STRIPE_SECRET_KEY) {
+        console.error(chalk.red('\nThis project has Stripe enabled but STRIPE_SECRET_KEY is not set.'))
+        console.error(chalk.gray('  export STRIPE_SECRET_KEY="sk_live_..."'))
+        process.exit(1)
+      }
+
       console.log(chalk.bold(`\nSetting up ${chalk.cyan(config.name)}\n`))
 
       // ── Step 1: SSH key ──────────────────────────────────────────────────────
@@ -137,6 +143,11 @@ export function registerSetup(program: Command): void {
       await execa('gh', ['secret', 'set', 'SERVER_IP', '--repo', config.github.repo, '--body', serverIp])
       await execa('gh', ['secret', 'set', 'SSH_PRIVATE_KEY', '--repo', config.github.repo, '--body', privateKeyContent])
       ok(`SERVER_IP (${serverIp}) and SSH_PRIVATE_KEY pushed`)
+
+      if (config.stripe) {
+        await execa('gh', ['secret', 'set', 'STRIPE_SECRET_KEY', '--repo', config.github.repo, '--body', process.env.STRIPE_SECRET_KEY!])
+        ok(`STRIPE_SECRET_KEY pushed (${config.stripe.mode} mode)`)
+      }
 
       for (const [secretKey, secretValue] of Object.entries(r2Secrets)) {
         await execa('gh', ['secret', 'set', secretKey, '--repo', config.github.repo, '--body', secretValue])

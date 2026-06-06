@@ -32,6 +32,11 @@ export const ProjectConfigSchema = z.object({
       customConfigSrc: z.string().optional(),
     })
     .optional(),
+  stripe: z
+    .object({
+      mode: z.enum(['test', 'live']).default('live'),
+    })
+    .optional(),
   deploy: z
     .object({
       appDir: z.string().default('/app'),
