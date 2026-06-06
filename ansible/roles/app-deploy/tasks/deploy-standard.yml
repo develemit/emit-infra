@@ -32,7 +32,7 @@
   when: rollback_enabled | default(true)
   block:
     - name: Verify app is serving traffic
-      command: "{{ app_dir }}/health-check.sh {{ app_port | default(3000) }} {{ health_check_retries | default(10) }}"
+      command: "{{ app_dir }}/health-check.sh {{ app_port | default(3000) }} {{ health_check_retries | default(10) }} {{ health_check_path | default('/') }} {{ health_check_backoff | default(3) }}"
 
   rescue:
     - name: "ROLLBACK: Restore previous images"
@@ -46,12 +46,12 @@
         chdir: "{{ app_dir }}"
 
     - name: "ROLLBACK: Verify rollback is serving traffic"
-      command: "{{ app_dir }}/health-check.sh {{ app_port | default(3000) }} {{ health_check_retries | default(10) }}"
+      command: "{{ app_dir }}/health-check.sh {{ app_port | default(3000) }} {{ health_check_retries | default(10) }} {{ health_check_path | default('/') }} {{ health_check_backoff | default(3) }}"
 
     - name: "ROLLBACK: Fail with descriptive message"
       fail:
         msg: "Deploy failed, rolled back to previous image. The previous version is now serving traffic."
 
 - name: Verify app is serving traffic (without rollback)
-  command: "{{ app_dir }}/health-check.sh {{ app_port | default(3000) }} {{ health_check_retries | default(10) }}"
+  command: "{{ app_dir }}/health-check.sh {{ app_port | default(3000) }} {{ health_check_retries | default(10) }} {{ health_check_path | default('/') }} {{ health_check_backoff | default(3) }}"
   when: not (rollback_enabled | default(true))

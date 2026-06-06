@@ -54,7 +54,7 @@
     {{ web_image.stdout | trim }}
 
 - name: Health-check standby on port {{ zd_standby_port }}
-  command: "{{ app_dir }}/health-check.sh {{ zd_standby_port }} {{ health_check_retries | default(10) }}"
+  command: "{{ app_dir }}/health-check.sh {{ zd_standby_port }} {{ health_check_retries | default(10) }} {{ health_check_path | default('/') }} {{ health_check_backoff | default(3) }}"
   register: standby_health
   ignore_errors: true
 
@@ -90,7 +90,7 @@
     chdir: "{{ app_dir }}"
 
 - name: Health-check compose on original port {{ zd_app_port }}
-  command: "{{ app_dir }}/health-check.sh {{ zd_app_port }} {{ health_check_retries | default(10) }}"
+  command: "{{ app_dir }}/health-check.sh {{ zd_app_port }} {{ health_check_retries | default(10) }} {{ health_check_path | default('/') }} {{ health_check_backoff | default(3) }}"
 
 - name: Point nginx back to compose port
   template:
