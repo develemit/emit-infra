@@ -9,10 +9,14 @@
     "lint": "nx run-many -t lint",
     "typecheck": "nx run-many -t typecheck",
     "test": "nx run-many -t test",
-    "graph": "nx graph"
+    "graph": "nx graph",
+    "tailscale:serve": "tailscale serve --bg --https=7003 http://127.0.0.1:7013",
+    "tailscale:stop": "tailscale serve --https=7003 off"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["sharp"]
+    "onlyBuiltDependencies": [
+      "sharp"
+    ]
   },
   "devDependencies": {
     "@nx/eslint": "^21.0.0",
@@ -20,6 +24,7 @@
     "@types/node": "^22.0.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
+    "esbuild": "^0.28.0",
     "eslint": "^9.0.0",
     "nx": "^21.0.0",
     "prettier": "^3.0.0",

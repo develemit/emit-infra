@@ -5,15 +5,11 @@
   "projectType": "application",
   "targets": {
     "build": {
-      "executor": "@nx/js:tsc",
-      "outputs": ["{options.outputPath}"],
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/dist"],
       "options": {
-        "outputPath": "dist/apps/cli",
-        "tsConfig": "apps/cli/tsconfig.json",
-        "main": "apps/cli/src/index.ts",
-        "assets": []
-      },
-      "dependsOn": ["^build"]
+        "command": "node apps/cli/esbuild.mjs"
+      }
     },
     "typecheck": {
       "executor": "nx:run-commands",
