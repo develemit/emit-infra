@@ -7,13 +7,22 @@
     group: "{{ ansible_user }}"
     mode: "0755"
 
-- name: Copy docker-compose.yml
+- name: Copy docker-compose file
   copy:
     src: "{{ compose_src | default('docker-compose.yml') }}"
-    dest: "{{ app_dir }}/docker-compose.yml"
+    dest: "{{ app_dir }}/{{ compose_dest | default('docker-compose.yml') }}"
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: "0644"
+
+- name: Copy extra files
+  copy:
+    src: "{{ item.src }}"
+    dest: "{{ app_dir }}/{{ item.dest }}"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0644"
+  loop: "{{ extra_files | default([]) }}"
 
 - name: Copy .env file
   copy:
@@ -25,14 +34,37 @@
   when: copy_env | default(false)
 
 - name: Pull latest images
-  command: docker compose pull
+  command: docker compose -f {{ compose_dest | default('docker-compose.yml') }} pull
   args:
     chdir: "{{ app_dir }}"
 
 - name: Start or restart app stack
-  command: docker compose up -d --remove-orphans
+  command: docker compose -f {{ compose_dest | default('docker-compose.yml') }} up -d --remove-orphans
   args:
     chdir: "{{ app_dir }}"
+
+- name: Copy health-check script
+  copy:
+    src: health-check.sh
+    dest: "{{ app_dir }}/health-check.sh"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0755"
+
+- name: Verify app is serving traffic
+  command: "{{ app_dir }}/health-check.sh {{ app_port | default(3000) }} {{ health_check_retries | default(10) }}"
+  register: health_check_result
+  failed_when: health_check_result.rc != 0
+
+- name: Run post-deploy commands
+  command: docker compose -f {{ compose_dest | default('docker-compose.yml') }} exec -T {{ item.service }} {{ item.command }}
+  args:
+    chdir: "{{ app_dir }}"
+  loop: "{{ post_deploy_exec | default([]) }}"
+  retries: 5
+  delay: 3
+  register: post_deploy_result
+  until: post_deploy_result is succeeded
 
 - name: Remove dangling images
   command: docker image prune -f
