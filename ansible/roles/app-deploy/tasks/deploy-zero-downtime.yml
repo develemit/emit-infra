@@ -40,6 +40,28 @@
   register: compose_network
   changed_when: false
 
+- name: Extract env vars for first compose service
+  shell: >
+    docker compose -f {{ zd_compose_file }} config --format json |
+    python3 -c "
+    import json, sys
+    cfg = json.load(sys.stdin)
+    svcs = list(cfg.get('services', {}).values())
+    if not svcs: sys.exit(0)
+    env = svcs[0].get('environment', {})
+    for k, v in sorted(env.items()):
+        print(f'{k}={v if v is not None else \"\"}')
+    "
+  args:
+    chdir: "{{ app_dir }}"
+  register: standby_env
+
+- name: Write standby env file
+  copy:
+    content: "{{ standby_env.stdout }}\n"
+    dest: "{{ app_dir }}/.standby.env"
+    mode: "0600"
+
 - name: Remove any leftover standby container
   shell: docker rm -f app-standby 2>/dev/null || true
   changed_when: false
@@ -49,6 +71,7 @@
     docker run -d
     --name app-standby
     --network {{ compose_network.stdout | trim }}
+    --env-file {{ app_dir }}/.standby.env
     -p 127.0.0.1:{{ zd_standby_port }}:{{ zd_internal_port }}
     --restart no
     {{ web_image.stdout | trim }}
