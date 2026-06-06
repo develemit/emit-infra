@@ -11,6 +11,7 @@ import { registerDestroy } from './commands/destroy.js'
 import { registerAudit } from './commands/audit.js'
 import { registerRollback } from './commands/rollback.js'
 import { registerVersions } from './commands/versions.js'
+import { registerHooks } from './commands/hooks.js'
 
 const program = new Command()
 
@@ -30,6 +31,7 @@ registerDestroy(program)
 registerAudit(program)
 registerRollback(program)
 registerVersions(program)
+registerHooks(program)
 
 program.parseAsync(process.argv).catch((err: unknown) => {
   console.error(err instanceof Error ? err.message : String(err))
