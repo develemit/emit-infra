@@ -87,3 +87,6 @@
     name: fail2ban
     state: started
     enabled: true
+
+- name: Write R2 credentials to app .env
+  import_tasks: r2-env.yml

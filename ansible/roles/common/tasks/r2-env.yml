@@ -1,0 +1,11 @@
+---
+- name: Write R2 credential to app .env
+  lineinfile:
+    path: "{{ app_dir }}/.env"
+    regexp: "^{{ item.key }}="
+    line: "{{ item.key }}={{ item.value }}"
+    create: true
+    mode: "0600"
+  loop: "{{ r2_credentials | dict2items }}"
+  when: r2_credentials is defined and r2_credentials | length > 0
+  no_log: true

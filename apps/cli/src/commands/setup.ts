@@ -138,6 +138,9 @@ export function registerSetup(program: Command): void {
         if (config.deploy?.composeDest) {
           ansibleVars.compose_file = config.deploy.composeDest
         }
+        if (Object.keys(r2Secrets).length > 0) {
+          ansibleVars.r2_credentials = r2Secrets
+        }
 
         await runAnsible('provision', inventoryPath, ansibleVars)
         ok('Server configured')
