@@ -125,6 +125,9 @@ function buildPreCommitHook(config: ProjectConfig): string {
   return `#!/usr/bin/env bash
 set -euo pipefail
 
+echo "pre-commit: running checks on affected projects..."
+pnpm nx affected -t check:all:e2e --base=HEAD
+
 echo "pre-commit: verifying Docker build..."
 TMPLOG=$(mktemp)
 if ! docker build --build-arg BUILD_NUMBER=0 -t ${tag} . > "$TMPLOG" 2>&1; then
@@ -135,7 +138,7 @@ if ! docker build --build-arg BUILD_NUMBER=0 -t ${tag} . > "$TMPLOG" 2>&1; then
 fi
 rm -f "$TMPLOG"
 docker rmi ${tag} > /dev/null 2>&1 || true
-echo "pre-commit: Docker build passed."
+echo "pre-commit: all checks passed."
 `
 }
 
