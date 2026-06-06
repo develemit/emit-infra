@@ -1,9 +1,9 @@
 import { Command } from 'commander'
-import { writeFileSync, existsSync, mkdirSync, chmodSync } from 'node:fs'
+import { writeFileSync, existsSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import chalk from 'chalk'
 import type { ProjectConfig } from '@emit-infra/core'
-import { buildPreCommitHook } from '../lib/scaffold-hooks.js'
+import { writePreCommitHook } from '../lib/scaffold-hooks.js'
 
 export function registerInit(program: Command): void {
   program
@@ -48,20 +48,18 @@ export function registerInit(program: Command): void {
         console.log(chalk.green(`Created .github/workflows/deploy.yml`))
       }
 
-      const hooksDir = join(process.cwd(), '.githooks')
-      if (!existsSync(hooksDir)) mkdirSync(hooksDir, { recursive: true })
-      const hookPath = join(hooksDir, 'pre-commit')
-      if (!existsSync(hookPath)) {
-        writeFileSync(hookPath, buildPreCommitHook(config as ProjectConfig))
-        chmodSync(hookPath, 0o755)
-        console.log(chalk.green(`Created .githooks/pre-commit`))
+      const hookResult = writePreCommitHook(process.cwd(), config as ProjectConfig)
+      if (hookResult.written) {
+        console.log(chalk.green(`Created ${hookResult.path}`))
       }
 
       console.log(chalk.cyan(`\nNext steps:`))
       console.log(`  emit-infra provision ${name}`)
       console.log(`  emit-infra configure ${name}`)
       console.log(`  emit-infra deploy ${name}`)
-      console.log(`  git config core.hooksPath .githooks  # activate pre-commit hook`)
+      if (hookResult.written && !hookResult.husky) {
+        console.log(`  git config core.hooksPath .githooks  # activate pre-commit hook`)
+      }
       console.log(`  Push to GitHub to trigger the deploy workflow`)
     })
 }
