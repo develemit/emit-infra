@@ -1,5 +1,5 @@
 import { Command } from 'commander'
-import { writeFileSync, existsSync, mkdirSync } from 'node:fs'
+import { writeFileSync, existsSync, mkdirSync, chmodSync } from 'node:fs'
 import { join } from 'node:path'
 import chalk from 'chalk'
 import type { ProjectConfig } from '@emit-infra/core'
@@ -47,10 +47,20 @@ export function registerInit(program: Command): void {
         console.log(chalk.green(`Created .github/workflows/deploy.yml`))
       }
 
+      const hooksDir = join(process.cwd(), '.githooks')
+      if (!existsSync(hooksDir)) mkdirSync(hooksDir, { recursive: true })
+      const hookPath = join(hooksDir, 'pre-commit')
+      if (!existsSync(hookPath)) {
+        writeFileSync(hookPath, buildPreCommitHook(config as ProjectConfig))
+        chmodSync(hookPath, 0o755)
+        console.log(chalk.green(`Created .githooks/pre-commit`))
+      }
+
       console.log(chalk.cyan(`\nNext steps:`))
       console.log(`  emit-infra provision ${name}`)
       console.log(`  emit-infra configure ${name}`)
       console.log(`  emit-infra deploy ${name}`)
+      console.log(`  git config core.hooksPath .githooks  # activate pre-commit hook`)
       console.log(`  Push to GitHub to trigger the deploy workflow`)
     })
 }
@@ -107,6 +117,25 @@ jobs:
             docker compose up -d --remove-orphans
             docker image prune -f
             echo "\${{ github.run_number }}" > ${appDir}/.deployed-version
+`
+}
+
+function buildPreCommitHook(config: ProjectConfig): string {
+  const tag = `${config.name}:pre-commit-check`
+  return `#!/usr/bin/env bash
+set -euo pipefail
+
+echo "pre-commit: verifying Docker build..."
+TMPLOG=$(mktemp)
+if ! docker build --build-arg BUILD_NUMBER=0 -t ${tag} . > "$TMPLOG" 2>&1; then
+  cat "$TMPLOG"
+  rm -f "$TMPLOG"
+  echo "pre-commit: Docker build failed. Fix the above errors before committing."
+  exit 1
+fi
+rm -f "$TMPLOG"
+docker rmi ${tag} > /dev/null 2>&1 || true
+echo "pre-commit: Docker build passed."
 `
 }
 
