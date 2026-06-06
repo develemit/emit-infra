@@ -7,9 +7,10 @@ interface StatTileProps {
   label: string
   value: string
   mono?: boolean
+  color?: string
 }
 
-function StatTile({ icon, label, value, mono = true }: StatTileProps) {
+function StatTile({ icon, label, value, mono = true, color }: StatTileProps) {
   return (
     <div className="flex flex-col gap-1">
       <span className="text-[11.5px] text-subtle flex items-center gap-1.5">
@@ -17,13 +18,29 @@ function StatTile({ icon, label, value, mono = true }: StatTileProps) {
         {label}
       </span>
       <span
-        className={`text-[14px] font-semibold text-fg${mono ? ' font-mono' : ''}`}
-        style={{ letterSpacing: mono ? 0 : undefined }}
+        className={`text-[14px] font-semibold${mono ? ' font-mono' : ''}`}
+        style={{ letterSpacing: mono ? 0 : undefined, color: color ?? 'var(--fg)' }}
       >
         {value}
       </span>
     </div>
   )
+}
+
+function sslDaysLeft(expiry: string | null | undefined): { value: string; color?: string } {
+  if (!expiry) return { value: '—' }
+  const expiryDate = new Date(expiry)
+  if (isNaN(expiryDate.getTime())) return { value: '—' }
+  const days = Math.floor((expiryDate.getTime() - Date.now()) / 86_400_000)
+  if (days < 0) return { value: 'Expired', color: 'var(--err)' }
+  if (days < 14) return { value: `${days}d`, color: 'var(--warn, #e5a00d)' }
+  return { value: `${days}d` }
+}
+
+function nginxLabel(status: string | null | undefined): { value: string; color?: string } {
+  if (!status) return { value: '—' }
+  if (status === 'active') return { value: 'Active', color: 'var(--ok, #22c55e)' }
+  return { value: 'Down', color: 'var(--err)' }
 }
 
 interface HealthCardProps {
@@ -46,6 +63,8 @@ export function HealthCard({ project, status, polledAgo }: HealthCardProps) {
   const region = status.region ?? project.config.region
   const serverType = status.serverType ?? '—'
   const ip = status.ip ?? '—'
+  const nginx = nginxLabel(status.nginxStatus)
+  const ssl = sslDaysLeft(status.sslExpiry)
 
   return (
     <div className="rounded-xl border border-border bg-card" style={{ padding: 18 }}>
@@ -72,6 +91,8 @@ export function HealthCard({ project, status, polledAgo }: HealthCardProps) {
         <StatTile icon="cpu" label="Server" value={serverType} />
         <StatTile icon="link" label="Public IP" value={ip} />
         <StatTile icon="hash" label="Build" value={status.buildNumber ?? '—'} />
+        <StatTile icon="shield" label="Nginx" value={nginx.value} color={nginx.color} />
+        <StatTile icon="lock" label="SSL" value={ssl.value} color={ssl.color} />
       </div>
 
       {/* Mobile: 2-col stat grid */}
@@ -79,6 +100,7 @@ export function HealthCard({ project, status, polledAgo }: HealthCardProps) {
         <StatTile icon="clock" label="Uptime" value={uptime} mono={false} />
         <StatTile icon="globe" label="Region" value={region} />
         <StatTile icon="hash" label="Build" value={status.buildNumber ?? '—'} />
+        <StatTile icon="shield" label="Nginx" value={nginx.value} color={nginx.color} />
       </div>
 
       {/* Desktop: side-by-side lg meters */}

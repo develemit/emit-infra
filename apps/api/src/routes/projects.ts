@@ -20,6 +20,9 @@ type StatusData = {
   httpStatus: number | null
   serverType: string | undefined; region: string | undefined; ip: string
   buildNumber: string | null
+  nginxStatus: string | null
+  nginxConfigured: boolean
+  sslExpiry: string | null
 }
 
 async function checkHttp(domain: string): Promise<number | null> {
@@ -117,12 +120,12 @@ export async function projectRoutes(app: FastifyInstance) {
       const [raw, httpStatus] = await Promise.all([
         sshExec(
           host,
-          `uptime -p; df -h / | tail -1 | awk '{print $5, $3, $2}'; free -m | awk 'NR==2{printf "%.0f %dM %dM\\n", $3/$2*100, $3, $2}'; docker ps -q --filter status=running | wc -l; docker ps -aq | wc -l; docker ps -q --filter status=restarting --filter status=dead | wc -l; cat /opt/${req.params.name}/.deployed-version 2>/dev/null || echo ""`,
+          `uptime -p; df -h / | tail -1 | awk '{print $5, $3, $2}'; free -m | awk 'NR==2{printf "%.0f %dM %dM\\n", $3/$2*100, $3, $2}'; docker ps -q --filter status=running | wc -l; docker ps -aq | wc -l; docker ps -q --filter status=restarting --filter status=dead | wc -l; cat /opt/${req.params.name}/.deployed-version 2>/dev/null || echo ""; systemctl is-active nginx 2>/dev/null || echo "unknown"; test -f /etc/nginx/sites-enabled/${req.params.name} && echo "configured" || echo "missing"; openssl x509 -enddate -noout -in /etc/letsencrypt/live/${domain}/fullchain.pem 2>/dev/null | sed 's/notAfter=//' || echo ""`,
           key,
         ),
         checkHttp(domain),
       ])
-      const [uptimeLine, diskLine, memLine, containerLine, totalLine, unhealthyLine, buildNumberLine] = raw.split('\n').map(l => l.trim())
+      const [uptimeLine, diskLine, memLine, containerLine, totalLine, unhealthyLine, buildNumberLine, nginxStatusLine, nginxConfigLine, sslExpiryLine] = raw.split('\n').map(l => l.trim())
       const diskParts = (diskLine ?? '').split(' ')
       const memParts = (memLine ?? '').split(' ')
       const data: StatusData = {
@@ -141,6 +144,9 @@ export async function projectRoutes(app: FastifyInstance) {
         region: projectConfig?.['region'] as string | undefined,
         ip: host,
         buildNumber: buildNumberLine || null,
+        nginxStatus: nginxStatusLine && nginxStatusLine !== 'unknown' ? nginxStatusLine : null,
+        nginxConfigured: nginxConfigLine === 'configured',
+        sslExpiry: sslExpiryLine || null,
       }
       statusCache.set(req.params.name, data)
       return data

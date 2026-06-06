@@ -37,6 +37,9 @@ export interface ProjectStatus {
   region?: string
   ip?: string
   buildNumber?: string | null
+  nginxStatus?: string | null
+  nginxConfigured?: boolean
+  sslExpiry?: string | null
   error?: string
 }
 
