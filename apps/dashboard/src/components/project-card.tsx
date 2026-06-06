@@ -2,37 +2,20 @@
 import Link from 'next/link'
 import type { ProjectSummary, ProjectStatus } from '@/lib/api'
 import { Icon } from '@/components/icon'
-import { Badge, type BadgeVariant } from '@/components/ui/badge'
+import { Badge } from '@/components/ui/badge'
 import { Meter } from '@/components/ui/meter'
 import { Skeleton } from '@/components/ui/skeleton'
+import { deriveHealth } from '@/lib/health'
 
 interface Props {
   project: ProjectSummary
   status: ProjectStatus | null
 }
 
-function deriveVariant(status: ProjectStatus | null): BadgeVariant {
-  if (status === null) return 'muted'
-  if (status.error) return 'err'
-  const disk = status.disk ?? 0
-  const mem = status.memory ?? 0
-  if (disk >= 80 || mem >= 80) return 'warn'
-  return 'ok'
-}
-
-const variantLabel: Record<BadgeVariant, string> = {
-  ok: 'Healthy',
-  warn: 'Degraded',
-  err: 'Unreachable',
-  muted: 'Loading',
-  accent: 'Accent',
-  region: 'Region',
-}
-
 export function ProjectCard({ project, status }: Props) {
   const { name, domain, region } = project.config
-  const variant = deriveVariant(status)
-  const reachable = variant === 'ok' || variant === 'warn'
+  const { variant, label } = deriveHealth(status)
+  const reachable = status !== null && !status.error
   const loading = status === null
   const disk = status?.disk ?? 0
   const mem = status?.memory ?? 0
@@ -50,10 +33,13 @@ export function ProjectCard({ project, status }: Props) {
           <div className="text-[12px] font-mono text-muted flex items-center gap-1.5 mt-0.5">
             <Icon name="globe" size={12} style={{ opacity: 0.6 }} />
             <span className="truncate">{domain}</span>
+            {status?.buildNumber && (
+              <span className="text-subtle whitespace-nowrap">v{status.buildNumber}</span>
+            )}
           </div>
         </div>
         <Badge variant={variant} dot loading={loading}>
-          {variantLabel[variant]}
+          {label}
         </Badge>
       </div>
 
@@ -93,7 +79,7 @@ export function ProjectCard({ project, status }: Props) {
         </span>
         <span className="text-[12px] font-mono text-subtle flex items-center gap-1.5 whitespace-nowrap">
           <Icon name="box" size={13} />
-          {status?.containerCount != null ? `${status.containerCount} running` : '— running'}
+          {status?.containerTotal != null ? `${status.containerCount ?? 0}/${status.containerTotal} running` : '— running'}
         </span>
       </div>
     </Link>

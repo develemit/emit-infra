@@ -32,9 +32,16 @@ interface HealthCardProps {
   polledAgo?: string
 }
 
+function sizeLabel(label: string, used?: string, total?: string): string {
+  if (used && total) return `${label} · ${used} / ${total}`
+  return label
+}
+
 export function HealthCard({ project, status, polledAgo }: HealthCardProps) {
   const disk = status.disk ?? 0
   const mem = status.memory ?? 0
+  const diskLabel = sizeLabel('Disk', status.diskUsed, status.diskTotal)
+  const memLabel = sizeLabel('Memory', status.memUsed, status.memTotal)
   const uptime = status.uptime?.replace('up ', '') ?? '—'
   const region = status.region ?? project.config.region
   const serverType = status.serverType ?? '—'
@@ -64,24 +71,26 @@ export function HealthCard({ project, status, polledAgo }: HealthCardProps) {
         <StatTile icon="globe" label="Region" value={region} />
         <StatTile icon="cpu" label="Server" value={serverType} />
         <StatTile icon="link" label="Public IP" value={ip} />
+        <StatTile icon="hash" label="Build" value={status.buildNumber ?? '—'} />
       </div>
 
       {/* Mobile: 2-col stat grid */}
       <div className="lg:hidden grid grid-cols-2 gap-4 mb-5">
         <StatTile icon="clock" label="Uptime" value={uptime} mono={false} />
         <StatTile icon="globe" label="Region" value={region} />
+        <StatTile icon="hash" label="Build" value={status.buildNumber ?? '—'} />
       </div>
 
       {/* Desktop: side-by-side lg meters */}
       <div className="hidden lg:flex gap-6">
-        <div className="flex-1"><Meter label="Disk · /dev/sda1" value={disk} lg /></div>
-        <div className="flex-1"><Meter label="Memory" value={mem} lg /></div>
+        <div className="flex-1"><Meter label={diskLabel} value={disk} lg /></div>
+        <div className="flex-1"><Meter label={memLabel} value={mem} lg /></div>
       </div>
 
       {/* Mobile: stacked lg meters */}
       <div className="lg:hidden flex flex-col gap-3">
-        <Meter label="Disk" value={disk} lg />
-        <Meter label="Memory" value={mem} lg />
+        <Meter label={diskLabel} value={disk} lg />
+        <Meter label={memLabel} value={mem} lg />
       </div>
     </div>
   )
