@@ -89,7 +89,7 @@ function auditDockerfile(filepath: string, content: string): Issue[] {
   }
 
   // npm install without --production / npm ci
-  const npmLines = lines.filter(l => /npm install(?!.*--production)(?!.*--omit=dev)/i.test(l))
+  const npmLines = lines.filter(l => /\bnpm install(?!.*--production)(?!.*--omit=dev)/i.test(l))
   if (npmLines.length && !lines.some(l => /npm ci/i.test(l))) {
     issues.push({
       severity: 'warn',
