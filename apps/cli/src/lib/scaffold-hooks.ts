@@ -30,23 +30,35 @@ export function writePreCommitHook(cwd: string, config: ProjectConfig, force = f
 }
 
 export function buildPreCommitHook(config: ProjectConfig): string {
-  const tag = `${config.name}:pre-commit-check`
   return `#!/usr/bin/env bash
 set -euo pipefail
 
 echo "pre-commit: running checks on affected projects..."
 pnpm nx affected -t check:all:e2e --base=HEAD
 
-echo "pre-commit: verifying Docker build..."
-TMPLOG=$(mktemp)
-if ! docker build --build-arg BUILD_NUMBER=0 -t ${tag} . > "$TMPLOG" 2>&1; then
-  cat "$TMPLOG"
-  rm -f "$TMPLOG"
-  echo "pre-commit: Docker build failed. Fix the above errors before committing."
-  exit 1
+if [ "\${EMIT_INFRA_DOCKER_CHECK:-0}" = "1" ]; then
+  echo "pre-commit: verifying Docker builds..."
+  FAILED=0
+  for df in $(find . -name 'Dockerfile' -not -path '*/node_modules/*' -not -path '*/.next/*'); do
+    APP=$(dirname "$df")
+    TAG="$(basename $(pwd))-$(basename $APP):pre-commit-check"
+    TMPLOG=$(mktemp)
+    echo "  building $df..."
+    if ! docker build -f "$df" --build-arg BUILD_NUMBER=0 -t "$TAG" . > "$TMPLOG" 2>&1; then
+      cat "$TMPLOG"
+      rm -f "$TMPLOG"
+      echo "pre-commit: Docker build failed for $df"
+      FAILED=1
+    else
+      rm -f "$TMPLOG"
+      docker rmi "$TAG" > /dev/null 2>&1 || true
+    fi
+  done
+  if [ "$FAILED" -eq 1 ]; then
+    echo "pre-commit: fix Docker errors above before committing."
+    exit 1
+  fi
 fi
-rm -f "$TMPLOG"
-docker rmi ${tag} > /dev/null 2>&1 || true
 echo "pre-commit: all checks passed."
 `
 }
