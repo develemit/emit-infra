@@ -1,5 +1,5 @@
 import { Command } from 'commander'
-import { writeFileSync, existsSync, mkdirSync } from 'node:fs'
+import { writeFileSync, existsSync, mkdirSync, readFileSync, appendFileSync } from 'node:fs'
 import { join } from 'node:path'
 import chalk from 'chalk'
 import type { ProjectConfig } from '@emit-infra/core'
@@ -48,6 +48,8 @@ export function registerInit(program: Command): void {
         console.log(chalk.green(`Created .github/workflows/deploy.yml`))
       }
 
+      ensureGitignoreEntry(process.cwd(), '.env.prod')
+
       const hookResult = writePreCommitHook(process.cwd(), config as ProjectConfig)
       if (hookResult.written) {
         console.log(chalk.green(`Created ${hookResult.path}`))
@@ -62,6 +64,18 @@ export function registerInit(program: Command): void {
       }
       console.log(`  Push to GitHub to trigger the deploy workflow`)
     })
+}
+
+function ensureGitignoreEntry(cwd: string, entry: string): void {
+  const gitignorePath = join(cwd, '.gitignore')
+  if (existsSync(gitignorePath)) {
+    const current = readFileSync(gitignorePath, 'utf-8')
+    if (!current.split('\n').some(l => l.trim() === entry)) {
+      appendFileSync(gitignorePath, `\n${entry}\n`)
+    }
+  } else {
+    writeFileSync(gitignorePath, `${entry}\n`)
+  }
 }
 
 function buildWorkflow(config: ProjectConfig): string {
