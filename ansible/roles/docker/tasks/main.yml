@@ -45,11 +45,3 @@
     name: "{{ ansible_user }}"
     groups: docker
     append: true
-
-- name: Weekly Docker system prune cron job
-  cron:
-    name: docker-system-prune
-    weekday: "0"
-    hour: "3"
-    minute: "0"
-    job: "docker system prune -f >> /var/log/docker-prune.log 2>&1"
