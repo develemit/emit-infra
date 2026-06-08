@@ -12,6 +12,7 @@ export interface TtlCache<T> {
    *  itself be null/falsy, so callers should check `!== undefined`. */
   get(key: string): T | undefined;
   set(key: string, value: T): void;
+  invalidate(key: string): void;
 }
 
 export function createTtlCache<T>(ttlMs: number): TtlCache<T> {
@@ -25,6 +26,9 @@ export function createTtlCache<T>(ttlMs: number): TtlCache<T> {
     },
     set(key, value) {
       store.set(key, { ts: Date.now(), value });
+    },
+    invalidate(key) {
+      store.delete(key);
     },
   };
 }

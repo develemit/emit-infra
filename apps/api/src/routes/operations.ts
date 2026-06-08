@@ -55,10 +55,18 @@ export async function operationRoutes(app: FastifyInstance) {
       return sseError(reply.raw, `inventory.ini not found at ~/projects/${name}/inventory.ini`)
     }
 
+    const deployVars: Record<string, unknown> = { project_name: name }
+    if (project.config.postgres) {
+      deployVars['postgres_version'] = project.config.postgres.version ?? '16'
+      if (project.config.postgres.backupBucket) {
+        deployVars['postgres_backup_bucket'] = project.config.postgres.backupBucket
+      }
+    }
+
     let exitCode = 0
     try {
       await Promise.race([
-        runAnsible('deploy', inventory, { project_name: name }, (stream, text) => {
+        runAnsible('deploy', inventory, deployVars, (stream, text) => {
           writeEvent(reply.raw, { type: 'line', stream, text })
         }),
         operationTimeout(),
@@ -94,7 +102,7 @@ export async function operationRoutes(app: FastifyInstance) {
         domain: (config['domain'] as string) ?? '',
         ...(config['region'] ? { region: config['region'] as string } : {}),
         ...(config['serverType'] ? { serverType: config['serverType'] as string } : {}),
-        ...(config['sshKey'] ? { sshKey: config['sshKey'] as string } : {}),
+        ...(config['sshKeyName'] ? { sshKey: config['sshKeyName'] as string } : {}),
       })
     }
 
@@ -124,7 +132,7 @@ export async function operationRoutes(app: FastifyInstance) {
     if (exitCode === 0) {
       try {
         const ip = await getTerraformOutput('server_ip', terraformDir)
-        await writeInventory(name, ip)
+        await writeInventory(name, ip, (config?.['sshKeyName'] as string | undefined) ?? 'emit-deploy')
       } catch {
         // inventory.ini can be written manually if terraform output fails
       }

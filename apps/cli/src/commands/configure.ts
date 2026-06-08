@@ -2,7 +2,7 @@ import { Command } from 'commander'
 import { join } from 'node:path'
 import { existsSync } from 'node:fs'
 import chalk from 'chalk'
-import { loadConfig, runAnsible } from '@emit-infra/core'
+import { loadConfig, runAnsible, type ProjectConfig } from '@emit-infra/core'
 
 export function registerConfigure(program: Command): void {
   program
@@ -15,7 +15,7 @@ export function registerConfigure(program: Command): void {
 
       console.log(chalk.cyan(`Configuring server for ${chalk.bold(config.name)}...`))
 
-      const inventory = opts.inventory ?? (await resolveInventoryPath(config.name))
+      const inventory = opts.inventory ?? (await resolveInventoryPath(config.name, config))
 
       await runAnsible('provision', inventory, { project_name: config.name, domain: config.domain })
 
@@ -23,13 +23,19 @@ export function registerConfigure(program: Command): void {
     })
 }
 
-export async function resolveInventoryPath(projectName: string): Promise<string> {
-  const tfDir = join(process.cwd(), 'terraform')
+export async function resolveInventoryPath(projectName: string, config?: ProjectConfig): Promise<string> {
   const inventoryPath = join(process.cwd(), 'ansible-inventory.ini')
 
   if (existsSync(inventoryPath)) return inventoryPath
 
-  // Try to get IP from terraform output
+  if (config?.serverIp) {
+    const keyFile = `~/.ssh/${config.sshKeyName}`
+    const { writeFileSync } = await import('node:fs')
+    writeFileSync(inventoryPath, `[${projectName}]\n${config.serverIp} ansible_user=root ansible_ssh_private_key_file=${keyFile}\n`)
+    return inventoryPath
+  }
+
+  const tfDir = join(process.cwd(), 'terraform')
   try {
     const { execa } = await import('execa')
     const result = await execa('terraform', ['-chdir=' + tfDir, 'output', '-raw', 'server_ip'])

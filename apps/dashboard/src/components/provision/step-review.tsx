@@ -38,6 +38,7 @@ export function StepReview({ values, onNext, onBack }: Props) {
         <KV k="SSH key" v={values.sshKey || 'emit-deploy'} />
         <KV k="R2 buckets" v={values.r2Buckets.length > 0 ? values.r2Buckets.join(', ') : 'none'} />
         <KV k="Redis" v={values.redis ? 'enabled' : 'disabled'} />
+        <KV k="Postgres" v={values.postgres ? `enabled · backup → ${values.postgresBucket || '(no bucket set)'}` : 'disabled'} />
       </div>
 
       <div

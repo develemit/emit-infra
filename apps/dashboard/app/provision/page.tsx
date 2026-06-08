@@ -23,6 +23,7 @@ const DEFAULT_VALUES: FormValues = {
   name: '', domain: '', githubRepo: '',
   region: 'nbg1', serverType: 'cx22', sshKey: 'emit-deploy',
   r2Buckets: [], redis: false,
+  postgres: true, postgresBucket: '',
 }
 
 export default function ProvisionPage() {
@@ -43,6 +44,7 @@ export default function ProvisionPage() {
     sshKeyName: values.sshKey,
     ...(values.r2Buckets.length > 0 ? { r2: { buckets: values.r2Buckets } } : {}),
     ...(values.redis ? { upstash: { region: 'eu-central-1' } } : {}),
+    ...(values.postgres ? { postgres: { version: '16', ...(values.postgresBucket ? { backupBucket: values.postgresBucket } : {}) } } : {}),
   }
 
   const { url: streamUrl, body: streamBody } = provisionProject(values.name || 'project', config)

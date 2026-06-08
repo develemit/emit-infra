@@ -7,16 +7,13 @@ const ANSIBLE_DIR = new URL('../../../ansible', import.meta.url).pathname
 export async function runAnsible(
   playbook: 'provision' | 'deploy',
   inventory: string,
-  extraVars?: Record<string, string>,
+  extraVars?: Record<string, unknown>,
   onLine?: (stream: 'stdout' | 'stderr', text: string) => void,
 ): Promise<void> {
   const args = [join(ANSIBLE_DIR, 'playbooks', `${playbook}.yml`), '-i', inventory]
 
   if (extraVars) {
-    const vars = Object.entries(extraVars)
-      .map(([k, v]) => `${k}=${v}`)
-      .join(' ')
-    args.push('--extra-vars', vars)
+    args.push('--extra-vars', JSON.stringify(extraVars))
   }
 
   if (!onLine) {

@@ -31,13 +31,99 @@ node dist/apps/cli/index.js --help
 
 | Command | Description |
 |---|---|
-| `emit-infra init <name>` | Scaffold `.emit-infra.json` and a Terraform root for a project |
-| `emit-infra provision <name>` | Run `terraform apply` to create all infrastructure |
-| `emit-infra configure <name>` | Run the full Ansible provision playbook on the server |
-| `emit-infra deploy <name>` | Pull latest Docker images and restart the app |
-| `emit-infra status <name>` | SSH health check: uptime, disk, memory, containers |
-| `emit-infra secrets sync <name>` | Push `.env` to GitHub repo secrets |
-| `emit-infra destroy <name>` | Destroy all Terraform-managed infrastructure |
+| `emit-infra setup` | One-time machine setup: checks Terraform, Ansible, pnpm, Node, gh CLI |
+| `emit-infra init <name>` | Scaffold `.emit-infra.json` and a Terraform root for a new project |
+| `emit-infra provision` | Run `terraform apply` — creates VPS, DNS, firewall, R2 buckets, Redis |
+| `emit-infra configure` | Run the full Ansible playbook on the server (Docker, nginx, SSL, swap) |
+| `emit-infra deploy` | SSH → pull latest Docker images → `docker compose up -d` |
+| `emit-infra status` | SSH health check: uptime, disk %, memory %, running containers |
+| `emit-infra audit` | Inspect Dockerfiles + remote image sizes for production-readiness issues |
+| `emit-infra secrets sync` | Push local `.env` values to GitHub repo secrets via `gh` CLI |
+| `emit-infra destroy` | Destroy all Terraform-managed infrastructure (irreversible) |
+
+All commands except `setup` and `init` read `.emit-infra.json` from the current directory (or a parent) to locate the project config.
+
+#### `emit-infra audit` — what it checks
+
+Run from any project root that has Dockerfiles. Exits with code 1 if any critical issues are found (CI-safe).
+
+**Local (Dockerfile analysis):**
+- `CRIT` — CMD/ENTRYPOINT runs a `dev` script in production (e.g. `pnpm dev`, `next dev`)
+- `CRIT` — No multi-stage build: all source files and devDependencies land in the final image
+- `WARN` — `pnpm install` without `--frozen-lockfile`
+- `WARN` — `.dockerignore` missing recommended exclusions (`.git`, `**/*.test.*`, `.env*`, `*.md`)
+- `INFO` — `COPY . .` detected: verify `.dockerignore` is comprehensive
+
+**Remote (SSH into the server):**
+- `WARN` — Container image > 500 MB
+- `CRIT` — Container image > 1 GB (target for a Next.js app: 200–400 MB)
+
+```bash
+emit-infra audit                          # local checks + SSH to config domain
+emit-infra audit --host 1.2.3.4          # override SSH target
+emit-infra audit --key ~/.ssh/my-key     # override SSH key (default: ~/.ssh/id_ed25519)
+emit-infra audit --local                 # skip SSH, local Dockerfile analysis only
+```
+
+#### Flags available on most commands
+
+```bash
+--config <path>    Path to .emit-infra.json (auto-discovered if omitted)
+--key <path>       SSH private key path
+--host <ip>        Override the server IP/hostname
+--inventory <path> Ansible inventory path (configure, deploy)
+```
+
+## Docker conventions
+
+Projects in this stack run via Docker Compose. Each app should have a production-ready Dockerfile following these rules — `emit-infra audit` checks them automatically.
+
+### Required: multi-stage build
+
+```dockerfile
+# ── Stage 1: build ───────────────────────────────────────────────
+FROM node:22-bookworm-slim AS builder
+RUN corepack enable
+WORKDIR /app
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile
+COPY . .
+RUN pnpm build:web          # runs "next build"
+
+# ── Stage 2: runtime ─────────────────────────────────────────────
+FROM node:22-bookworm-slim AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+# Copy only the built output — no source, no devDeps
+COPY --from=builder /app/apps/web/.next/standalone ./
+COPY --from=builder /app/apps/web/.next/static ./.next/static
+COPY --from=builder /app/apps/web/public ./public
+EXPOSE 3000
+CMD ["node", "server.js"]
+```
+
+Key rules:
+- **Never run a dev server in production** (`pnpm dev`, `next dev`). Dev servers run webpack in watch mode and accumulate memory indefinitely.
+- **Copy only the build output** to the runner stage — no `node_modules` (except pruned prod deps), no `.ts` source, no test files.
+- **Enable Next.js standalone output** in `next.config.ts`: `output: 'standalone'`. This bundles only the required Node modules, reducing image size from ~2 GB to ~300 MB.
+- **Use `--frozen-lockfile`** on every `pnpm install` in a Dockerfile.
+
+### `.dockerignore` template
+
+```
+node_modules
+.next
+dist
+.nx
+.git
+coverage
+playwright-report
+test-results
+**/*.test.*
+**/*.spec.*
+*.md
+.env*
+```
 
 ## Project config
 

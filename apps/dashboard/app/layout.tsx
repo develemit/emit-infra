@@ -4,6 +4,7 @@ import { GeistMono } from 'geist/font/mono'
 import './globals.css'
 import { Shell } from '@/components/shell/shell'
 import { SwRegister } from '@/components/sw-register'
+import { SplashGate } from '@/components/splash-screen'
 
 export const metadata: Metadata = {
   title: 'Emit Infra',
@@ -42,6 +43,7 @@ export default function RootLayout({
       <body>
         <Shell>{children}</Shell>
         <SwRegister />
+        <SplashGate />
       </body>
     </html>
   )

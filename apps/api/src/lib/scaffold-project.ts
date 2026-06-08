@@ -91,9 +91,9 @@ export async function scaffoldProject(config: ProvisionConfig): Promise<void> {
   await writeIfAbsent(join(terraformDir, 'terraform.tfvars'), tfvars(full))
 }
 
-export async function writeInventory(name: string, ip: string): Promise<void> {
+export async function writeInventory(name: string, ip: string, sshKeyName = 'emit-deploy'): Promise<void> {
   const content = `[all]
-${ip} ansible_user=root ansible_ssh_private_key_file=~/.ssh/emit-deploy
+${ip} ansible_user=root ansible_ssh_private_key_file=~/.ssh/${sshKeyName}
 
 [all:vars]
 ansible_ssh_common_args='-o StrictHostKeyChecking=no'

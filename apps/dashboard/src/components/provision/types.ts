@@ -7,4 +7,6 @@ export interface FormValues {
   sshKey: string
   r2Buckets: string[]
   redis: boolean
+  postgres: boolean
+  postgresBucket: string
 }

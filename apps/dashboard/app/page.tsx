@@ -14,6 +14,7 @@ export default function HomePage() {
   const fetchAll = useCallback(async () => {
     const ps = await getProjects()
     setProjects(ps)
+    window.dispatchEvent(new Event('emit:ready'))
     ps.forEach((p) => {
       void getStatus(p.config.name).then(
         (s) => setStatuses((prev) => ({ ...prev, [p.config.name]: s })),

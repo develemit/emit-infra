@@ -124,6 +124,32 @@ export function StepInfrastructure({ values, onChange, onNext, onBack }: Props) 
         <Switch on={values.redis} onChange={() => onChange({ redis: !values.redis })} />
       </div>
 
+      {/* Postgres toggle */}
+      <div
+        className="flex items-center gap-3 rounded-xl"
+        style={{ padding: '12px 14px', background: 'var(--card)', border: '1px solid var(--border)' }}
+      >
+        <Icon name="database" size={16} style={{ color: 'var(--accent-bright)', flexShrink: 0 }} />
+        <div className="flex-1">
+          <div className="text-[13px] font-semibold text-fg">PostgreSQL</div>
+          <div className="text-[11.5px] text-subtle">Self-hosted Postgres with daily R2 backups</div>
+        </div>
+        <Switch on={values.postgres} onChange={() => onChange({ postgres: !values.postgres })} />
+      </div>
+
+      {values.postgres && (
+        <div>
+          <FieldLabel>Backup R2 bucket</FieldLabel>
+          <input
+            value={values.postgresBucket}
+            onChange={e => onChange({ postgresBucket: e.target.value })}
+            placeholder="my-project-db-backups"
+            className="w-full h-[36px] px-3 rounded-lg text-[12.5px] font-mono text-fg bg-card border border-border focus:outline-none focus:border-accent transition-colors"
+          />
+          <span className="text-[11.5px] font-mono text-subtle mt-1 block">R2 bucket to store daily pg_dump files</span>
+        </div>
+      )}
+
       {/* Desktop nav buttons */}
       <div className="hidden lg:flex items-center gap-2 mt-1">
         <button onClick={onBack} className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-[13px] font-medium text-fg border border-border hover:bg-card-hover transition-colors">

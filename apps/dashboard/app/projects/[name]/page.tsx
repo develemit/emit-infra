@@ -4,26 +4,15 @@ import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { getStatus, getContainers, getProjects, getApiBase, type ProjectSummary, type ProjectStatus, type Container } from '@/lib/api'
 import { Icon } from '@/components/icon'
-import { Badge, type BadgeVariant } from '@/components/ui/badge'
+import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { HealthCard } from '@/components/detail/health-card'
 import { ContainerTable } from '@/components/detail/container-table'
+import { ResourceChart } from '@/components/detail/resource-chart'
+import { DockerUsage } from '@/components/detail/docker-usage'
 import { DeployPanel } from '@/components/deploy-panel'
 import { DestroyModal } from '@/components/destroy-modal'
-
-function deriveVariant(status: ProjectStatus | null): BadgeVariant {
-  if (status === null) return 'muted'
-  if (status.error) return 'err'
-  const disk = status.disk ?? 0
-  const mem = status.memory ?? 0
-  if (disk >= 80 || mem >= 80) return 'warn'
-  return 'ok'
-}
-
-const variantLabel: Record<BadgeVariant, string> = {
-  ok: 'Healthy', warn: 'Degraded', err: 'Unreachable',
-  muted: 'Loading', accent: 'Accent', region: 'Region',
-}
+import { deriveHealth } from '@/lib/health'
 
 export default function ProjectDetailPage() {
   const params = useParams()
@@ -51,7 +40,7 @@ export default function ProjectDetailPage() {
     return () => clearInterval(interval)
   }, [fetchData])
 
-  const variant = deriveVariant(status)
+  const { variant, label } = deriveHealth(status)
   const domain = project?.config.domain ?? ''
   const loading = status === null
 
@@ -70,7 +59,7 @@ export default function ProjectDetailPage() {
           {domain && <span className="text-[11px] font-mono text-subtle">{domain}</span>}
         </div>
         <div className="flex-1" />
-        <Badge variant={variant} dot loading={variant === 'muted'}>{variantLabel[variant]}</Badge>
+        <Badge variant={variant} dot loading={variant === 'muted'}>{label}</Badge>
         <div style={{ width: 1, height: 22, background: 'var(--border)' }} />
         <Link
           href={`/projects/${encodeURIComponent(name)}/logs`}
@@ -104,7 +93,7 @@ export default function ProjectDetailPage() {
           {domain && <div className="text-[10.5px] font-mono text-subtle truncate">{domain}</div>}
         </div>
         <div className="flex-1" />
-        <Badge variant={variant} dot loading={variant === 'muted'}>{variantLabel[variant]}</Badge>
+        <Badge variant={variant} dot loading={variant === 'muted'}>{label}</Badge>
       </div>
 
       {/* Content */}
@@ -128,6 +117,12 @@ export default function ProjectDetailPage() {
               {containers !== null && (
                 <ContainerTable containers={containers} projectName={name} />
               )}
+              <ResourceChart
+                name={name}
+                mem={status?.memory ?? null}
+                disk={status?.disk ?? null}
+              />
+              <DockerUsage projectName={name} onPrune={fetchData} />
               {deploying && (
                 <DeployPanel
                   url={deployUrl}
