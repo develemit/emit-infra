@@ -49,6 +49,13 @@ function redisLabel(status: string | null | undefined): { value: string; color?:
   return { value: 'Down', color: 'var(--err)' }
 }
 
+function queueLabel(failed: number | null | undefined, wait: number | null | undefined): { value: string; color?: string } | null {
+  if (failed == null) return null
+  if (failed > 0) return { value: `${failed} failed · ${wait ?? 0} waiting`, color: 'var(--err)' }
+  if ((wait ?? 0) > 100) return { value: `${wait} waiting`, color: 'var(--warn, #e5a00d)' }
+  return { value: `OK · ${wait ?? 0} waiting`, color: 'var(--ok, #22c55e)' }
+}
+
 interface HealthCardProps {
   project: ProjectSummary
   status: ProjectStatus
@@ -72,6 +79,7 @@ export function HealthCard({ project, status, polledAgo }: HealthCardProps) {
   const nginx = nginxLabel(status.nginxStatus)
   const ssl = sslDaysLeft(status.sslExpiry)
   const redis = redisLabel(status.redisStatus)
+  const queue = queueLabel(status.queueFailed, status.queueWait)
 
   return (
     <div className="rounded-xl border border-border bg-card" style={{ padding: 18 }}>
@@ -101,6 +109,7 @@ export function HealthCard({ project, status, polledAgo }: HealthCardProps) {
         <StatTile icon="shield" label="Nginx" value={nginx.value} color={nginx.color} />
         <StatTile icon="lock" label="SSL" value={ssl.value} color={ssl.color} />
         {status.redisStatus && <StatTile icon="database" label="Redis" value={redis.value} color={redis.color} />}
+        {queue && <StatTile icon="layers" label="Queue" value={queue.value} color={queue.color} mono={false} />}
       </div>
 
       {/* Mobile: 2-col stat grid */}
@@ -110,6 +119,7 @@ export function HealthCard({ project, status, polledAgo }: HealthCardProps) {
         <StatTile icon="hash" label="Build" value={status.buildNumber ?? '—'} />
         <StatTile icon="shield" label="Nginx" value={nginx.value} color={nginx.color} />
         {status.redisStatus && <StatTile icon="database" label="Redis" value={redis.value} color={redis.color} />}
+        {queue && <StatTile icon="layers" label="Queue" value={queue.value} color={queue.color} mono={false} />}
       </div>
 
       {/* Desktop: side-by-side lg meters */}

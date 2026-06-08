@@ -24,6 +24,8 @@ type StatusData = {
   nginxConfigured: boolean
   sslExpiry: string | null
   redisStatus: string | null
+  queueFailed: number | null
+  queueWait: number | null
 }
 
 async function checkHttp(domain: string): Promise<number | null> {
@@ -121,12 +123,12 @@ export async function projectRoutes(app: FastifyInstance) {
       const [raw, httpStatus] = await Promise.all([
         sshExec(
           host,
-          `uptime -p; df -h / | tail -1 | awk '{print $5, $3, $2}'; free -m | awk 'NR==2{printf "%.0f %dM %dM\\n", $3/$2*100, $3, $2}'; docker ps -q --filter status=running | wc -l; docker ps -aq | wc -l; docker ps -q --filter status=restarting --filter status=dead | wc -l; cat /opt/${req.params.name}/.deployed-version 2>/dev/null || echo ""; systemctl is-active nginx 2>/dev/null || echo "unknown"; test -f /etc/nginx/sites-enabled/${req.params.name} && echo "configured" || echo "missing"; openssl x509 -enddate -noout -in /etc/letsencrypt/live/${domain}/fullchain.pem 2>/dev/null | sed 's/notAfter=//' || echo ""; cd /opt/${req.params.name} && docker compose ps --format '{{.Service}}' 2>/dev/null | grep -qi redis && docker compose exec -T redis redis-cli ping 2>/dev/null || echo ""`,
+          `uptime -p; df -h / | tail -1 | awk '{print $5, $3, $2}'; free -m | awk 'NR==2{printf "%.0f %dM %dM\\n", $3/$2*100, $3, $2}'; docker ps -q --filter status=running | wc -l; docker ps -aq | wc -l; docker ps -q --filter status=restarting --filter status=dead | wc -l; cat /opt/${req.params.name}/.deployed-version 2>/dev/null || echo ""; systemctl is-active nginx 2>/dev/null || echo "unknown"; test -f /etc/nginx/sites-enabled/${req.params.name} && echo "configured" || echo "missing"; openssl x509 -enddate -noout -in /etc/letsencrypt/live/${domain}/fullchain.pem 2>/dev/null | sed 's/notAfter=//' || echo ""; cd /opt/${req.params.name} && docker compose ps --format '{{.Service}}' 2>/dev/null | grep -qi redis && docker compose exec -T redis redis-cli ping 2>/dev/null || echo ""; cd /opt/${req.params.name} && docker compose ps --format '{{.Service}}' 2>/dev/null | grep -qi redis && docker compose exec -T redis redis-cli eval 'local f=0;local w=0;for _,k in ipairs(redis.call("KEYS","bull:*:failed")) do f=f+redis.call("LLEN",k) end;for _,k in ipairs(redis.call("KEYS","bull:*:wait")) do w=w+redis.call("LLEN",k) end;return tostring(f)..":"..tostring(w)' 0 2>/dev/null || echo ""`,
           key,
         ),
         checkHttp(domain),
       ])
-      const [uptimeLine, diskLine, memLine, containerLine, totalLine, unhealthyLine, buildNumberLine, nginxStatusLine, nginxConfigLine, sslExpiryLine, redisLine] = raw.split('\n').map(l => l.trim())
+      const [uptimeLine, diskLine, memLine, containerLine, totalLine, unhealthyLine, buildNumberLine, nginxStatusLine, nginxConfigLine, sslExpiryLine, redisLine, queueLine] = raw.split('\n').map(l => l.trim())
       const diskParts = (diskLine ?? '').split(' ')
       const memParts = (memLine ?? '').split(' ')
       const data: StatusData = {
@@ -149,6 +151,8 @@ export async function projectRoutes(app: FastifyInstance) {
         nginxConfigured: nginxConfigLine === 'configured',
         sslExpiry: sslExpiryLine || null,
         redisStatus: redisLine === 'PONG' ? 'healthy' : redisLine ? 'unhealthy' : null,
+        queueFailed: queueLine ? parseInt(queueLine.split(':')[0] ?? '', 10) || 0 : null,
+        queueWait: queueLine ? parseInt(queueLine.split(':')[1] ?? '', 10) || 0 : null,
       }
       statusCache.set(req.params.name, data)
       return data
