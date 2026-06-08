@@ -20,15 +20,17 @@ for compute reservation — delete, don't stop.
 
 ## Currently Provisioned
 
-| Project | Server Type | Region | Status | $/month |
-|---|---|---|---|---|
-| emit-vision | cx22 | ash (Ashburn) | active | ~$4.15 |
-| martialops | cx22 | ash (Ashburn) | active | ~$4.15 |
-| diner-decider | cx22 | ash (Ashburn) | planned | ~$4.15 |
-| develemail | cx22 | ash (Ashburn) | planned | ~$4.15 |
+IPv4 addresses are billed separately at ~€0.72/month per server since 2024.
 
-**Current total: ~$8.30/month (2 active servers)**
-**Planned total: ~$16.60/month (4 servers)**
+| Project | Server Type | Region | Server | +IPv4 | Total/month |
+|---|---|---|---|---|---|
+| emit-vision | cx22 | nbg1 (Nuremberg) | ~€3.79 | ~€0.72 | ~€4.51 |
+| martialops | cx22 | ash (Ashburn) | ~€4.15 | ~€0.72 | ~€4.87 |
+| diner-decider | cx22 | ash (Ashburn) | ~€4.15 | ~€0.72 | ~€4.87 |
+| develemail | cx22 | ash (Ashburn) | ~€4.15 | ~€0.72 | ~€4.87 |
+
+**Current total: ~€9.38/month (~$10.20/month) — 2 active servers**
+**Planned total: ~€19.12/month (~$20.80/month) — 4 servers**
 
 ## Upgrade Triggers
 

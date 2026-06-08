@@ -17,11 +17,16 @@ console.
   available to the emit-infra API via the server environment
 - The dashboard currently shows container status and resource charts per project;
   billing belongs on the main overview page as a summary widget
-- Hetzner resources to query: `/v1/servers`, `/v1/volumes`, `/v1/floating_ips`,
-  `/v1/load_balancers`
-- Each resource includes `server_type.prices[].price_monthly.gross` (or
-  equivalent) and `created` timestamp — multiply hourly rate by hours elapsed
-  this calendar month for "spend to date"
+- Hetzner resources to query: `/v1/servers`, `/v1/primary_ips`, `/v1/volumes`,
+  `/v1/floating_ips`, `/v1/load_balancers`
+- IPv4 addresses are billed separately (~€0.72/month each) since 2024 — each
+  server has an associated primary IP that must be fetched from `/v1/primary_ips`
+  and added to the server's cost line
+- Each server includes `server_type.prices[].price_monthly.gross` and each
+  primary IP includes `prices[].price_monthly.gross` — multiply hourly rate by
+  hours elapsed this calendar month for "spend to date"
+- Real observed cost: ~€4.51/month (nbg1 cx22 + IPv4) and ~€4.87/month
+  (ash cx22 + IPv4) — use these as a sanity-check against the API calculation
 
 ## API Design
 
@@ -35,8 +40,8 @@ Response shape:
   "projectedMonthly": 16.60,
   "currency": "EUR",
   "breakdown": [
-    { "type": "server", "name": "martialops", "monthlyRate": 4.15, "spendToDate": 2.07 },
-    { "type": "server", "name": "emit-vision", "monthlyRate": 4.15, "spendToDate": 2.07 }
+    { "type": "server", "name": "martialops", "serverRate": 4.15, "ipv4Rate": 0.72, "monthlyRate": 4.87, "spendToDate": 2.44 },
+    { "type": "server", "name": "emit-vision", "serverRate": 3.79, "ipv4Rate": 0.72, "monthlyRate": 4.51, "spendToDate": 2.26 }
   ],
   "fetchedAt": "2026-06-07T04:00:00Z"
 }
@@ -52,9 +57,11 @@ need to be live, and the Hetzner API has rate limits.
      dedicated `HCLOUD_TOKEN` env var to the server env)
    - Calls `GET https://api.hetzner.cloud/v1/servers` with
      `Authorization: Bearer <token>`
+   - Calls `GET https://api.hetzner.cloud/v1/primary_ips` to get IPv4 costs
    - Calls `GET https://api.hetzner.cloud/v1/volumes` (if any volumes provisioned)
-   - For each server: find the `price_monthly.gross` for the server's location
-     in `server_type.prices[]`, compute hours-elapsed-this-month fraction
+   - For each server: sum `server_type.prices[location].price_monthly.gross` +
+     the associated primary IP's `prices[location].price_monthly.gross`,
+     then multiply by hours-elapsed-this-month fraction
    - Returns the response shape above
    - On API error (bad token, network): return `{ error: "unavailable" }` with
      200 — the widget should degrade gracefully, not break the dashboard
