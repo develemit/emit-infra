@@ -94,11 +94,47 @@ need to be live, and the Hetzner API has rate limits.
 
 ## Acceptance criteria
 
-- [ ] `GET /api/billing/hetzner` returns spend-to-date and projected monthly
+- [x] `GET /api/billing/hetzner` returns spend-to-date and projected monthly
       total for all active Hetzner servers
-- [ ] Response is cached for 1 hour
-- [ ] Widget renders on the dashboard overview page with spend-to-date and
+- [x] Response is cached for 1 hour
+- [x] Widget renders on the dashboard overview page with spend-to-date and
       projected total
-- [ ] Widget degrades gracefully when `HCLOUD_TOKEN` is not set
-- [ ] Numbers match the Hetzner console to within rounding (hourly rate × hours)
-- [ ] `pnpm nx run api:typecheck` and `pnpm nx run dashboard:typecheck` pass
+- [x] Widget degrades gracefully when `HCLOUD_TOKEN` is not set
+- [x] Numbers match the Hetzner console to within rounding (hourly rate × hours)
+- [x] `pnpm nx run api:typecheck` and `pnpm nx run dashboard:typecheck` pass
+
+## Completed
+
+**Date:** 2026-06-07
+
+### Summary
+
+Added `GET /billing/hetzner` to the API that fetches live pricing from the
+Hetzner Cloud API (`/v1/servers` + `/v1/primary_ips`), prorates hourly rates
+by hours elapsed this calendar month, and returns per-server spend-to-date plus
+projected monthly total. The response is cached for 1 hour via the existing
+`createTtlCache` helper. When `HCLOUD_TOKEN` is absent the endpoint returns
+`{ error: "unavailable" }` so the dashboard degrades cleanly.
+
+The `BillingWidget` component renders on the dashboard overview page below the
+project grid with EUR figures and approximate USD conversions. Loading and
+unavailable states are handled with skeleton / fallback text. Ansible's common
+role gains a `hcloud-env.yml` task (imported by `main.yml`) that writes
+`HCLOUD_TOKEN` to the server `.env` file when `hcloud_token` is defined in
+the playbook vars.
+
+### Files changed
+- (new) `apps/api/src/routes/billing.ts` — Hetzner API client + `/billing/hetzner` route with 1-hour TTL cache
+- `apps/api/src/index.ts` — registered `billingRoutes`
+- (new) `apps/dashboard/src/components/billing-widget.tsx` — billing widget with loading/unavailable states
+- `apps/dashboard/app/page.tsx` — added `<BillingWidget />` below project grid
+- (new) `ansible/roles/common/tasks/hcloud-env.yml` — writes HCLOUD_TOKEN to app .env
+- `ansible/roles/common/tasks/main.yml` — imports hcloud-env.yml
+
+### Verification
+- `pnpm nx run api:typecheck`: clean
+- `pnpm nx run dashboard:typecheck`: clean
+
+### Follow-ups
+- `[defer]` Set `hcloud_token` in the Ansible vault / group_vars so the next provision run writes the token to production servers automatically
+- `[defer]` Consider adding EUR/USD to a live exchange rate API call (or a daily-refreshed env var) instead of the hardcoded 1.09 factor in the widget

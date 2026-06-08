@@ -90,3 +90,6 @@
 
 - name: Write R2 credentials to app .env
   import_tasks: r2-env.yml
+
+- name: Write HCLOUD_TOKEN to app .env
+  import_tasks: hcloud-env.yml

@@ -5,6 +5,7 @@ import { ProjectCard } from '@/components/project-card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Icon } from '@/components/icon'
 import { AddProjectDropdown } from '@/components/add-project-dropdown'
+import { BillingWidget } from '@/components/billing-widget'
 
 export default function HomePage() {
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null)
@@ -92,6 +93,9 @@ export default function HomePage() {
             ))}
           </div>
         )}
+        <div className="mt-4 md:mt-6">
+          <BillingWidget />
+        </div>
       </div>
     </div>
   )
