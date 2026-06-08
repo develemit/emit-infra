@@ -1,17 +1,17 @@
 # Infrastructure Cost Overview — Develemit Stack
 
-_Last updated: 2026-06-07_
+_Last updated: 2026-06-08 (numbers confirmed via Hetzner billing API)_
 
 ## Modeling Assumptions
 
 | Variable | Value | Basis |
 |---|---|---|
-| Server type | cx22 (2 vCPU, 4 GB RAM) | All current .emit-infra.json configs |
-| Datacenter | Ashburn (ash) | All current projects |
+| emit-vision server | cpx22 nbg1 | Confirmed via Hetzner API |
+| martialops server | cpx21 ash | Confirmed via Hetzner API |
+| New projects | cpx22 nbg1 (default) | Best value, EU latency acceptable |
 | Repos | Public | All develemit/* repos |
 | Redis usage | <10k commands/day per project | Conservative estimate |
 | R2 storage | <10 GB total | Current usage patterns |
-| Email volume | Varies by project (see per-project notes) | — |
 | Currency | USD (Hetzner EUR × 1.09 approx) | 2026-06 exchange rate |
 
 ---
@@ -20,13 +20,15 @@ _Last updated: 2026-06-07_
 
 | Service | Vendor | Cost | Notes |
 |---|---|---|---|
-| emit-vision server | Hetzner cx22 | ~$4.15 | Active |
-| martialops server | Hetzner cx22 | ~$4.15 | Active |
+| emit-vision-prod (cpx22 nbg1) | Hetzner | €9.49 | Active |
+| emit-vision IPv4 | Hetzner | €0.60 | Active |
+| martialops (cpx21 ash) | Hetzner | €13.99 | Active |
+| martialops IPv4 | Hetzner | €0.60 | Active |
 | DNS / CDN | Cloudflare | $0 | Free tier |
 | R2 Storage | Cloudflare | $0 | <10 GB, free tier |
 | Redis | Upstash | $0 | Free tier per project |
 | CI/CD + Registry | GitHub | $0 | Public repos |
-| **Total** | | **~$8.30/month** | |
+| **Total** | | **€24.68/month (~$26.90)** | |
 
 ---
 
@@ -34,30 +36,30 @@ _Last updated: 2026-06-07_
 
 | Service | Vendor | Cost | Notes |
 |---|---|---|---|
-| emit-vision server | Hetzner cx22 | ~$4.15 | Active |
-| martialops server | Hetzner cx22 | ~$4.15 | Active |
-| diner-decider server | Hetzner cx22 | ~$4.15 | Planned |
-| develemail server | Hetzner cx22 | ~$4.15 | Planned |
+| emit-vision-prod (cpx22 nbg1) | Hetzner | €10.09 | Active |
+| martialops (cpx21 ash) | Hetzner | €14.59 | Active |
+| diner-decider (cpx22 nbg1) | Hetzner | €10.09 | Planned |
+| develemail (cpx22 nbg1) | Hetzner | €10.09 | Planned |
 | DNS / CDN (4 domains) | Cloudflare | $0 | Free tier |
 | R2 Storage | Cloudflare | $0 | Free tier |
 | Redis (4 instances) | Upstash | $0 | Free tier |
 | CI/CD + Registry | GitHub | $0 | Public repos |
-| **Total** | | **~$16.60/month** | |
+| **Total** | | **€44.86/month (~$48.90)** | |
 
 ---
 
-## Cost by Scale (per project, using martialops as model)
+## Cost by Scale (per project, cpx22 nbg1 as baseline)
 
 | Scale | Users | Infra Cost | Notes |
 |---|---|---|---|
-| Launch | 0–500 | ~$4.15/month | Single cx22 handles it comfortably |
-| Growth | 500–5k | ~$4.15/month | cx22 still sufficient, monitor CPU/RAM |
-| Scale | 5k–20k | ~$8.30/month | Likely upgrade to cx32 ($8.30) for DB headroom |
-| Mature | 20k–100k | ~$20–40/month | Separate DB server or managed Postgres |
+| Launch | 0–500 | ~€10/month | Single cpx22 handles it comfortably |
+| Growth | 500–5k | ~€10/month | cpx22 still sufficient, monitor CPU/RAM |
+| Scale | 5k–20k | ~€20/month | Likely upgrade to cpx31 (~€14) for DB headroom |
+| Mature | 20k–100k | ~€35–60/month | Separate DB server or managed Postgres |
 
 **The dominant cost at every scale is Stripe fees, not infrastructure.**
 At $20/user/month and 500 paying users: Stripe takes ~$300/month (2.9% + $0.30).
-Infrastructure at that scale: $4.15/month. Infra is <2% of Stripe fees.
+Infrastructure at that scale: ~€10/month. Infra is <4% of Stripe fees.
 
 ---
 
@@ -65,12 +67,12 @@ Infrastructure at that scale: $4.15/month. Infra is <2% of Stripe fees.
 
 | Paying Users | MRR | Stripe Fees (~3.2%) | Infra | Net Revenue | Gross Margin |
 |---|---|---|---|---|---|
-| 10 | $200 | $6.40 | $4.15 | $189.45 | 94.7% |
-| 50 | $1,000 | $32 | $4.15 | $963.85 | 96.4% |
-| 100 | $2,000 | $64 | $4.15 | $1,931.85 | 96.6% |
-| 500 | $10,000 | $320 | $4.15 | $9,675.85 | 96.8% |
-| 1,000 | $20,000 | $640 | $8.30 | $19,351.70 | 96.8% |
-| 5,000 | $100,000 | $3,200 | $20 | $96,780 | 96.8% |
+| 10 | $200 | $6.40 | ~$11 | $182.60 | 91.3% |
+| 50 | $1,000 | $32 | ~$11 | $957 | 95.7% |
+| 100 | $2,000 | $64 | ~$11 | $1,925 | 96.3% |
+| 500 | $10,000 | $320 | ~$11 | $9,669 | 96.7% |
+| 1,000 | $20,000 | $640 | ~$22 | $19,338 | 96.7% |
+| 5,000 | $100,000 | $3,200 | ~$40 | $96,760 | 96.8% |
 
 Infrastructure is never the margin story — Stripe is.
 
@@ -80,22 +82,22 @@ Infrastructure is never the margin story — Stripe is.
 
 | When | Threshold | Action | Cost Change |
 |---|---|---|---|
-| Now | 2 active projects | — | $8.30/month |
-| +2 projects | diner-decider + develemail launched | Add 2× cx22 | +$8.30 → $16.60/month |
-| Any project >70% CPU | Sustained high load | Upgrade cx22 → cx32 | +$4.15/server |
+| Now | 2 active projects | — | €24.68/month |
+| +2 projects | diner-decider + develemail launched | Add 2× cpx22 nbg1 | +€20.18 → €44.86/month |
+| Any project >70% CPU | Sustained high load | Upgrade cpx22 → cpx31 | +~€4/server |
 | R2 >10 GB | File upload growth | R2 paid: $0.015/GB | ~+$0.15/GB over 10 GB |
 | Redis >10k cmds/day | High-traffic project | Upstash pay-as-you-go | $0.20/100k commands |
-| Postgres >3 GB RAM | DB-heavy workload | Separate DB server (cx22) | +$4.15/month |
+| Postgres >3 GB RAM | DB-heavy workload | Separate DB server (cpx22) | +€10/month |
 | Private repos needed | IP protection | GitHub paid | +$0–4/month |
 
 ---
 
 ## Break-Even Analysis
 
-Minimum paid infrastructure to go live with a single project: **$4.15/month** (one cx22).
+Minimum paid infrastructure for a single project: **~€10/month** (cpx22 nbg1 + IPv4).
 
 With that server running, break-even at various price points:
-- $5/month plan → 1 paying user covers infra
+- $5/month plan → 3 paying users cover infra
 - $20/month plan → infra is covered in <1 paying user's fees
 
 ---
@@ -104,23 +106,21 @@ With that server running, break-even at various price points:
 
 | Item | Cost |
 |---|---|
-| Hetzner cx22 | ~$4.15/month |
+| Hetzner cpx22 nbg1 | €9.49/month |
+| Hetzner IPv4 | €0.60/month |
 | Cloudflare DNS | $0 |
 | Upstash Redis | $0 |
 | GitHub CI/CD | $0 |
 | Cloudflare R2 | $0 |
-| **Total** | **~$4.15/month** |
-
-This is the floor. There is no cheaper viable self-hosted production stack.
+| **Total** | **~€10.09/month (~$11)** |
 
 ---
 
-## Dashboard Billing Widget (planned)
+## Dashboard Billing Widget
 
-A real-time cost widget is planned for the emit-infra dashboard. It will call
-the Hetzner Cloud API (`/v1/servers`, `/v1/volumes`, `/v1/floating_ips`) using
-the stored `TF_VAR_hcloud_token` to calculate current-month spend to date and
-project end-of-month total. See sprint `28-hetzner-billing-widget.md`.
+Live cost data is surfaced on the emit-infra dashboard via `GET /billing/hetzner`.
+Queries the Hetzner Cloud API in real time and caches for 1 hour. Requires
+`HCLOUD_TOKEN` in `apps/api/.env`. See `sprint/28-hetzner-billing-widget.md`.
 
 ---
 
