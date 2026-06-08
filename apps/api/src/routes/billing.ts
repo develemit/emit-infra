@@ -25,6 +25,7 @@ type HetznerServer = {
   id: number
   name: string
   datacenter: { location: { name: string } }
+  public_net: { ipv4: { id: number } | null }
   server_type: {
     prices: Array<{
       location: string
@@ -34,11 +35,15 @@ type HetznerServer = {
   }
 }
 
-type HetznerPrimaryIp = {
-  id: number
-  assignee_id: number | null
-  assignee_type: string
-  prices: Array<{ location: string; price_monthly: { gross: string } }>
+type HetznerPricing = {
+  primary_ips: Array<{
+    type: string
+    prices: Array<{
+      location: string
+      price_hourly: { gross: string }
+      price_monthly: { gross: string }
+    }>
+  }>
 }
 
 const billingCache = createTtlCache<BillingResponse | { error: string }>(BILLING_TTL)
@@ -57,16 +62,18 @@ async function fetchBilling(token: string): Promise<BillingResponse> {
   const headers = { Authorization: `Bearer ${token}` }
   const opts = { headers, signal: AbortSignal.timeout(10000) }
 
-  const [serversRes, ipsRes] = await Promise.all([
+  const [serversRes, pricingRes] = await Promise.all([
     fetch('https://api.hetzner.cloud/v1/servers?per_page=50', opts),
-    fetch('https://api.hetzner.cloud/v1/primary_ips?per_page=50', opts),
+    fetch('https://api.hetzner.cloud/v1/pricing', opts),
   ])
 
   if (!serversRes.ok) throw new Error(`Hetzner servers API ${serversRes.status}`)
-  if (!ipsRes.ok) throw new Error(`Hetzner primary_ips API ${ipsRes.status}`)
+  if (!pricingRes.ok) throw new Error(`Hetzner pricing API ${pricingRes.status}`)
 
   const { servers } = (await serversRes.json()) as { servers: HetznerServer[] }
-  const { primary_ips } = (await ipsRes.json()) as { primary_ips: HetznerPrimaryIp[] }
+  const { pricing } = (await pricingRes.json()) as { pricing: HetznerPricing }
+
+  const ipv4Prices = pricing.primary_ips.find((p) => p.type === 'ipv4')?.prices ?? []
 
   const { hours, hoursInMonth } = hoursElapsedThisMonth()
 
@@ -76,14 +83,14 @@ async function fetchBilling(token: string): Promise<BillingResponse> {
     const serverMonthly = parseFloat(serverPrice?.price_monthly.gross ?? '0')
     const serverHourly = parseFloat(serverPrice?.price_hourly.gross ?? '0')
 
-    const primaryIp = primary_ips.find(
-      (ip) => ip.assignee_type === 'server' && ip.assignee_id === server.id,
-    )
-    const ipPrice = primaryIp?.prices.find((p) => p.location === loc) ?? primaryIp?.prices[0]
+    const hasIpv4 = server.public_net.ipv4 !== null
+    const ipPrice = hasIpv4
+      ? (ipv4Prices.find((p) => p.location === loc) ?? ipv4Prices[0])
+      : undefined
     const ipMonthly = parseFloat(ipPrice?.price_monthly.gross ?? '0')
-    const ipHourly = ipMonthly / hoursInMonth
+    const ipHourly = parseFloat(ipPrice?.price_hourly.gross ?? '0')
 
-    const spend = serverHourly * hours + ipHourly * hours
+    const spend = (serverHourly + ipHourly) * hours
 
     return {
       type: 'server' as const,
