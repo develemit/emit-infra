@@ -91,10 +91,35 @@
     --agree-tos
     --email {{ certbot_email }}
     -d {{ domain }}
-    -d www.{{ domain }}
+    {% if nginx_www | default(true) %}-d www.{{ domain }}{% endif %}
   args:
     creates: "/etc/letsencrypt/live/{{ domain }}/fullchain.pem"
   when: not (nginx_wildcard_cert | default(false))
+
+- name: Create /etc/nginx/blue-green/ directory for slot include files
+  file:
+    path: /etc/nginx/blue-green
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: blue_green | default(false)
+
+- name: Write initial blue-green slot config (blue slot)
+  template:
+    src: blue-green-slot.conf.j2
+    dest: "/etc/nginx/blue-green/{{ project_name }}.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  vars:
+    slot: blue
+    web_port: "{{ blue_web_port | default(4300) }}"
+    api_port: "{{ blue_api_port | default(4301) }}"
+    worker_port: "{{ blue_worker_port | default(4302) }}"
+    marketing_port: "{{ blue_marketing_port | default(4303) }}"
+  when: blue_green | default(false)
+  notify: reload nginx
 
 - name: Set up certbot auto-renewal
   cron:

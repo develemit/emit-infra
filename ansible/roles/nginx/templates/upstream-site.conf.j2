@@ -1,13 +1,18 @@
+{% if blue_green | default(false) %}
+# Active upstreams are defined by the slot include file written by blue-green-deploy.sh.
+include /etc/nginx/blue-green/{{ project_name }}.conf;
+{% else %}
 upstream {{ project_name }}_backend {
-    server 127.0.0.1:{{ active_backend_port }};
+    server 127.0.0.1:{{ active_backend_port | default(app_port | default(3000)) }};
 }
+{% endif %}
 
 server {
     listen 80;
-    server_name {{ domain }} www.{{ domain }};
+    server_name {{ domain }}{% if nginx_www | default(true) %} www.{{ domain }}{% endif %};
 
     location / {
-        proxy_pass http://{{ project_name }}_backend;
+        proxy_pass http://{{ project_name }}_{% if blue_green | default(false) %}web{% else %}backend{% endif %};
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -18,3 +23,22 @@ server {
         proxy_cache_bypass $http_upgrade;
     }
 }
+
+{% if nginx_api_port is defined or blue_green | default(false) %}
+server {
+    listen 80;
+    server_name api.{{ domain }};
+
+    location / {
+        proxy_pass http://{{ project_name }}_api;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+{% endif %}

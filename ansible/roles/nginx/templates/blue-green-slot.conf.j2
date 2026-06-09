@@ -1,0 +1,6 @@
+# Active slot: {{ slot }} — written by blue-green-deploy.sh during slot activation.
+# Included by the nginx site config; defines named upstreams pointing to the live slot's ports.
+upstream {{ project_name }}_web      { server 127.0.0.1:{{ web_port }}; }
+upstream {{ project_name }}_api      { server 127.0.0.1:{{ api_port }}; }
+upstream {{ project_name }}_worker   { server 127.0.0.1:{{ worker_port }}; }
+upstream {{ project_name }}_marketing { server 127.0.0.1:{{ marketing_port }}; }
