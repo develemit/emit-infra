@@ -1,0 +1,45 @@
+---
+# Creates a non-login deploy user with Docker access and an SSH authorized key.
+# Required vars:
+#   deploy_public_key  — the public key string to install in authorized_keys
+#   project_name       — used to create /opt/<project>/ owned by deploy
+# Optional vars:
+#   app_dir            — override for the app directory (default: /opt/<project_name>)
+
+- name: Create deploy group
+  group:
+    name: deploy
+    state: present
+
+- name: Create deploy user
+  user:
+    name: deploy
+    group: deploy
+    groups: docker
+    append: true
+    shell: /usr/sbin/nologin
+    create_home: true
+    state: present
+
+- name: Create deploy SSH directory
+  file:
+    path: /home/deploy/.ssh
+    state: directory
+    owner: deploy
+    group: deploy
+    mode: "0700"
+
+- name: Install deploy authorized key
+  authorized_key:
+    user: deploy
+    key: "{{ deploy_public_key }}"
+    state: present
+  when: deploy_public_key is defined
+
+- name: Create app directory owned by deploy
+  file:
+    path: "{{ app_dir | default('/opt/' + project_name) }}"
+    state: directory
+    owner: deploy
+    group: deploy
+    mode: "0755"

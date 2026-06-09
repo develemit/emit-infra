@@ -32,7 +32,7 @@
 
 - name: Write nginx site config from template
   template:
-    src: site.conf.j2
+    src: "{{ 'upstream-site.conf.j2' if blue_green | default(false) else 'site.conf.j2' }}"
     dest: "/etc/nginx/sites-available/{{ project_name }}"
     owner: root
     group: root

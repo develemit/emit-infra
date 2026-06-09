@@ -60,6 +60,32 @@
     mode: "0755"
   when: blue_green | default(false)
 
+- name: Copy blue-green compose files
+  copy:
+    src: "{{ item }}"
+    dest: "{{ app_dir }}/{{ item | basename }}"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0644"
+  loop: "{{ blue_green_compose_files | default([]) }}"
+  when: blue_green | default(false)
+
+- name: Start infra stack
+  command: docker compose -f docker-compose.infra.yml up -d
+  args:
+    chdir: "{{ app_dir }}"
+  when: blue_green | default(false)
+
+- name: Initialise active slot to blue
+  copy:
+    content: "blue"
+    dest: "{{ app_dir }}/.active-slot"
+    force: false
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0644"
+  when: blue_green | default(false)
+
 # ── Deploy strategy ──────────────────────────────────────────────
 - name: Deploy (zero-downtime)
   include_tasks: deploy-zero-downtime.yml

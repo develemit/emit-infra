@@ -7,10 +7,18 @@
   vars:
     app_dir: "/opt/{{ project_name }}"
     certbot_email: "{{ lookup('env', 'CERTBOT_EMAIL') | default('ops@' + domain) }}"
+    # Blue-green provisioning: set blue_green: true in inventory to enable.
+    # Also set: blue_green_compose_files (list of local paths to compose files),
+    # deploy_public_key (SSH public key string for the deploy user).
+    blue_green: false
 
   roles:
     - common
     - docker
+    - role: deploy-user
+      when: deploy_public_key is defined
     - nginx
+    - role: app-deploy
+      when: blue_green | default(false)
     - role: postgres-backup
       when: postgres_backup_bucket is defined and postgres_backup_bucket | length > 0
