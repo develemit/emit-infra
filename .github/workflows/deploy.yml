@@ -15,6 +15,14 @@ on:
         description: Docker Compose file name
         type: string
         default: docker-compose.yml
+      blue-green:
+        description: Use blue-green slot deploy instead of standard compose up
+        type: boolean
+        default: false
+      project-name:
+        description: Project name for blue-green script (e.g. emit-vision)
+        type: string
+        default: app
     secrets:
       SSH_PRIVATE_KEY:
         description: SSH private key for the deploy user
@@ -35,7 +43,14 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "${{ secrets.SERVER_IP }}" >> ~/.ssh/known_hosts
 
-      - name: Pull latest images and restart
+      - name: Deploy (blue-green)
+        if: ${{ inputs.blue-green == true }}
+        run: |
+          ssh -i ~/.ssh/deploy_key root@${{ secrets.SERVER_IP }} \
+            "/opt/${{ inputs.project-name }}/blue-green-deploy.sh ${{ inputs.project-name }}"
+
+      - name: Deploy (standard)
+        if: ${{ inputs.blue-green != true }}
         run: |
           ssh -i ~/.ssh/deploy_key root@${{ secrets.SERVER_IP }} \
             "cd ${{ inputs.app-dir }} && \
@@ -43,7 +58,8 @@ jobs:
              docker compose -f ${{ inputs.compose-file }} up -d --remove-orphans && \
              docker image prune -f"
 
-      - name: Verify deployment
+      - name: Report active slot
+        if: ${{ inputs.blue-green == true }}
         run: |
           ssh -i ~/.ssh/deploy_key root@${{ secrets.SERVER_IP }} \
-            "docker compose -f ${{ inputs.app-dir }}/${{ inputs.compose-file }} ps"
+            "cat /opt/${{ inputs.project-name }}/.active-slot"
