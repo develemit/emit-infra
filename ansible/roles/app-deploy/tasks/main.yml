@@ -42,6 +42,24 @@
     group: "{{ ansible_user }}"
     mode: "0755"
 
+- name: Copy blue-green deploy script
+  copy:
+    src: blue-green-deploy.sh
+    dest: "{{ app_dir }}/blue-green-deploy.sh"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0755"
+  when: blue_green | default(false)
+
+- name: Copy health-check-all script
+  copy:
+    src: health-check-all.sh
+    dest: "{{ app_dir }}/health-check-all.sh"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0755"
+  when: blue_green | default(false)
+
 # ── Deploy strategy ──────────────────────────────────────────────
 - name: Deploy (zero-downtime)
   include_tasks: deploy-zero-downtime.yml
