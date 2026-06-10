@@ -1,6 +1,7 @@
 import { Command } from 'commander'
-import { readFileSync, writeFileSync, existsSync } from 'node:fs'
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
+import { homedir } from 'node:os'
 import chalk from 'chalk'
 import { execa } from 'execa'
 import {
@@ -80,6 +81,18 @@ export function registerSetup(program: Command): void {
       await ensureR2Bucket(stateAccountId, stateBucket, cfToken)
       const stateToken = await createR2Token(stateAccountId, stateBucket, cfToken)
       ok(`State bucket ready: ${stateBucket}`)
+
+      const credDir = join(homedir(), '.emit-infra', config.name)
+      mkdirSync(credDir, { recursive: true })
+      const credPath = join(credDir, 'terraform-backend.env')
+      const credContent = [
+        `bucket=${stateBucket}`,
+        `access_key=${stateToken.accessKeyId}`,
+        `secret_key=${stateToken.secretAccessKey}`,
+        `endpoint=https://${stateAccountId}.r2.cloudflarestorage.com`,
+      ].join('\n') + '\n'
+      writeFileSync(credPath, credContent, { mode: 0o600 })
+      ok(`Saved backend credentials to ${credPath}`)
 
       const backendTf = `terraform {
   backend "s3" {
