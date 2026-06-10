@@ -37,7 +37,7 @@ export function registerSecretsSync(program: Command): void {
       console.log(chalk.cyan(`Syncing ${entries.length} secrets to ${config.github.repo}...`))
 
       for (const [key, value] of entries) {
-        await execa('gh', ['secret', 'set', key, '--repo', config.github.repo, '--body', value])
+        await execa('gh', ['secret', 'set', key, '--repo', config.github.repo], { input: value })
         console.log(chalk.gray(`  set ${key}`))
       }
 

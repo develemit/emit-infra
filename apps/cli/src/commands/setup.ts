@@ -153,17 +153,17 @@ export function registerSetup(program: Command): void {
       step(ghStep, total, `Syncing secrets to ${config.github.repo}`)
       const serverIp = await getTerraformOutput('server_ip', tfDir)
       const privateKeyContent = readFileSync(key.privateKey, 'utf-8')
-      await execa('gh', ['secret', 'set', 'SERVER_IP', '--repo', config.github.repo, '--body', serverIp])
-      await execa('gh', ['secret', 'set', 'SSH_PRIVATE_KEY', '--repo', config.github.repo, '--body', privateKeyContent])
+      await execa('gh', ['secret', 'set', 'SERVER_IP', '--repo', config.github.repo], { input: serverIp })
+      await execa('gh', ['secret', 'set', 'SSH_PRIVATE_KEY', '--repo', config.github.repo], { input: privateKeyContent })
       ok(`SERVER_IP (${serverIp}) and SSH_PRIVATE_KEY pushed`)
 
       if (config.stripe) {
-        await execa('gh', ['secret', 'set', 'STRIPE_SECRET_KEY', '--repo', config.github.repo, '--body', process.env.STRIPE_SECRET_KEY!])
+        await execa('gh', ['secret', 'set', 'STRIPE_SECRET_KEY', '--repo', config.github.repo], { input: process.env.STRIPE_SECRET_KEY! })
         ok(`STRIPE_SECRET_KEY pushed (${config.stripe.mode} mode)`)
       }
 
       for (const [secretKey, secretValue] of Object.entries(r2Secrets)) {
-        await execa('gh', ['secret', 'set', secretKey, '--repo', config.github.repo, '--body', secretValue])
+        await execa('gh', ['secret', 'set', secretKey, '--repo', config.github.repo], { input: secretValue })
       }
       if (Object.keys(r2Secrets).length > 0) {
         ok(`R2 secrets pushed: ${Object.keys(r2Secrets).join(', ')}`)
