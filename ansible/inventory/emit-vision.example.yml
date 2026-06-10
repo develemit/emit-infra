@@ -1,0 +1,133 @@
+# Ansible inventory example for a blue-green emit-vision deployment.
+#
+# Usage:
+#   cp ansible/inventory/emit-vision.example.yml ansible/inventory/emit-vision.yml
+#   # Edit emit-vision.yml with actual host and variable values
+#   ansible-playbook -i ansible/inventory/emit-vision.yml ansible/playbooks/provision.yml
+#
+# This example shows all blue-green variables required by the provisioning playbook.
+# For non-blue-green projects (standard single-slot deploys), omit the blue_green*
+# variables and the deploy_user role will not be invoked.
+
+all:
+  hosts:
+    emit-vision-prod:
+      # ── Connection ────────────────────────────────────────────────────────
+      # Hostname or IP of the target server (usually a Hetzner cloud machine)
+      ansible_host: "192.0.2.1"
+      # SSH user with sudo permissions (used for provisioning)
+      ansible_user: "root"
+
+      # ── Project identity ──────────────────────────────────────────────────
+      # Project name used as:
+      # - Docker compose project prefix (e.g., emit-vision-blue, emit-vision-green)
+      # - App directory path (/opt/emit-vision)
+      # - nginx site config name
+      project_name: "emit-vision"
+
+      # ── Domain and TLS ────────────────────────────────────────────────────
+      # Primary domain for the site (used by nginx and certbot)
+      domain: "emit-vision.com"
+      # Request wildcard cert (DNS-01 challenge with Cloudflare) for *.emit-vision.com
+      # Set to true if you need subdomains like api.emit-vision.com, staging.emit-vision.com
+      nginx_wildcard_cert: false
+      # Cloudflare API token (required if nginx_wildcard_cert: true)
+      # Used for certbot DNS-01 challenge to issue wildcard certs
+      cloudflare_api_token: "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
+      # Enable HTTPS/SSL blocks in nginx config (default: true)
+      # Set to false for local/test environments without TLS certificates
+      nginx_ssl: true
+      # Include www.{{ domain }} in the nginx server blocks (default: true)
+      nginx_www: true
+
+      # ── Blue-green deployment setup ──────────────────────────────────────
+      # Enable blue-green deploy mode (required for zero-downtime deploys)
+      # When true, provisions both blue and green slots with independent port ranges
+      # and installs the blue-green-deploy.sh script
+      blue_green: true
+
+      # Docker-compose files required for blue-green deployment
+      # These are local paths on the ansible control machine that will be copied
+      # to /opt/{{ project_name }}/ on the remote server.
+      # Required files:
+      # - docker-compose.app.yml  — base app services (no port bindings)
+      # - docker-compose.blue.yml — blue slot (web:4300 api:4301 worker:4302 marketing:4303)
+      # - docker-compose.green.yml — green slot (web:4400 api:4401 worker:4402 marketing:4403)
+      # - docker-compose.infra.yml — shared infra (postgres, redis, clickhouse)
+      blue_green_compose_files:
+        - "path/to/emit-vision/docker-compose.app.yml"
+        - "path/to/emit-vision/docker-compose.blue.yml"
+        - "path/to/emit-vision/docker-compose.green.yml"
+        - "path/to/emit-vision/docker-compose.infra.yml"
+
+      # SSH public key for the deploy user (required for blue-green)
+      # When defined, creates a non-login 'deploy' user with docker group membership
+      # and installs this SSH public key in ~deploy/.ssh/authorized_keys.
+      # Generate with: ssh-keygen -t ed25519 -f deploy_key -C deploy@emit-vision
+      # Paste the public key string here (includes "ssh-ed25519 AAAA...")
+      deploy_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBxyz... deploy@emit-vision"
+
+      # ── Blue slot port configuration (default: 4300-4303) ─────────────────
+      # These ports are used by the blue slot compose override file.
+      # The defaults match docker-compose.blue.yml conventions.
+      # Override these only if your blue slot uses non-standard ports.
+      blue_web_port: 4300      # Web service port
+      blue_api_port: 4301      # API service port
+      blue_worker_port: 4302   # Worker service port
+      blue_marketing_port: 4303 # Marketing service port
+
+      # ── Green slot port configuration (default: 4400-4403) ───────────────
+      # These ports are embedded in the blue-green-deploy.sh script and should
+      # match the docker-compose.green.yml file. They are NOT used by Ansible
+      # but documented here for completeness.
+      # The deploy script currently hardcodes these; override only if you've
+      # customized docker-compose.green.yml with different ports.
+      # green_web_port: 4400
+      # green_api_port: 4401
+      # green_worker_port: 4402
+      # green_marketing_port: 4403
+
+      # ── Health check configuration ────────────────────────────────────────
+      # Number of retries for health checks during deploy
+      health_check_retries: 30
+      # HTTP path for health checks (blue-green and zero-downtime deploy use this)
+      # Most apps use "/" (GET /) or "/health" or "/readyz"
+      health_check_path: "/"
+      # Backoff delay (seconds) between health check retries
+      health_check_backoff: 3
+
+      # ── Environment and application configuration ─────────────────────────
+      # .env file on the ansible control machine to copy to /opt/{{ project_name }}/.env
+      # Should contain: IMAGE_TAG, GHCR_ORG, database credentials, API keys, etc.
+      env_src: "path/to/emit-vision/.env"
+      # Only copy .env if this is set to true (prevents accidental empty env)
+      copy_env: true
+
+      # Docker compose file name in the app directory (used in deploy playbooks)
+      compose_dest: "docker-compose.yml"
+
+      # Commands to run after deploy via `docker compose exec`
+      # Example: run migrations, cache warming, smoke tests
+      # post_deploy_exec:
+      #   - service: "web"
+      #     command: "npm run migrate"
+      #   - service: "api"
+      #     command: "python manage.py warm_cache"
+
+      # ── PostgreSQL backup configuration ──────────────────────────────────
+      # R2 bucket name for postgres automated backups (optional)
+      # When defined and non-empty, enables the postgres-backup role
+      # postgres_backup_bucket: "emit-vision-backups"
+      # postgres_backup_schedule: "0 2 * * *"  # Daily at 2 AM UTC
+
+      # ── Zero-downtime deploy configuration (optional) ────────────────────
+      # Enable zero-downtime deploy strategy (alternative to standard restart)
+      # When true, starts containers on a standby port and health-checks before
+      # nginx switch; standard deploy just restarts the compose stack
+      # zero_downtime: true
+
+      # ── API-specific nginx configuration ──────────────────────────────────
+      # If defined, nginx will create an api.{{ domain }} server block
+      # pointing to the API service upstream (proxies to {{ project_name }}_api)
+      # For blue-green, this is automatic; for standard deploys, set this var
+      # nginx_api_port: 4301
