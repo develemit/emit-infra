@@ -3,12 +3,11 @@
 Deferred follow-ups from completed sprints. Run `/plan-sprint` referencing this
 file to promote items into proper sprints when the list grows worth addressing.
 
-<!-- follow-up-scan: date=2026-06-06 through=15 clean=true -->
-> _Sprint scan: incremental scan completed 2026-06-06 through sprint-15. Prior scan through sprint-05 on 2026-06-06._
+<!-- follow-up-scan: date=2026-06-09 through=33 clean=false -->
+> _Sprint scan: incremental scan completed 2026-06-09 through sprint-33. 5 discoveries promoted to sprints 34-38. Prior scan: 2026-06-06 through sprint-15 (clean)._
 
 - (sprint 04, 2026-06-03) `pnpm build` fails on `/_error` and `/500` static pre-render — `<Html>` outside pages/_document error in Next.js 15.5.19 (upstream bug; dev server and typecheck/lint are clean) `[hold]`
 - (sprint 04, 2026-06-03) Provision wizard uses local Zod schema mirroring `ProjectConfigSchema` — consider extracting shared browser-safe types into `@emit-infra/types`; run `/plan-sprint "shared types package"` to plan `[hold]`
-- (sprint 20, 2026-06-06) R2 token rotation on re-provision — currently creates a new token each time but old tokens accumulate in the Cloudflare dashboard; consider revoking the previous token before creating a new one
 - (sprint 05, 2026-06-03) POST /ops/chat not end-to-end tested with live ANTHROPIC_API_KEY — functional validation requires a real key `[hold]`
 - (sprint 05, 2026-06-03) Sessions are in-memory only, cleared on API restart — sufficient for local use but won't survive restarts `[hold]`
 - (sprint 08, 2026-06-03) Destroy modal resource list uses static defaults — ideally parsed from project's terraform directory `[hold]`
@@ -41,3 +40,4 @@ file to promote items into proper sprints when the list grows worth addressing.
 - ~~(sprint 07, 2026-06-06) Rollback health-check port hardcoded to 3000~~ → sprint-16 (2026-06-06)
 - ~~(sprint 03, 2026-06-06) Custom nginx configs can't use zero-downtime~~ → sprint-17 (2026-06-06)
 - ~~(sprint 08, 2026-06-06) `.standby.env` not cleaned up after deploy~~ → sprint-17 (2026-06-06)
+- ~~(sprint 20, 2026-06-06) R2 token rotation on re-provision — old tokens accumulate in CF dashboard~~ → sprint-38 (2026-06-09)
