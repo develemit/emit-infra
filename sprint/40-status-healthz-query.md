@@ -76,12 +76,30 @@ add a `/healthz` route, `emit-infra status` surfaces it automatically.
   `buildStatusScript(port)` function; read port from config; append healthz curl
 
 ## Acceptance criteria
-- [ ] `emit-infra status` output includes an `=== healthz (port N) ===` section
-- [ ] When `/healthz` responds with JSON, the output is pretty-printed
-- [ ] When `/healthz` is unreachable, the command still exits 0 with the
+- [x] `emit-infra status` output includes an `=== healthz (port N) ===` section
+- [x] When `/healthz` responds with JSON, the output is pretty-printed
+- [x] When `/healthz` is unreachable, the command still exits 0 with the
   "healthz unavailable" message (not a crash)
-- [ ] Port is read from `config.deploy.appPort` when set, otherwise `3001`
-- [ ] `pnpm nx run cli:typecheck` clean
+- [x] Port is read from `config.deploy.appPort` when set, otherwise `3001`
+- [x] `pnpm nx run cli:typecheck` clean
+
+## Completed
+
+**Date:** 2026-06-11
+
+### Summary
+Refactored the module-level `STATUS_SCRIPT` const into a `buildStatusScript(appPort)` function so the SSH script can incorporate the project's configured app port. The function appends a healthz curl section that pretty-prints JSON via `python3 -m json.tool` and falls back to a soft "(healthz unavailable)" message when the endpoint is unreachable — the status command never crashes on a missing healthz.
+
+### Files changed
+- `apps/cli/src/commands/status.ts` — replaced `STATUS_SCRIPT` const with `buildStatusScript(appPort)` function; read port from `config.deploy?.appPort ?? '3001'`; added healthz curl section
+
+### Verification
+- `pnpm nx run cli:typecheck`: clean
+- Code inspection: healthz header uses interpolated port, curl uses `-sf --max-time 3`, fallback `|| echo` ensures exit 0
+
+### Follow-ups
+- `[defer]` Each project (emit-vision, martialops, easy-living, develemail, diner-decider) still needs to add its own `/healthz` route for this to surface useful data
+- `[defer]` Blue-green slot-aware port selection — the active slot may use a different port than `appPort`; revisit once blue-green is production-proven
 
 ## Out of scope
 - Parsing or validating the healthz JSON shape (just display it)

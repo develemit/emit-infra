@@ -4,12 +4,16 @@ import { join } from 'node:path'
 import chalk from 'chalk'
 import { loadConfig, sshExec } from '@emit-infra/core'
 
-const STATUS_SCRIPT = [
-  `echo "=== uptime ===" && uptime`,
-  `echo "=== disk ===" && df -h /`,
-  `echo "=== memory ===" && free -h`,
-  `echo "=== containers ===" && docker ps --format "table {{.Names}}\\t{{.Status}}\\t{{.Ports}}"`,
-].join(' && ')
+function buildStatusScript(appPort: string): string {
+  return [
+    `echo "=== uptime ===" && uptime`,
+    `echo "=== disk ===" && df -h /`,
+    `echo "=== memory ===" && free -h`,
+    `echo "=== containers ===" && docker ps --format "table {{.Names}}\\t{{.Status}}\\t{{.Ports}}"`,
+    `echo "=== healthz (port ${appPort}) ==="`,
+    `curl -sf --max-time 3 http://localhost:${appPort}/healthz | python3 -m json.tool 2>/dev/null || echo "(healthz unavailable — add /healthz to the API or set deploy.appPort in .emit-infra.json)"`,
+  ].join(' && ')
+}
 
 export function registerStatus(program: Command): void {
   program
@@ -27,9 +31,11 @@ export function registerStatus(program: Command): void {
         process.exit(1)
       }
 
+      const appPort = config.deploy?.appPort ?? '3001'
+
       console.log(chalk.cyan(`Status for ${chalk.bold(config.name)} (${host})\n`))
 
-      const output = await sshExec(host, STATUS_SCRIPT, opts.key)
+      const output = await sshExec(host, buildStatusScript(appPort), opts.key)
       console.log(output)
     })
 }
