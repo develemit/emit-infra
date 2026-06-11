@@ -51,6 +51,7 @@ export interface Container {
   image: string
   status: string
   state: string
+  buildNumber?: string
 }
 
 async function apiFetch<T>(path: string): Promise<T> {

@@ -21,6 +21,12 @@ function sortContainers(containers: Container[]): Container[] {
   return [...containers].sort((a, b) => stateOrder(a.state) - stateOrder(b.state))
 }
 
+function buildLabel(c: Container): string {
+  if (c.buildNumber) return `#${c.buildNumber}`
+  const tag = c.image.split(':').at(-1) ?? ''
+  return tag.slice(0, 8)
+}
+
 function MContainer({ c, logsHref }: { c: Container; logsHref: string }) {
   const variant = stateBadge(c.state)
   return (
@@ -37,7 +43,10 @@ function MContainer({ c, logsHref }: { c: Container; logsHref: string }) {
           </Link>
         </div>
       </div>
-      <div className="font-mono text-[11px] text-subtle truncate">{c.image}</div>
+      <div className="flex items-center gap-2">
+        <div className="font-mono text-[11px] text-subtle truncate flex-1">{c.image}</div>
+        <span className="font-mono text-[11px] text-faint shrink-0">{buildLabel(c)}</span>
+      </div>
       <div className="font-mono text-[11px] text-faint">{c.status}</div>
     </div>
   )
@@ -71,7 +80,7 @@ export function ContainerTable({ containers, projectName }: ContainerTableProps)
             <table className="w-full">
               <thead>
                 <tr>
-                  {['Name', 'Image', 'State', 'Status', ''].map(h => (
+                  {['Name', 'Image', 'Build', 'State', 'Status', ''].map(h => (
                     <th
                       key={h}
                       className="text-left text-[11px] font-semibold uppercase tracking-wide text-subtle pb-3"
@@ -93,9 +102,12 @@ export function ContainerTable({ containers, projectName }: ContainerTableProps)
                       <td className="font-mono font-medium text-[12px] text-fg py-3 pr-3">{c.name}</td>
                       <td
                         className="font-mono text-[12px] text-subtle py-3 pr-3 truncate"
-                        style={{ maxWidth: 240 }}
+                        style={{ maxWidth: 200 }}
                       >
                         {c.image}
+                      </td>
+                      <td className="font-mono text-[12px] text-faint py-3 pr-3 whitespace-nowrap">
+                        {buildLabel(c)}
                       </td>
                       <td className="py-3 pr-3">
                         <Badge variant={stateBadge(c.state)} dot>{c.state}</Badge>

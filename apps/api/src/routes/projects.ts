@@ -40,7 +40,7 @@ async function checkHttp(domain: string): Promise<number | null> {
     return null
   }
 }
-type Container = { name: string; image: string; status: string; state: string }
+type Container = { name: string; image: string; status: string; state: string; buildNumber?: string }
 const statusCache = createTtlCache<StatusData | null>(STATUS_TTL)
 const containersCache = createTtlCache<Container[] | null>(STATUS_TTL)
 
@@ -212,7 +212,7 @@ export async function projectRoutes(app: FastifyInstance) {
 
     const key = sshKeyPath(project.config.sshKeyName)
     const host = project.config.serverIp ?? project.config.domain
-    const fmt = '{"name":"{{.Names}}","image":"{{.Image}}","status":"{{.Status}}","state":"{{.State}}"}'
+    const fmt = '{{.Names}}|{{.Image}}|{{.Status}}|{{.State}}|{{.Label "build.number"}}'
 
     try {
       const output = await sshExec(host, `docker ps -a --format '${fmt}'`, key)
@@ -220,7 +220,10 @@ export async function projectRoutes(app: FastifyInstance) {
         .split('\n')
         .map((line: string) => line.trim())
         .filter(Boolean)
-        .map((line: string) => JSON.parse(line) as Container)
+        .map((line: string) => {
+          const [name, image, status, state, buildNumber] = line.split('|')
+          return { name, image, status, state, buildNumber: buildNumber || undefined } as Container
+        })
       containersCache.set(req.params.name, containers)
       return containers
     } catch {
