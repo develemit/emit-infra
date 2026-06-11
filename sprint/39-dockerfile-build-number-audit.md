@@ -61,15 +61,34 @@ time rather than discovering it in production.
 - `apps/cli/src/commands/audit.ts` — add two checks inside `auditDockerfile`
 
 ## Acceptance criteria
-- [ ] `emit-infra audit --local` on a multi-stage Dockerfile without `ARG BUILD_NUMBER`
+- [x] `emit-infra audit --local` on a multi-stage Dockerfile without `ARG BUILD_NUMBER`
   reports a `warn` with the correct fix message
-- [ ] `emit-infra audit --local` on a Dockerfile with `ARG BUILD_NUMBER` but no `ENV`
+- [x] `emit-infra audit --local` on a Dockerfile with `ARG BUILD_NUMBER` but no `ENV`
   reports an `info` about promotion
-- [ ] `emit-infra audit --local` on a correct Dockerfile (`ARG` + `ENV`) reports no
+- [x] `emit-infra audit --local` on a correct Dockerfile (`ARG` + `ENV`) reports no
   BUILD_NUMBER issues
-- [ ] Single-stage Dockerfiles do not trigger these checks (they already have the
+- [x] Single-stage Dockerfiles do not trigger these checks (they already have the
   multi-stage `critical` to address first)
-- [ ] `pnpm nx run cli:typecheck` clean
+- [x] `pnpm nx run cli:typecheck` clean
+
+## Completed
+
+**Date:** 2026-06-11
+
+### Summary
+Added two BUILD_NUMBER checks to `auditDockerfile` in `audit.ts`. The first (warn) fires on multi-stage Dockerfiles missing `ARG BUILD_NUMBER`, catching the silent-drop of the CI build-arg. The second (info) fires when the ARG is declared but not promoted to an ENV, noting it won't be available at runtime. Both checks are gated on `isMultiStage` so single-stage Dockerfiles (which already get the critical multi-stage warning) are not double-flagged.
+
+### Files changed
+- `apps/cli/src/commands/audit.ts` — added BUILD_NUMBER arg/env checks in `auditDockerfile`
+
+### Verification
+- `pnpm nx run cli:typecheck`: clean
+- Code review: warn branch fires only when `isMultiStage && !hasBuildNumberArg`
+- Code review: info branch fires only when `isMultiStage && hasBuildNumberArg && !hasBuildNumberEnv`
+- Code review: single-stage Dockerfiles skip both branches (`isMultiStage` is false)
+
+### Follow-ups
+- none
 
 ## Out of scope
 - Adding `ARG BUILD_NUMBER` to any project's actual Dockerfile (that's each project's work)

@@ -109,6 +109,25 @@ function auditDockerfile(filepath: string, content: string): Issue[] {
     })
   }
 
+  // BUILD_NUMBER build-arg capture
+  const hasBuildNumberArg = lines.some(l => /^ARG\s+BUILD_NUMBER/i.test(l))
+  const hasBuildNumberEnv = lines.some(l => /^ENV\s+.*BUILD_NUMBER/i.test(l))
+  if (isMultiStage && !hasBuildNumberArg) {
+    issues.push({
+      severity: 'warn',
+      file: rel,
+      message: 'BUILD_NUMBER build-arg not declared — the value passed by CI is silently dropped.',
+      fix: 'Add "ARG BUILD_NUMBER" before the final stage CMD, then "ENV BUILD_NUMBER=$BUILD_NUMBER" to expose it at runtime.',
+    })
+  } else if (isMultiStage && hasBuildNumberArg && !hasBuildNumberEnv) {
+    issues.push({
+      severity: 'info',
+      file: rel,
+      message: 'ARG BUILD_NUMBER declared but not promoted to ENV — not available as a runtime env var.',
+      fix: 'Add "ENV BUILD_NUMBER=$BUILD_NUMBER" (or "ENV NEXT_PUBLIC_BUILD_NUMBER=$BUILD_NUMBER" for Next.js) after the ARG line.',
+    })
+  }
+
   return issues
 }
 
