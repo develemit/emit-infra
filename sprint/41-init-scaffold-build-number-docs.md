@@ -60,11 +60,33 @@ that build validation is part of the deploy loop.
   add one `console.log` line in "Next steps"
 
 ## Acceptance criteria
-- [ ] Scaffolded `deploy.yml` contains the `ARG BUILD_NUMBER` / `ENV` comment block
+- [x] Scaffolded `deploy.yml` contains the `ARG BUILD_NUMBER` / `ENV` comment block
   immediately above `build-args:`
-- [ ] `emit-infra init` "Next steps" output includes the healthz curl line
-- [ ] `pnpm nx run cli:typecheck` clean
-- [ ] The comment block is valid YAML (comments don't break yaml parsing)
+- [x] `emit-infra init` "Next steps" output includes the healthz curl line
+- [x] `pnpm nx run cli:typecheck` clean
+- [x] The comment block is valid YAML (comments don't break yaml parsing)
+
+## Completed
+
+**Date:** 2026-06-11
+
+### Summary
+Added a 4-line YAML comment block to `buildWorkflow()` immediately above the
+`build-args:` key, explaining that the Dockerfile must declare `ARG BUILD_NUMBER`
+and optionally promote it to `ENV` (with a Next.js-specific hint for
+`NEXT_PUBLIC_BUILD_NUMBER`). Added a healthz curl line to the "Next steps"
+console output so developers know to verify the build number after first deploy.
+
+### Files changed
+- `apps/cli/src/commands/init.ts` — added BUILD_NUMBER guidance comment block in `buildWorkflow()`; added healthz curl line to "Next steps" output
+
+### Verification
+- `pnpm nx run cli:typecheck`: clean (cached, no errors)
+- Code inspection: comment block at correct 10-space indent, immediately above `build-args:`
+- Code inspection: healthz curl line uses `config.domain` for the URL
+
+### Follow-ups
+none
 
 ## Out of scope
 - Changing the actual workflow logic — comments only

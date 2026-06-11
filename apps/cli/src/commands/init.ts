@@ -63,6 +63,7 @@ export function registerInit(program: Command): void {
         console.log(`  git config core.hooksPath .githooks  # activate pre-commit hook`)
       }
       console.log(`  Push to GitHub to trigger the deploy workflow`)
+      console.log(`  curl https://${config.domain}/healthz  # verify build number after first deploy`)
     })
 }
 
@@ -113,6 +114,10 @@ jobs:
         with:
           push: true
           tags: \${{ env.IMAGE }}:latest,\${{ env.IMAGE }}:\${{ github.sha }}
+          # BUILD_NUMBER is passed as a Docker build-arg.
+          # Your Dockerfile must declare: ARG BUILD_NUMBER
+          # To expose at runtime:        ENV BUILD_NUMBER=$BUILD_NUMBER
+          # For Next.js public access:   ENV NEXT_PUBLIC_BUILD_NUMBER=$BUILD_NUMBER
           build-args: |
             BUILD_NUMBER=\${{ github.run_number }}
           labels: |
