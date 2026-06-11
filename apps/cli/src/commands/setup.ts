@@ -14,6 +14,7 @@ import {
   resolveAccountId,
   ensureR2Bucket,
   createR2Token,
+  revokeR2Token,
 } from '@emit-infra/core'
 
 export function registerSetup(program: Command): void {
@@ -79,17 +80,34 @@ export function registerSetup(program: Command): void {
       const stateAccountId = await resolveAccountId(cfToken)
       const stateBucket = `${config.name}-tfstate`
       await ensureR2Bucket(stateAccountId, stateBucket, cfToken)
-      const stateToken = await createR2Token(stateAccountId, stateBucket, cfToken)
-      ok(`State bucket ready: ${stateBucket}`)
 
       const credDir = join(homedir(), '.emit-infra', config.name)
       mkdirSync(credDir, { recursive: true })
       const credPath = join(credDir, 'terraform-backend.env')
+
+      if (existsSync(credPath)) {
+        const existingContent = readFileSync(credPath, 'utf-8')
+        const tokenIdMatch = existingContent.match(/^token_id=(.+)$/m)
+        if (tokenIdMatch && tokenIdMatch[1]) {
+          const oldTokenId = tokenIdMatch[1]
+          const revoked = await revokeR2Token(cfToken, oldTokenId)
+          if (revoked) {
+            ok(`Revoked old R2 token`)
+          } else {
+            warn(`Could not revoke old R2 token (it may already be deleted)`)
+          }
+        }
+      }
+
+      const stateToken = await createR2Token(stateAccountId, stateBucket, cfToken)
+      ok(`State bucket ready: ${stateBucket}`)
+
       const credContent = [
         `bucket=${stateBucket}`,
         `access_key=${stateToken.accessKeyId}`,
         `secret_key=${stateToken.secretAccessKey}`,
         `endpoint=https://${stateAccountId}.r2.cloudflarestorage.com`,
+        `token_id=${stateToken.tokenId}`,
       ].join('\n') + '\n'
       writeFileSync(credPath, credContent, { mode: 0o600 })
       ok(`Saved backend credentials to ${credPath}`)

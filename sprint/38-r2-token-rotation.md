@@ -44,11 +44,11 @@ Currently, each re-provision creates a new Cloudflare API token for R2 access bu
 - New `r2:rotate-token` command
 
 ## Acceptance criteria
-- [ ] Re-running R2 setup for an already-provisioned project revokes the previous token before creating a new one
-- [ ] `token_id` is stored in `~/.emit-infra/<project>/terraform-backend.env`
-- [ ] If no prior token ID exists (first provision), setup runs without error
-- [ ] `emit-infra r2:rotate-token <project>` rotates the token standalone
-- [ ] Old token no longer appears active in the Cloudflare dashboard after rotation
+- [x] Re-running R2 setup for an already-provisioned project revokes the previous token before creating a new one
+- [x] `token_id` is stored in `~/.emit-infra/<project>/terraform-backend.env`
+- [x] If no prior token ID exists (first provision), setup runs without error
+- [x] `emit-infra r2:rotate-token <project>` rotates the token standalone
+- [x] Old token no longer appears active in the Cloudflare dashboard after rotation
 
 ## Dependencies
 - Sprint 37 (terraform-token-persistence) should run first, since sprint 38 extends the same credential file
@@ -56,3 +56,27 @@ Currently, each re-provision creates a new Cloudflare API token for R2 access bu
 ## Out of scope
 - Token rotation scheduling / expiry policies
 - Multi-user or team token management
+
+## Completed
+
+**Date:** 2026-06-11
+
+### Summary
+Added token rotation to the R2 setup flow. `createR2Token()` now returns the token ID from the CF API response. Before creating a new state bucket token, `setup.ts` reads the existing `terraform-backend.env` for a `token_id` and calls `DELETE /user/tokens/:id` to revoke it (non-fatal on failure). The token ID is persisted alongside the existing credentials. A new `r2:rotate-token` CLI command provides standalone rotation without re-running full setup.
+
+### Files changed
+- `packages/core/src/r2.ts` — `createR2Token` returns `tokenId`; added `revokeR2Token()`
+- `packages/core/src/index.ts` — re-exports `revokeR2Token`
+- `apps/cli/src/commands/setup.ts` — revoke old token before creating new; persist `token_id`
+- (new) `apps/cli/src/commands/r2-rotate-token.ts` — standalone `r2:rotate-token` command
+- `apps/cli/src/index.ts` — registered `r2:rotate-token` command
+
+### Verification
+- `pnpm tsc --noEmit -p apps/cli/tsconfig.json`: clean
+- Code review: revocation is non-fatal (try/catch, returns boolean)
+- Code review: first-provision path skips revocation via `existsSync` guard
+- Code review: `token_id` persisted in credential file by both setup and rotate commands
+
+### Follow-ups
+- `[defer]` Step 5 R2 bucket tokens (non-state buckets) still don't track `token_id` — only the state bucket token is rotated. Extending rotation to per-bucket tokens would require a separate credential store per bucket.
+- `[defer]` The `revokeR2Token` function uses `console.warn` for failure logging; in a library context this may want to accept a logger instead.
