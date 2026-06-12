@@ -53,6 +53,15 @@
     state: absent
   notify: reload nginx
 
+- name: Create /var/www/certbot for ACME HTTP-01 challenges
+  file:
+    path: /var/www/certbot
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: "0755"
+  when: not (nginx_wildcard_cert | default(false))
+
 - name: Ensure Cloudflare credentials dir exists
   file:
     path: /etc/letsencrypt/cloudflare
