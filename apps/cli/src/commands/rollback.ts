@@ -10,8 +10,10 @@ export function registerRollback(program: Command): void {
     .description('Restore :rollback-tagged images and restart the app stack')
     .option('--config <path>', 'Path to .emit-infra.json')
     .option('--version <N>', 'Roll back to a specific build number from the registry')
+    .option('--timestamp <tag>', 'Roll back to a specific timestamped snapshot (e.g. rollback-20260611T221443)')
+    .option('--list', 'List available timestamped rollback snapshots')
     .option('--port <port>', 'Override health-check port')
-    .action(async (_name: string | undefined, opts: { config?: string; version?: string; port?: string }) => {
+    .action(async (_name: string | undefined, opts: { config?: string; version?: string; timestamp?: string; list?: boolean; port?: string }) => {
       const config = loadConfig(opts.config)
       const host = config.serverIp ?? config.domain
       const key = join(homedir(), '.ssh', config.sshKeyName)
@@ -33,8 +35,12 @@ export function registerRollback(program: Command): void {
         process.exit(1)
       }
 
-      if (opts.version) {
+      if (opts.list) {
+        await listRollbackSnapshots(host, key, imageList)
+      } else if (opts.version) {
         await rollbackToVersion(host, key, appDir, composeFile, imageList, opts.version, port)
+      } else if (opts.timestamp) {
+        await rollbackToTimestamp(host, key, appDir, composeFile, imageList, opts.timestamp, port)
       } else {
         await rollbackToTag(host, key, appDir, composeFile, imageList, port)
       }
@@ -89,6 +95,41 @@ async function rollbackToTag(
 
   await sshExec(host, tagScript, key)
   console.log(chalk.dim('Restored :rollback tags to :latest'))
+  await restartAndHealthCheck(host, key, appDir, composeFile, port)
+}
+
+async function listRollbackSnapshots(host: string, key: string, imageList: string[]): Promise<void> {
+  const firstImage = imageList[0]!.split(':')[0]
+  const output = await sshExec(
+    host,
+    `docker images --format "{{.Repository}}:{{.Tag}}" "${firstImage}" | grep ":rollback-" | sort -r`,
+    key,
+  )
+  const lines = output.trim()
+  console.log(lines || '(no rollback snapshots found)')
+}
+
+async function rollbackToTimestamp(
+  host: string, key: string, appDir: string, composeFile: string,
+  imageList: string[], timestamp: string, port: string,
+): Promise<void> {
+  console.log(chalk.dim(`Tagging ${timestamp} as :latest...`))
+
+  const tagScript = imageList
+    .map(img => {
+      const base = img.split(':')[0]
+      return `docker tag "${base}:${timestamp}" "${base}:latest"`
+    })
+    .join(' && ')
+
+  try {
+    await sshExec(host, tagScript, key)
+  } catch {
+    console.error(chalk.red(`Failed to tag ${timestamp}. Run "emit-infra rollback --list" to see available snapshots.`))
+    process.exit(1)
+  }
+
+  console.log(chalk.dim(`Tagged ${timestamp} as :latest`))
   await restartAndHealthCheck(host, key, appDir, composeFile, port)
 }
 

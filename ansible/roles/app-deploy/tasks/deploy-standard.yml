@@ -9,10 +9,15 @@
   register: current_images
   when: rollback_enabled | default(true)
 
-- name: Tag current images as :rollback
+- name: Tag current images with timestamp and :rollback alias
   shell: |
-    docker tag "{{ item }}:latest" "{{ item }}:rollback" 2>/dev/null || \
-    docker tag "{{ item }}" "{{ item.split(':')[0] }}:rollback" 2>/dev/null || true
+    TS=$(date -u +%Y%m%dT%H%M%S)
+    IMAGE_BASE="{{ item.split(':')[0] }}"
+    docker tag "{{ item }}:latest" "${IMAGE_BASE}:rollback-${TS}" 2>/dev/null || \
+    docker tag "{{ item }}" "${IMAGE_BASE}:rollback-${TS}" 2>/dev/null || true
+    docker tag "${IMAGE_BASE}:rollback-${TS}" "${IMAGE_BASE}:rollback" 2>/dev/null || true
+    docker images --format "{{ '{{' }}.Tag{{ '}}' }}" "${IMAGE_BASE}" | grep "^rollback-" | sort | head -n -3 | \
+      xargs -I{} docker rmi "${IMAGE_BASE}:{}" 2>/dev/null || true
   loop: "{{ current_images.stdout_lines | default([]) }}"
   when: rollback_enabled | default(true)
 
