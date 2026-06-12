@@ -94,7 +94,11 @@ export async function createR2Token(
   return { tokenId: result.id, accessKeyId: result.accessKeyId, secretAccessKey: result.secretAccessKey }
 }
 
-export async function revokeR2Token(apiToken: string, tokenId: string): Promise<boolean> {
+export async function revokeR2Token(
+  apiToken: string,
+  tokenId: string,
+  logger?: (msg: string) => void,
+): Promise<boolean> {
   try {
     const res = await fetch(`${CF_API}/user/tokens/${tokenId}`, {
       method: 'DELETE',
@@ -107,13 +111,13 @@ export async function revokeR2Token(apiToken: string, tokenId: string): Promise<
     if (!res.ok) {
       const body = (await res.json()) as CfResponse<unknown>
       const msgs = body.errors?.map((e) => `${e.code}: ${e.message}`).join(', ') ?? res.statusText
-      console.warn(`Warning: failed to revoke R2 token ${tokenId}: ${msgs}`)
+      logger?.(`Warning: failed to revoke R2 token ${tokenId}: ${msgs}`)
       return false
     }
 
     return true
   } catch (err) {
-    console.warn(`Warning: failed to revoke R2 token ${tokenId}: ${err instanceof Error ? err.message : String(err)}`)
+    logger?.(`Warning: failed to revoke R2 token ${tokenId}: ${err instanceof Error ? err.message : String(err)}`)
     return false
   }
 }

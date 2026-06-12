@@ -90,7 +90,7 @@ export function registerSetup(program: Command): void {
         const tokenIdMatch = existingContent.match(/^token_id=(.+)$/m)
         if (tokenIdMatch && tokenIdMatch[1]) {
           const oldTokenId = tokenIdMatch[1]
-          const revoked = await revokeR2Token(cfToken, oldTokenId)
+          const revoked = await revokeR2Token(cfToken, oldTokenId, warn)
           if (revoked) {
             ok(`Revoked old R2 token`)
           } else {
@@ -150,7 +150,7 @@ export function registerSetup(program: Command): void {
           await ensureR2Bucket(accountId, bucket, cfToken)
           const existing = appTokenStore[bucket]
           if (existing?.tokenId) {
-            const revoked = await revokeR2Token(cfToken, existing.tokenId)
+            const revoked = await revokeR2Token(cfToken, existing.tokenId, warn)
             if (revoked) ok(`Revoked old R2 token for ${bucket}`)
             else warn(`Could not revoke old R2 token for ${bucket} (may already be deleted)`)
           }
@@ -165,7 +165,7 @@ export function registerSetup(program: Command): void {
           await ensureR2Bucket(accountId, bucket, cfToken)
           const existing = appTokenStore[bucket]
           if (existing?.tokenId) {
-            const revoked = await revokeR2Token(cfToken, existing.tokenId)
+            const revoked = await revokeR2Token(cfToken, existing.tokenId, warn)
             if (revoked) ok(`Revoked old R2 token for ${bucket}`)
             else warn(`Could not revoke old R2 token for ${bucket} (may already be deleted)`)
           }

@@ -49,7 +49,26 @@ check the call site).
 
 ## Acceptance criteria
 
-- [ ] `revokeR2Token` signature includes `logger?: (msg: string) => void`
-- [ ] No `console.warn` calls remain inside `revokeR2Token`
-- [ ] The call site in `setup.ts` passes a logger (not left as `undefined`)
-- [ ] `pnpm nx run cli:typecheck` clean
+- [x] `revokeR2Token` signature includes `logger?: (msg: string) => void`
+- [x] No `console.warn` calls remain inside `revokeR2Token`
+- [x] The call site in `setup.ts` passes a logger (not left as `undefined`)
+- [x] `pnpm nx run cli:typecheck` clean
+
+## Completed
+
+**Date:** 2026-06-12
+
+### Summary
+Added `logger?: (msg: string) => void` as a third parameter to `revokeR2Token` in `packages/core/src/r2.ts`. Replaced both `console.warn` calls inside the function with `logger?.(...)`. Updated all three call sites in `setup.ts` to pass the module-level `warn` helper (chalk yellow + ⚠ prefix) so the detailed API error message flows through the same styled output channel as the rest of the setup step output.
+
+### Files changed
+- `packages/core/src/r2.ts` — added `logger?` param, replaced 2× `console.warn` with `logger?.()`
+- `apps/cli/src/commands/setup.ts` — passed `warn` as logger at all 3 `revokeR2Token` call sites
+
+### Verification
+- `pnpm nx run cli:typecheck`: clean
+- Code review: no `console.warn` remains in `revokeR2Token`
+- Code review: all 3 call sites pass `warn`
+
+### Follow-ups
+none
