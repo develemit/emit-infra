@@ -56,7 +56,25 @@ Example compound command:
 
 ## Acceptance criteria
 
-- [ ] `listRollbackSnapshots` queries each unique image base, not just the first
-- [ ] Output is deduplicated and sorted newest-first
-- [ ] Single-image stacks still work (no regression)
-- [ ] `pnpm nx run cli:typecheck` clean
+- [x] `listRollbackSnapshots` queries each unique image base, not just the first
+- [x] Output is deduplicated and sorted newest-first
+- [x] Single-image stacks still work (no regression)
+- [x] `pnpm nx run cli:typecheck` clean
+
+## Completed
+
+**Date:** 2026-06-12
+
+### Summary
+Replaced the single-image query in `listRollbackSnapshots` with a compound shell command that queries every unique image base from the compose stack. The bases list is deduplicated via `new Set` before building the shell clauses. The compound command wraps all `docker images | grep` clauses in `{ ...; }` and pipes through `sort -u -r` to merge, deduplicate, and sort newest-first in one SSH round trip. Single-image stacks produce the same output as before.
+
+### Files changed
+- `apps/cli/src/commands/rollback.ts` — replaced single-image query in `listRollbackSnapshots` with multi-image compound command
+
+### Verification
+- `pnpm nx run cli:typecheck`: clean
+- Code review: `new Set(imageList.map(...))` handles deduplication before building clauses
+- Code review: single-image case still works — `{ clause; } | sort -u -r` is valid shell with one clause
+
+### Follow-ups
+none

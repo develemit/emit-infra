@@ -99,12 +99,11 @@ async function rollbackToTag(
 }
 
 async function listRollbackSnapshots(host: string, key: string, imageList: string[]): Promise<void> {
-  const firstImage = imageList[0]!.split(':')[0]
-  const output = await sshExec(
-    host,
-    `docker images --format "{{.Repository}}:{{.Tag}}" "${firstImage}" | grep ":rollback-" | sort -r`,
-    key,
-  )
+  const bases = [...new Set(imageList.map(img => img.split(':')[0]))]
+  const clauses = bases
+    .map(base => `docker images --format "{{.Repository}}:{{.Tag}}" "${base}" | grep ":rollback-"`)
+    .join(';\n  ')
+  const output = await sshExec(host, `{ ${clauses}; } | sort -u -r`, key)
   const lines = output.trim()
   console.log(lines || '(no rollback snapshots found)')
 }
