@@ -143,11 +143,19 @@ export function registerSetup(program: Command): void {
       if (hasBuckets || hasBackupBucket) {
         step(5, total, 'Provisioning R2 buckets and tokens')
         const accountId = stateAccountId
+        const appTokenStore = readAppTokenStore(config.name)
 
         if (hasBackupBucket) {
           const bucket = config.postgres!.backupBucket!
           await ensureR2Bucket(accountId, bucket, cfToken)
+          const existing = appTokenStore[bucket]
+          if (existing?.tokenId) {
+            const revoked = await revokeR2Token(cfToken, existing.tokenId)
+            if (revoked) ok(`Revoked old R2 token for ${bucket}`)
+            else warn(`Could not revoke old R2 token for ${bucket} (may already be deleted)`)
+          }
           const creds = await createR2Token(accountId, bucket, cfToken)
+          appTokenStore[bucket] = { tokenId: creds.tokenId, accessKeyId: creds.accessKeyId }
           r2Secrets['CF_ACCOUNT_ID'] = accountId
           r2Secrets['R2_ACCESS_KEY_ID'] = creds.accessKeyId
           r2Secrets['R2_SECRET_ACCESS_KEY'] = creds.secretAccessKey
@@ -155,12 +163,20 @@ export function registerSetup(program: Command): void {
 
         for (const bucket of config.r2?.buckets ?? []) {
           await ensureR2Bucket(accountId, bucket, cfToken)
+          const existing = appTokenStore[bucket]
+          if (existing?.tokenId) {
+            const revoked = await revokeR2Token(cfToken, existing.tokenId)
+            if (revoked) ok(`Revoked old R2 token for ${bucket}`)
+            else warn(`Could not revoke old R2 token for ${bucket} (may already be deleted)`)
+          }
           const creds = await createR2Token(accountId, bucket, cfToken)
+          appTokenStore[bucket] = { tokenId: creds.tokenId, accessKeyId: creds.accessKeyId }
           const prefix = bucket.toUpperCase().replace(/-/g, '_')
           r2Secrets[`R2_${prefix}_ACCESS_KEY_ID`] = creds.accessKeyId
           r2Secrets[`R2_${prefix}_SECRET_ACCESS_KEY`] = creds.secretAccessKey
         }
 
+        writeAppTokenStore(config.name, appTokenStore)
         ok(`Provisioned ${Object.keys(r2Secrets).length} R2 credentials`)
       }
 
@@ -238,4 +254,22 @@ function ok(msg: string): void {
 
 function warn(msg: string): void {
   console.log(chalk.yellow(`  ⚠ ${msg}`))
+}
+
+type AppTokenStore = Record<string, { tokenId: string; accessKeyId: string }>
+
+function readAppTokenStore(project: string): AppTokenStore {
+  const storePath = join(homedir(), '.emit-infra', project, 'r2-app-tokens.json')
+  if (!existsSync(storePath)) return {}
+  try {
+    return JSON.parse(readFileSync(storePath, 'utf-8')) as AppTokenStore
+  } catch {
+    return {}
+  }
+}
+
+function writeAppTokenStore(project: string, store: AppTokenStore): void {
+  const dir = join(homedir(), '.emit-infra', project)
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, 'r2-app-tokens.json'), JSON.stringify(store, null, 2) + '\n', { mode: 0o600 })
 }
