@@ -96,8 +96,8 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      packages: write
+      contents: write      # required for git tag push
+      packages: write      # required for GHCR push
 
     steps:
       - uses: actions/checkout@v4

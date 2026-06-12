@@ -52,7 +52,24 @@ explicit alongside `contents: write` for clarity.
 
 ## Acceptance criteria
 
-- [ ] Scaffolded workflow includes `permissions: contents: write` and
+- [x] Scaffolded workflow includes `permissions: contents: write` and
       `permissions: packages: write` under the `build:` job
-- [ ] YAML indentation is consistent with the rest of the template
-- [ ] `pnpm nx run cli:typecheck` clean
+- [x] YAML indentation is consistent with the rest of the template
+- [x] `pnpm nx run cli:typecheck` clean
+
+## Completed
+
+**Date:** 2026-06-12
+
+### Summary
+The `buildWorkflow()` scaffold in `init.ts` already had a `permissions:` block — but it used `contents: read`, which would silently fail any git tag push step in orgs with restricted default permissions. Changed `contents: read` to `contents: write` and added inline comments (`# required for git tag push` / `# required for GHCR push`) to both permission keys. The job is named `deploy:` in the actual scaffold (not `build:` as the sprint spec said — minor discrepancy in the spec, no functional difference).
+
+### Files changed
+- `apps/cli/src/commands/init.ts` — changed `contents: read` → `contents: write`, added explanatory comments to both permission keys in `buildWorkflow()`
+
+### Verification
+- `pnpm nx run cli:typecheck`: clean
+- Code review: `permissions.contents` is now `write`; indentation matches surrounding 4-space job-level keys; `packages: write` comment added
+
+### Follow-ups
+none
