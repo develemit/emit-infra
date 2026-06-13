@@ -12,6 +12,16 @@ interface Props {
   status: ProjectStatus | null
 }
 
+function sslDaysLeft(expiry: string | null | undefined): { value: string; color?: string; days: number } {
+  if (!expiry) return { value: '—', days: Infinity }
+  const expiryDate = new Date(expiry)
+  if (isNaN(expiryDate.getTime())) return { value: '—', days: Infinity }
+  const days = Math.floor((expiryDate.getTime() - Date.now()) / 86_400_000)
+  if (days < 0) return { value: 'Expired', color: 'var(--err)', days }
+  if (days < 14) return { value: `${days}d`, color: 'var(--warn, #e5a00d)', days }
+  return { value: `${days}d`, days }
+}
+
 export function ProjectCard({ project, status }: Props) {
   const { name, domain, region } = project.config
   const { variant, label } = deriveHealth(status)
@@ -19,6 +29,7 @@ export function ProjectCard({ project, status }: Props) {
   const loading = status === null
   const disk = status?.disk ?? 0
   const mem = status?.memory ?? 0
+  const ssl = sslDaysLeft(status?.sslExpiry)
 
   return (
     <Link
@@ -46,6 +57,11 @@ export function ProjectCard({ project, status }: Props) {
       {/* Region badge */}
       <div className="flex gap-1.5">
         <Badge variant="region">{region}</Badge>
+        {status?.sslExpiry && ssl.days <= 30 && (
+          <span className="text-[11px] font-mono px-1.5 py-0.5 rounded" style={{ color: ssl.color, background: 'var(--card-2)', border: '1px solid var(--border)' }}>
+            SSL {ssl.value}
+          </span>
+        )}
       </div>
 
       {/* Meters / skeleton / unreachable */}
