@@ -57,11 +57,27 @@ function notifyUp(name: string) {
 - `apps/dashboard/app/page.tsx` — add `notifyUp` + back-online transition detection
 
 ## Acceptance criteria
-- [ ] When a project transitions from unreachable to reachable during a poll, a browser notification fires
-- [ ] Repeated polls showing the same project still up do NOT fire duplicate notifications (`tag: up-<name>`)
-- [ ] Projects that were already reachable on first load do NOT trigger a notification
-- [ ] Goes-down notifications still work (no regression)
-- [ ] `pnpm nx run dashboard:typecheck` clean
+- [x] When a project transitions from unreachable to reachable during a poll, a browser notification fires
+- [x] Repeated polls showing the same project still up do NOT fire duplicate notifications (`tag: up-<name>`)
+- [x] Projects that were already reachable on first load do NOT trigger a notification
+- [x] Goes-down notifications still work (no regression)
+- [x] `pnpm nx run dashboard:typecheck` clean
+
+## Completed
+
+**Date:** 2026-06-13
+
+### Summary
+Added `notifyUp(name)` as a module-level function alongside `notifyDown` in `apps/dashboard/app/page.tsx`. The function fires a browser notification with `tag: up-${name}` for deduplication when a project transitions from error state to healthy. Added a second branch in the transition detection loop that checks `if (prev?.error && !newStatus.error)` — the `prev?.error` guard naturally prevents first-load false positives since `prev` is `undefined` on initial poll.
+
+### Files changed
+- `apps/dashboard/app/page.tsx` — added `notifyUp` helper (lines 18–24) and back-online transition detection (lines 64–66)
+
+### Verification
+- `pnpm nx run dashboard:typecheck`: clean
+
+### Follow-ups
+none
 
 ## Out of scope
 - Per-project opt-out settings for up/down notifications

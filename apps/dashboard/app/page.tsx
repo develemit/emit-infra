@@ -15,6 +15,14 @@ function notifyDown(name: string) {
   })
 }
 
+function notifyUp(name: string) {
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
+  new Notification(`${name} is back online`, {
+    body: 'SSH reachable — server has recovered.',
+    tag: `up-${name}`,
+  })
+}
+
 export default function HomePage() {
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null)
   const [statuses, setStatuses] = useState<Record<string, ProjectStatus>>({})
@@ -52,6 +60,9 @@ export default function HomePage() {
       const prev = prevStatuses.current[name]
       if (prev && !prev.error && newStatus.error) {
         notifyDown(name)
+      }
+      if (prev?.error && !newStatus.error) {
+        notifyUp(name)
       }
     }
 
