@@ -1,15 +1,13 @@
 import type { FastifyInstance } from 'fastify'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { access, mkdir, writeFile, readFile } from 'node:fs/promises'
-import { existsSync } from 'node:fs'
-import { execa } from 'execa'
-import { runAnsible, runTerraform, getTerraformOutput, sshMuxArgs, sshExec } from '@emit-infra/core'
+import { access, mkdir, writeFile } from 'node:fs/promises'
+import { runAnsible, runTerraform, getTerraformOutput, sshMuxArgs } from '@emit-infra/core'
 import { scaffoldProject, writeInventory } from '../lib/scaffold-project.js'
 import { discoverProjects } from '../lib/discover-projects.js'
 import { writeEvent } from '../lib/write-sse.js'
+import { openSse, sseError } from '../lib/open-sse.js'
 import { streamProcess } from '../lib/stream-process.js'
-
 
 const OPERATION_TIMEOUT_MS = 15 * 60 * 1000
 
@@ -17,37 +15,6 @@ function operationTimeout(): Promise<never> {
   return new Promise((_, reject) =>
     setTimeout(() => reject(new Error('timeout')), OPERATION_TIMEOUT_MS),
   )
-}
-
-function sseError(raw: import('node:http').ServerResponse, message: string) {
-  writeEvent(raw, { type: 'error', message })
-  writeEvent(raw, { type: 'done', exitCode: 1 })
-  raw.end()
-}
-
-function openSse(reply: { hijack(): void; raw: import('node:http').ServerResponse }) {
-  reply.hijack()
-  reply.raw.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
-    'Access-Control-Allow-Origin': '*',
-  })
-}
-
-function parseEnvFile(content: string): [string, string][] {
-  return content
-    .split('\n')
-    .map(line => line.trim())
-    .filter(line => line && !line.startsWith('#'))
-    .map(line => {
-      const idx = line.indexOf('=')
-      if (idx === -1) return null
-      const key = line.slice(0, idx).trim()
-      const value = line.slice(idx + 1).trim().replace(/^["']|["']$/g, '')
-      return [key, value] as [string, string]
-    })
-    .filter((entry): entry is [string, string] => entry !== null)
 }
 
 function sshKeyPath(keyName = 'emit-deploy'): string {
@@ -158,100 +125,6 @@ export async function operationRoutes(app: FastifyInstance) {
     writeEvent(reply.raw, { type: 'done', exitCode })
     reply.raw.end()
   },
-  )
-
-  app.post<{ Params: { name: string }; Body: { timestamp?: string } }>(
-    '/projects/:name/rollback',
-    async (req, reply) => {
-      const project = await findProject(req.params.name)
-      if (!project) return reply.status(404).send({ error: 'not found' })
-
-      const key = sshKeyPath(project.config.sshKeyName)
-      const host = project.config.serverIp ?? project.config.domain
-      const appDir = project.config.deploy?.appDir ?? '/app'
-      const composeFile = project.config.deploy?.composeDest ?? 'docker-compose.yml'
-      const tagStr = req.body?.timestamp ?? 'rollback'
-
-      openSse(reply)
-
-      let exitCode = 0
-      try {
-        const images = await sshExec(host, `cd ${appDir} && docker compose -f ${composeFile} config --images`, key)
-        const imageList = images.split('\n').map(l => l.trim()).filter(Boolean)
-
-        if (imageList.length === 0) {
-          return sseError(reply.raw, 'No images found in compose config')
-        }
-
-        const tagScript = imageList
-          .map(img => {
-            const base = img.split(':')[0]!
-            return `docker tag "${base}:${tagStr}" "${base}:latest"`
-          })
-          .join(' && ')
-
-        writeEvent(reply.raw, { type: 'line', stream: 'stdout', text: `Tagging :${tagStr} as :latest...` })
-        await sshExec(host, tagScript, key)
-        writeEvent(reply.raw, { type: 'line', stream: 'stdout', text: 'Tagged. Restarting app stack...' })
-
-        const upOut = await sshExec(host, `cd ${appDir} && docker compose -f ${composeFile} up -d --remove-orphans`, key)
-        for (const line of upOut.split('\n').map(l => l.trim()).filter(Boolean)) {
-          writeEvent(reply.raw, { type: 'line', stream: 'stdout', text: line })
-        }
-        writeEvent(reply.raw, { type: 'line', stream: 'stdout', text: 'Rollback complete.' })
-      } catch (err) {
-        exitCode = 1
-        writeEvent(reply.raw, { type: 'line', stream: 'stderr', text: `Error: ${String(err)}` })
-      }
-
-      writeEvent(reply.raw, { type: 'done', exitCode })
-      reply.raw.end()
-    },
-  )
-
-  app.post<{ Params: { name: string }; Body?: { envFile?: string } }>(
-    '/projects/:name/secrets-sync',
-    async (req, reply) => {
-      const project = await findProject(req.params.name)
-      if (!project) return reply.status(404).send({ error: 'not found' })
-
-      const projectDir = join(homedir(), 'projects', req.params.name)
-      const envFilePath = req.body?.envFile
-        ?? (existsSync(join(projectDir, '.env.prod'))
-          ? join(projectDir, '.env.prod')
-          : join(projectDir, '.env'))
-
-      openSse(reply)
-
-      if (!existsSync(envFilePath)) {
-        return sseError(reply.raw, `No env file found (.env.prod or .env) in ~/projects/${req.params.name}/`)
-      }
-
-      const content = await readFile(envFilePath, 'utf-8')
-      const entries = parseEnvFile(content)
-
-      if (entries.length === 0) {
-        writeEvent(reply.raw, { type: 'line', stream: 'stdout', text: 'No secrets found in env file.' })
-        writeEvent(reply.raw, { type: 'done', exitCode: 0 })
-        reply.raw.end()
-        return
-      }
-
-      let exitCode = 0
-      for (const [key, value] of entries) {
-        try {
-          await execa('gh', ['secret', 'set', key, '--repo', project.config.github.repo], { input: value })
-          writeEvent(reply.raw, { type: 'line', stream: 'stdout', text: `set ${key}` })
-        } catch (err) {
-          writeEvent(reply.raw, { type: 'line', stream: 'stderr', text: `failed ${key}: ${String(err)}` })
-          exitCode = 1
-          break
-        }
-      }
-
-      writeEvent(reply.raw, { type: 'done', exitCode })
-      reply.raw.end()
-    },
   )
 
   app.post<{ Params: { name: string } }>('/projects/:name/destroy', async (req, reply) => {

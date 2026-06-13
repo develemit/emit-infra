@@ -2,6 +2,8 @@ import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import { projectRoutes } from './routes/projects.js'
 import { operationRoutes } from './routes/operations.js'
+import { rollbackRoutes } from './routes/rollback.js'
+import { secretsSyncRoutes } from './routes/secrets-sync.js'
 import { opsRoutes } from './routes/ops.js'
 import { billingRoutes } from './routes/billing.js'
 
@@ -10,6 +12,8 @@ const app = Fastify({ logger: true })
 await app.register(cors, { origin: '*' })
 await app.register(projectRoutes)
 await app.register(operationRoutes)
+await app.register(rollbackRoutes)
+await app.register(secretsSyncRoutes)
 await app.register(opsRoutes)
 await app.register(billingRoutes)
 

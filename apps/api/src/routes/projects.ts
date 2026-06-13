@@ -187,32 +187,6 @@ export async function projectRoutes(app: FastifyInstance) {
     }
   })
 
-  app.get<{ Params: { name: string } }>('/projects/:name/rollback/snapshots', async (req, reply) => {
-    const project = await findProject(req.params.name)
-    if (!project) return reply.status(404).send({ error: 'not found' })
-
-    const key = sshKeyPath(project.config.sshKeyName)
-    const host = project.config.serverIp ?? project.config.domain
-    const appDir = project.config.deploy?.appDir ?? '/app'
-    const composeFile = project.config.deploy?.composeDest ?? 'docker-compose.yml'
-
-    try {
-      const images = await sshExec(host, `cd ${appDir} && docker compose -f ${composeFile} config --images`, key)
-      const imageList = images.split('\n').map(l => l.trim()).filter(Boolean)
-      if (imageList.length === 0) return { snapshots: [] }
-
-      const bases = [...new Set(imageList.map(img => img.split(':')[0]))]
-      const clauses = bases
-        .map(base => `docker images --format "{{.Repository}}:{{.Tag}}" "${base}" | grep ":rollback-"`)
-        .join(';\n  ')
-      const output = await sshExec(host, `{ ${clauses}; } | sort -u -r`, key)
-      const snapshots = output.trim().split('\n').map(l => l.trim()).filter(Boolean)
-      return { snapshots }
-    } catch {
-      return { snapshots: [] }
-    }
-  })
-
   app.post<{ Params: { name: string } }>('/projects/:name/prune', async (req, reply) => {
     const project = await findProject(req.params.name)
     if (!project) return reply.status(404).send({ error: 'not found' })
