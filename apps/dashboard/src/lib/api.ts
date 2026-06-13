@@ -13,6 +13,7 @@ export interface ProjectConfig {
   name: string
   domain: string
   region: string
+  github?: { repo: string }
 }
 
 export interface ProjectSummary {
@@ -147,6 +148,10 @@ export function rollbackProject(
     url: `${API_BASE}/projects/${encodeURIComponent(name)}/rollback`,
     body: JSON.stringify(timestamp ? { timestamp } : {}),
   }
+}
+
+export function syncSecrets(name: string): { url: string } {
+  return { url: `${API_BASE}/projects/${encodeURIComponent(name)}/secrets-sync` }
 }
 
 export function openSseStream(path: string): EventSource {
