@@ -1,18 +1,9 @@
 import type { FastifyInstance } from 'fastify'
-import { homedir } from 'node:os'
-import { join } from 'node:path'
 import { sshExec } from '@emit-infra/core'
-import { discoverProjects } from '../lib/discover-projects.js'
 import { writeEvent } from '../lib/write-sse.js'
 import { openSse, sseError } from '../lib/open-sse.js'
+import { findProject, sshKeyPath } from '../lib/project-helpers.js'
 
-function sshKeyPath(keyName = 'emit-deploy'): string {
-  return process.env['EMIT_SSH_KEY_PATH'] ?? join(homedir(), '.ssh', keyName)
-}
-
-async function findProject(name: string) {
-  return (await discoverProjects()).find((p) => p.config.name === name) ?? null
-}
 
 export async function rollbackRoutes(app: FastifyInstance) {
   app.get<{ Params: { name: string } }>('/projects/:name/rollback/snapshots', async (req, reply) => {

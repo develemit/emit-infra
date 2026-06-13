@@ -56,7 +56,29 @@ Both helpers are pure functions that import only from `@emit-infra/core` or `../
 - `apps/api/src/routes/secrets-sync.ts` — import from lib, remove local definitions
 
 ## Acceptance criteria
-- [ ] `findProject` and `sshKeyPath` are defined in exactly one place
-- [ ] All four route files import them from `../lib/project-helpers.js`
-- [ ] `pnpm nx run api:typecheck` clean
-- [ ] No orphaned imports left in the route files after removing the local helpers
+- [x] `findProject` and `sshKeyPath` are defined in exactly one place
+- [x] All four route files import them from `../lib/project-helpers.js`
+- [x] `pnpm nx run api:typecheck` clean
+- [x] No orphaned imports left in the route files after removing the local helpers
+
+## Completed
+
+**Date:** 2026-06-13
+
+### Summary
+Extracted the duplicated `findProject` and `sshKeyPath` helpers from four route files into a single shared `apps/api/src/lib/project-helpers.ts` module. The `sshKeyPath` signature was normalized to use the default parameter `keyName = 'emit-deploy'` across all call sites. Each route file now imports from the shared lib, and unused imports (`discoverProjects` in operations/rollback/secrets-sync) were cleaned up. Imports like `homedir`, `join`, and `discoverProjects` that are still used for other purposes in their respective files were left intact.
+
+### Files changed
+- (new) `apps/api/src/lib/project-helpers.ts` — shared `findProject` + `sshKeyPath` definitions
+- `apps/api/src/routes/projects.ts` — removed local helpers, imports from shared lib
+- `apps/api/src/routes/operations.ts` — removed local helpers + unused `discoverProjects`, imports from shared lib
+- `apps/api/src/routes/rollback.ts` — removed local helpers + unused `homedir`/`join`/`discoverProjects`, imports from shared lib
+- `apps/api/src/routes/secrets-sync.ts` — removed local `findProject` + unused `discoverProjects`, imports from shared lib
+
+### Verification
+- `pnpm nx run api:typecheck --skip-nx-cache`: clean
+- grep for local `findProject`/`sshKeyPath` definitions in route files: none found
+- grep for orphaned `discoverProjects` in operations/rollback/secrets-sync: none found
+
+### Follow-ups
+- none

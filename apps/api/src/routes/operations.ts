@@ -4,10 +4,10 @@ import { join } from 'node:path'
 import { access, mkdir, writeFile } from 'node:fs/promises'
 import { runAnsible, runTerraform, getTerraformOutput, sshMuxArgs } from '@emit-infra/core'
 import { scaffoldProject, writeInventory } from '../lib/scaffold-project.js'
-import { discoverProjects } from '../lib/discover-projects.js'
 import { writeEvent } from '../lib/write-sse.js'
 import { openSse, sseError } from '../lib/open-sse.js'
 import { streamProcess } from '../lib/stream-process.js'
+import { findProject, sshKeyPath } from '../lib/project-helpers.js'
 
 const OPERATION_TIMEOUT_MS = 15 * 60 * 1000
 
@@ -17,13 +17,6 @@ function operationTimeout(): Promise<never> {
   )
 }
 
-function sshKeyPath(keyName = 'emit-deploy'): string {
-  return process.env['EMIT_SSH_KEY_PATH'] ?? join(homedir(), '.ssh', keyName)
-}
-
-async function findProject(name: string) {
-  return (await discoverProjects()).find((p) => p.config.name === name) ?? null
-}
 
 export async function operationRoutes(app: FastifyInstance) {
   app.post<{ Params: { name: string } }>('/projects/:name/deploy', async (req, reply) => {

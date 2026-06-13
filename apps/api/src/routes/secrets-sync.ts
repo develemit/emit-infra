@@ -4,9 +4,9 @@ import { join } from 'node:path'
 import { readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { execa } from 'execa'
-import { discoverProjects } from '../lib/discover-projects.js'
 import { writeEvent } from '../lib/write-sse.js'
 import { openSse, sseError } from '../lib/open-sse.js'
+import { findProject } from '../lib/project-helpers.js'
 
 function parseEnvFile(content: string): [string, string][] {
   return content
@@ -23,9 +23,6 @@ function parseEnvFile(content: string): [string, string][] {
     .filter((entry): entry is [string, string] => entry !== null)
 }
 
-async function findProject(name: string) {
-  return (await discoverProjects()).find((p) => p.config.name === name) ?? null
-}
 
 export async function secretsSyncRoutes(app: FastifyInstance) {
   app.post<{ Params: { name: string }; Body?: { envFile?: string } }>(

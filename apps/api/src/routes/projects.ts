@@ -6,6 +6,7 @@ import { existsSync } from 'node:fs'
 import { sshExec } from '@emit-infra/core'
 import { discoverProjects, discoverUnregistered } from '../lib/discover-projects.js'
 import { createTtlCache } from '../lib/ttl-cache.js'
+import { findProject, sshKeyPath } from '../lib/project-helpers.js'
 
 // Concurrent dashboard pollers (multiple tabs/instances) hit these on the same
 // interval. Cache the SSH result briefly so they share one round-trip per
@@ -45,13 +46,6 @@ type Container = { name: string; image: string; status: string; state: string; b
 const statusCache = createTtlCache<StatusData | null>(STATUS_TTL)
 const containersCache = createTtlCache<Container[] | null>(STATUS_TTL)
 
-function sshKeyPath(keyName: string): string {
-  return process.env['EMIT_SSH_KEY_PATH'] ?? join(homedir(), '.ssh', keyName)
-}
-
-async function findProject(name: string) {
-  return (await discoverProjects()).find((p) => p.config.name === name) ?? null
-}
 
 async function readProjectConfig(name: string): Promise<Record<string, unknown> | null> {
   try {
