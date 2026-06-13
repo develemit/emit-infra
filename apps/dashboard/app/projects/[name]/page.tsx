@@ -24,6 +24,8 @@ export default function ProjectDetailPage() {
   const [containers, setContainers] = useState<Container[] | null>(null)
   const [deploying, setDeploying] = useState(false)
   const [showDestroy, setShowDestroy] = useState(false)
+  const [lastPolledAt, setLastPolledAt] = useState<number>(0)
+  const [polledAgo, setPolledAgo] = useState('')
 
   const deployUrl = `${apiBase}/projects/${encodeURIComponent(name)}/deploy`
 
@@ -32,6 +34,7 @@ export default function ProjectDetailPage() {
     setProject(ps.find(p => p.config.name === name) ?? null)
     setStatus(s)
     setContainers(c)
+    setLastPolledAt(Date.now())
   }, [name])
 
   useEffect(() => {
@@ -39,6 +42,26 @@ export default function ProjectDetailPage() {
     const interval = setInterval(() => void fetchData(), 30_000)
     return () => clearInterval(interval)
   }, [fetchData])
+
+  useEffect(() => {
+    const tick = setInterval(() => {
+      if (lastPolledAt === 0) {
+        setPolledAgo('')
+        return
+      }
+      const elapsed = Date.now() - lastPolledAt
+      const seconds = Math.floor(elapsed / 1000)
+      if (seconds <= 3) {
+        setPolledAgo('just now')
+      } else if (seconds < 60) {
+        setPolledAgo(`${seconds}s ago`)
+      } else {
+        const minutes = Math.floor(seconds / 60)
+        setPolledAgo(`${minutes}m ago`)
+      }
+    }, 1000)
+    return () => clearInterval(tick)
+  }, [lastPolledAt])
 
   const { variant, label } = deriveHealth(status)
   const domain = project?.config.domain ?? ''
@@ -112,7 +135,7 @@ export default function ProjectDetailPage() {
           ) : (
             <>
               {project && status && (
-                <HealthCard project={project} status={status} polledAgo="polled 30s ago" />
+                <HealthCard project={project} status={status} polledAgo={polledAgo} onRefresh={fetchData} />
               )}
               {containers !== null && (
                 <ContainerTable containers={containers} projectName={name} />

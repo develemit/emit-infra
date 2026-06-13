@@ -60,6 +60,7 @@ interface HealthCardProps {
   project: ProjectSummary
   status: ProjectStatus
   polledAgo?: string
+  onRefresh?: () => void
 }
 
 function sizeLabel(label: string, used?: string, total?: string): string {
@@ -67,7 +68,7 @@ function sizeLabel(label: string, used?: string, total?: string): string {
   return label
 }
 
-export function HealthCard({ project, status, polledAgo }: HealthCardProps) {
+export function HealthCard({ project, status, polledAgo, onRefresh }: HealthCardProps) {
   const disk = status.disk ?? 0
   const mem = status.memory ?? 0
   const diskLabel = sizeLabel('Disk', status.diskUsed, status.diskTotal)
@@ -89,13 +90,14 @@ export function HealthCard({ project, status, polledAgo }: HealthCardProps) {
         <span className="text-[13.5px] font-semibold text-fg">Server Health</span>
         <div className="flex-1" />
         {polledAgo && (
-          <span
-            className="inline-flex items-center gap-1.5 text-[11px] font-mono text-subtle rounded-full px-2.5 py-1"
+          <button
+            onClick={onRefresh}
+            className="inline-flex items-center gap-1.5 text-[11px] font-mono text-subtle rounded-full px-2.5 py-1 hover:bg-border transition-colors disabled:opacity-50"
             style={{ background: 'var(--card-2)', border: '1px solid var(--border)' }}
           >
             <Icon name="refresh" size={12} />
             {polledAgo}
-          </span>
+          </button>
         )}
       </div>
 
