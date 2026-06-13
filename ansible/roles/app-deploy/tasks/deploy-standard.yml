@@ -60,3 +60,6 @@
 - name: Verify app is serving traffic (without rollback)
   command: "{{ app_dir }}/health-check.sh {{ app_port | default(3000) }} {{ health_check_retries | default(10) }} {{ health_check_path | default('/') }} {{ health_check_backoff | default(3) }}"
   when: not (rollback_enabled | default(true))
+
+- name: Record deploy timestamp
+  shell: "date +%s > /opt/{{ project_name }}/.deployed-at"

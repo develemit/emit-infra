@@ -49,6 +49,16 @@ function redisLabel(status: string | null | undefined): { value: string; color?:
   return { value: 'Down', color: 'var(--err)' }
 }
 
+function deployedAgo(epoch: string | null | undefined): string {
+  if (!epoch) return '—'
+  const secs = Math.floor(Date.now() / 1000) - parseInt(epoch, 10)
+  if (isNaN(secs) || secs < 0) return '—'
+  if (secs < 60) return 'just now'
+  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`
+  if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`
+  return `${Math.floor(secs / 86400)}d ago`
+}
+
 function queueLabel(failed: number | null | undefined, wait: number | null | undefined): { value: string; color?: string } | null {
   if (failed == null) return null
   if (failed > 0) return { value: `${failed} failed · ${wait ?? 0} waiting`, color: 'var(--err)' }
@@ -81,6 +91,7 @@ export function HealthCard({ project, status, polledAgo, onRefresh }: HealthCard
   const ssl = sslDaysLeft(status.sslExpiry)
   const redis = redisLabel(status.redisStatus)
   const queue = queueLabel(status.queueFailed, status.queueWait)
+  const deployed = deployedAgo(status.deployedAt)
 
   return (
     <div className="rounded-xl border border-border bg-card" style={{ padding: 18 }}>
@@ -108,6 +119,7 @@ export function HealthCard({ project, status, polledAgo, onRefresh }: HealthCard
         <StatTile icon="cpu" label="Server" value={serverType} />
         <StatTile icon="link" label="Public IP" value={ip} />
         <StatTile icon="hash" label="Build" value={status.buildNumber ?? '—'} />
+        <StatTile icon="clock" label="Deployed" value={deployed} mono={false} />
         <StatTile icon="shield" label="Nginx" value={nginx.value} color={nginx.color} />
         <StatTile icon="lock" label="SSL" value={ssl.value} color={ssl.color} />
         {status.redisStatus && <StatTile icon="database" label="Redis" value={redis.value} color={redis.color} />}
@@ -119,6 +131,7 @@ export function HealthCard({ project, status, polledAgo, onRefresh }: HealthCard
         <StatTile icon="clock" label="Uptime" value={uptime} mono={false} />
         <StatTile icon="globe" label="Region" value={region} />
         <StatTile icon="hash" label="Build" value={status.buildNumber ?? '—'} />
+        <StatTile icon="clock" label="Deployed" value={deployed} mono={false} />
         <StatTile icon="shield" label="Nginx" value={nginx.value} color={nginx.color} />
         {status.redisStatus && <StatTile icon="database" label="Redis" value={redis.value} color={redis.color} />}
         {queue && <StatTile icon="layers" label="Queue" value={queue.value} color={queue.color} mono={false} />}

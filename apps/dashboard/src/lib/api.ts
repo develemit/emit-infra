@@ -43,6 +43,7 @@ export interface ProjectStatus {
   redisStatus?: string | null
   queueFailed?: number | null
   queueWait?: number | null
+  deployedAt?: string | null
   error?: string
 }
 

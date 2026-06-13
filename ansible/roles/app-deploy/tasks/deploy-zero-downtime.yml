@@ -178,3 +178,6 @@
   file:
     path: "{{ app_dir }}/.standby.env"
     state: absent
+
+- name: Record deploy timestamp
+  shell: "date +%s > /opt/{{ project_name }}/.deployed-at"
