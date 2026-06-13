@@ -1,7 +1,10 @@
+'use client'
+import { useState } from 'react'
 import Link from 'next/link'
 import { Icon } from '@/components/icon'
 import { Badge, type BadgeVariant } from '@/components/ui/badge'
 import type { Container } from '@/lib/api'
+import { restartContainer } from '@/lib/api'
 
 function stateBadge(state: string): BadgeVariant {
   const s = state.toLowerCase()
@@ -27,8 +30,30 @@ function buildLabel(c: Container): string {
   return tag.slice(0, 8)
 }
 
-function MContainer({ c, logsHref }: { c: Container; logsHref: string }) {
+function MContainer({
+  c,
+  logsHref,
+  projectName,
+  onRefetch,
+}: {
+  c: Container
+  logsHref: string
+  projectName: string
+  onRefetch?: () => void
+}) {
+  const [restarting, setRestarting] = useState(false)
   const variant = stateBadge(c.state)
+
+  async function handleRestart() {
+    setRestarting(true)
+    try {
+      await restartContainer(projectName, c.name)
+      onRefetch?.()
+    } finally {
+      setRestarting(false)
+    }
+  }
+
   return (
     <div
       className="rounded-xl border border-border bg-card flex flex-col gap-1.5"
@@ -38,6 +63,14 @@ function MContainer({ c, logsHref }: { c: Container; logsHref: string }) {
         <span className="font-mono font-semibold text-[13px] text-fg">{c.name}</span>
         <div className="flex items-center gap-2">
           <Badge variant={variant} dot>{c.state}</Badge>
+          <button
+            onClick={handleRestart}
+            disabled={restarting}
+            className="text-subtle hover:text-fg transition-colors disabled:opacity-40"
+            title="Restart container"
+          >
+            <Icon name="refresh" size={13} />
+          </button>
           <Link href={logsHref} className="text-subtle hover:text-fg transition-colors">
             <Icon name="file" size={13} />
           </Link>
@@ -55,12 +88,28 @@ function MContainer({ c, logsHref }: { c: Container; logsHref: string }) {
 interface ContainerTableProps {
   containers: Container[]
   projectName: string
+  onRefetch?: () => void
 }
 
-export function ContainerTable({ containers, projectName }: ContainerTableProps) {
+export function ContainerTable({ containers, projectName, onRefetch }: ContainerTableProps) {
+  const [restartingSet, setRestartingSet] = useState<Set<string>>(new Set())
   const sorted = sortContainers(containers)
   const runningCount = containers.filter(c => c.state.toLowerCase() === 'running').length
   const logsBase = `/projects/${encodeURIComponent(projectName)}/logs`
+
+  async function handleRestart(containerName: string) {
+    setRestartingSet(prev => new Set(prev).add(containerName))
+    try {
+      await restartContainer(projectName, containerName)
+      onRefetch?.()
+    } finally {
+      setRestartingSet(prev => {
+        const next = new Set(prev)
+        next.delete(containerName)
+        return next
+      })
+    }
+  }
 
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden" style={{ padding: 18 }}>
@@ -94,6 +143,7 @@ export function ContainerTable({ containers, projectName }: ContainerTableProps)
               <tbody>
                 {sorted.map(c => {
                   const href = `${logsBase}?service=${encodeURIComponent(c.name)}`
+                  const isRestarting = restartingSet.has(c.name)
                   return (
                     <tr
                       key={c.name}
@@ -114,9 +164,19 @@ export function ContainerTable({ containers, projectName }: ContainerTableProps)
                       </td>
                       <td className="font-mono text-[12px] text-subtle py-3 pr-3">{c.status}</td>
                       <td className="py-3">
-                        <Link href={href} className="text-subtle hover:text-fg transition-colors">
-                          <Icon name="file" size={13} />
-                        </Link>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleRestart(c.name)}
+                            disabled={isRestarting}
+                            className="text-subtle hover:text-fg transition-colors disabled:opacity-40"
+                            title="Restart container"
+                          >
+                            <Icon name="refresh" size={13} />
+                          </button>
+                          <Link href={href} className="text-subtle hover:text-fg transition-colors">
+                            <Icon name="file" size={13} />
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -132,6 +192,8 @@ export function ContainerTable({ containers, projectName }: ContainerTableProps)
                 key={c.name}
                 c={c}
                 logsHref={`${logsBase}?service=${encodeURIComponent(c.name)}`}
+                projectName={projectName}
+                onRefetch={onRefetch}
               />
             ))}
           </div>

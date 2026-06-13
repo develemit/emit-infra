@@ -110,6 +110,18 @@ export function getDockerUsage(name: string): Promise<DockerUsageRow[]> {
   return apiFetch<DockerUsageRow[]>(`/projects/${encodeURIComponent(name)}/docker-usage`)
 }
 
+export async function restartContainer(
+  name: string,
+  container: string,
+): Promise<{ ok: boolean; output: string }> {
+  const res = await fetch(
+    `${API_BASE}/projects/${encodeURIComponent(name)}/containers/${encodeURIComponent(container)}/restart`,
+    { method: 'POST', cache: 'no-store' },
+  )
+  if (!res.ok) throw new Error(`Restart failed: ${res.status}`)
+  return res.json() as Promise<{ ok: boolean; output: string }>
+}
+
 export async function pruneDocker(name: string): Promise<{ ok: boolean; output: string }> {
   const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/prune`, {
     method: 'POST',

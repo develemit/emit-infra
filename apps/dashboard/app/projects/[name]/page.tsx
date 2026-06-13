@@ -138,7 +138,7 @@ export default function ProjectDetailPage() {
                 <HealthCard project={project} status={status} polledAgo={polledAgo} onRefresh={fetchData} />
               )}
               {containers !== null && (
-                <ContainerTable containers={containers} projectName={name} />
+                <ContainerTable containers={containers} projectName={name} onRefetch={fetchData} />
               )}
               <ResourceChart
                 name={name}

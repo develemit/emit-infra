@@ -201,6 +201,25 @@ export async function projectRoutes(app: FastifyInstance) {
     }
   })
 
+  app.post<{ Params: { name: string; container: string } }>(
+    '/projects/:name/containers/:container/restart',
+    async (req, reply) => {
+      const project = await findProject(req.params.name)
+      if (!project) return reply.status(404).send({ error: 'not found' })
+
+      const key = sshKeyPath(project.config.sshKeyName)
+      const host = project.config.serverIp ?? project.config.domain
+
+      try {
+        const output = await sshExec(host, `docker restart ${req.params.container}`, key)
+        containersCache.invalidate(req.params.name)
+        return { ok: true, output }
+      } catch (err) {
+        return { ok: false, output: String(err) }
+      }
+    },
+  )
+
   app.get<{ Params: { name: string } }>('/projects/:name/containers', async (req, reply) => {
     const project = await findProject(req.params.name)
     if (!project) return reply.status(404).send({ error: 'not found' })
