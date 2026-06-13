@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { getProjects, getStatus, type ProjectSummary, type ProjectStatus } from '@/lib/api'
 import { ProjectCard } from '@/components/project-card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -7,21 +7,56 @@ import { Icon } from '@/components/icon'
 import { AddProjectDropdown } from '@/components/add-project-dropdown'
 import { BillingWidget } from '@/components/billing-widget'
 
+function notifyDown(name: string) {
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
+  new Notification(`${name} is down`, {
+    body: 'SSH unreachable — check the server.',
+    tag: `down-${name}`,
+  })
+}
+
 export default function HomePage() {
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null)
   const [statuses, setStatuses] = useState<Record<string, ProjectStatus>>({})
   const [search, setSearch] = useState('')
+  const prevStatuses = useRef<Record<string, ProjectStatus>>({})
+
+  useEffect(() => {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      void Notification.requestPermission()
+    }
+  }, [])
 
   const fetchAll = useCallback(async () => {
     const ps = await getProjects()
     setProjects(ps)
     window.dispatchEvent(new Event('emit:ready'))
-    ps.forEach((p) => {
-      void getStatus(p.config.name).then(
-        (s) => setStatuses((prev) => ({ ...prev, [p.config.name]: s })),
-        () => setStatuses((prev) => ({ ...prev, [p.config.name]: { error: 'unreachable' } })),
-      )
-    })
+
+    const settled = await Promise.allSettled(
+      ps.map((p) =>
+        getStatus(p.config.name).then(
+          (s) => ({ name: p.config.name, status: s }),
+          () => ({ name: p.config.name, status: { error: 'unreachable' } as ProjectStatus }),
+        ),
+      ),
+    )
+
+    const newStatuses: Record<string, ProjectStatus> = {}
+    for (const r of settled) {
+      if (r.status === 'fulfilled') {
+        newStatuses[r.value.name] = r.value.status
+      }
+    }
+
+    for (const [name, newStatus] of Object.entries(newStatuses)) {
+      const prev = prevStatuses.current[name]
+      if (prev && !prev.error && newStatus.error) {
+        notifyDown(name)
+      }
+    }
+
+    prevStatuses.current = newStatuses
+    setStatuses(newStatuses)
   }, [])
 
   useEffect(() => {
@@ -30,8 +65,8 @@ export default function HomePage() {
     return () => clearInterval(interval)
   }, [fetchAll])
 
-  const filtered = projects?.filter(p =>
-    !search || p.config.name.includes(search) || p.config.domain.includes(search),
+  const filtered = projects?.filter(
+    (p) => !search || p.config.name.includes(search) || p.config.domain.includes(search),
   )
 
   return (
