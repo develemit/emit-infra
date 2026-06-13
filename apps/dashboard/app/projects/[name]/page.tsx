@@ -92,6 +92,12 @@ export default function ProjectDetailPage() {
         >
           <Icon name="file" size={13} />Logs
         </Link>
+        <Link
+          href={`/ops?project=${encodeURIComponent(name)}`}
+          className="inline-flex items-center gap-1.5 px-3 h-[32px] rounded-lg text-[12px] font-medium text-fg border border-border hover:bg-card-hover transition-colors"
+        >
+          <Icon name="zap" size={13} />Ask Claude
+        </Link>
         <button
           onClick={() => setShowRollback(true)}
           className="inline-flex items-center gap-1.5 px-3 h-[32px] rounded-lg text-[12px] font-medium text-fg border border-border hover:bg-card-hover transition-colors"

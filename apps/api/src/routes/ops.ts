@@ -17,6 +17,7 @@ interface ChatBody {
   sessionId: string
   message: string
   confirmationFor?: string
+  systemContext?: string
 }
 
 type PendingConf = { toolName: string; projectName: string }
@@ -31,7 +32,7 @@ export async function opsRoutes(app: FastifyInstance) {
   })
 
   app.post<{ Body: ChatBody }>('/ops/chat', async (req, reply) => {
-    const { sessionId, message, confirmationFor } = req.body
+    const { sessionId, message, confirmationFor, systemContext } = req.body
 
     // SSE execution path — runs Ansible/Terraform after user confirms
     if (confirmationFor) {
@@ -160,6 +161,10 @@ export async function opsRoutes(app: FastifyInstance) {
     })
 
     const agentSessionId = getAgentSessionId(sessionId)
+    const systemPrompt =
+      systemContext && !agentSessionId
+        ? `${SYSTEM}\n\nCurrent project context:\n${systemContext}`
+        : SYSTEM
     const textParts: string[] = []
     let capturedAgentSessionId: string | undefined
 
@@ -167,7 +172,7 @@ export async function opsRoutes(app: FastifyInstance) {
       for await (const msg of query({
         prompt: message,
         options: {
-          systemPrompt: SYSTEM,
+          systemPrompt,
           ...(agentSessionId ? { resume: agentSessionId } : {}),
           mcpServers: { emitInfra: server },
           maxTurns: 10,
