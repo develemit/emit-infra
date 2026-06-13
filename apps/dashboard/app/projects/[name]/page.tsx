@@ -11,6 +11,7 @@ import { ContainerTable } from '@/components/detail/container-table'
 import { ResourceChart } from '@/components/detail/resource-chart'
 import { DockerUsage } from '@/components/detail/docker-usage'
 import { DeployPanel } from '@/components/deploy-panel'
+import { RollbackPanel } from '@/components/rollback-panel'
 import { DestroyModal } from '@/components/destroy-modal'
 import { deriveHealth } from '@/lib/health'
 
@@ -23,6 +24,7 @@ export default function ProjectDetailPage() {
   const [status, setStatus] = useState<ProjectStatus | null>(null)
   const [containers, setContainers] = useState<Container[] | null>(null)
   const [deploying, setDeploying] = useState(false)
+  const [showRollback, setShowRollback] = useState(false)
   const [showDestroy, setShowDestroy] = useState(false)
   const [lastPolledAt, setLastPolledAt] = useState<number>(0)
   const [polledAgo, setPolledAgo] = useState('')
@@ -91,6 +93,12 @@ export default function ProjectDetailPage() {
           <Icon name="file" size={13} />Logs
         </Link>
         <button
+          onClick={() => setShowRollback(true)}
+          className="inline-flex items-center gap-1.5 px-3 h-[32px] rounded-lg text-[12px] font-medium text-fg border border-border hover:bg-card-hover transition-colors"
+        >
+          <Icon name="refresh" size={13} />Rollback
+        </button>
+        <button
           onClick={() => setDeploying(true)}
           disabled={deploying}
           className="inline-flex items-center gap-1.5 px-3 h-[32px] rounded-lg text-[12px] font-medium text-accent-fg bg-accent hover:opacity-90 disabled:opacity-50 transition-opacity"
@@ -153,6 +161,12 @@ export default function ProjectDetailPage() {
                   onClose={() => setDeploying(false)}
                 />
               )}
+              {showRollback && (
+                <RollbackPanel
+                  name={name}
+                  onClose={() => setShowRollback(false)}
+                />
+              )}
             </>
           )}
         </div>
@@ -178,6 +192,13 @@ export default function ProjectDetailPage() {
           >
             <Icon name="file" size={14} />Logs
           </Link>
+          <button
+            onClick={() => setShowRollback(true)}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl text-[13px] font-medium text-fg border border-border hover:bg-card-hover transition-colors"
+            style={{ height: 44 }}
+          >
+            <Icon name="refresh" size={14} />Rollback
+          </button>
           <button
             onClick={() => setShowDestroy(true)}
             className="flex flex-1 items-center justify-center gap-1.5 rounded-xl text-[13px] font-medium text-err border border-err-line hover:bg-err-soft transition-colors"

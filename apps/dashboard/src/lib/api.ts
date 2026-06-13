@@ -132,6 +132,23 @@ export async function pruneDocker(name: string): Promise<{ ok: boolean; output: 
   return res.json() as Promise<{ ok: boolean; output: string }>
 }
 
+export async function getRollbackSnapshots(name: string): Promise<string[]> {
+  const data = await apiFetch<{ snapshots: string[] }>(
+    `/projects/${encodeURIComponent(name)}/rollback/snapshots`,
+  )
+  return data.snapshots
+}
+
+export function rollbackProject(
+  name: string,
+  timestamp?: string,
+): { url: string; body: string } {
+  return {
+    url: `${API_BASE}/projects/${encodeURIComponent(name)}/rollback`,
+    body: JSON.stringify(timestamp ? { timestamp } : {}),
+  }
+}
+
 export function openSseStream(path: string): EventSource {
   return new EventSource(`${API_BASE}${path}`)
 }

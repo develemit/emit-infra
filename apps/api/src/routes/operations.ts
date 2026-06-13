@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { access, mkdir, writeFile } from 'node:fs/promises'
-import { runAnsible, runTerraform, getTerraformOutput, sshMuxArgs } from '@emit-infra/core'
+import { runAnsible, runTerraform, getTerraformOutput, sshMuxArgs, sshExec } from '@emit-infra/core'
 import { scaffoldProject, writeInventory } from '../lib/scaffold-project.js'
 import { discoverProjects } from '../lib/discover-projects.js'
 import { writeEvent } from '../lib/write-sse.js'
@@ -141,6 +141,55 @@ export async function operationRoutes(app: FastifyInstance) {
     writeEvent(reply.raw, { type: 'done', exitCode })
     reply.raw.end()
   },
+  )
+
+  app.post<{ Params: { name: string }; Body: { timestamp?: string } }>(
+    '/projects/:name/rollback',
+    async (req, reply) => {
+      const project = await findProject(req.params.name)
+      if (!project) return reply.status(404).send({ error: 'not found' })
+
+      const key = sshKeyPath(project.config.sshKeyName)
+      const host = project.config.serverIp ?? project.config.domain
+      const appDir = project.config.deploy?.appDir ?? '/app'
+      const composeFile = project.config.deploy?.composeDest ?? 'docker-compose.yml'
+      const tagStr = req.body?.timestamp ?? 'rollback'
+
+      openSse(reply)
+
+      let exitCode = 0
+      try {
+        const images = await sshExec(host, `cd ${appDir} && docker compose -f ${composeFile} config --images`, key)
+        const imageList = images.split('\n').map(l => l.trim()).filter(Boolean)
+
+        if (imageList.length === 0) {
+          return sseError(reply.raw, 'No images found in compose config')
+        }
+
+        const tagScript = imageList
+          .map(img => {
+            const base = img.split(':')[0]!
+            return `docker tag "${base}:${tagStr}" "${base}:latest"`
+          })
+          .join(' && ')
+
+        writeEvent(reply.raw, { type: 'line', stream: 'stdout', text: `Tagging :${tagStr} as :latest...` })
+        await sshExec(host, tagScript, key)
+        writeEvent(reply.raw, { type: 'line', stream: 'stdout', text: 'Tagged. Restarting app stack...' })
+
+        const upOut = await sshExec(host, `cd ${appDir} && docker compose -f ${composeFile} up -d --remove-orphans`, key)
+        for (const line of upOut.split('\n').map(l => l.trim()).filter(Boolean)) {
+          writeEvent(reply.raw, { type: 'line', stream: 'stdout', text: line })
+        }
+        writeEvent(reply.raw, { type: 'line', stream: 'stdout', text: 'Rollback complete.' })
+      } catch (err) {
+        exitCode = 1
+        writeEvent(reply.raw, { type: 'line', stream: 'stderr', text: `Error: ${String(err)}` })
+      }
+
+      writeEvent(reply.raw, { type: 'done', exitCode })
+      reply.raw.end()
+    },
   )
 
   app.post<{ Params: { name: string } }>('/projects/:name/destroy', async (req, reply) => {
