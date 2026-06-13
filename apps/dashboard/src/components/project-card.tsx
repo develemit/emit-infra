@@ -22,6 +22,16 @@ function sslDaysLeft(expiry: string | null | undefined): { value: string; color?
   return { value: `${days}d`, days }
 }
 
+function deployedAgo(epoch: string | null | undefined): string {
+  if (!epoch) return ''
+  const secs = Math.floor(Date.now() / 1000) - parseInt(epoch, 10)
+  if (isNaN(secs) || secs < 0) return ''
+  if (secs < 60) return 'just now'
+  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`
+  if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`
+  return `${Math.floor(secs / 86400)}d ago`
+}
+
 export function ProjectCard({ project, status }: Props) {
   const { name, domain, region } = project.config
   const { variant, label } = deriveHealth(status)
@@ -30,6 +40,7 @@ export function ProjectCard({ project, status }: Props) {
   const disk = status?.disk ?? 0
   const mem = status?.memory ?? 0
   const ssl = sslDaysLeft(status?.sslExpiry)
+  const deployedAgoStr = deployedAgo(status?.deployedAt)
 
   return (
     <Link
@@ -60,6 +71,11 @@ export function ProjectCard({ project, status }: Props) {
         {status?.sslExpiry && ssl.days <= 30 && (
           <span className="text-[11px] font-mono px-1.5 py-0.5 rounded" style={{ color: ssl.color, background: 'var(--card-2)', border: '1px solid var(--border)' }}>
             SSL {ssl.value}
+          </span>
+        )}
+        {deployedAgoStr && (
+          <span className="text-[11px] font-mono px-1.5 py-0.5 rounded text-subtle" style={{ background: 'var(--card-2)', border: '1px solid var(--border)' }}>
+            {deployedAgoStr}
           </span>
         )}
       </div>

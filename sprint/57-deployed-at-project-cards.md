@@ -52,10 +52,26 @@ Render position: place a small chip in the region badge row (`<div className="fl
 - `apps/dashboard/src/components/project-card.tsx` — add `deployedAgo` helper + conditional chip
 
 ## Acceptance criteria
-- [ ] Cards show "Xm ago / Xh ago / Xd ago / just now" when `deployedAt` is set
-- [ ] Cards show no chip when `deployedAt` is null or missing (no '—', no crash)
-- [ ] Card height is unchanged for projects without a deployed timestamp
-- [ ] `pnpm nx run dashboard:typecheck` clean
+- [x] Cards show "Xm ago / Xh ago / Xd ago / just now" when `deployedAt` is set
+- [x] Cards show no chip when `deployedAt` is null or missing (no '—', no crash)
+- [x] Card height is unchanged for projects without a deployed timestamp
+- [x] `pnpm nx run dashboard:typecheck` clean
+
+## Completed
+
+**Date:** 2026-06-13
+
+### Summary
+Added `deployedAgo(epoch)` helper to `project-card.tsx` (same logic as the one in `health-card.tsx` from sprint 51). Computed `deployedAgoStr` in the component and rendered a small mono chip in the region badge row alongside the SSL chip. The chip only renders when the string is non-empty, so cards without a deploy timestamp are visually unchanged.
+
+### Files changed
+- `apps/dashboard/src/components/project-card.tsx` — added `deployedAgo` helper + conditional chip in region badge row (120 lines total)
+
+### Verification
+- `pnpm nx run dashboard:typecheck`: clean
+
+### Follow-ups
+none
 
 ## Out of scope
 - Showing deploy history (more than one timestamp)
