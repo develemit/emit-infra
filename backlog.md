@@ -3,8 +3,8 @@
 Deferred follow-ups from completed sprints. Run `/plan-sprint` referencing this
 file to promote items into proper sprints when the list grows worth addressing.
 
-<!-- follow-up-scan: date=2026-06-12 through=44 clean=false -->
-> _Sprint scan: incremental scan completed 2026-06-12 through sprint-44. 3 discoveries promoted to sprints 45-47. Prior scan: 2026-06-11 through sprint-41 (3 discoveries → sprints 42-44)._
+<!-- follow-up-scan: date=2026-06-13 through=55 clean=false -->
+> _Sprint scan: incremental scan completed 2026-06-13 through sprint-55. 3 discoveries promoted to sprints 56-58. Prior scan: 2026-06-12 through sprint-44 (3 discoveries → sprints 45-47)._
 
 - (sprint 04, 2026-06-03) `pnpm build` fails on `/_error` and `/500` static pre-render — `<Html>` outside pages/_document error in Next.js 15.5.19 (upstream bug; dev server and typecheck/lint are clean) `[hold]`
 - (sprint 04, 2026-06-03) Provision wizard uses local Zod schema mirroring `ProjectConfigSchema` — consider extracting shared browser-safe types into `@emit-infra/types`; run `/plan-sprint "shared types package"` to plan `[hold]`
