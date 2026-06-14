@@ -230,7 +230,7 @@ export async function projectRoutes(app: FastifyInstance) {
     const fmt = '{{.Names}}|{{.Image}}|{{.Status}}|{{.State}}|{{.Label "build.number"}}'
 
     try {
-      const output = await sshExec(host, `docker ps -a --format '${fmt}'`, key)
+      const output = await sshExec(host, `timeout 30 docker ps -a --format '${fmt}'`, key)
       const containers = output
         .split('\n')
         .map((line: string) => line.trim())

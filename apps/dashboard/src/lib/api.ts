@@ -74,9 +74,10 @@ export async function getStatus(name: string): Promise<ProjectStatus> {
 }
 
 export async function getContainers(name: string): Promise<Container[]> {
-  const data = await apiFetch<Container[] | { error: string }>(
-    `/projects/${encodeURIComponent(name)}/containers`,
-  )
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/containers`, { cache: 'no-store' })
+  if (res.status === 503) return []
+  if (!res.ok) throw new Error(`API error ${res.status}`)
+  const data = await res.json() as Container[] | { error: string }
   return Array.isArray(data) ? data : []
 }
 

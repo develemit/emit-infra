@@ -6,6 +6,8 @@ import { rollbackRoutes } from './routes/rollback.js'
 import { secretsSyncRoutes } from './routes/secrets-sync.js'
 import { opsRoutes } from './routes/ops.js'
 import { billingRoutes } from './routes/billing.js'
+import { pushRoutes } from './routes/push.js'
+import { startStatusMonitor } from './lib/status-monitor.js'
 
 const app = Fastify({ logger: true })
 
@@ -16,6 +18,8 @@ await app.register(rollbackRoutes)
 await app.register(secretsSyncRoutes)
 await app.register(opsRoutes)
 await app.register(billingRoutes)
+await app.register(pushRoutes)
 
 const port = Number(process.env['PORT'] ?? 7001)
 await app.listen({ port, host: '0.0.0.0' })
+startStatusMonitor()

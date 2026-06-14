@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Icon } from '@/components/icon'
 import { AddProjectDropdown } from '@/components/add-project-dropdown'
 import { BillingWidget } from '@/components/billing-widget'
+import { PushSubscribeButton } from '@/components/push-subscribe-button'
 
 function notifyDown(name: string) {
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
@@ -104,6 +105,7 @@ export default function HomePage() {
             className="w-full h-full rounded-lg pl-8 pr-3 text-[12px] font-mono text-fg bg-card border border-border focus:outline-none focus:border-accent"
           />
         </div>
+        <PushSubscribeButton />
         <AddProjectDropdown onRegistered={() => void fetchAll()} />
       </div>
 
