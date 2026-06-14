@@ -74,6 +74,7 @@ cleanup() {
   if [ "$SWITCHED" -eq 0 ]; then
     echo "==> Deploy failed before nginx switch. Stopping ${INACTIVE} slot..."
     docker compose -f "$COMPOSE_APP" -f "$INACTIVE_COMPOSE" \
+      --env-file "${APP_DIR}/.env" \
       --project-name "$INACTIVE_PROJECT" down 2>/dev/null || true
     echo "==> Old slot (${ACTIVE}) is still serving traffic."
   else
@@ -85,11 +86,13 @@ trap cleanup EXIT
 
 # ── 1. Pull new images ────────────────────────────────────────────────────────
 echo "==> Pulling images for ${INACTIVE} slot..."
-docker compose -f "$COMPOSE_APP" -f "$INACTIVE_COMPOSE" pull
+docker compose -f "$COMPOSE_APP" -f "$INACTIVE_COMPOSE" \
+  --env-file "${APP_DIR}/.env" pull
 
 # ── 2. Start inactive slot ────────────────────────────────────────────────────
 echo "==> Starting ${INACTIVE} slot..."
 docker compose -f "$COMPOSE_APP" -f "$INACTIVE_COMPOSE" \
+  --env-file "${APP_DIR}/.env" \
   --project-name "$INACTIVE_PROJECT" up -d --remove-orphans
 
 # ── 3. Health check inactive slot ────────────────────────────────────────────
@@ -117,6 +120,7 @@ echo "$INACTIVE" > "$SLOT_FILE"
 echo "==> Stopping old ${ACTIVE} slot..."
 docker compose -f "$COMPOSE_APP" \
   -f "${APP_DIR}/docker-compose.${ACTIVE}.yml" \
+  --env-file "${APP_DIR}/.env" \
   --project-name "$ACTIVE_PROJECT" stop
 
 # ── 7. Prune old images ───────────────────────────────────────────────────────

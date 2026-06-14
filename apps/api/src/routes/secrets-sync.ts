@@ -23,6 +23,14 @@ function parseEnvFile(content: string): [string, string][] {
     .filter((entry): entry is [string, string] => entry !== null)
 }
 
+// URL-typed vars that must use Docker service names in production, never localhost.
+const URL_KEYS = /^(DATABASE_URL|REDIS_URL|CLICKHOUSE_URL|MONGO_URL|AMQP_URL|BROKER_URL|.*_URL|.*_DSN|.*_HOST)$/i
+const LOCALHOST_PATTERN = /\b(localhost|127\.0\.0\.1)\b/
+
+function findLocalhostValues(entries: [string, string][]): [string, string][] {
+  return entries.filter(([key, value]) => URL_KEYS.test(key) && LOCALHOST_PATTERN.test(value))
+}
+
 
 export async function secretsSyncRoutes(app: FastifyInstance) {
   app.post<{ Params: { name: string }; Body?: { envFile?: string } }>(
@@ -49,6 +57,18 @@ export async function secretsSyncRoutes(app: FastifyInstance) {
       if (entries.length === 0) {
         writeEvent(reply.raw, { type: 'line', stream: 'stdout', text: 'No secrets found in env file.' })
         writeEvent(reply.raw, { type: 'done', exitCode: 0 })
+        reply.raw.end()
+        return
+      }
+
+      const localhostHits = findLocalhostValues(entries)
+      if (localhostHits.length > 0) {
+        const keys = localhostHits.map(([k]) => k).join(', ')
+        writeEvent(reply.raw, {
+          type: 'line', stream: 'stderr',
+          text: `ABORT: ${keys} contain localhost URLs — syncing dev defaults to GitHub Secrets would overwrite production values. Sync from .env.prod with Docker service-name URLs instead.`,
+        })
+        writeEvent(reply.raw, { type: 'done', exitCode: 1 })
         reply.raw.end()
         return
       }
