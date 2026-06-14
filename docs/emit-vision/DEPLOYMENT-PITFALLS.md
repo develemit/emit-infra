@@ -136,6 +136,43 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc tsconfig.base.json .
 
 ---
 
+## 8. Postgres belongs in `docker-compose.infra.yml`, not as an external service
+
+**Symptom:** API `/readyz` returns 503 with `ECONNREFUSED localhost:55432` in container logs — the dev-default Postgres port.
+
+**Cause:** `docker-compose.infra.yml` was originally marked "postgres-less" and did not run a Postgres container, so nothing was on the `emit-vision-infra` network at `postgres:5432`. Compounding this, the `DATABASE_URL` GitHub secret had been overwritten with the local dev default (`postgresql://emit:emit@localhost:55432/emit_vision`) during a secrets sync from `.env` instead of `.env.prod`.
+
+**Fix:** Add a `postgres` service to `docker-compose.infra.yml` alongside Redis and ClickHouse:
+
+```yaml
+postgres:
+  image: postgres:17-alpine
+  restart: unless-stopped
+  networks: [emit-vision-infra]
+  environment:
+    POSTGRES_DB: ${POSTGRES_DB:-emit_vision}
+    POSTGRES_USER: ${POSTGRES_USER:-emit}
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-emit}
+  volumes:
+    - postgres_data:/var/lib/postgresql/data
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-emit} -d ${POSTGRES_DB:-emit_vision}"]
+    interval: 10s
+    timeout: 5s
+    retries: 20
+```
+
+Set `DATABASE_URL` in GitHub Secrets to use the Docker service name:
+
+```
+DATABASE_URL=postgresql://emit:emit@postgres:5432/emit_vision
+REDIS_URL=redis://redis:6379
+```
+
+**Rule of thumb:** Any `localhost` URL in `DATABASE_URL` or `REDIS_URL` is a sign secrets were synced from `.env` (dev). These must always use Docker service names on the `emit-vision-infra` network.
+
+---
+
 ## Debugging checklist for a new deployment
 
 When a container is crash-looping, check in this order:
@@ -146,3 +183,4 @@ When a container is crash-looping, check in this order:
 4. Caddy returning 502? → Verify `reverse_proxy` uses service names, not `localhost`
 5. Cloudflare 522? → Check that the floating IP is configured in netplan on the host
 6. Caddy TLS/cert error? → Check if the domain is Cloudflare-proxied; if so, add `tls internal`
+7. API health check 503? → Check `DATABASE_URL`/`REDIS_URL` aren't localhost values (see #8); confirm infra stack is running before app deploys (see global pitfall #13)

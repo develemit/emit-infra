@@ -169,6 +169,144 @@ lives at `/app` and uses `docker-compose.prod.yml`.
 
 ---
 
+## 9. `environment:` key is invalid on reusable workflow jobs — GitHub silently skips the workflow
+
+**Symptom:** The deploy workflow shows as "skipped" or completes in under 2 seconds with no steps executing. No error message is surfaced. CI passes but nothing ever ships.
+
+**Cause:** GitHub Actions does not allow the `environment:` key on a job that calls a reusable workflow via `uses:`. The YAML is syntactically valid so no parse error is shown, but GitHub silently drops the entire workflow definition and treats every run as skipped.
+
+**Fix:** Remove `environment:` from any job that uses `uses:`. If you need environment-level secret scoping, apply it to individual steps or pass secrets explicitly via the `secrets:` block on the `uses:` job.
+
+```yaml
+# Wrong — silently breaks the whole workflow
+deploy:
+  uses: org/repo/.github/workflows/deploy.yml@main
+  environment: production   # ← invalid here
+
+# Right
+deploy:
+  uses: org/repo/.github/workflows/deploy.yml@main
+  secrets: inherit
+```
+
+**Prevention:** Run `actionlint` in CI. It catches this. Add it to `check-all` so it runs pre-push.
+
+---
+
+## 10. GHCR login must be in the same SSH session as the image pull
+
+**Symptom:** Blue-green deploy fails with `denied: permission_denied` when docker tries to pull the image, even though a `docker login` step ran immediately before.
+
+**Cause:** Each `ssh` invocation starts an independent shell session. `docker login` in one session writes credentials to `/root/.docker/config.json` but the CI runner's environment is not available in the next SSH session. The pull session reads stale or missing credentials.
+
+**Fix:** Pipe the token and run login + pull + deploy in a single SSH command:
+
+```yaml
+- name: Blue-green deploy
+  env:
+    GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  run: |
+    printf '%s\n' "$GHCR_TOKEN" | \
+      ssh -i ~/.ssh/deploy_key root@${{ secrets.SERVER_IP }} \
+      "docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin \
+       && /opt/myapp/blue-green-deploy.sh myapp"
+```
+
+---
+
+## 11. Secrets sync from local `.env` overwrites production values with dev defaults
+
+**Symptom:** After syncing secrets to GitHub, the deployed API connects to `localhost:55432` or `redis://localhost:56379` — dev default ports that don't exist on the production server.
+
+**Cause:** The secrets sync was run against the local `.env` file, which contains development defaults. Those values were written to GitHub Secrets, overwriting the previously correct production values.
+
+**Fix:**
+- Always sync from `.env.prod` (or a dedicated production secrets file), never from `.env`.
+- Keep `.env` strictly for local dev with no production values.
+- After any sync, verify with `gh secret list` — check the update timestamps on sensitive secrets and confirm the source was correct.
+- Add a guard in sync tooling to reject files containing `localhost` URLs or dev-port patterns (e.g. `:55432`, `:56379`).
+
+---
+
+## 12. Docker Compose network label conflict when the network was pre-created manually
+
+**Symptom:** `docker compose up` fails with `network <name> was found but has incorrect label com.docker.compose.network set to "" (expected: "<name>")`.
+
+**Cause:** An earlier deploy step created the network with `docker network create` (no Compose labels). When a Compose file later tries to "own" that network (without `external: true`), Compose rejects the label mismatch.
+
+**Fix:** Any network shared between multiple Compose stacks must be declared `external: true` in every file that uses it. Create it manually before any `compose up`:
+
+```yaml
+# Both infra and app compose files
+networks:
+  myapp-infra:
+    external: true
+```
+
+```bash
+docker network create myapp-infra 2>/dev/null || true
+docker compose -f docker-compose.infra.yml up -d
+```
+
+---
+
+## 13. Infra services must be running before the app health check fires
+
+**Symptom:** Blue-green health check returns HTTP 503 immediately and persists for the full retry window. Container logs show `ECONNREFUSED` to the database, Redis, or ClickHouse address.
+
+**Cause:** The deploy workflow started the app (green slot) before the infra stack was up. The app process starts and accepts HTTP, but its `/readyz` endpoint pings all infra dependencies — any one that's down returns 503.
+
+**Fix:** Add an idempotent "Ensure infra services" step that runs before the blue-green deploy step:
+
+```bash
+docker network create myapp-infra 2>/dev/null || true
+docker compose \
+  -f /opt/myapp/docker-compose.infra.yml \
+  --env-file /opt/myapp/.env \
+  --project-name myapp \
+  up -d --remove-orphans
+```
+
+If infra is already running, Compose is a no-op. If it just started, the app containers have seconds of extra startup time before the health check begins.
+
+---
+
+## 14. Always pass `--env-file` explicitly to docker compose in deploy scripts
+
+**Symptom:** Docker Compose substitutes `${DATABASE_URL}` and similar vars as empty strings. The container either crashes on startup (required-var validation) or connects to wrong hosts.
+
+**Cause:** Docker Compose auto-discovers `.env` from the project directory (directory of the first `-f` file). This is fragile in deploy scripts where the CWD when the script runs may differ from the compose file's directory.
+
+**Fix:** Always pass `--env-file` explicitly on every `docker compose` call — pull, up, stop, and down:
+
+```bash
+docker compose \
+  -f /opt/myapp/docker-compose.app.yml \
+  -f /opt/myapp/docker-compose.green.yml \
+  --env-file /opt/myapp/.env \
+  --project-name myapp-green \
+  up -d
+```
+
+---
+
+## 15. NX Cloud plan expiry exits CI with code 1 — remove `nxCloudId` when not on a paid plan
+
+**Symptom:** CI fails in under 60 seconds with `Your organization can be re-enabled immediately by an organization admin upgrading to the Team plan`. All tasks are skipped.
+
+**Cause:** When the NX Cloud free-tier quota is exhausted or the org plan lapses, the integration returns a hard error rather than falling back gracefully to local caching.
+
+**Fix:** Remove `nxCloudId` from `nx.json` and stop passing `NX_CLOUD_ACCESS_TOKEN` to CI. Nx falls back to local task caching with no functional change:
+
+```json
+// nx.json — remove or comment out
+"nxCloudId": "6a1e70e8d32a9b685af16560"
+```
+
+Re-add when a paid Cloud plan is in place.
+
+---
+
 ## Debugging checklist for a new emit-infra deployment
 
 1. `TF_VAR_*` set? → Run `echo $TF_VAR_hcloud_token` before `emit-infra setup`
@@ -177,3 +315,7 @@ lives at `/app` and uses `docker-compose.prod.yml`.
 4. nginx 502? → Confirm host-to-container binding (see #4 above)
 5. Ansible `handler not found`? → Verify `ansible/roles/<role>/handlers/main.yml` exists
 6. Migrations failing in CI? → Add `cd /app &&` prefix and `--schema` flag (see #6, #7)
+7. Deploy workflow silently skipped? → Check for `environment:` on a `uses:` job (see #9)
+8. GHCR pull denied in blue-green? → Ensure login + deploy are one SSH command (see #10)
+9. API health check 503 on first deploy? → Confirm infra stack is up before app starts (see #13)
+10. Env vars empty in container? → Add `--env-file` to every `docker compose` call (see #14)
