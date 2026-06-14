@@ -173,6 +173,64 @@ REDIS_URL=redis://redis:6379
 
 ---
 
+## 9. Docker creates directory stubs when bind-mount file sources don't exist
+
+**Symptom:** `scp: dest open "/opt/project/script.sh": Failure` when trying to copy a script to the server, even as root. Or `error mounting ... not a directory` when Docker tries to start a container with a file bind-mount.
+
+**Cause:** When Docker starts a container and a bind-mount source **file** doesn't exist on the host, Docker silently creates a **directory** at that path as a stub. Once a directory stub exists:
+- SCP (via SFTP) cannot overwrite a directory with a file — returns `Failure`
+- On the next `compose up`, Docker tries to bind-mount a directory into a slot expecting a file — fails with `not a directory`
+
+This typically happens on first deploy if the deploy workflow copies compose files to the server but doesn't separately copy the script files they reference as bind-mounts.
+
+**Fix:** Ensure bind-mounted script files exist on the server **before** `docker compose up` runs for the first time. Two patterns:
+
+Option A — copy files explicitly in the deploy step (before compose up):
+```bash
+scp pg-backup.sh clickhouse-backup.sh root@server:/opt/project/
+docker compose up -d
+```
+
+Option B — embed scripts in the Docker image with `COPY` in the Dockerfile instead of bind-mounting them from the host. This eliminates the problem entirely and is the cleaner long-term pattern.
+
+If stubs have already formed, remove them and force-remove any containers referencing them before re-copying:
+```bash
+rm -rf /opt/project/pg-backup.sh /opt/project/clickhouse-backup.sh
+docker rm -f project-pg-backup-1 project-clickhouse-backup-1 2>/dev/null || true
+# now scp the correct files, then compose up
+```
+
+---
+
+## 10. Runtime package installs in container entrypoints cause memory spikes on every start
+
+**Symptom:** Memory spikes during deploy; containers OOM-kill other processes; SSH drops mid-deploy. Gets worse during blue-green (both slots starting simultaneously).
+
+**Cause:** An entrypoint running `apk add --no-cache aws-cli` (or `apt-get install`) installs hundreds of MiB of packages on **every container start** — not just once. `aws-cli` on Alpine pulls ~383 MiB of Python packages. With two slots starting during a blue-green deploy, that's ~766 MiB of concurrent installs on a small server.
+
+**Fix:** Bake tools into the Docker image at build time. Create a dedicated Dockerfile:
+
+```dockerfile
+FROM postgres:17-alpine
+RUN apk add --no-cache aws-cli
+```
+
+Then reference it in compose:
+
+```yaml
+pg-backup:
+  build:
+    context: .
+    dockerfile: Dockerfile.pg-backup
+  entrypoint: ["/bin/sh", "/usr/local/bin/pg-backup.sh"]
+```
+
+The `apk add` runs once during `docker compose up -d --build` (or CI image build), and is cached on subsequent deploys. Container startup goes from ~30s + 383 MiB to under 1s.
+
+**Rule of thumb:** Entrypoints should start the process, not install dependencies. If you see `apk add`, `apt-get install`, `pip install`, or `npm install` in an entrypoint or CMD, move it to a `RUN` layer in the Dockerfile.
+
+---
+
 ## Debugging checklist for a new deployment
 
 When a container is crash-looping, check in this order:
@@ -184,3 +242,5 @@ When a container is crash-looping, check in this order:
 5. Cloudflare 522? → Check that the floating IP is configured in netplan on the host
 6. Caddy TLS/cert error? → Check if the domain is Cloudflare-proxied; if so, add `tls internal`
 7. API health check 503? → Check `DATABASE_URL`/`REDIS_URL` aren't localhost values (see #8); confirm infra stack is running before app deploys (see global pitfall #13)
+8. `scp: dest open "...script.sh": Failure`? → That path is a Docker stub directory; `rm -rf` it, force-remove the container, then re-scp (see #9)
+9. Memory spike or OOM during deploy? → Check entrypoints for `apk add` / `apt-get install` — move those installs into the Dockerfile `RUN` layer (see #10)

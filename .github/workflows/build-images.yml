@@ -28,6 +28,9 @@ jobs:
     permissions:
       contents: write
       packages: write
+    concurrency:
+      group: build-image-${{ matrix.image.name }}-${{ github.repository }}
+      cancel-in-progress: false
     strategy:
       fail-fast: false
       matrix:
