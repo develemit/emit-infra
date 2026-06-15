@@ -307,6 +307,52 @@ Re-add when a paid Cloud plan is in place.
 
 ---
 
+## 16. Ansible-provisioned nginx config conflicts with deploy-managed config — hardcoded ports cause 502 on slot swap
+
+**Symptom:** After a blue-green deploy succeeds (health checks pass, new slot containers are healthy), all HTTPS traffic returns 502. nginx logs show `conflicting server name "domain.com" on 0.0.0.0:443, ignored` for every domain.
+
+**Cause:** The Ansible nginx role writes to `/etc/nginx/sites-available/<project>` (no `.conf` extension) and enables it via symlink. A deploy script that writes to `sites-available/<project>.conf` and enables that creates two simultaneous configs for the same server names. nginx processes both, warns about conflicts, and **uses the first one alphabetically** — the extensionless Ansible config wins. That config was rendered at provision time with hardcoded blue slot ports (e.g. `proxy_pass http://127.0.0.1:4300`). When green becomes active, HTTPS traffic hits the Ansible config and is proxied to stopped blue containers → 502.
+
+The issue is invisible while blue is active (the hardcoded ports happen to be correct) and only surfaces after the first slot swap.
+
+**Fix:** The deploy script must remove the Ansible-provisioned config before or during each nginx config update:
+
+```bash
+# Remove legacy Ansible-provisioned config (hardcoded ports, not blue-green aware)
+rm -f /etc/nginx/sites-enabled/<project> /etc/nginx/sites-available/<project>
+ln -sf /etc/nginx/sites-available/<project>.conf /etc/nginx/sites-enabled/<project>.conf
+nginx -t && nginx -s reload
+```
+
+Add this to the "Deploy nginx config" step in `deploy.yml`. The `rm -f` is idempotent — safe to run even after the file is already gone.
+
+**Also:** the deploy-managed config (`<project>.conf`) must handle HTTPS (port 443) itself. If it only has `listen 80` blocks, the Ansible config's 443 blocks were the only thing handling HTTPS — removing it without adding 443 blocks will break SSL. Use named upstreams (from the blue-green slot include file) rather than hardcoded ports.
+
+---
+
+## 17. Blue-green nginx config `include` requires slot file to exist before first reload
+
+**Symptom:** First deploy to a freshly provisioned server fails at the "Deploy nginx config" step with `nginx: [emerg] open() "/etc/nginx/blue-green/<project>.conf" failed (2: No such file or directory)`.
+
+**Cause:** The project's nginx config includes `/etc/nginx/blue-green/<project>.conf` to load named upstreams (e.g. `upstream <project>_web { server 127.0.0.1:4400; }`). This file is written by `blue-green-deploy.sh` on each deploy — but on the very first deploy it doesn't exist yet. nginx refuses to reload with a missing include.
+
+**Fix:** The Ansible `nginx` role already handles this — its final task writes an initial blue-slot config to `/etc/nginx/blue-green/<project>.conf` using `blue-green-slot.conf.j2`. **Run the Ansible playbook before the first deploy.** This is a hard prerequisite for blue-green projects; CI cannot substitute for it.
+
+If you need to bootstrap manually without Ansible:
+
+```bash
+mkdir -p /etc/nginx/blue-green
+cat > /etc/nginx/blue-green/<project>.conf <<'EOF'
+# Bootstrap — blue slot defaults. Overwritten by blue-green-deploy.sh on first deploy.
+upstream <project>_web      { server 127.0.0.1:4300; }
+upstream <project>_api      { server 127.0.0.1:4301; }
+upstream <project>_worker   { server 127.0.0.1:4302; }
+upstream <project>_marketing { server 127.0.0.1:4303; }
+EOF
+```
+
+---
+
 ## Debugging checklist for a new emit-infra deployment
 
 1. `TF_VAR_*` set? → Run `echo $TF_VAR_hcloud_token` before `emit-infra setup`
@@ -318,4 +364,6 @@ Re-add when a paid Cloud plan is in place.
 7. Deploy workflow silently skipped? → Check for `environment:` on a `uses:` job (see #9)
 8. GHCR pull denied in blue-green? → Ensure login + deploy are one SSH command (see #10)
 9. API health check 503 on first deploy? → Confirm infra stack is up before app starts (see #13)
+10. nginx 502 after first slot swap? → Check for conflicting Ansible-provisioned config (see #16)
+11. `nginx -t` fails on first deploy with missing include? → Run Ansible playbook first to bootstrap blue-green slot file (see #17)
 10. Env vars empty in container? → Add `--env-file` to every `docker compose` call (see #14)
