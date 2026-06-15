@@ -12,6 +12,7 @@ import {
   ensureSshKey,
   ensureHetznerKey,
   resolveAccountId,
+  resolveZoneId,
   ensureR2Bucket,
   createR2Token,
   revokeR2Token,
@@ -38,7 +39,7 @@ export function registerSetup(program: Command): void {
       }
 
       // ── Pre-flight: required env vars ────────────────────────────────────────
-      const requiredTfVars = ['TF_VAR_hcloud_token', 'TF_VAR_cloudflare_api_token', 'TF_VAR_cloudflare_zone_id']
+      const requiredTfVars = ['TF_VAR_hcloud_token', 'TF_VAR_cloudflare_api_token']
       const missingVars = requiredTfVars.filter((v) => !process.env[v])
       if (missingVars.length > 0) {
         console.error(chalk.red('\nMissing required env vars for Terraform:'))
@@ -46,8 +47,14 @@ export function registerSetup(program: Command): void {
         console.error(chalk.yellow('\nExport them before running setup, e.g.:'))
         console.error(chalk.gray('  export TF_VAR_hcloud_token="<hetzner token>"'))
         console.error(chalk.gray('  export TF_VAR_cloudflare_api_token="<cf token>"'))
-        console.error(chalk.gray('  export TF_VAR_cloudflare_zone_id="<zone id>"'))
         process.exit(1)
+      }
+
+      // ── Auto-resolve zone ID from config.domain ───────────────────────────────
+      if (!process.env.TF_VAR_cloudflare_zone_id) {
+        const cfToken = process.env.TF_VAR_cloudflare_api_token!
+        const zoneId = await resolveZoneId(config.domain, cfToken)
+        process.env.TF_VAR_cloudflare_zone_id = zoneId
       }
 
       if (config.stripe && !process.env.STRIPE_SECRET_KEY) {

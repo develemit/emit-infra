@@ -353,6 +353,80 @@ EOF
 
 ---
 
+## 18. Google OAuth state dies on API restart or blue-green deploy
+
+**Symptom:** `google_auth_failed` URL after clicking "Continue with Google." Logs show `google_oauth: state not found in store`.
+
+**Cause:** Storing OAuth state (code verifier, nonce, returnTo) in a process-local `Map` means any API restart or blue-green slot swap between `/start` and `/callback` clears it — the callback arrives at a fresh process that has never seen the state.
+
+**Fix:** Store OAuth state in Redis with a TTL:
+
+```typescript
+storeOAuthState: async (state, entry) => {
+  await redis.set(`oauth:state:${state}`, JSON.stringify(entry), "EX", 600);
+},
+consumeOAuthState: async (state) => {
+  const key = `oauth:state:${state}`;
+  const raw = await redis.get(key);
+  if (!raw) return null;
+  await redis.del(key);
+  return JSON.parse(raw);
+},
+```
+
+Redis is shared across slots and survives restarts. An in-memory fallback is fine for local dev where there's no Redis.
+
+---
+
+## 19. openid-client v5 requires the `iss` parameter forwarded to `client.callback()`
+
+**Symptom:** `google_oauth: token exchange failed` in logs. Error: `RPError: iss missing from the response`.
+
+**Cause:** Google's OAuth callback URL includes an `iss` query parameter (`iss=https%3A%2F%2Faccounts.google.com`) per RFC 9207. openid-client v5 validates this parameter and throws if it's not included in the `callbackParams` object passed to `client.callback()`.
+
+**Fix:** Add `iss` to the Querystring type, destructure it, and forward it:
+
+```typescript
+// Querystring type
+{ code?: string; state?: string; error?: string; iss?: string }
+
+// In the handler
+const { code, state, error, iss } = request.query;
+
+// In client.callback()
+const tokenSet = await client.callback(
+  callbackUrl,
+  { code, state, iss },   // ← iss must be included
+  { state, nonce: stored.nonce, code_verifier: stored.codeVerifier },
+);
+```
+
+---
+
+## 20. OAuth callback cookie must set `Domain` to the parent domain
+
+**Symptom:** Token exchange succeeds (callback returns 302), but every subsequent API call returns 401. The session cookie was never sent.
+
+**Cause:** The OAuth callback runs on `api.<domain>`. Setting a cookie without an explicit `Domain` attribute scopes it to exactly that host. When the browser redirects to `app.<domain>`, the cookie isn't sent — the API returns 401.
+
+**Fix:** Set `Domain` to the shared parent domain when issuing the session cookie:
+
+```typescript
+const appHostname = new URL(appUrl).hostname;
+const hostParts = appHostname.split(".");
+const cookieDomain =
+  hostParts.length >= 2 ? hostParts.slice(-2).join(".") : appHostname;
+
+reply.header(
+  "Set-Cookie",
+  `emit_session=...; Path=/; HttpOnly; Secure; SameSite=Lax; Domain=${cookieDomain}`,
+);
+```
+
+`app.emitvision.com` → `cookieDomain = emitvision.com`. Both `api.<domain>` and `app.<domain>` can now read and send the cookie.
+
+---
+
 ## Debugging checklist for a new emit-infra deployment
 
 1. `TF_VAR_*` set? → Run `echo $TF_VAR_hcloud_token` before `emit-infra setup`
@@ -366,4 +440,7 @@ EOF
 9. API health check 503 on first deploy? → Confirm infra stack is up before app starts (see #13)
 10. nginx 502 after first slot swap? → Check for conflicting Ansible-provisioned config (see #16)
 11. `nginx -t` fails on first deploy with missing include? → Run Ansible playbook first to bootstrap blue-green slot file (see #17)
-10. Env vars empty in container? → Add `--env-file` to every `docker compose` call (see #14)
+12. Env vars empty in container? → Add `--env-file` to every `docker compose` call (see #14)
+13. OAuth state not found after restart or blue-green swap? → Store state in Redis, not in-memory (see #18)
+14. `iss missing from the response` on OAuth callback? → Forward `iss` query param to `client.callback()` (see #19)
+15. Session cookie not sent after OAuth redirect to app subdomain? → Set `Domain` to parent domain on the cookie (see #20)

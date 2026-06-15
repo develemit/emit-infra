@@ -36,6 +36,7 @@ export async function sshExec(
     '-i', keyPath,
     '-o', 'StrictHostKeyChecking=no',
     '-o', 'ConnectTimeout=10',
+    '-o', 'BatchMode=yes',
     ...sshMuxArgs(),
     `root@${host}`,
     command,

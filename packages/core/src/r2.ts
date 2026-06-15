@@ -33,6 +33,13 @@ export async function resolveAccountId(apiToken: string): Promise<string> {
   return id
 }
 
+export async function resolveZoneId(domain: string, apiToken: string): Promise<string> {
+  const zones = await cfFetch<{ id: string; name: string }[]>(`/zones?name=${encodeURIComponent(domain)}&per_page=1`, apiToken)
+  const id = zones?.[0]?.id
+  if (!id) throw new Error(`No Cloudflare zone found for domain "${domain}" — check the domain is in your account`)
+  return id
+}
+
 export async function ensureR2Bucket(accountId: string, bucketName: string, apiToken: string): Promise<void> {
   const checkRes = await fetch(`${CF_API}/accounts/${accountId}/r2/buckets/${bucketName}`, {
     headers: { Authorization: `Bearer ${apiToken}` },
