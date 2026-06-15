@@ -444,3 +444,65 @@ reply.header(
 13. OAuth state not found after restart or blue-green swap? → Store state in Redis, not in-memory (see #18)
 14. `iss missing from the response` on OAuth callback? → Forward `iss` query param to `client.callback()` (see #19)
 15. Session cookie not sent after OAuth redirect to app subdomain? → Set `Domain` to parent domain on the cookie (see #20)
+16. OAuth callback 500 with `42P01` (undefined table)? → Migrations never ran in production — copy migrations into the Docker image and remove the `NODE_ENV === 'production'` guard (see #21)
+
+---
+
+## 21. OAuth callback 500 — `42P01` (undefined_table) — migrations never ran in production
+
+**Symptom:** Sign-in with Google (or any OAuth provider) lands on the callback URL and returns `{"error":{"code":"42P01","message":"Internal server error"}}`. The OAuth handshake succeeds (no `redirect_uri_mismatch`), but the API throws a PostgreSQL error when trying to look up or create the user.
+
+**Cause:** Two compounding mistakes:
+
+1. The API's `migrate.ts` had a guard: `if (env.NODE_ENV === 'production') { return; }` — so `runPendingMigrations()` was a no-op in the Docker container, which runs with `NODE_ENV=production`.
+2. The Drizzle migrator uses `migrationsFolder: 'packages/db/migrations'` relative to CWD. The API Dockerfile's runner stage only copied the compiled output (`dist/apps/api`), not the migrations folder — so even without the guard, the migrator would have thrown "directory not found".
+
+Result: the production database had **zero tables**. Every API call that touched the DB returned `42P01`.
+
+**Fix (immediate — run migrations manually):**
+
+```bash
+# Copy migration SQL files to server
+scp -i ~/.ssh/emit-deploy -r packages/db/migrations root@<SERVER_IP>:/tmp/dd-migrations
+
+# Run all migrations in order
+ssh -i ~/.ssh/emit-deploy root@<SERVER_IP> "
+  DB_USER=\$(grep POSTGRES_USER /opt/<project>/.env | cut -d= -f2)
+  DB_NAME=\$(grep POSTGRES_DB /opt/<project>/.env | cut -d= -f2)
+  for f in \$(ls /tmp/dd-migrations/*.sql | sort); do
+    docker compose -f /opt/<project>/docker-compose.prod.yml exec -T postgres \
+      psql -U \$DB_USER -d \$DB_NAME -f /dev/stdin < \$f
+  done
+"
+```
+
+**Fix (permanent — so this never happens again):**
+
+1. Remove the production guard from `migrate.ts`:
+```typescript
+// Before — skips migrations in production
+export async function runPendingMigrations() {
+  if (env.NODE_ENV === 'production') { return; }
+  // ...
+}
+
+// After — Drizzle's migrator is idempotent; safe to run on every startup
+export async function runPendingMigrations() {
+  const db = getDb();
+  await migrate(db, { migrationsFolder: 'packages/db/migrations' });
+  await getPool().query('SELECT 1');
+}
+```
+
+2. Copy migrations into the API Docker runner stage so the folder exists at the expected path:
+```dockerfile
+COPY --from=builder --chown=appuser:nodejs /app/dist/apps/api ./
+COPY --from=builder --chown=appuser:nodejs /app/packages/db/migrations ./packages/db/migrations
+```
+
+Drizzle's `migrate()` creates a `__drizzle_migrations` tracking table and only applies SQL files that haven't been recorded yet — it is fully idempotent and safe to run on every container startup.
+
+**What to check in a new project:**
+- Is `NODE_ENV=production` set in the Docker runner stage? If yes, any env-based guard will be active.
+- Does the production Docker image include the migrations folder? Check the Dockerfile runner stage `COPY` lines.
+- Does the deploy workflow include a migration step, or are migrations run only at startup?
