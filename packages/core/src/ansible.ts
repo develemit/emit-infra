@@ -16,12 +16,14 @@ export async function runAnsible(
     args.push('--extra-vars', JSON.stringify(extraVars))
   }
 
+  const env = { ...process.env, ANSIBLE_HOST_KEY_CHECKING: 'False' }
+
   if (!onLine) {
-    await execa('ansible-playbook', args, { stdio: 'inherit' })
+    await execa('ansible-playbook', args, { stdio: 'inherit', env })
     return
   }
 
-  const proc = execa('ansible-playbook', args, { stdout: 'pipe', stderr: 'pipe', reject: false })
+  const proc = execa('ansible-playbook', args, { stdout: 'pipe', stderr: 'pipe', reject: false, env })
   const rlOut = createInterface({ input: proc.stdout! })
   const rlErr = createInterface({ input: proc.stderr! })
   rlOut.on('line', (text) => onLine('stdout', text))

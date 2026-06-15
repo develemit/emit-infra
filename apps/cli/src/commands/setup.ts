@@ -84,7 +84,7 @@ export function registerSetup(program: Command): void {
       // ── Step 3: Remote state bucket ──────────────────────────────────────────
       step(3, total, 'Preparing remote state bucket')
       const cfToken = process.env.TF_VAR_cloudflare_api_token!
-      const stateAccountId = await resolveAccountId(cfToken)
+      const stateAccountId = process.env.TF_VAR_cloudflare_account_id ?? await resolveAccountId(cfToken)
       const stateBucket = `${config.name}-tfstate`
       await ensureR2Bucket(stateAccountId, stateBucket, cfToken)
 
@@ -92,21 +92,32 @@ export function registerSetup(program: Command): void {
       mkdirSync(credDir, { recursive: true })
       const credPath = join(credDir, 'terraform-backend.env')
 
-      if (existsSync(credPath)) {
-        const existingContent = readFileSync(credPath, 'utf-8')
-        const tokenIdMatch = existingContent.match(/^token_id=(.+)$/m)
-        if (tokenIdMatch && tokenIdMatch[1]) {
-          const oldTokenId = tokenIdMatch[1]
-          const revoked = await revokeR2Token(cfToken, oldTokenId, warn)
-          if (revoked) {
-            ok(`Revoked old R2 token`)
-          } else {
-            warn(`Could not revoke old R2 token (it may already be deleted)`)
+      const presetAccessKey = process.env.CF_R2_ACCESS_KEY_ID
+      const presetSecretKey = process.env.CF_R2_SECRET_ACCESS_KEY
+
+      if (!presetAccessKey || !presetSecretKey) {
+        if (existsSync(credPath)) {
+          const existingContent = readFileSync(credPath, 'utf-8')
+          const tokenIdMatch = existingContent.match(/^token_id=(.+)$/m)
+          if (tokenIdMatch && tokenIdMatch[1]) {
+            const oldTokenId = tokenIdMatch[1]
+            const revoked = await revokeR2Token(cfToken, oldTokenId, warn)
+            if (revoked) {
+              ok(`Revoked old R2 token`)
+            } else {
+              warn(`Could not revoke old R2 token (it may already be deleted)`)
+            }
           }
         }
       }
 
-      const stateToken = await createR2Token(stateAccountId, stateBucket, cfToken)
+      let stateToken: { tokenId: string; accessKeyId: string; secretAccessKey: string }
+      if (presetAccessKey && presetSecretKey) {
+        stateToken = { tokenId: 'preset', accessKeyId: presetAccessKey, secretAccessKey: presetSecretKey }
+        ok('Using pre-provided R2 credentials (CF_R2_ACCESS_KEY_ID / CF_R2_SECRET_ACCESS_KEY)')
+      } else {
+        stateToken = await createR2Token(stateAccountId, stateBucket, cfToken)
+      }
       ok(`State bucket ready: ${stateBucket}`)
 
       const credContent = [
@@ -128,6 +139,7 @@ export function registerSetup(program: Command): void {
     skip_credentials_validation = true
     skip_metadata_api_check     = true
     skip_region_validation      = true
+    skip_requesting_account_id  = true
     force_path_style            = true
   }
 }
@@ -216,7 +228,7 @@ export function registerSetup(program: Command): void {
       } else {
         step(ansibleStep, total, 'Configuring server (this takes a few minutes)')
         const inventoryPath = join(process.cwd(), 'ansible-inventory.ini')
-        writeFileSync(inventoryPath, `[${config.name}]\n${serverIp}\n`)
+        writeFileSync(inventoryPath, `[${config.name}]\n${serverIp} ansible_user=root ansible_ssh_private_key_file=~/.ssh/id_ed25519\n`)
 
         const ansibleVars: Record<string, unknown> = {
           project_name: config.name,
@@ -224,6 +236,7 @@ export function registerSetup(program: Command): void {
           app_dir: config.deploy?.appDir ?? '/app',
           nginx_wildcard_cert: config.nginx?.wildcardCert ?? false,
           cloudflare_api_token: process.env.TF_VAR_cloudflare_api_token ?? '',
+          certbot_email: process.env.CERTBOT_EMAIL || `ops@${config.domain}`,
         }
         if (config.nginx?.customConfigSrc) {
           ansibleVars.nginx_custom_config_src = join(process.cwd(), config.nginx.customConfigSrc)

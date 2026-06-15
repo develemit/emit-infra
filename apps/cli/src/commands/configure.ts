@@ -1,5 +1,5 @@
 import { Command } from 'commander'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { existsSync } from 'node:fs'
 import chalk from 'chalk'
 import { loadConfig, runAnsible, type ProjectConfig } from '@emit-infra/core'
@@ -17,7 +17,26 @@ export function registerConfigure(program: Command): void {
 
       const inventory = opts.inventory ?? (await resolveInventoryPath(config.name, config))
 
-      await runAnsible('provision', inventory, { project_name: config.name, domain: config.domain })
+      const extraVars: Record<string, unknown> = {
+        project_name: config.name,
+        domain: config.domain,
+      }
+
+      if (config.nginx?.wildcardCert) {
+        extraVars.nginx_wildcard_cert = true
+        const cfToken = process.env.TF_VAR_cloudflare_api_token
+        if (!cfToken) {
+          console.error(chalk.red('Error: TF_VAR_cloudflare_api_token must be set for wildcardCert DNS-01 challenge'))
+          process.exit(1)
+        }
+        extraVars.cloudflare_api_token = cfToken
+      }
+
+      if (config.nginx?.customConfigSrc) {
+        extraVars.nginx_custom_config_src = resolve(process.cwd(), config.nginx.customConfigSrc)
+      }
+
+      await runAnsible('provision', inventory, extraVars)
 
       console.log(chalk.green(`\nDone. Run "emit-infra deploy ${config.name}" to deploy the app.`))
     })

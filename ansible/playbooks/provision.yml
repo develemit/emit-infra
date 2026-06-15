@@ -6,7 +6,7 @@
 
   vars:
     app_dir: "/opt/{{ project_name }}"
-    certbot_email: "{{ lookup('env', 'CERTBOT_EMAIL') | default('ops@' + domain) }}"
+    certbot_email: "{{ lookup('env', 'CERTBOT_EMAIL') | default('ops@' + domain, boolean=True) }}"
     # Blue-green provisioning: set blue_green: true in inventory to enable.
     # Also set: blue_green_compose_files (list of local paths to compose files),
     # deploy_public_key (SSH public key string for the deploy user).

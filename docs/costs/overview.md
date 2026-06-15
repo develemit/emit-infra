@@ -1,18 +1,18 @@
 # Infrastructure Cost Overview — Develemit Stack
 
-_Last updated: 2026-06-08 (numbers confirmed via Hetzner billing API)_
+_Last updated: 2026-06-15 (numbers confirmed via Hetzner billing API)_
 
 ## Modeling Assumptions
 
 | Variable | Value | Basis |
 |---|---|---|
-| emit-vision server | cpx22 nbg1 | Confirmed via Hetzner API |
-| martialops server | cpx21 ash | Confirmed via Hetzner API |
-| New projects | cpx22 nbg1 (default) | Best value, EU latency acceptable |
+| All servers | cx23 nbg1 | Migrated from CPX legacy line June 2026 |
 | Repos | Public | All develemit/* repos |
 | Redis usage | <10k commands/day per project | Conservative estimate |
 | R2 storage | <10 GB total | Current usage patterns |
 | Currency | USD (Hetzner EUR × 1.09 approx) | 2026-06 exchange rate |
+
+> **CPX → CX migration note:** Hetzner's CPX series is deprecated and priced 2–3× higher than equivalent CX specs. All new servers must use CX. Existing CPX servers should be migrated (snapshot → new CX server → delete old). See `docs/costs/hetzner.md` for the full pricing comparison.
 
 ---
 
@@ -20,31 +20,32 @@ _Last updated: 2026-06-08 (numbers confirmed via Hetzner billing API)_
 
 | Service | Vendor | Cost | Notes |
 |---|---|---|---|
-| emit-vision-prod (cpx22 nbg1) | Hetzner | €9.49 | Active |
-| emit-vision IPv4 | Hetzner | €0.60 | Active |
-| martialops (cpx21 ash) | Hetzner | €13.99 | Active |
-| martialops IPv4 | Hetzner | €0.60 | Active |
+| emit-vision-prod (cx23 nbg1) | Hetzner | €7.09 | CPX22→CX23 migration pending |
+| martialops (cx23 nbg1) | Hetzner | €7.09 | Migrated June 2026 |
+| tastease (cx23 nbg1) | Hetzner | €7.09 | Active |
+| diner-decider (cx23 nbg1) | Hetzner | €7.09 | Migrated June 2026 (was CPX21 ash) |
 | DNS / CDN | Cloudflare | $0 | Free tier |
 | R2 Storage | Cloudflare | $0 | <10 GB, free tier |
 | Redis | Upstash | $0 | Free tier per project |
 | CI/CD + Registry | GitHub | $0 | Public repos |
-| **Total** | | **€24.68/month (~$26.90)** | |
+| **Total** | | **€28.36/month (~$30.90)** | emit-vision still on CPX22 = €44.26 until migrated |
 
 ---
 
-## Planned Stack (all 4 projects provisioned)
+## Planned Stack (5 projects)
 
 | Service | Vendor | Cost | Notes |
 |---|---|---|---|
-| emit-vision-prod (cpx22 nbg1) | Hetzner | €10.09 | Active |
-| martialops (cpx21 ash) | Hetzner | €14.59 | Active |
-| diner-decider (cpx22 nbg1) | Hetzner | €10.09 | Planned |
-| develemail (cpx22 nbg1) | Hetzner | €10.09 | Planned |
-| DNS / CDN (4 domains) | Cloudflare | $0 | Free tier |
+| emit-vision-prod (cx23 nbg1) | Hetzner | €7.09 | |
+| martialops (cx23 nbg1) | Hetzner | €7.09 | |
+| tastease (cx23 nbg1) | Hetzner | €7.09 | |
+| diner-decider (cx23 nbg1) | Hetzner | €7.09 | |
+| develemail (cx23 nbg1) | Hetzner | €7.09 | Planned |
+| DNS / CDN (5 domains) | Cloudflare | $0 | Free tier |
 | R2 Storage | Cloudflare | $0 | Free tier |
-| Redis (4 instances) | Upstash | $0 | Free tier |
+| Redis (5 instances) | Upstash | $0 | Free tier |
 | CI/CD + Registry | GitHub | $0 | Public repos |
-| **Total** | | **€44.86/month (~$48.90)** | |
+| **Total** | | **€35.45/month (~$38.60)** | |
 
 ---
 
@@ -82,9 +83,9 @@ Infrastructure is never the margin story — Stripe is.
 
 | When | Threshold | Action | Cost Change |
 |---|---|---|---|
-| Now | 2 active projects | — | €24.68/month |
-| +2 projects | diner-decider + develemail launched | Add 2× cpx22 nbg1 | +€20.18 → €44.86/month |
-| Any project >70% CPU | Sustained high load | Upgrade cpx22 → cpx31 | +~€4/server |
+| Now | 4 active projects | — | ~€44/month (€28 after emit-vision migration) |
+| +1 project | develemail launched | Add 1× cx23 nbg1 | +€7.09 → ~€35/month |
+| Any project >70% CPU | Sustained high load | Upgrade cx23 → cx32 | +~€4.60/server |
 | R2 >10 GB | File upload growth | R2 paid: $0.015/GB | ~+$0.15/GB over 10 GB |
 | Redis >10k cmds/day | High-traffic project | Upstash pay-as-you-go | $0.20/100k commands |
 | Postgres >3 GB RAM | DB-heavy workload | Separate DB server (cpx22) | +€10/month |

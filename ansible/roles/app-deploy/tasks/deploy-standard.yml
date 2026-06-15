@@ -22,6 +22,11 @@
   when: rollback_enabled | default(true)
 
 # ── Pull and deploy ──────────────────────────────────────────────
+- name: Login to GHCR
+  shell: echo "{{ ghcr_token }}" | docker login ghcr.io -u "{{ ghcr_actor }}" --password-stdin
+  when: ghcr_token is defined
+  no_log: true
+
 - name: Pull latest images
   command: docker compose -f {{ compose_dest | default('docker-compose.yml') }} pull
   args:

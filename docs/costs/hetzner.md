@@ -6,15 +6,28 @@ hosts Docker Compose (API + web + postgres + nginx + any project-specific
 containers). Servers are provisioned via Terraform using the `hetzner-server`
 module and configured via Ansible.
 
-## Pricing Tiers (CPX shared-CPU line, EU datacenter)
+## Pricing Tiers
+
+### CX shared-CPU line (current — use for all new servers)
 
 | Type | vCPU | RAM | Disk | EU/month | ash/month |
 |---|---|---|---|---|---|
-| CPX11 | 2 | 2 GB | 40 GB SSD | ~€4.15 | ~€5.99 |
-| **CPX21** | 3 | 4 GB | 80 GB SSD | ~€7.90 | **~€13.99** |
-| **CPX22** ← emit-vision | 4 | 8 GB | 80 GB SSD | **~€9.49** | ~€14.99 |
-| CPX31 | 4 | 8 GB | 160 GB SSD | ~€13.09 | ~€20.99 |
-| CPX41 | 8 | 16 GB | 240 GB SSD | ~€22.19 | ~€36.99 |
+| CX22 | 2 | 4 GB | 40 GB SSD | ~€4.35 | ~€6.29 |
+| **CX23** ← all projects | 2 | 4 GB | 80 GB SSD | **~€6.49** | ~€9.39 |
+| CX32 | 4 | 8 GB | 80 GB SSD | ~€11.09 | ~€16.09 |
+| CX42 | 8 | 16 GB | 160 GB SSD | ~€20.19 | ~€29.29 |
+| CX52 | 16 | 32 GB | 240 GB SSD | ~€38.39 | ~€55.59 |
+
+### CPX legacy line (deprecated — do not use for new servers)
+
+Hetzner still runs CPX instances but at significantly higher prices than CX equivalents. Migrate any existing CPX servers to CX.
+
+| Type | vCPU | RAM | EU/month | ash/month | CX equivalent |
+|---|---|---|---|---|---|
+| CPX21 | 3 | 4 GB | ~€14.19 | ~€37.49 | CX23 |
+| CPX22 | 2 | 4 GB | ~€22.99 | ~€33.29 | CX23 |
+| CPX31 | 4 | 8 GB | ~€27.09 | ~€39.19 | CX32 |
+| CPX41 | 8 | 16 GB | ~€51.09 | ~€74.09 | CX42 |
 
 Billing is hourly (server creation to deletion). Powered-off servers still bill
 for compute reservation — delete, don't stop.
@@ -26,26 +39,27 @@ IPv4 addresses are billed separately at **€0.60/month** per server since 2024
 
 | Project | Server Type | Region | Server/month | +IPv4 | Total/month |
 |---|---|---|---|---|---|
-| emit-vision-prod | cpx22 | nbg1 (Nuremberg) | €9.49 | €0.60 | **€10.09** |
-| martialops | cpx21 | ash (Ashburn) | €13.99 | €0.60 | **€14.59** |
+| emit-vision-prod | cx23 | nbg1 (Nuremberg) | €6.49 | €0.60 | **€7.09** |
+| martialops | cx23 | nbg1 (Nuremberg) | €6.49 | €0.60 | **€7.09** |
+| tastease | cx23 | nbg1 (Nuremberg) | €6.49 | €0.60 | **€7.09** |
+| diner-decider | cx23 | nbg1 (Nuremberg) | €6.49 | €0.60 | **€7.09** |
 
-**Current total: ~€24.68/month (~$26.90/month) — 2 active servers**
+**Current total: ~€28.36/month — 4 active servers**
 
-> Live figures confirmed by the emit-infra billing widget (`GET /billing/hetzner`).
+> Note: emit-vision-prod is still on CPX22 (€22.99) pending migration — actual current total is ~€44.26 until that migration is complete. See emit-vision pitfalls for the data-safe migration process.
 
-## Planned Servers (new projects use cpx22 nbg1 unless latency requires ash)
+## Planned Servers (new projects use cx23 nbg1 unless US latency is a hard requirement)
 
 | Project | Planned Type | Region | Est. Total/month |
 |---|---|---|---|
-| diner-decider | cpx22 | nbg1 | ~€10.09 |
-| develemail | cpx22 | nbg1 | ~€10.09 |
+| develemail | cx23 | nbg1 | ~€7.09 |
 
-**Planned total: ~€44.86/month — 4 servers**
+**Planned total: ~€35.45/month — 5 servers**
 
 ## Upgrade Triggers
 
-- **CPX31** when: sustained CPU >70% on a cpx22, or app container OOM-killing
-- **CPX41** when: multiple high-traffic apps co-located, or Postgres needing >8 GB RAM
+- **CX32** when: sustained CPU >70% on a CX23, or app container OOM-killing
+- **CX42** when: multiple high-traffic apps co-located, or Postgres needing >8 GB RAM
 - **Separate DB server**: when Postgres needs isolation from app containers (usually >10k active users on a single project)
 
 ## Alternatives Considered

@@ -85,6 +85,15 @@ export function registerDeploy(program: Command): void {
         extraVars.env_src = envPath
       }
 
+      const ghcrToken = process.env.GHCR_TOKEN ?? process.env.CR_PAT
+      const ghcrActor = process.env.GHCR_ACTOR ?? process.env.GITHUB_ACTOR
+      if (ghcrToken) {
+        extraVars.ghcr_token = ghcrToken
+        extraVars.ghcr_actor = ghcrActor ?? 'x-access-token'
+      } else {
+        console.warn(chalk.yellow('Warning: GHCR_TOKEN not set — docker pull may fail for private images'))
+      }
+
       await runAnsible('deploy', inventory, extraVars)
 
       console.log(chalk.green(`\nDeployed successfully.`))
