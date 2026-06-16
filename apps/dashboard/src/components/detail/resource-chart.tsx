@@ -1,12 +1,11 @@
 'use client'
 import { Icon } from '@/components/icon'
-import { useMetricHistory, type MetricPoint } from '@/lib/metric-history'
+import type { MetricPoint } from '@/lib/metric-history'
 
 interface Props {
   name: string
-  mem: number | null
-  disk: number | null
-  up: boolean
+  history: MetricPoint[]
+  uptimePct: number | null
 }
 
 // SVG plot dimensions (no internal margin — layout div handles spacing)
@@ -36,8 +35,7 @@ function LegendLine({ color, label }: { color: string; label: string }) {
   )
 }
 
-export function ResourceChart({ name, mem, disk, up }: Props) {
-  const history = useMetricHistory(name, mem, disk, up)
+export function ResourceChart({ name, history, uptimePct }: Props) {
   const hasData = history.length >= 2
   const gradId = `mf-${name.replace(/\W/g, '-')}`
 
@@ -60,6 +58,14 @@ export function ResourceChart({ name, mem, disk, up }: Props) {
             <LegendLine color="var(--accent)" label="mem" />
             <LegendLine color="var(--fg-faint)" label="disk" />
           </div>
+        )}
+        {uptimePct != null && (
+          <span
+            className="text-[10px] font-mono rounded-full px-2 py-0.5"
+            style={{ background: 'var(--card-2)', border: '1px solid var(--border)', color: 'var(--subtle)' }}
+          >
+            {uptimePct}% up
+          </span>
         )}
         <span
           className="text-[10px] font-mono text-subtle rounded-full px-2 py-0.5"

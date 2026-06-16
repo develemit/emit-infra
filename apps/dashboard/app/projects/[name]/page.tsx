@@ -15,6 +15,7 @@ import { RollbackPanel } from '@/components/rollback-panel'
 import { SecretsSyncPanel } from '@/components/secrets-sync-panel'
 import { DestroyModal } from '@/components/destroy-modal'
 import { deriveHealth } from '@/lib/health'
+import { useMetricHistory, computeUptimePct } from '@/lib/metric-history'
 
 export default function ProjectDetailPage() {
   const params = useParams()
@@ -71,6 +72,10 @@ export default function ProjectDetailPage() {
   const domain = project?.config.domain ?? ''
   const loading = status === null
   const up = !!status && !status.error && status.httpStatus === 200
+  const mem = status?.memory ?? null
+  const disk = status?.disk ?? null
+  const history = useMetricHistory(name, mem, disk, up)
+  const uptimePct = computeUptimePct(history)
 
   return (
     <div className="flex flex-col min-h-full">
@@ -158,16 +163,15 @@ export default function ProjectDetailPage() {
           ) : (
             <>
               {project && status && (
-                <HealthCard project={project} status={status} polledAgo={polledAgo} onRefresh={fetchData} />
+                <HealthCard project={project} status={status} polledAgo={polledAgo} onRefresh={fetchData} uptimePct={uptimePct} />
               )}
               {containers !== null && (
                 <ContainerTable containers={containers} projectName={name} onRefetch={fetchData} />
               )}
               <ResourceChart
                 name={name}
-                mem={status?.memory ?? null}
-                disk={status?.disk ?? null}
-                up={up}
+                history={history}
+                uptimePct={uptimePct}
               />
               <DockerUsage projectName={name} onPrune={fetchData} />
               {deploying && (

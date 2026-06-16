@@ -71,6 +71,7 @@ interface HealthCardProps {
   status: ProjectStatus
   polledAgo?: string
   onRefresh?: () => void
+  uptimePct?: number | null
 }
 
 function sizeLabel(label: string, used?: string, total?: string): string {
@@ -78,7 +79,7 @@ function sizeLabel(label: string, used?: string, total?: string): string {
   return label
 }
 
-export function HealthCard({ project, status, polledAgo, onRefresh }: HealthCardProps) {
+export function HealthCard({ project, status, polledAgo, onRefresh, uptimePct }: HealthCardProps) {
   const disk = status.disk ?? 0
   const mem = status.memory ?? 0
   const diskLabel = sizeLabel('Disk', status.diskUsed, status.diskTotal)
@@ -122,6 +123,12 @@ export function HealthCard({ project, status, polledAgo, onRefresh }: HealthCard
         <StatTile icon="clock" label="Deployed" value={deployed} mono={false} />
         <StatTile icon="shield" label="Nginx" value={nginx.value} color={nginx.color} />
         <StatTile icon="lock" label="SSL" value={ssl.value} color={ssl.color} />
+        <StatTile
+          icon="activity"
+          label="Uptime 24h"
+          value={uptimePct != null ? `${uptimePct}%` : '—'}
+          color={uptimePct != null && uptimePct < 95 ? 'var(--err)' : undefined}
+        />
         {status.redisStatus && <StatTile icon="database" label="Redis" value={redis.value} color={redis.color} />}
         {queue && <StatTile icon="layers" label="Queue" value={queue.value} color={queue.color} mono={false} />}
       </div>
@@ -133,6 +140,12 @@ export function HealthCard({ project, status, polledAgo, onRefresh }: HealthCard
         <StatTile icon="hash" label="Build" value={status.buildNumber ?? '—'} />
         <StatTile icon="clock" label="Deployed" value={deployed} mono={false} />
         <StatTile icon="shield" label="Nginx" value={nginx.value} color={nginx.color} />
+        <StatTile
+          icon="activity"
+          label="Uptime 24h"
+          value={uptimePct != null ? `${uptimePct}%` : '—'}
+          color={uptimePct != null && uptimePct < 95 ? 'var(--err)' : undefined}
+        />
         {status.redisStatus && <StatTile icon="database" label="Redis" value={redis.value} color={redis.color} />}
         {queue && <StatTile icon="layers" label="Queue" value={queue.value} color={queue.color} mono={false} />}
       </div>

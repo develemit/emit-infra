@@ -63,3 +63,9 @@ export function useMetricHistory(
 
   return history
 }
+
+export function computeUptimePct(history: MetricPoint[]): number | null {
+  if (history.length < 2) return null
+  const upCount = history.filter(p => p.up).length
+  return Math.round((upCount / history.length) * 100)
+}
