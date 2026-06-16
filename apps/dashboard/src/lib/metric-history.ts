@@ -4,6 +4,7 @@ export interface MetricPoint {
   t: number    // Unix ms
   mem: number  // 0–100
   disk: number // 0–100
+  up: boolean  // was the project reachable at this poll?
 }
 
 const MAX_POINTS = 288         // 24h at 30s intervals
@@ -23,6 +24,7 @@ export function useMetricHistory(
   name: string,
   mem: number | null,
   disk: number | null,
+  up: boolean = true,
 ): MetricPoint[] {
   const [history, setHistory] = useState<MetricPoint[]>([])
 
@@ -32,8 +34,13 @@ export function useMetricHistory(
       const raw = localStorage.getItem(storageKey(name))
       if (!raw) return
       const now = Date.now()
-      const pts: MetricPoint[] = JSON.parse(raw)
-      setHistory(pts.filter(p => now - p.t < TTL_MS).slice(-MAX_POINTS))
+      const pts: (MetricPoint & { up?: boolean })[] = JSON.parse(raw)
+      setHistory(
+        pts
+          .filter(p => now - p.t < TTL_MS)
+          .slice(-MAX_POINTS)
+          .map(p => ({ ...p, up: p.up ?? true }))
+      )
     } catch { /* corrupt storage — start fresh */ }
   }, [name])
 
@@ -44,7 +51,7 @@ export function useMetricHistory(
     setHistory(prev => {
       const last = prev[prev.length - 1]
       if (last && now - last.t < 20_000) return prev  // debounce
-      const next = [...prev, { t: now, mem, disk: disk ?? 0 }]
+      const next = [...prev, { t: now, mem, disk: disk ?? 0, up }]
         .filter(p => now - p.t < TTL_MS)
         .slice(-MAX_POINTS)
       try {
@@ -52,7 +59,7 @@ export function useMetricHistory(
       } catch { /* storage quota exceeded */ }
       return next
     })
-  }, [name, mem, disk])
+  }, [name, mem, disk, up])
 
   return history
 }

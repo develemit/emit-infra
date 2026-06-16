@@ -6,6 +6,7 @@ interface Props {
   name: string
   mem: number | null
   disk: number | null
+  up: boolean
 }
 
 // SVG plot dimensions (no internal margin — layout div handles spacing)
@@ -35,8 +36,8 @@ function LegendLine({ color, label }: { color: string; label: string }) {
   )
 }
 
-export function ResourceChart({ name, mem, disk }: Props) {
-  const history = useMetricHistory(name, mem, disk)
+export function ResourceChart({ name, mem, disk, up }: Props) {
+  const history = useMetricHistory(name, mem, disk, up)
   const hasData = history.length >= 2
   const gradId = `mf-${name.replace(/\W/g, '-')}`
 

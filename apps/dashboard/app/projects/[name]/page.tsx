@@ -70,6 +70,7 @@ export default function ProjectDetailPage() {
   const { variant, label } = deriveHealth(status)
   const domain = project?.config.domain ?? ''
   const loading = status === null
+  const up = !!status && !status.error && status.httpStatus === 200
 
   return (
     <div className="flex flex-col min-h-full">
@@ -166,6 +167,7 @@ export default function ProjectDetailPage() {
                 name={name}
                 mem={status?.memory ?? null}
                 disk={status?.disk ?? null}
+                up={up}
               />
               <DockerUsage projectName={name} onPrune={fetchData} />
               {deploying && (
