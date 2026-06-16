@@ -125,6 +125,44 @@ export async function restartContainer(
   return res.json() as Promise<{ ok: boolean; output: string }>
 }
 
+export interface CiProgress {
+  step: number
+  total: number
+  pct: number
+  label: string
+}
+
+export interface CiStatus {
+  status: string
+  sha?: string
+  branch?: string
+  startedAt?: string
+  completedAt?: string
+  progress?: CiProgress | null
+}
+
+export type DeployStatus = CiStatus
+
+export async function getCiStatus(name: string): Promise<CiStatus | null> {
+  try {
+    const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/ci-status`, { cache: 'no-store' })
+    if (!res.ok) return null
+    return res.json() as Promise<CiStatus>
+  } catch {
+    return null
+  }
+}
+
+export async function getDeployStatus(name: string): Promise<DeployStatus | null> {
+  try {
+    const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/deploy-status`, { cache: 'no-store' })
+    if (!res.ok) return null
+    return res.json() as Promise<DeployStatus>
+  } catch {
+    return null
+  }
+}
+
 export async function pruneDocker(name: string): Promise<{ ok: boolean; output: string }> {
   const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/prune`, {
     method: 'POST',

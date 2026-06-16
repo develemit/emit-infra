@@ -1,12 +1,32 @@
 'use client'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import type { ProjectSummary, ProjectStatus } from '@/lib/api'
+import type { ProjectSummary, ProjectStatus, CiStatus, DeployStatus } from '@/lib/api'
+import { getCiStatus, getDeployStatus } from '@/lib/api'
 import { Icon } from '@/components/icon'
 import { Badge } from '@/components/ui/badge'
 import { Meter } from '@/components/ui/meter'
 import { Skeleton } from '@/components/ui/skeleton'
 import { deriveHealth } from '@/lib/health'
 import { useUptimePct } from '@/lib/use-uptime-pct'
+
+function usePipelineStatus(name: string): { ciStatus: CiStatus | null; deployStatus: DeployStatus | null } {
+  const [ciStatus, setCiStatus] = useState<CiStatus | null>(null)
+  const [deployStatus, setDeployStatus] = useState<DeployStatus | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    async function poll() {
+      const [ci, deploy] = await Promise.all([getCiStatus(name), getDeployStatus(name)])
+      if (!cancelled) { setCiStatus(ci); setDeployStatus(deploy) }
+    }
+    void poll()
+    const id = setInterval(() => void poll(), 15_000)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [name])
+
+  return { ciStatus, deployStatus }
+}
 
 interface Props {
   project: ProjectSummary
@@ -37,6 +57,9 @@ export function ProjectCard({ project, status }: Props) {
   const { name, domain, region } = project.config
   const { variant, label } = deriveHealth(status)
   const uptimePct = useUptimePct(name)
+  const { ciStatus, deployStatus } = usePipelineStatus(name)
+  const ciProgress = ciStatus?.status === 'running' ? ciStatus.progress : null
+  const deployProgress = deployStatus?.status === 'deploying' ? deployStatus.progress : null
   const reachable = status !== null && !status.error
   const loading = status === null
   const disk = status?.disk ?? 0
@@ -85,6 +108,16 @@ export function ProjectCard({ project, status }: Props) {
             }}
           >
             {uptimePct}% up
+          </span>
+        )}
+        {ciProgress != null && (
+          <span className="text-[11px] font-mono px-1.5 py-0.5 rounded" style={{ color: 'var(--accent)', background: 'var(--card-2)', border: '1px solid var(--border)' }}>
+            running · {ciProgress.pct}%
+          </span>
+        )}
+        {deployProgress != null && (
+          <span className="text-[11px] font-mono px-1.5 py-0.5 rounded" style={{ color: 'var(--accent)', background: 'var(--card-2)', border: '1px solid var(--border)' }}>
+            deploying · {deployProgress.pct}%
           </span>
         )}
         {deployedAgoStr && (

@@ -216,6 +216,26 @@ export async function projectRoutes(app: FastifyInstance) {
     },
   )
 
+  app.get<{ Params: { name: string } }>('/projects/:name/ci-status', async (req, reply) => {
+    const filePath = join(homedir(), 'projects', req.params.name, '.ci-status.json')
+    try {
+      const raw = await readFile(filePath, 'utf8')
+      return JSON.parse(raw) as unknown
+    } catch {
+      return reply.status(404).send({ error: 'not found' })
+    }
+  })
+
+  app.get<{ Params: { name: string } }>('/projects/:name/deploy-status', async (req, reply) => {
+    const filePath = join(homedir(), 'projects', req.params.name, '.deploy-status.json')
+    try {
+      const raw = await readFile(filePath, 'utf8')
+      return JSON.parse(raw) as unknown
+    } catch {
+      return reply.status(404).send({ error: 'not found' })
+    }
+  })
+
   app.get<{ Params: { name: string } }>('/projects/:name/containers', async (req, reply) => {
     const project = await findProject(req.params.name)
     if (!project) return reply.status(404).send({ error: 'not found' })
