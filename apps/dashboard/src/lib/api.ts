@@ -193,6 +193,69 @@ export function syncSecrets(name: string): { url: string } {
   return { url: `${API_BASE}/projects/${encodeURIComponent(name)}/secrets-sync` }
 }
 
+// --- History types and fetch functions ---
+
+export interface MetricPoint {
+  t: number
+  cpu: number
+  mem: number
+  memUsedMb: number
+  memTotalMb: number
+  disk: number
+  diskUsedGb: string
+  diskTotalGb: string
+  netRxBytes: number
+  netTxBytes: number
+  containers: { name: string; cpu: number; memMb: number; restarts: number }[]
+}
+
+export interface MetricsResponse {
+  points: MetricPoint[]
+  range: { from: number; to: number }
+}
+
+export interface DeployHistoryEntry {
+  status: string
+  sha: string
+  branch: string
+  startedAt: string
+  completedAt: string
+  durationSec: number
+  servicesBuilt: string[]
+}
+
+export interface DeployHistoryResponse {
+  deploys: DeployHistoryEntry[]
+}
+
+export interface CiHistoryEntry {
+  status: string
+  sha: string
+  branch: string
+  startedAt: string
+  completedAt: string
+  durationSec: number
+}
+
+export interface CiHistoryResponse {
+  runs: CiHistoryEntry[]
+}
+
+export function getMetrics(name: string, hours?: number): Promise<MetricsResponse> {
+  const qs = hours ? `?hours=${hours}` : ''
+  return apiFetch<MetricsResponse>(`/projects/${encodeURIComponent(name)}/metrics${qs}`)
+}
+
+export function getDeployHistory(name: string, limit?: number): Promise<DeployHistoryResponse> {
+  const qs = limit ? `?limit=${limit}` : ''
+  return apiFetch<DeployHistoryResponse>(`/projects/${encodeURIComponent(name)}/deploy-history${qs}`)
+}
+
+export function getCiHistory(name: string, limit?: number): Promise<CiHistoryResponse> {
+  const qs = limit ? `?limit=${limit}` : ''
+  return apiFetch<CiHistoryResponse>(`/projects/${encodeURIComponent(name)}/ci-history${qs}`)
+}
+
 export function openSseStream(path: string): EventSource {
   return new EventSource(`${API_BASE}${path}`)
 }
