@@ -3,7 +3,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { Icon } from '@/components/icon'
 import { Badge, type BadgeVariant } from '@/components/ui/badge'
-import type { Container } from '@/lib/api'
+import type { Container, MetricPoint } from '@/lib/api'
 import { restartContainer } from '@/lib/api'
 
 function stateBadge(state: string): BadgeVariant {
@@ -35,11 +35,13 @@ function MContainer({
   logsHref,
   projectName,
   onRefetch,
+  metrics,
 }: {
   c: Container
   logsHref: string
   projectName: string
   onRefetch?: () => void
+  metrics?: ContainerMetrics
 }) {
   const [restarting, setRestarting] = useState(false)
   const variant = stateBadge(c.state)
@@ -81,19 +83,54 @@ function MContainer({
         <span className="font-mono text-[11px] text-faint shrink-0">{buildLabel(c)}</span>
       </div>
       <div className="font-mono text-[11px] text-faint">{c.status}</div>
+      {metrics && (
+        <div className="flex items-center gap-3 text-[11px] font-mono text-subtle mt-0.5">
+          <span>CPU {metrics.cpu.toFixed(1)}%</span>
+          <span>{metrics.memMb.toFixed(0)} MB</span>
+          {metrics.restarts > 0 && (
+            <span style={{ color: 'var(--err)' }}>{metrics.restarts} restarts</span>
+          )}
+        </div>
+      )}
     </div>
   )
+}
+
+interface ContainerMetrics {
+  cpu: number
+  memMb: number
+  restarts: number
 }
 
 interface ContainerTableProps {
   containers: Container[]
   projectName: string
   onRefetch?: () => void
+  latestMetric?: MetricPoint | null
 }
 
-export function ContainerTable({ containers, projectName, onRefetch }: ContainerTableProps) {
+function metricsMap(metric?: MetricPoint | null): Map<string, ContainerMetrics> {
+  const map = new Map<string, ContainerMetrics>()
+  if (!metric?.containers) return map
+  for (const c of metric.containers) {
+    map.set(c.name, { cpu: c.cpu, memMb: c.memMb, restarts: c.restarts })
+  }
+  return map
+}
+
+function sortByMemory(containers: Container[], metrics: Map<string, ContainerMetrics>): Container[] {
+  return [...containers].sort((a, b) => {
+    const ma = metrics.get(a.name)?.memMb ?? 0
+    const mb = metrics.get(b.name)?.memMb ?? 0
+    if (mb !== ma) return mb - ma
+    return stateOrder(a.state) - stateOrder(b.state)
+  })
+}
+
+export function ContainerTable({ containers, projectName, onRefetch, latestMetric }: ContainerTableProps) {
   const [restartingSet, setRestartingSet] = useState<Set<string>>(new Set())
-  const sorted = sortContainers(containers)
+  const cMetrics = metricsMap(latestMetric)
+  const sorted = latestMetric ? sortByMemory(containers, cMetrics) : sortContainers(containers)
   const runningCount = containers.filter(c => c.state.toLowerCase() === 'running').length
   const logsBase = `/projects/${encodeURIComponent(projectName)}/logs`
 
@@ -129,7 +166,7 @@ export function ContainerTable({ containers, projectName, onRefetch }: Container
             <table className="w-full">
               <thead>
                 <tr>
-                  {['Name', 'Image', 'Build', 'State', 'Status', ''].map(h => (
+                  {['Name', 'Image', 'Build', 'CPU', 'Mem', 'Restarts', 'State', 'Status', ''].map(h => (
                     <th
                       key={h}
                       className="text-left text-[11px] font-semibold uppercase tracking-wide text-subtle pb-3"
@@ -144,6 +181,7 @@ export function ContainerTable({ containers, projectName, onRefetch }: Container
                 {sorted.map(c => {
                   const href = `${logsBase}?service=${encodeURIComponent(c.name)}`
                   const isRestarting = restartingSet.has(c.name)
+                  const cm = cMetrics.get(c.name)
                   return (
                     <tr
                       key={c.name}
@@ -158,6 +196,15 @@ export function ContainerTable({ containers, projectName, onRefetch }: Container
                       </td>
                       <td className="font-mono text-[12px] text-faint py-3 pr-3 whitespace-nowrap">
                         {buildLabel(c)}
+                      </td>
+                      <td className="font-mono text-[12px] text-subtle py-3 pr-3 whitespace-nowrap">
+                        {cm ? `${cm.cpu.toFixed(1)}%` : '—'}
+                      </td>
+                      <td className="font-mono text-[12px] text-subtle py-3 pr-3 whitespace-nowrap">
+                        {cm ? `${cm.memMb.toFixed(0)} MB` : '—'}
+                      </td>
+                      <td className="font-mono text-[12px] py-3 pr-3 whitespace-nowrap" style={{ color: cm && cm.restarts > 0 ? 'var(--err)' : 'var(--subtle)' }}>
+                        {cm ? cm.restarts : '—'}
                       </td>
                       <td className="py-3 pr-3">
                         <Badge variant={stateBadge(c.state)} dot>{c.state}</Badge>
@@ -194,6 +241,7 @@ export function ContainerTable({ containers, projectName, onRefetch }: Container
                 logsHref={`${logsBase}?service=${encodeURIComponent(c.name)}`}
                 projectName={projectName}
                 onRefetch={onRefetch}
+                metrics={cMetrics.get(c.name)}
               />
             ))}
           </div>

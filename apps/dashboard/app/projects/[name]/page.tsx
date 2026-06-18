@@ -9,6 +9,11 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { HealthCard } from '@/components/detail/health-card'
 import { ContainerTable } from '@/components/detail/container-table'
 import { ResourceChart } from '@/components/detail/resource-chart'
+import { RangeSelector } from '@/components/detail/range-selector'
+import { FullChart } from '@/components/detail/full-chart'
+import { NetworkChart } from '@/components/detail/network-chart'
+import { DeployTimeline } from '@/components/detail/deploy-timeline'
+import { CiTimeline } from '@/components/detail/ci-timeline'
 import { DockerUsage } from '@/components/detail/docker-usage'
 import { DeployPanel } from '@/components/deploy-panel'
 import { RollbackPanel } from '@/components/rollback-panel'
@@ -18,6 +23,7 @@ import { deriveHealth } from '@/lib/health'
 import { useMetricHistory, computeUptimePct } from '@/lib/metric-history'
 import { useServerMetrics } from '@/lib/use-server-metrics'
 import { useDeployMarkers } from '@/lib/use-deploy-markers'
+import { useCiHistory } from '@/lib/use-ci-history'
 
 export default function ProjectDetailPage() {
   const params = useParams()
@@ -33,6 +39,7 @@ export default function ProjectDetailPage() {
   const [showDestroy, setShowDestroy] = useState(false)
   const [lastPolledAt, setLastPolledAt] = useState<number>(0)
   const [polledAgo, setPolledAgo] = useState('')
+  const [rangeHours, setRangeHours] = useState(24)
 
   const deployUrl = `${apiBase}/projects/${encodeURIComponent(name)}/deploy`
 
@@ -78,12 +85,21 @@ export default function ProjectDetailPage() {
   const disk = status?.disk ?? null
   const localHistory = useMetricHistory(name, mem, disk, up)
   const uptimePct = computeUptimePct(localHistory)
-  const { points: serverPoints } = useServerMetrics(name)
+  const { points: serverPoints } = useServerMetrics(name, rangeHours)
   const { deploys } = useDeployMarkers(name)
+  const { runs: ciRuns } = useCiHistory(name)
 
   const chartHistory = serverPoints.length >= 2
     ? serverPoints.map(p => ({ t: p.t * 1000, cpu: p.cpu, mem: p.mem, disk: p.disk }))
     : localHistory.map(p => ({ t: p.t, mem: p.mem, disk: p.disk }))
+  const fullChartPoints = serverPoints.length >= 2
+    ? serverPoints.map(p => ({ t: p.t * 1000, cpu: p.cpu, mem: p.mem, disk: p.disk }))
+    : []
+  const networkPoints = serverPoints.length >= 2
+    ? serverPoints.map(p => ({ t: p.t * 1000, netRxBytes: p.netRxBytes, netTxBytes: p.netTxBytes }))
+    : []
+  const latestMetric = serverPoints.length > 0 ? serverPoints[serverPoints.length - 1] : null
+  const deployMarkers = deploys.map(d => ({ completedAt: d.completedAt, sha: d.sha, status: d.status }))
 
   return (
     <div className="flex flex-col min-h-full">
@@ -173,15 +189,27 @@ export default function ProjectDetailPage() {
               {project && status && (
                 <HealthCard project={project} status={status} polledAgo={polledAgo} onRefresh={fetchData} uptimePct={uptimePct} />
               )}
-              {containers !== null && (
-                <ContainerTable containers={containers} projectName={name} onRefetch={fetchData} />
-              )}
+              <div className="flex items-center justify-between">
+                <span className="text-[13px] font-semibold text-fg">Health Detail</span>
+                <RangeSelector value={rangeHours} onChange={setRangeHours} />
+              </div>
               <ResourceChart
                 name={name}
                 history={chartHistory}
-                deploys={deploys.map(d => ({ completedAt: d.completedAt, sha: d.sha, status: d.status }))}
+                deploys={deployMarkers}
                 uptimePct={uptimePct}
               />
+              {fullChartPoints.length >= 2 && (
+                <FullChart points={fullChartPoints} deploys={deployMarkers} hours={rangeHours} />
+              )}
+              {networkPoints.length >= 2 && (
+                <NetworkChart points={networkPoints} deploys={deployMarkers} hours={rangeHours} />
+              )}
+              {containers !== null && (
+                <ContainerTable containers={containers} projectName={name} onRefetch={fetchData} latestMetric={latestMetric} />
+              )}
+              <DeployTimeline deploys={deploys} />
+              <CiTimeline runs={ciRuns} />
               <DockerUsage projectName={name} onPrune={fetchData} />
               {deploying && (
                 <DeployPanel
