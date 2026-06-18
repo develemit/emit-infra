@@ -16,6 +16,8 @@ import { SecretsSyncPanel } from '@/components/secrets-sync-panel'
 import { DestroyModal } from '@/components/destroy-modal'
 import { deriveHealth } from '@/lib/health'
 import { useMetricHistory, computeUptimePct } from '@/lib/metric-history'
+import { useServerMetrics } from '@/lib/use-server-metrics'
+import { useDeployMarkers } from '@/lib/use-deploy-markers'
 
 export default function ProjectDetailPage() {
   const params = useParams()
@@ -74,8 +76,14 @@ export default function ProjectDetailPage() {
   const up = !!status && !status.error && status.httpStatus === 200
   const mem = status?.memory ?? null
   const disk = status?.disk ?? null
-  const history = useMetricHistory(name, mem, disk, up)
-  const uptimePct = computeUptimePct(history)
+  const localHistory = useMetricHistory(name, mem, disk, up)
+  const uptimePct = computeUptimePct(localHistory)
+  const { points: serverPoints } = useServerMetrics(name)
+  const { deploys } = useDeployMarkers(name)
+
+  const chartHistory = serverPoints.length >= 2
+    ? serverPoints.map(p => ({ t: p.t * 1000, cpu: p.cpu, mem: p.mem, disk: p.disk }))
+    : localHistory.map(p => ({ t: p.t, mem: p.mem, disk: p.disk }))
 
   return (
     <div className="flex flex-col min-h-full">
@@ -170,7 +178,8 @@ export default function ProjectDetailPage() {
               )}
               <ResourceChart
                 name={name}
-                history={history}
+                history={chartHistory}
+                deploys={deploys.map(d => ({ completedAt: d.completedAt, sha: d.sha, status: d.status }))}
                 uptimePct={uptimePct}
               />
               <DockerUsage projectName={name} onPrune={fetchData} />
