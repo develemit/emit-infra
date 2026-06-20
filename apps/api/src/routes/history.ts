@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { readFile } from 'node:fs/promises'
 import { readJsonl, downsample } from '../lib/jsonl.js'
 import { findProject } from '../lib/project-helpers.js'
 
@@ -105,4 +106,36 @@ export async function historyRoutes(app: FastifyInstance) {
 
     return { runs }
   })
+
+  app.get<{ Params: { name: string; sha: string } }>(
+    '/projects/:name/ci-log/:sha',
+    async (req, reply) => {
+      if (req.params.sha.includes('/')) return reply.status(400).send('invalid sha')
+      const project = await findProject(req.params.name)
+      if (!project) return reply.status(404).send('not found')
+      const filePath = join(homedir(), 'projects', req.params.name, '.ci-logs', `${req.params.sha}.log`)
+      try {
+        const content = await readFile(filePath, 'utf8')
+        return reply.type('text/plain').send(content)
+      } catch {
+        return reply.status(404).send('log not found')
+      }
+    },
+  )
+
+  app.get<{ Params: { name: string; sha: string } }>(
+    '/projects/:name/deploy-log/:sha',
+    async (req, reply) => {
+      if (req.params.sha.includes('/')) return reply.status(400).send('invalid sha')
+      const project = await findProject(req.params.name)
+      if (!project) return reply.status(404).send('not found')
+      const filePath = join(homedir(), 'projects', req.params.name, '.deploy-logs', `${req.params.sha}.log`)
+      try {
+        const content = await readFile(filePath, 'utf8')
+        return reply.type('text/plain').send(content)
+      } catch {
+        return reply.status(404).send('log not found')
+      }
+    },
+  )
 }

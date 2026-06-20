@@ -256,6 +256,20 @@ export function getCiHistory(name: string, limit?: number): Promise<CiHistoryRes
   return apiFetch<CiHistoryResponse>(`/projects/${encodeURIComponent(name)}/ci-history${qs}`)
 }
 
+export async function getCiLog(name: string, sha: string): Promise<string> {
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/ci-log/${encodeURIComponent(sha)}`, { cache: 'no-store' })
+  if (res.status === 404) return ''
+  if (!res.ok) throw new Error(`getCiLog failed: ${res.status}`)
+  return res.text()
+}
+
+export async function getDeployLog(name: string, sha: string): Promise<string> {
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/deploy-log/${encodeURIComponent(sha)}`, { cache: 'no-store' })
+  if (res.status === 404) return ''
+  if (!res.ok) throw new Error(`getDeployLog failed: ${res.status}`)
+  return res.text()
+}
+
 export function openSseStream(path: string): EventSource {
   return new EventSource(`${API_BASE}${path}`)
 }
