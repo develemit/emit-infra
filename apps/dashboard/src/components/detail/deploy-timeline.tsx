@@ -1,10 +1,12 @@
 'use client'
+import Link from 'next/link'
 import { Icon } from '@/components/icon'
 import { Badge } from '@/components/ui/badge'
 import type { DeployHistoryEntry } from '@/lib/api'
 
 interface Props {
   deploys: DeployHistoryEntry[]
+  name: string
 }
 
 function formatTimestamp(iso: string): string {
@@ -19,25 +21,44 @@ function formatDuration(sec: number): string {
   return s > 0 ? `${m}m ${s}s` : `${m}m`
 }
 
-export function DeployTimeline({ deploys }: Props) {
+export function DeployTimeline({ deploys, name }: Props) {
+  const total = deploys.length
+  const successes = deploys.filter(d => d.status === 'deployed').length
+  const avgSec = total > 0 ? Math.round(deploys.reduce((a, d) => a + d.durationSec, 0) / total) : 0
+  const lastSec = deploys[0]?.durationSec ?? 0
+  const rateColor = total === 0 || successes / total >= 0.9
+    ? 'var(--ok, #22c55e)'
+    : successes / total >= 0.7 ? '#f59e0b' : 'var(--err)'
+
   return (
     <div className="rounded-xl border border-border bg-card" style={{ padding: 18 }}>
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-2">
         <Icon name="deploy" size={16} style={{ color: 'var(--fg-muted)' }} />
         <span className="text-[13.5px] font-semibold text-fg">Deploy History</span>
-        <Badge variant="muted" mono className="ml-1">{deploys.length}</Badge>
+        <Badge variant="muted" mono className="ml-1">{total}</Badge>
       </div>
 
-      {deploys.length === 0 ? (
+      {total > 0 && (
+        <div className="flex items-center gap-3 mb-3 text-[10px] font-mono flex-wrap">
+          <span style={{ color: rateColor }}>{successes}/{total} succeeded</span>
+          <span className="text-subtle">·</span>
+          <span className="text-subtle">avg {formatDuration(avgSec)}</span>
+          <span className="text-subtle">·</span>
+          <span className="text-subtle">last {formatDuration(lastSec)}</span>
+        </div>
+      )}
+
+      {total === 0 ? (
         <p className="text-sm text-subtle py-2">No deploys recorded.</p>
       ) : (
-        <div className="flex flex-col gap-0">
+        <div className="overflow-y-auto" style={{ maxHeight: 580 }}>
           {deploys.map((d, i) => {
             const failed = d.status === 'failed'
             return (
-              <div
+              <Link
                 key={i}
-                className={`flex items-start gap-3 py-3 border-t border-border first:border-t-0 ${failed ? 'bg-err-soft/30' : ''}`}
+                href={`/projects/${encodeURIComponent(name)}/deploy-log/${d.sha}`}
+                className={`flex items-start gap-3 py-3 border-t border-border first:border-t-0 transition-colors ${failed ? 'bg-err-soft/30 hover:bg-err-soft/50' : 'hover:bg-card-hover'}`}
               >
                 <div className="shrink-0 mt-0.5">
                   <div
@@ -47,11 +68,7 @@ export function DeployTimeline({ deploys }: Props) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span
-                      className="font-mono text-[12px] text-fg cursor-pointer hover:underline"
-                      title={d.sha}
-                      onClick={() => navigator.clipboard.writeText(d.sha)}
-                    >
+                    <span className="font-mono text-[12px] text-fg">
                       {d.sha.slice(0, 7)}
                     </span>
                     {d.branch && (
@@ -67,7 +84,7 @@ export function DeployTimeline({ deploys }: Props) {
                     )}
                   </div>
                 </div>
-              </div>
+              </Link>
             )
           })}
         </div>

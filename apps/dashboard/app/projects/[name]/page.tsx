@@ -208,8 +208,8 @@ export default function ProjectDetailPage() {
               {containers !== null && (
                 <ContainerTable containers={containers} projectName={name} onRefetch={fetchData} latestMetric={latestMetric} />
               )}
-              <DeployTimeline deploys={deploys} />
-              <CiTimeline runs={ciRuns} />
+              <DeployTimeline deploys={deploys} name={name} />
+              <CiTimeline runs={ciRuns} name={name} />
               <DockerUsage projectName={name} onPrune={fetchData} />
               {deploying && (
                 <DeployPanel
