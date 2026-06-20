@@ -27,6 +27,17 @@ _EMIT_CI_TOTAL=0
 _EMIT_DEPLOY_STEP=0
 _EMIT_DEPLOY_TOTAL=0
 _EMIT_SERVICES_BUILT=""
+_EMIT_LOG_FILE=""
+_EMIT_DEPLOY_LOG_FILE=""
+
+_emit_rotate_logs() {
+  local dir="$1" max="${2:-100}"
+  local count
+  count=$(ls -t "$dir"/*.log 2>/dev/null | wc -l)
+  if [[ $count -gt $max ]]; then
+    ls -t "$dir"/*.log 2>/dev/null | tail -n +"$((max + 1))" | xargs rm -f
+  fi
+}
 
 _emit_truncate_history() {
   local f="$1" max=1000 keep=500
@@ -52,6 +63,10 @@ ci_init() {
   _EMIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
   _EMIT_STARTED=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
   _EMIT_STARTED_EPOCH=$(date +%s)
+  if mkdir -p ".ci-logs" 2>/dev/null; then
+    _EMIT_LOG_FILE=".ci-logs/${_EMIT_SHA}.log"
+    exec > >(tee -a "$_EMIT_LOG_FILE") 2>&1
+  fi
   printf '{"status":"running","sha":"%s","branch":"%s","startedAt":"%s","progress":{"step":0,"total":%d,"pct":0,"label":"starting"}}\n' \
     "$_EMIT_SHA" "$_EMIT_BRANCH" "$_EMIT_STARTED" "$_EMIT_CI_TOTAL" > .ci-status.json
 }
@@ -76,6 +91,7 @@ ci_done() {
     "$1" "$_EMIT_SHA" "$_EMIT_BRANCH" "$_EMIT_STARTED" "$completed_at" "$duration" >> .ci-history.jsonl
 
   _emit_truncate_history .ci-history.jsonl
+  [[ -d ".ci-logs" ]] && _emit_rotate_logs .ci-logs
 }
 
 deploy_init() {
@@ -85,6 +101,10 @@ deploy_init() {
   _EMIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
   _EMIT_STARTED=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
   _EMIT_STARTED_EPOCH=$(date +%s)
+  if mkdir -p ".deploy-logs" 2>/dev/null; then
+    _EMIT_DEPLOY_LOG_FILE=".deploy-logs/${_EMIT_SHA}.log"
+    exec > >(tee -a "$_EMIT_DEPLOY_LOG_FILE") 2>&1
+  fi
   printf '{"status":"deploying","sha":"%s","branch":"%s","startedAt":"%s","progress":{"step":0,"total":%d,"pct":0,"label":"starting"}}\n' \
     "$_EMIT_SHA" "$_EMIT_BRANCH" "$_EMIT_STARTED" "$_EMIT_DEPLOY_TOTAL" > .deploy-status.json
 }
@@ -109,4 +129,5 @@ deploy_done() {
     "$1" "$_EMIT_SHA" "$_EMIT_BRANCH" "$_EMIT_STARTED" "$completed_at" "$duration" "$(_emit_services_json)" >> .deploy-history.jsonl
 
   _emit_truncate_history .deploy-history.jsonl
+  [[ -d ".deploy-logs" ]] && _emit_rotate_logs .deploy-logs
 }
