@@ -7,6 +7,7 @@ import type { DeployHistoryEntry } from '@/lib/api'
 interface Props {
   deploys: DeployHistoryEntry[]
   name: string
+  repoUrl?: string
 }
 
 function formatTimestamp(iso: string): string {
@@ -21,7 +22,7 @@ function formatDuration(sec: number): string {
   return s > 0 ? `${m}m ${s}s` : `${m}m`
 }
 
-export function DeployTimeline({ deploys, name }: Props) {
+export function DeployTimeline({ deploys, name, repoUrl }: Props) {
   const total = deploys.length
   const successes = deploys.filter(d => d.status === 'deployed').length
   const avgSec = total > 0 ? Math.round(deploys.reduce((a, d) => a + d.durationSec, 0) / total) : 0
@@ -68,9 +69,21 @@ export function DeployTimeline({ deploys, name }: Props) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-mono text-[12px] text-fg">
-                      {d.sha.slice(0, 7)}
-                    </span>
+                    {repoUrl ? (
+                      <a
+                        href={repoUrl + d.sha}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={e => e.stopPropagation()}
+                        className="font-mono text-[12px] text-fg hover:underline"
+                      >
+                        {d.sha.slice(0, 7)}
+                      </a>
+                    ) : (
+                      <span className="font-mono text-[12px] text-fg">
+                        {d.sha.slice(0, 7)}
+                      </span>
+                    )}
                     <button
                       type="button"
                       className="text-subtle hover:text-fg transition-colors"

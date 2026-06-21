@@ -79,6 +79,7 @@ export default function ProjectDetailPage() {
 
   const { variant, label } = deriveHealth(status)
   const domain = project?.config.domain ?? ''
+  const repoUrl = project?.config.github?.repo ? `https://github.com/${project.config.github.repo}/commit/` : undefined
   const loading = status === null
   const up = !!status && !status.error && status.httpStatus === 200
   const mem = status?.memory ?? null
@@ -208,8 +209,8 @@ export default function ProjectDetailPage() {
               {containers !== null && (
                 <ContainerTable containers={containers} projectName={name} onRefetch={fetchData} latestMetric={latestMetric} />
               )}
-              <DeployTimeline deploys={deploys} name={name} />
-              <CiTimeline runs={ciRuns} name={name} />
+              <DeployTimeline deploys={deploys} name={name} repoUrl={repoUrl} />
+              <CiTimeline runs={ciRuns} name={name} repoUrl={repoUrl} />
               <DockerUsage projectName={name} onPrune={fetchData} />
               {deploying && (
                 <DeployPanel

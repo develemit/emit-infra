@@ -7,6 +7,7 @@ import type { CiHistoryEntry } from '@/lib/api'
 interface Props {
   runs: CiHistoryEntry[]
   name: string
+  repoUrl?: string
 }
 
 function formatTimestamp(iso: string): string {
@@ -21,7 +22,7 @@ function formatDuration(sec: number): string {
   return s > 0 ? `${m}m ${s}s` : `${m}m`
 }
 
-export function CiTimeline({ runs, name }: Props) {
+export function CiTimeline({ runs, name, repoUrl }: Props) {
   const total = runs.length
   const successes = runs.filter(r => r.status !== 'failure').length
   const avgSec = total > 0 ? Math.round(runs.reduce((a, r) => a + r.durationSec, 0) / total) : 0
@@ -68,7 +69,19 @@ export function CiTimeline({ runs, name }: Props) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-mono text-[12px] text-fg">{r.sha.slice(0, 7)}</span>
+                    {repoUrl ? (
+                      <a
+                        href={repoUrl + r.sha}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={e => e.stopPropagation()}
+                        className="font-mono text-[12px] text-fg hover:underline"
+                      >
+                        {r.sha.slice(0, 7)}
+                      </a>
+                    ) : (
+                      <span className="font-mono text-[12px] text-fg">{r.sha.slice(0, 7)}</span>
+                    )}
                     <button
                       type="button"
                       className="text-subtle hover:text-fg transition-colors"
