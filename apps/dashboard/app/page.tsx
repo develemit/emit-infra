@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { getProjects, getStatus, type ProjectSummary, type ProjectStatus } from '@/lib/api'
+import { usePipelineRunningCount } from '@/lib/use-pipeline-running-count'
 import { ProjectCard } from '@/components/project-card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Icon } from '@/components/icon'
@@ -29,6 +30,7 @@ export default function HomePage() {
   const [statuses, setStatuses] = useState<Record<string, ProjectStatus>>({})
   const [search, setSearch] = useState('')
   const prevStatuses = useRef<Record<string, ProjectStatus>>({})
+  const { ciRunning, deployRunning } = usePipelineRunningCount(projects)
 
   useEffect(() => {
     if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
@@ -81,6 +83,15 @@ export default function HomePage() {
     (p) => !search || p.config.name.includes(search) || p.config.domain.includes(search),
   )
 
+  const statusesLoaded = projects !== null && Object.keys(statuses).length > 0
+  const total = projects?.length ?? 0
+  const healthy = projects?.filter(p => statuses[p.config.name] && !statuses[p.config.name].error).length ?? 0
+  const healthColor = healthy === total ? 'var(--ok, #22c55e)' : healthy >= total * 0.5 ? '#f59e0b' : 'var(--err)'
+  const summaryParts: string[] = [`${healthy} / ${total} healthy`]
+  if (ciRunning > 0) summaryParts.push(`${ciRunning} CI running`)
+  if (deployRunning > 0) summaryParts.push(`${deployRunning} deploying`)
+  const summaryText = summaryParts.join(' · ')
+
   return (
     <div className="flex flex-col h-full">
       {/* Desktop topbar */}
@@ -92,6 +103,11 @@ export default function HomePage() {
         <div className="text-[12px] font-mono text-subtle">
           {projects ? `${projects.length} managed` : '—'}
         </div>
+        {statusesLoaded && (
+          <div className="text-[12px] font-mono" style={{ color: healthColor }}>
+            {summaryText}
+          </div>
+        )}
         <div className="flex-1" />
         {/* Search */}
         <div className="relative flex items-center" style={{ width: 200, height: 34 }}>
@@ -114,7 +130,12 @@ export default function HomePage() {
         className="md:hidden flex items-center justify-between px-4 border-b border-border shrink-0"
         style={{ height: 52 }}
       >
-        <span className="text-[17px] font-semibold text-fg">Projects</span>
+        <div className="flex flex-col">
+          <span className="text-[17px] font-semibold text-fg">Projects</span>
+          {statusesLoaded && (
+            <div className="text-[11px] font-mono text-subtle mt-0.5">{summaryText}</div>
+          )}
+        </div>
         <AddProjectDropdown onRegistered={() => void fetchAll()} />
       </div>
 
