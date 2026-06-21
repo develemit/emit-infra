@@ -31,6 +31,7 @@ function usePipelineStatus(name: string): { ciStatus: CiStatus | null; deploySta
 interface Props {
   project: ProjectSummary
   status: ProjectStatus | null
+  onRetry?: () => Promise<void>
 }
 
 function sslDaysLeft(expiry: string | null | undefined): { value: string; color?: string; days: number } {
@@ -53,7 +54,8 @@ function deployedAgo(epoch: string | null | undefined): string {
   return `${Math.floor(secs / 86400)}d ago`
 }
 
-export function ProjectCard({ project, status }: Props) {
+export function ProjectCard({ project, status, onRetry }: Props) {
+  const [retrying, setRetrying] = useState(false)
   const { name, domain, region } = project.config
   const { variant, label } = deriveHealth(status)
   const uptimePct = useUptimePct(name)
@@ -91,7 +93,7 @@ export function ProjectCard({ project, status }: Props) {
       </div>
 
       {/* Region badge */}
-      <div className="flex gap-1.5">
+      <div className="flex flex-wrap gap-1.5">
         <Badge variant="region">{region}</Badge>
         {status?.sslExpiry && ssl.days <= 30 && (
           <span className="text-[11px] font-mono px-1.5 py-0.5 rounded" style={{ color: ssl.color, background: 'var(--card-2)', border: '1px solid var(--border)' }}>
@@ -144,6 +146,20 @@ export function ProjectCard({ project, status }: Props) {
         >
           <Icon name="alert" size={15} style={{ color: 'var(--err)', flexShrink: 0 }} />
           <span>SSH unreachable — last seen 2h ago</span>
+          {onRetry && (
+            <button
+              type="button"
+              disabled={retrying}
+              className="ml-auto text-[11px] font-mono text-err hover:text-fg disabled:opacity-50 transition-colors"
+              onClick={async () => {
+                setRetrying(true)
+                await onRetry()
+                setRetrying(false)
+              }}
+            >
+              {retrying ? '…' : 'Retry'}
+            </button>
+          )}
         </div>
       )}
 

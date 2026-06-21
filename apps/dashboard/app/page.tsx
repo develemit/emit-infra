@@ -158,6 +158,10 @@ export default function HomePage() {
                 key={p.config.name}
                 project={p}
                 status={statuses[p.config.name] ?? null}
+                onRetry={async () => {
+                  const s = await getStatus(p.config.name).catch(() => ({ error: 'unreachable' } as ProjectStatus))
+                  setStatuses(prev => ({ ...prev, [p.config.name]: s }))
+                }}
               />
             ))}
           </div>
