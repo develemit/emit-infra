@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { Icon } from '@/components/icon'
 import { Badge } from '@/components/ui/badge'
 import type { CiHistoryEntry } from '@/lib/api'
+import { formatDuration } from '@/lib/format-duration'
 
 interface Props {
   runs: CiHistoryEntry[]
@@ -13,13 +14,6 @@ interface Props {
 function formatTimestamp(iso: string): string {
   const d = new Date(iso)
   return d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
-}
-
-function formatDuration(sec: number): string {
-  if (sec < 60) return `${sec}s`
-  const m = Math.floor(sec / 60)
-  const s = sec % 60
-  return s > 0 ? `${m}m ${s}s` : `${m}m`
 }
 
 export function CiTimeline({ runs, name, repoUrl }: Props) {

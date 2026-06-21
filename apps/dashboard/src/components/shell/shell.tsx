@@ -9,6 +9,7 @@ function pathToActive(pathname: string): string {
   if (pathname === '/') return 'overview'
   if (pathname.startsWith('/projects')) return 'projects'
   if (pathname.startsWith('/logs')) return 'logs'
+  if (pathname.startsWith('/ci')) return 'ci'
   if (pathname.startsWith('/ops')) return 'ops'
   if (pathname.startsWith('/provision')) return 'projects'
   return 'overview'
