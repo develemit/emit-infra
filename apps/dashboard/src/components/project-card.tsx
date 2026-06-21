@@ -9,6 +9,7 @@ import { Meter } from '@/components/ui/meter'
 import { Skeleton } from '@/components/ui/skeleton'
 import { deriveHealth } from '@/lib/health'
 import { useUptimePct } from '@/lib/use-uptime-pct'
+import { useDiskTrend } from '@/lib/use-disk-trend'
 
 function usePipelineStatus(name: string): { ciStatus: CiStatus | null; deployStatus: DeployStatus | null } {
   const [ciStatus, setCiStatus] = useState<CiStatus | null>(null)
@@ -59,6 +60,11 @@ export function ProjectCard({ project, status, onRetry }: Props) {
   const { name, domain, region } = project.config
   const { variant, label } = deriveHealth(status)
   const uptimePct = useUptimePct(name)
+  const diskTrend = useDiskTrend(name)
+  const showDiskWarning = diskTrend !== null
+    && diskTrend.projectedDaysUntilFull !== null
+    && diskTrend.projectedDaysUntilFull <= 30
+    && diskTrend.disk > 75
   const { ciStatus, deployStatus } = usePipelineStatus(name)
   const ciProgress = ciStatus?.status === 'running' ? ciStatus.progress : null
   const deployProgress = deployStatus?.status === 'deploying' ? deployStatus.progress : null
@@ -110,6 +116,14 @@ export function ProjectCard({ project, status, onRetry }: Props) {
             }}
           >
             {uptimePct}% up
+          </span>
+        )}
+        {showDiskWarning && (
+          <span
+            className="text-[11px] font-mono px-1.5 py-0.5 rounded"
+            style={{ color: 'var(--warn, #e5a00d)', background: 'var(--card-2)', border: '1px solid var(--border)' }}
+          >
+            disk full ~{Math.round(diskTrend!.projectedDaysUntilFull!)}d
           </span>
         )}
         {ciProgress != null && (

@@ -24,6 +24,7 @@ import { useMetricHistory, computeUptimePct } from '@/lib/metric-history'
 import { useServerMetrics } from '@/lib/use-server-metrics'
 import { useDeployMarkers } from '@/lib/use-deploy-markers'
 import { useCiHistory } from '@/lib/use-ci-history'
+import { useDiskTrend } from '@/lib/use-disk-trend'
 
 export default function ProjectDetailPage() {
   const params = useParams()
@@ -89,6 +90,7 @@ export default function ProjectDetailPage() {
   const { points: serverPoints } = useServerMetrics(name, rangeHours)
   const { deploys } = useDeployMarkers(name)
   const { runs: ciRuns } = useCiHistory(name)
+  const diskTrend = useDiskTrend(name)
 
   const chartHistory = serverPoints.length >= 2
     ? serverPoints.map(p => ({ t: p.t * 1000, cpu: p.cpu, mem: p.mem, disk: p.disk }))
@@ -189,6 +191,11 @@ export default function ProjectDetailPage() {
             <>
               {project && status && (
                 <HealthCard project={project} status={status} polledAgo={polledAgo} onRefresh={fetchData} uptimePct={uptimePct} />
+              )}
+              {diskTrend !== null && diskTrend.projectedDaysUntilFull !== null && diskTrend.disk > 75 && (
+                <div className="text-[12px] font-mono px-3 py-2 rounded-lg border" style={{ color: 'var(--warn, #e5a00d)', borderColor: 'var(--border)', background: 'var(--card-2)' }}>
+                  Disk trending: +{diskTrend.pctPerDay.toFixed(1)}%/day · full in ~{Math.round(diskTrend.projectedDaysUntilFull)}d
+                </div>
               )}
               <div className="flex items-center justify-between">
                 <span className="text-[13px] font-semibold text-fg">Health Detail</span>

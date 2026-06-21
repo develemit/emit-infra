@@ -138,4 +138,42 @@ export async function historyRoutes(app: FastifyInstance) {
       }
     },
   )
+
+  app.get<{ Params: { name: string } }>(
+    '/projects/:name/disk-trend',
+    async (req, reply) => {
+      const project = await findProject(req.params.name)
+      if (!project) return reply.status(404).send({ error: 'not found' })
+
+      const cutoff = Math.floor(Date.now() / 1000) - 48 * 3600
+      const filePath = join(homedir(), 'projects', req.params.name, '.metrics.jsonl')
+      const points = await readJsonl<MetricPoint>(
+        filePath,
+        (p) => typeof p.t === 'number' && p.t >= cutoff && typeof p.disk === 'number' && !('error' in p),
+      )
+
+      if (points.length < 5) {
+        return { disk: points[points.length - 1]?.disk ?? 0, pctPerDay: 0, projectedDaysUntilFull: null }
+      }
+
+      const n = points.length
+      let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0
+      for (const p of points) {
+        sumX += p.t
+        sumY += p.disk
+        sumXY += p.t * p.disk
+        sumX2 += p.t * p.t
+      }
+      const denom = n * sumX2 - sumX * sumX
+      const slopePerSec = denom === 0 ? 0 : (n * sumXY - sumX * sumY) / denom
+      const pctPerDay = slopePerSec * 86400
+      const currentDisk = points[points.length - 1]!.disk
+
+      const projectedDaysUntilFull = pctPerDay <= 0
+        ? null
+        : (100 - currentDisk) / pctPerDay
+
+      return { disk: currentDisk, pctPerDay, projectedDaysUntilFull }
+    },
+  )
 }

@@ -256,6 +256,19 @@ export function getCiHistory(name: string, limit?: number): Promise<CiHistoryRes
   return apiFetch<CiHistoryResponse>(`/projects/${encodeURIComponent(name)}/ci-history${qs}`)
 }
 
+export interface DiskTrend {
+  disk: number
+  pctPerDay: number
+  projectedDaysUntilFull: number | null
+}
+
+export async function getDiskTrend(name: string): Promise<DiskTrend | null> {
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/disk-trend`, { cache: 'no-store' })
+  if (res.status === 404) return null
+  if (!res.ok) return null
+  return res.json() as Promise<DiskTrend>
+}
+
 export async function getCiLog(name: string, sha: string): Promise<string> {
   const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/ci-log/${encodeURIComponent(sha)}`, { cache: 'no-store' })
   if (res.status === 404) return ''
