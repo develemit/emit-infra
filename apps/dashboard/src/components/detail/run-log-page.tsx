@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import AnsiToHtml from 'ansi-to-html'
 import { getCiLog, getDeployLog } from '@/lib/api'
 import { Terminal } from '@/components/ui/terminal'
 import { Icon } from '@/components/icon'
@@ -10,6 +11,8 @@ interface Props {
   name: string
   sha: string
 }
+
+const ansiConverter = new AnsiToHtml({ escapeXML: true })
 
 export function RunLogPage({ type, name, sha }: Props) {
   const [content, setContent] = useState<string | null>(null)
@@ -37,16 +40,16 @@ export function RunLogPage({ type, name, sha }: Props) {
       </div>
     )
   } else {
-    const termLines = content.split('\n').map((line, i) => (
-      <div key={i} className="ec-ln">
-        <span style={{ flex: 1 }}>{line}</span>
-      </div>
+    const htmlLines = ansiConverter.toHtml(content).split('\n')
+    const termLines = htmlLines.map((line, i) => (
+      <div key={i} className="ec-ln" dangerouslySetInnerHTML={{ __html: line }} />
     ))
     body = (
       <Terminal
         title={`${name} · ${shortSha}`}
         running={false}
         footer={false}
+        scrollBottom
         style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
         bodyStyle={{ flex: 1, minHeight: 0 }}
       >

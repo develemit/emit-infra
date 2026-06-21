@@ -14,6 +14,7 @@ interface TerminalProps {
   bar?: boolean
   footer?: boolean
   className?: string
+  scrollBottom?: boolean
 }
 
 export function Terminal({
@@ -26,6 +27,7 @@ export function Terminal({
   bar = true,
   footer = true,
   className,
+  scrollBottom,
 }: TerminalProps) {
   const bodyRef = useRef<HTMLDivElement>(null)
 
@@ -34,6 +36,12 @@ export function Terminal({
       bodyRef.current.scrollTop = bodyRef.current.scrollHeight
     }
   })
+
+  useEffect(() => {
+    if (scrollBottom && bodyRef.current) {
+      bodyRef.current.scrollTop = bodyRef.current.scrollHeight
+    }
+  }, [scrollBottom, children])
 
   return (
     <div className={cn('ec-term', className)} style={style}>
