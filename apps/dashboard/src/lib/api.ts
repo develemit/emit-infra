@@ -269,6 +269,18 @@ export async function getDiskTrend(name: string): Promise<DiskTrend | null> {
   return res.json() as Promise<DiskTrend>
 }
 
+export interface BackupStatus {
+  lastRun: string
+  status: 'ok' | 'failed'
+}
+
+export async function getBackupStatus(name: string): Promise<BackupStatus | null> {
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/backup-status`, { cache: 'no-store' })
+  if (res.status === 404) return null
+  if (!res.ok) return null
+  return res.json() as Promise<BackupStatus>
+}
+
 export async function getCiLog(name: string, sha: string): Promise<string> {
   const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/ci-log/${encodeURIComponent(sha)}`, { cache: 'no-store' })
   if (res.status === 404) return ''

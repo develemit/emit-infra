@@ -216,6 +216,22 @@ export async function projectRoutes(app: FastifyInstance) {
     },
   )
 
+  app.get<{ Params: { name: string } }>('/projects/:name/backup-status', async (req, reply) => {
+    const project = await findProject(req.params.name)
+    if (!project) return reply.status(404).send({ error: 'not found' })
+
+    const key = sshKeyPath(project.config.sshKeyName)
+    const host = project.config.serverIp ?? project.config.domain
+
+    try {
+      const raw = await sshExec(host, `cat /opt/${req.params.name}/.backup-status.json 2>/dev/null || echo ""`, key)
+      if (!raw.trim()) return reply.status(404).send({ error: 'no backup status' })
+      return JSON.parse(raw.trim()) as unknown
+    } catch {
+      return reply.status(503).send({ error: 'unreachable' })
+    }
+  })
+
   app.get<{ Params: { name: string } }>('/projects/:name/ci-status', async (req, reply) => {
     const filePath = join(homedir(), 'projects', req.params.name, '.ci-status.json')
     try {

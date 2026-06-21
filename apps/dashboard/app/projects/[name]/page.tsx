@@ -25,6 +25,7 @@ import { useServerMetrics } from '@/lib/use-server-metrics'
 import { useDeployMarkers } from '@/lib/use-deploy-markers'
 import { useCiHistory } from '@/lib/use-ci-history'
 import { useDiskTrend } from '@/lib/use-disk-trend'
+import { useBackupStatus } from '@/lib/use-backup-status'
 
 export default function ProjectDetailPage() {
   const params = useParams()
@@ -91,6 +92,7 @@ export default function ProjectDetailPage() {
   const { deploys } = useDeployMarkers(name)
   const { runs: ciRuns } = useCiHistory(name)
   const diskTrend = useDiskTrend(name)
+  const backupStatus = useBackupStatus(name)
 
   const chartHistory = serverPoints.length >= 2
     ? serverPoints.map(p => ({ t: p.t * 1000, cpu: p.cpu, mem: p.mem, disk: p.disk }))
@@ -197,6 +199,19 @@ export default function ProjectDetailPage() {
                   Disk trending: +{diskTrend.pctPerDay.toFixed(1)}%/day · full in ~{Math.round(diskTrend.projectedDaysUntilFull)}d
                 </div>
               )}
+              {backupStatus !== null && (() => {
+                const ageHours = (Date.now() - new Date(backupStatus.lastRun).getTime()) / 3_600_000
+                const failed = backupStatus.status === 'failed'
+                const color = failed || ageHours >= 48 ? 'var(--err)' : ageHours >= 25 ? 'var(--warn, #e5a00d)' : 'var(--ok, #22c55e)'
+                const label = failed
+                  ? `backup failed · ${Math.round(ageHours)}h ago`
+                  : `backup ${Math.round(ageHours)}h ago`
+                return (
+                  <div className="text-[12px] font-mono px-3 py-2 rounded-lg border" style={{ color, borderColor: 'var(--border)', background: 'var(--card-2)' }}>
+                    {label}
+                  </div>
+                )
+              })()}
               <div className="flex items-center justify-between">
                 <span className="text-[13px] font-semibold text-fg">Health Detail</span>
                 <RangeSelector value={rangeHours} onChange={setRangeHours} />
