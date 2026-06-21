@@ -71,6 +71,13 @@ export function DeployTimeline({ deploys, name }: Props) {
                     <span className="font-mono text-[12px] text-fg">
                       {d.sha.slice(0, 7)}
                     </span>
+                    <button
+                      type="button"
+                      className="text-subtle hover:text-fg transition-colors"
+                      onClick={e => { e.preventDefault(); e.stopPropagation(); void navigator.clipboard.writeText(d.sha) }}
+                    >
+                      <Icon name="copy" size={11} />
+                    </button>
                     {d.branch && (
                       <span className="font-mono text-[11px] text-subtle truncate max-w-[120px]">{d.branch}</span>
                     )}

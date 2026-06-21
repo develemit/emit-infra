@@ -69,6 +69,13 @@ export function CiTimeline({ runs, name }: Props) {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-mono text-[12px] text-fg">{r.sha.slice(0, 7)}</span>
+                    <button
+                      type="button"
+                      className="text-subtle hover:text-fg transition-colors"
+                      onClick={e => { e.preventDefault(); e.stopPropagation(); void navigator.clipboard.writeText(r.sha) }}
+                    >
+                      <Icon name="copy" size={11} />
+                    </button>
                     {r.branch && (
                       <span className="font-mono text-[11px] text-subtle truncate max-w-[120px]">{r.branch}</span>
                     )}
