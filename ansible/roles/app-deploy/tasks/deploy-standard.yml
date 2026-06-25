@@ -41,8 +41,16 @@
 - name: Health check and rollback
   when: rollback_enabled | default(true)
   block:
-    - name: Verify app is serving traffic
+    - name: Verify app is serving traffic (url)
+      command: >-
+        curl -sf --max-time 5 --retry {{ health_check_retries | default(10) }}
+        --retry-delay {{ health_check_backoff | default(3) }}
+        --retry-connrefused "{{ health_check_url }}"
+      when: health_check_url is defined
+
+    - name: Verify app is serving traffic (port)
       command: "{{ app_dir }}/health-check.sh {{ app_port | default(3000) }} {{ health_check_retries | default(10) }} {{ health_check_path | default('/') }} {{ health_check_backoff | default(3) }}"
+      when: health_check_url is not defined
 
   rescue:
     - name: "ROLLBACK: Restore previous images"
@@ -55,16 +63,31 @@
       args:
         chdir: "{{ app_dir }}"
 
-    - name: "ROLLBACK: Verify rollback is serving traffic"
+    - name: "ROLLBACK: Verify rollback is serving traffic (url)"
+      command: >-
+        curl -sf --max-time 5 --retry {{ health_check_retries | default(10) }}
+        --retry-delay {{ health_check_backoff | default(3) }}
+        --retry-connrefused "{{ health_check_url }}"
+      when: health_check_url is defined
+
+    - name: "ROLLBACK: Verify rollback is serving traffic (port)"
       command: "{{ app_dir }}/health-check.sh {{ app_port | default(3000) }} {{ health_check_retries | default(10) }} {{ health_check_path | default('/') }} {{ health_check_backoff | default(3) }}"
+      when: health_check_url is not defined
 
     - name: "ROLLBACK: Fail with descriptive message"
       fail:
         msg: "Deploy failed, rolled back to previous image. The previous version is now serving traffic."
 
-- name: Verify app is serving traffic (without rollback)
+- name: Verify app is serving traffic (without rollback, url)
+  command: >-
+    curl -sf --max-time 5 --retry {{ health_check_retries | default(10) }}
+    --retry-delay {{ health_check_backoff | default(3) }}
+    --retry-connrefused "{{ health_check_url }}"
+  when: not (rollback_enabled | default(true)) and health_check_url is defined
+
+- name: Verify app is serving traffic (without rollback, port)
   command: "{{ app_dir }}/health-check.sh {{ app_port | default(3000) }} {{ health_check_retries | default(10) }} {{ health_check_path | default('/') }} {{ health_check_backoff | default(3) }}"
-  when: not (rollback_enabled | default(true))
+  when: not (rollback_enabled | default(true)) and health_check_url is not defined
 
 - name: Prune old Docker images and stopped containers
   shell: |

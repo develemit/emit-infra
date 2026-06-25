@@ -69,6 +69,13 @@ export function registerDeploy(program: Command): void {
         if (config.deploy.postDeployExec && config.deploy.postDeployExec.length > 0) {
           extraVars.post_deploy_exec = config.deploy.postDeployExec
         }
+        if (config.deploy.appPort) {
+          extraVars.app_port = config.deploy.appPort
+        }
+      }
+
+      if (config.healthCheck?.url) {
+        extraVars.health_check_url = config.healthCheck.url
       }
 
       if (config.postgres) {
