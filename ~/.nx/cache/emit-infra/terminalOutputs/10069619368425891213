@@ -1,0 +1,186 @@
+> next dev --port 7013
+
+   [1m[38;2;173;127;168m▲ Next.js 15.5.19[39m[22m
+   - Local:        http://localhost:7013
+   - Network:      http://192.168.1.7:7013
+
+ [32m[1m✓[22m[39m Starting...
+ [32m[1m✓[22m[39m Ready in 1035ms
+ [32m[1m✓[22m[39m Compiled /projects/[name] in 492ms (684 modules)
+ GET /projects/tastease [32m200[39m in 4570ms
+ [32m[1m✓[22m[39m Compiled in 603ms (698 modules)
+ GET /projects/tastease [32m200[39m in 73ms
+ [32m[1m✓[22m[39m Compiled / in 206ms (703 modules)
+ GET / [32m200[39m in 353ms
+ [32m[1m✓[22m[39m Compiled /ops in 139ms (720 modules)
+ GET /ops [32m200[39m in 170ms
+ [32m[1m✓[22m[39m Compiled /projects in 85ms (725 modules)
+ GET /projects [32m200[39m in 119ms
+ GET / [32m200[39m in 16ms
+ GET /projects/develemail [32m200[39m in 21ms
+ [32m[1m✓[22m[39m Compiled in 207ms (735 modules)
+ GET /projects/tastease [32m200[39m in 72ms
+ [32m[1m✓[22m[39m Compiled in 108ms (735 modules)
+ GET /projects/tastease [32m200[39m in 40ms
+ [32m[1m✓[22m[39m Compiled in 213ms (735 modules)
+ GET /projects/tastease [32m200[39m in 85ms
+ [32m[1m✓[22m[39m Compiled in 156ms (735 modules)
+ GET /projects/tastease [32m200[39m in 70ms
+ [32m[1m✓[22m[39m Compiled in 103ms (735 modules)
+ GET /projects/tastease [32m200[39m in 33ms
+ [31m[1m⨯[22m[39m ./src/components/detail/ci-timeline.tsx
+Error:   [31m×[0m Expected '</', got ')'
+    ╭─[[36;1;4m/Users/emitdutcher/projects/emit-infra/apps/dashboard/src/components/detail/ci-timeline.tsx[0m:83:1]
+ [2m80[0m │                   </div>
+ [2m81[0m │                 </div>
+ [2m82[0m │               </div>
+ [2m83[0m │             )
+    · [35;1m            ─[0m
+ [2m84[0m │           })}
+ [2m85[0m │         </div>
+ [2m86[0m │       )}
+    ╰────
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/components/detail/ci-timeline.tsx
+./app/projects/[name]/page.tsx
+ [32m[1m✓[22m[39m Compiled in 107ms (735 modules)
+ GET /projects/tastease [32m200[39m in 33ms
+ [32m[1m✓[22m[39m Compiled in 123ms (735 modules)
+ GET /projects/tastease [32m200[39m in 30ms
+ [32m[1m✓[22m[39m Compiled in 92ms (735 modules)
+ GET /projects/tastease [32m200[39m in 29ms
+ [31m[1m⨯[22m[39m ./src/components/detail/deploy-timeline.tsx
+Error:   [31m×[0m Expected '</', got ')'
+    ╭─[[36;1;4m/Users/emitdutcher/projects/emit-infra/apps/dashboard/src/components/detail/deploy-timeline.tsx[0m:88:1]
+ [2m85[0m │                   </div>
+ [2m86[0m │                 </div>
+ [2m87[0m │               </div>
+ [2m88[0m │             )
+    · [35;1m            ─[0m
+ [2m89[0m │           })}
+ [2m90[0m │         </div>
+ [2m91[0m │       )}
+    ╰────
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/components/detail/deploy-timeline.tsx
+./app/projects/[name]/page.tsx
+ [32m[1m✓[22m[39m Compiled in 126ms (735 modules)
+ GET /projects/tastease [32m200[39m in 37ms
+ [32m[1m✓[22m[39m Compiled in 219ms (735 modules)
+ GET /projects/tastease [32m200[39m in 34ms
+ [32m[1m✓[22m[39m Compiled in 52ms (300 modules)
+ GET /projects/tastease [32m200[39m in 14ms
+ [32m[1m✓[22m[39m Compiled in 44ms (300 modules)
+ GET /projects/tastease [32m200[39m in 13ms
+ [32m[1m✓[22m[39m Compiled in 44ms (300 modules)
+ [32m[1m✓[22m[39m Compiled in 43ms (300 modules)
+ [32m[1m✓[22m[39m Compiled in 41ms (300 modules)
+ GET / [32m200[39m in 24ms
+ GET / [32m200[39m in 8ms
+ [32m[1m✓[22m[39m Compiled in 113ms (286 modules)
+ [32m[1m✓[22m[39m Compiled in 240ms (735 modules)
+ [32m[1m✓[22m[39m Compiled in 107ms (735 modules)
+ [32m[1m✓[22m[39m Compiled in 52ms (300 modules)
+ [32m[1m✓[22m[39m Compiled in 45ms (300 modules)
+ [32m[1m✓[22m[39m Compiled in 42ms (300 modules)
+ [32m[1m✓[22m[39m Compiled in 44ms (300 modules)
+ [32m[1m✓[22m[39m Compiled in 50ms (300 modules)
+ [32m[1m✓[22m[39m Compiled in 158ms (735 modules)
+ [32m[1m✓[22m[39m Compiled in 98ms (735 modules)
+ [32m[1m✓[22m[39m Compiled in 146ms (735 modules)
+ [32m[1m✓[22m[39m Compiled in 94ms (735 modules)
+ [32m[1m✓[22m[39m Compiled in 92ms (735 modules)
+ [32m[1m✓[22m[39m Compiled in 91ms (735 modules)
+ [32m[1m✓[22m[39m Compiled in 96ms (735 modules)
+ [32m[1m✓[22m[39m Compiled in 115ms (735 modules)
+ [32m[1m✓[22m[39m Compiled in 225ms (735 modules)
+ [32m[1m✓[22m[39m Compiled in 106ms (735 modules)
+ [32m[1m✓[22m[39m Compiled in 61ms (300 modules)
+ [32m[1m✓[22m[39m Compiled in 229ms (735 modules)
+ [32m[1m✓[22m[39m Compiled in 129ms (737 modules)
+ [32m[1m✓[22m[39m Compiled in 109ms (737 modules)
+ [32m[1m✓[22m[39m Compiled in 98ms (737 modules)
+ [32m[1m✓[22m[39m Compiled in 130ms (737 modules)
+ [32m[1m✓[22m[39m Compiled in 231ms (737 modules)
+ [32m[1m✓[22m[39m Compiled in 107ms (737 modules)
+ [32m[1m✓[22m[39m Compiled in 120ms (737 modules)
+ [32m[1m✓[22m[39m Compiled in 104ms (737 modules)
+ [32m[1m✓[22m[39m Compiled in 195ms (737 modules)
+ [32m[1m✓[22m[39m Compiled in 39ms (301 modules)
+ [32m[1m✓[22m[39m Compiled in 96ms (737 modules)
+ [32m[1m✓[22m[39m Compiled in 118ms (739 modules)
+ [32m[1m✓[22m[39m Compiled in 94ms (739 modules)
+ [32m[1m✓[22m[39m Compiled in 167ms (739 modules)
+ [32m[1m✓[22m[39m Compiled in 129ms (739 modules)
+ [32m[1m✓[22m[39m Compiled in 143ms (739 modules)
+ [32m[1m✓[22m[39m Compiled in 210ms (739 modules)
+ [32m[1m✓[22m[39m Compiled in 42ms (302 modules)
+ [32m[1m✓[22m[39m Compiled in 143ms (739 modules)
+ [32m[1m✓[22m[39m Compiled in 174ms (741 modules)
+ [32m[1m✓[22m[39m Compiled in 119ms (741 modules)
+ [32m[1m✓[22m[39m Compiled in 124ms (303 modules)
+ [32m[1m✓[22m[39m Compiled in 189ms (743 modules)
+ [32m[1m✓[22m[39m Compiled in 216ms (743 modules)
+ [32m[1m✓[22m[39m Compiled in 94ms (743 modules)
+ [32m[1m✓[22m[39m Compiled in 103ms (743 modules)
+ [32m[1m✓[22m[39m Compiled in 51ms (304 modules)
+ [32m[1m✓[22m[39m Compiled in 48ms (304 modules)
+ [32m[1m✓[22m[39m Compiled in 68ms (729 modules)
+ [31m[1m⨯[22m[39m [Error: ENOENT: no such file or directory, open '/Users/emitdutcher/projects/emit-infra/apps/dashboard/.next/prerender-manifest.json'] {
+  errno: [33m-2[39m,
+  code: [32m'ENOENT'[39m,
+  syscall: [32m'open'[39m,
+  path: [32m'/Users/emitdutcher/projects/emit-infra/apps/dashboard/.next/prerender-manifest.json'[39m,
+  page: [32m'/projects/tastease'[39m
+}
+ [31m[1m⨯[22m[39m Failed to generate static paths for /projects/[name]:
+[Error: Cannot find module './vendor-chunks/next@15.5.19_@babel+core@7.29.7_react-dom@18.3.1_react@18.3.1__react@18.3.1.js'
+Require stack:
+- /Users/emitdutcher/projects/emit-infra/apps/dashboard/.next/server/webpack-runtime.js
+- /Users/emitdutcher/projects/emit-infra/apps/dashboard/.next/server/app/projects/[name]/page.js
+- /Users/emitdutcher/projects/emit-infra/node_modules/.pnpm/next@15.5.19_@babel+core@7.29.7_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/server/require.js
+- /Users/emitdutcher/projects/emit-infra/node_modules/.pnpm/next@15.5.19_@babel+core@7.29.7_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/server/load-components.js
+- /Users/emitdutcher/projects/emit-infra/node_modules/.pnpm/next@15.5.19_@babel+core@7.29.7_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/build/utils.js
+- /Users/emitdutcher/projects/emit-infra/node_modules/.pnpm/next@15.5.19_@babel+core@7.29.7_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/server/dev/static-paths-worker.js
+- /Users/emitdutcher/projects/emit-infra/node_modules/.pnpm/next@15.5.19_@babel+core@7.29.7_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/next/dist/compiled/jest-worker/processChild.js] {
+  type: [32m'Error'[39m,
+  code: [32m'MODULE_NOT_FOUND'[39m,
+  requireStack: [36m[Array][39m
+}
+ [32m[1m✓[22m[39m Compiled /_error in 388ms (1081 modules)
+ [31m[1m⨯[22m[39m [Error: ENOENT: no such file or directory, open '/Users/emitdutcher/projects/emit-infra/apps/dashboard/.next/prerender-manifest.json'] {
+  errno: [33m-2[39m,
+  code: [32m'ENOENT'[39m,
+  syscall: [32m'open'[39m,
+  path: [32m'/Users/emitdutcher/projects/emit-infra/apps/dashboard/.next/prerender-manifest.json'[39m
+}
+[Error: ENOENT: no such file or directory, open '/Users/emitdutcher/projects/emit-infra/apps/dashboard/.next/prerender-manifest.json'] {
+  errno: [33m-2[39m,
+  code: [32m'ENOENT'[39m,
+  syscall: [32m'open'[39m,
+  path: [32m'/Users/emitdutcher/projects/emit-infra/apps/dashboard/.next/prerender-manifest.json'[39m,
+  page: [32m'/projects/tastease'[39m
+}
+ [31m[1m⨯[22m[39m [Error: ENOENT: no such file or directory, open '/Users/emitdutcher/projects/emit-infra/apps/dashboard/.next/prerender-manifest.json'] {
+  errno: [33m-2[39m,
+  code: [32m'ENOENT'[39m,
+  syscall: [32m'open'[39m,
+  path: [32m'/Users/emitdutcher/projects/emit-infra/apps/dashboard/.next/prerender-manifest.json'[39m
+}
+[Error: ENOENT: no such file or directory, open '/Users/emitdutcher/projects/emit-infra/apps/dashboard/.next/prerender-manifest.json'] {
+  errno: [33m-2[39m,
+  code: [32m'ENOENT'[39m,
+  syscall: [32m'open'[39m,
+  path: [32m'/Users/emitdutcher/projects/emit-infra/apps/dashboard/.next/prerender-manifest.json'[39m
+}
+ GET /projects/tastease [31m500[39m in 1637ms
+ GET /projects/tastease [31m500[39m in 235ms
+[?25h

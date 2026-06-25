@@ -1,0 +1,21 @@
+{
+  "run": {
+    "command": "nx run-many -t dev",
+    "startTime": "2026-06-24T15:32:33.208Z",
+    "endTime": "2026-06-24T16:27:34.398Z",
+    "inner": false
+  },
+  "tasks": [
+    {
+      "taskId": "core:build",
+      "target": "build",
+      "projectName": "core",
+      "hash": "9409599152949163579",
+      "startTime": "2026-06-24T15:32:33.242Z",
+      "endTime": "2026-06-24T15:32:33.314Z",
+      "params": "",
+      "cacheStatus": "local-cache-hit",
+      "status": 0
+    }
+  ]
+}

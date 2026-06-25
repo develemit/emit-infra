@@ -170,9 +170,10 @@ export async function operationRoutes(app: FastifyInstance) {
         'Access-Control-Allow-Origin': '*',
       })
 
+      const name = project.config.name
       const remoteCmd = service
-        ? `docker logs --tail=500 ${service}`
-        : `docker compose -p ${project.config.name} logs --follow --tail=100`
+        ? `docker logs --follow --tail=500 ${service}`
+        : `PROJECTS=$(docker compose ls 2>/dev/null | awk 'NR>1 && $1~/^${name}(-[^ ]+)?$/{print $1}'); [ -z "$PROJECTS" ] && PROJECTS="${name}"; for P in $PROJECTS; do docker compose -p "$P" logs --follow --tail=50 & done; wait`
 
       const sshArgs = [
         '-i',

@@ -66,5 +66,11 @@
   command: "{{ app_dir }}/health-check.sh {{ app_port | default(3000) }} {{ health_check_retries | default(10) }} {{ health_check_path | default('/') }} {{ health_check_backoff | default(3) }}"
   when: not (rollback_enabled | default(true))
 
+- name: Prune old Docker images and stopped containers
+  shell: |
+    docker container prune -f --filter "until=24h"
+    docker image prune -a -f --filter "until=24h"
+  ignore_errors: true
+
 - name: Record deploy timestamp
   shell: "date +%s > /opt/{{ project_name }}/.deployed-at"

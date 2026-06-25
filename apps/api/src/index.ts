@@ -10,7 +10,7 @@ import { pushRoutes } from './routes/push.js'
 import { historyRoutes } from './routes/history.js'
 import { startStatusMonitor } from './lib/status-monitor.js'
 
-const app = Fastify({ logger: true })
+const app = Fastify({ logger: process.env['NODE_ENV'] === 'development' ? { level: 'warn' } : true })
 
 await app.register(cors, { origin: '*' })
 await app.register(projectRoutes)

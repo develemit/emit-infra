@@ -1,5 +1,5 @@
 'use client'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Icon } from '@/components/icon'
 import { Badge } from '@/components/ui/badge'
 import type { CiHistoryEntry } from '@/lib/api'
@@ -17,6 +17,7 @@ function formatTimestamp(iso: string): string {
 }
 
 export function CiTimeline({ runs, name, repoUrl }: Props) {
+  const router = useRouter()
   const total = runs.length
   const successes = runs.filter(r => r.status !== 'failure').length
   const avgSec = total > 0 ? Math.round(runs.reduce((a, r) => a + r.durationSec, 0) / total) : 0
@@ -50,10 +51,13 @@ export function CiTimeline({ runs, name, repoUrl }: Props) {
           {runs.map((r, i) => {
             const failed = r.status === 'failure'
             return (
-              <Link
+              <div
                 key={i}
-                href={`/projects/${encodeURIComponent(name)}/ci-log/${r.sha}`}
-                className={`flex items-start gap-3 py-3 border-t border-border first:border-t-0 transition-colors ${failed ? 'bg-err-soft/30 hover:bg-err-soft/50' : 'hover:bg-card-hover'}`}
+                role="link"
+                tabIndex={0}
+                onClick={() => router.push(`/projects/${encodeURIComponent(name)}/ci-log/${r.sha}`)}
+                onKeyDown={e => e.key === 'Enter' && router.push(`/projects/${encodeURIComponent(name)}/ci-log/${r.sha}`)}
+                className={`cursor-pointer flex items-start gap-3 py-3 border-t border-border first:border-t-0 transition-colors ${failed ? 'bg-err-soft/30 hover:bg-err-soft/50' : 'hover:bg-card-hover'}`}
               >
                 <div className="shrink-0 mt-0.5">
                   <div
@@ -93,7 +97,7 @@ export function CiTimeline({ runs, name, repoUrl }: Props) {
                     <span>{formatDuration(r.durationSec)}</span>
                   </div>
                 </div>
-              </Link>
+              </div>
             )
           })}
         </div>

@@ -12,12 +12,22 @@ import { sshKeyPath } from './project-helpers.js'
 import { sendToAll } from './push.js'
 
 const POLL_MS = 60_000
-const state = new Map<string, 'up' | 'down'>()
+const sshState = new Map<string, 'up' | 'down'>()
+const httpState = new Map<string, 'up' | 'down'>()
 
-async function probe(host: string, key: string): Promise<'up' | 'down'> {
+async function sshProbe(host: string, key: string): Promise<'up' | 'down'> {
   try {
     await sshExec(host, 'echo ok', key)
     return 'up'
+  } catch {
+    return 'down'
+  }
+}
+
+async function httpProbe(url: string): Promise<'up' | 'down'> {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(10_000) })
+    return res.ok ? 'up' : 'down'
   } catch {
     return 'down'
   }
@@ -30,8 +40,8 @@ async function poll(): Promise<void> {
     projects.map(async ({ config }) => {
       const host = config.serverIp ?? config.domain
       const key = sshKeyPath(config.sshKeyName)
-      const next = await probe(host, key)
-      const prev = state.get(config.name)
+      const next = await sshProbe(host, key)
+      const prev = sshState.get(config.name)
 
       if (prev === 'up' && next === 'down') {
         await sendToAll({
@@ -49,7 +59,30 @@ async function poll(): Promise<void> {
         }).catch(() => {/* push failures are best-effort */})
       }
 
-      state.set(config.name, next)
+      sshState.set(config.name, next)
+
+      if (config.healthCheck?.url) {
+        const httpNext = await httpProbe(config.healthCheck.url)
+        const httpPrev = httpState.get(config.name)
+
+        if (httpPrev === 'up' && httpNext === 'down') {
+          await sendToAll({
+            title: config.name,
+            body: 'Health check failing — app may be down.',
+            url: `/projects/${encodeURIComponent(config.name)}`,
+            tag: `http-down:${config.name}`,
+          }).catch(() => {/* push failures are best-effort */})
+        } else if (httpPrev === 'down' && httpNext === 'up') {
+          await sendToAll({
+            title: config.name,
+            body: 'Health check passing — app is back up.',
+            url: `/projects/${encodeURIComponent(config.name)}`,
+            tag: `http-up:${config.name}`,
+          }).catch(() => {/* push failures are best-effort */})
+        }
+
+        httpState.set(config.name, httpNext)
+      }
     }),
   )
 }

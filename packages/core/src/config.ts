@@ -7,6 +7,11 @@ export const ProjectConfigSchema = z.object({
   serverType: z.string().default('cx22'),
   sshKeyName: z.string().default('emit-deploy'),
   serverIp: z.string().optional(),
+  healthCheck: z
+    .object({
+      url: z.string().url(),
+    })
+    .optional(),
   github: z.object({
     repo: z.string().regex(/^[^/]+\/[^/]+$/, 'Must be in owner/repo format'),
   }),

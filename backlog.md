@@ -3,6 +3,10 @@
 Deferred follow-ups from completed sprints. Run `/plan-sprint` referencing this
 file to promote items into proper sprints when the list grows worth addressing.
 
+- (sprint 76, 2026-06-20) Docker layer progress output (hundreds of `\r`-terminated lines) appears in deploy logs — noisy but readable. Could add `--quiet` to docker push/pull in individual deploy scripts if it becomes a problem.
+- (sprint 78, 2026-06-20) SHA clipboard-copy on deploy rows was removed when rows became links. Could restore as a small copy icon next to the SHA with `e.preventDefault()` to avoid triggering navigation.
+- (sprint 78, 2026-06-20) Log viewer starts at top of file; for CI/deploy the tail (final result) is most useful. Could auto-scroll to bottom on load via a ref after content is set.
+
 <!-- follow-up-scan: date=2026-06-15 through=59 clean=false -->
 > _Sprint scan: incremental scan completed 2026-06-15 through sprint-59. 2 discoveries → sprint-60, sprint-61. Prior scan: 2026-06-13 through sprint-59 (clean)._
 
@@ -18,6 +22,9 @@ file to promote items into proper sprints when the list grows worth addressing.
 - (sprint 10, 2026-06-03) ConfirmCard onConfirm callback is a no-op in ChatThread — wire it up if the page needs to track transitions `[hold]`
 - (sprint 34, 2026-06-11) Switch certbot HTTP-01 from `certbot --nginx` (rewrites config in-place) to `certbot certonly --webroot` with manual ssl cert path injection so Ansible stays in control of the nginx config file. Complex architectural change — run `/plan-sprint "certbot certonly webroot migration"` before queuing. `[hold]`
 - (sprint 40, 2026-06-11) Blue-green slot-aware port selection in `emit-infra status` — active slot may use a different API port than `config.deploy.appPort`. Revisit once blue-green is production-proven on emit-vision. `[hold]`
+
+- (sprint 72, 2026-06-18) martialops and tastease are unreachable via domain — may need `serverIp` added to their `.emit-infra.json` configs once DNS or firewall is resolved
+- (sprint 72, 2026-06-18) emit-vision has two containers both named "backup" (pg-backup and ch-backup share the suffix) — could disambiguate with a longer name extraction if needed
 
 ## ✅ Converted to Sprints
 

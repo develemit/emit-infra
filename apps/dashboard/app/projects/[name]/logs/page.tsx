@@ -2,9 +2,12 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
+import AnsiToHtml from 'ansi-to-html'
 import { getContainers, openSseStream } from '@/lib/api'
 import { Terminal } from '@/components/ui/terminal'
 import { Icon } from '@/components/icon'
+
+const ansi = new AnsiToHtml({ escapeXML: true })
 
 const COLOR_PALETTE = [
   'var(--t-blue)', 'var(--t-cyan)', 'var(--t-magenta)',
@@ -136,7 +139,7 @@ export default function LogsPage() {
           <span style={{ color: 'var(--term-dim)', margin: '0 10px' }}>│</span>
         </>
       )}
-      <span style={{ flex: 1 }}>{l.text}</span>
+      <span style={{ flex: 1 }} dangerouslySetInnerHTML={{ __html: ansi.toHtml(l.text) }} />
     </div>
   ))
 

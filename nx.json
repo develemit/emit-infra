@@ -32,5 +32,7 @@
       "inputs": ["default", "^production"]
     }
   },
-  "nxCloudId": ""
+  "nxCloudId": "",
+  "cacheDirectory": "~/.nx/cache/emit-infra",
+  "cacheMaxAge": 604800000
 }

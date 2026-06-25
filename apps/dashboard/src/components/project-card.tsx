@@ -181,12 +181,12 @@ export function ProjectCard({ project, status, onRetry }: Props) {
       <div style={{ height: 1, background: 'var(--border)' }} />
 
       {/* Footer */}
-      <div className="flex items-center justify-between">
-        <span className="text-[12px] font-mono text-subtle flex items-center gap-1.5 whitespace-nowrap">
-          <Icon name="clock" size={13} />
-          {status?.uptime ?? '—'}
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[12px] font-mono text-subtle flex items-center gap-1.5 min-w-0">
+          <Icon name="clock" size={13} className="shrink-0" />
+          <span className="truncate">{status?.uptime ?? '—'}</span>
         </span>
-        <span className="text-[12px] font-mono text-subtle flex items-center gap-1.5 whitespace-nowrap">
+        <span className="text-[12px] font-mono text-subtle flex items-center gap-1.5 whitespace-nowrap shrink-0">
           <Icon name="box" size={13} />
           {status?.containerTotal != null ? `${status.containerCount ?? 0}/${status.containerTotal} running` : '— running'}
         </span>

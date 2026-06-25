@@ -1,0 +1,9 @@
+> next dev --port 7013
+
+   [1m[38;2;173;127;168m▲ Next.js 15.5.19[39m[22m
+   - Local:        http://localhost:7013
+   - Network:      http://192.168.1.7:7013
+
+ [32m[1m✓[22m[39m Starting...
+ [32m[1m✓[22m[39m Ready in 1100ms
+[?25h

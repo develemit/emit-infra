@@ -179,5 +179,11 @@
     path: "{{ app_dir }}/.standby.env"
     state: absent
 
+- name: Prune old Docker images and stopped containers
+  shell: |
+    docker container prune -f --filter "until=24h"
+    docker image prune -a -f --filter "until=24h"
+  ignore_errors: true
+
 - name: Record deploy timestamp
   shell: "date +%s > /opt/{{ project_name }}/.deployed-at"

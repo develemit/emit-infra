@@ -1,8 +1,9 @@
 'use client'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Icon } from '@/components/icon'
 import { Badge } from '@/components/ui/badge'
 import type { DeployHistoryEntry } from '@/lib/api'
+import { formatDuration } from '@/lib/format-duration'
 
 interface Props {
   deploys: DeployHistoryEntry[]
@@ -15,14 +16,8 @@ function formatTimestamp(iso: string): string {
   return d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
-function formatDuration(sec: number): string {
-  if (sec < 60) return `${sec}s`
-  const m = Math.floor(sec / 60)
-  const s = sec % 60
-  return s > 0 ? `${m}m ${s}s` : `${m}m`
-}
-
 export function DeployTimeline({ deploys, name, repoUrl }: Props) {
+  const router = useRouter()
   const total = deploys.length
   const successes = deploys.filter(d => d.status === 'deployed').length
   const avgSec = total > 0 ? Math.round(deploys.reduce((a, d) => a + d.durationSec, 0) / total) : 0
@@ -56,10 +51,13 @@ export function DeployTimeline({ deploys, name, repoUrl }: Props) {
           {deploys.map((d, i) => {
             const failed = d.status === 'failed'
             return (
-              <Link
+              <div
                 key={i}
-                href={`/projects/${encodeURIComponent(name)}/deploy-log/${d.sha}`}
-                className={`flex items-start gap-3 py-3 border-t border-border first:border-t-0 transition-colors ${failed ? 'bg-err-soft/30 hover:bg-err-soft/50' : 'hover:bg-card-hover'}`}
+                role="link"
+                tabIndex={0}
+                onClick={() => router.push(`/projects/${encodeURIComponent(name)}/deploy-log/${d.sha}`)}
+                onKeyDown={e => e.key === 'Enter' && router.push(`/projects/${encodeURIComponent(name)}/deploy-log/${d.sha}`)}
+                className={`cursor-pointer flex items-start gap-3 py-3 border-t border-border first:border-t-0 transition-colors ${failed ? 'bg-err-soft/30 hover:bg-err-soft/50' : 'hover:bg-card-hover'}`}
               >
                 <div className="shrink-0 mt-0.5">
                   <div
@@ -104,7 +102,7 @@ export function DeployTimeline({ deploys, name, repoUrl }: Props) {
                     )}
                   </div>
                 </div>
-              </Link>
+              </div>
             )
           })}
         </div>

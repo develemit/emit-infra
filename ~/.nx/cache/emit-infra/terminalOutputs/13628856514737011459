@@ -1,0 +1,10 @@
+
+Linting "dashboard"...
+[0m[0m
+[0m[4m/Users/emitdutcher/projects/emit-infra/apps/dashboard/src/components/detail/full-chart.tsx[24m[0m
+[0m  [2m20:7[22m  [31merror[39m  'PAD_B' is assigned a value but never used  [2m@typescript-eslint/no-unused-vars[22m[0m
+[0m[0m
+[0m[31m[1m✖ 1 problem (1 error, 0 warnings)[22m[39m[0m
+[0m[31m[1m[22m[39m[0m
+✖ 1 problem (1 error, 0 warnings)
+
