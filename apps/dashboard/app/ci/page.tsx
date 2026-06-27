@@ -1,4 +1,5 @@
 'use client'
+import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { Icon } from '@/components/icon'
 import { Badge } from '@/components/ui/badge'
@@ -84,7 +85,11 @@ export default function CiPage() {
       }
     }
     load()
-    return () => { cancelled = true }
+    const interval = setInterval(load, 60_000)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
   }, [])
 
   return (
@@ -129,7 +134,7 @@ export default function CiPage() {
                 key={s.name}
                 className="flex items-center gap-4 py-3 border-t border-border"
               >
-                <div className="w-36 text-[13px] font-medium text-fg truncate">{s.name}</div>
+                <div className="w-36 text-[13px] font-medium text-fg truncate"><Link href={`/projects/${encodeURIComponent(s.name)}`} className="hover:underline">{s.name}</Link></div>
                 <div className="w-24">
                   {s.total === 0 ? (
                     <span className="text-[12px] text-subtle font-mono">no runs</span>
@@ -174,7 +179,7 @@ export default function CiPage() {
             stats.map(s => (
               <div key={s.name} className="rounded-xl border border-border bg-card p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[13px] font-medium text-fg">{s.name}</span>
+                  <Link href={`/projects/${encodeURIComponent(s.name)}`} className="text-[13px] font-medium text-fg hover:underline">{s.name}</Link>
                   {s.lastStatus && (
                     <Badge variant={s.lastStatus === 'failure' ? 'err' : 'ok'} dot>
                       {s.lastStatus}

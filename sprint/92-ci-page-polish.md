@@ -32,7 +32,24 @@ Two backlog items from sprint 87:
 
 ## Acceptance criteria
 
-- [ ] Page re-fetches CI data every 60 seconds without full reload
-- [ ] Project name in the desktop table row links to `/projects/<name>`
-- [ ] Project name in the mobile card links to `/projects/<name>`
-- [ ] No TypeScript errors (`pnpm nx typecheck dashboard`)
+- [x] Page re-fetches CI data every 60 seconds without full reload
+- [x] Project name in the desktop table row links to `/projects/<name>`
+- [x] Project name in the mobile card links to `/projects/<name>`
+- [x] No TypeScript errors (`pnpm nx typecheck dashboard`)
+
+## Completed
+
+**Date:** 2026-06-27
+
+### Summary
+Added 60-second auto-refresh polling and project name links to the CI overview page. The `useEffect` now starts a `setInterval(load, 60_000)` after the initial load, with proper cleanup via `clearInterval`. Project names in both the desktop table row and mobile card are wrapped in `next/link` `<Link>` components pointing to `/projects/<name>`, styled with `hover:underline` to match the existing design system conventions.
+
+### Files changed
+- `apps/dashboard/app/ci/page.tsx` — added `Link` import, 60s polling interval in useEffect, wrapped project names in both desktop and mobile layouts
+
+### Verification
+- `pnpm nx typecheck dashboard --skip-nx-cache`: clean
+- Code inspection: `setInterval` + `clearInterval` properly paired; `Link` hrefs use `encodeURIComponent`
+
+### Follow-ups
+- none
