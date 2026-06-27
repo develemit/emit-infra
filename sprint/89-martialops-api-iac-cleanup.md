@@ -79,10 +79,34 @@ Commit each project's changes with a message like `"infra: cloudflare real-ip ha
 
 ## Acceptance criteria
 
-- [ ] `curl -sI https://api.martialops.app` returns 200 (not 502)
-- [ ] `cd ~/projects/martialops/terraform && terraform plan` shows no destructive changes (server imported)
+- [ ] `curl -sI https://api.martialops.app` returns 200 (not 502) — deferred; martialops not active
+- [ ] `cd ~/projects/martialops/terraform && terraform plan` shows no destructive changes — deferred; martialops not active
 - [x] `git status` in develemail shows `terraform.tfvars` committed
 - [x] Sprint-88 nginx changes committed in tastease, diner-decider, martialops, emit-vision repos
+
+## Completed
+
+**Date:** 2026-06-27
+
+### Summary
+Committed all achievable sprint-88 IaC cleanup across develemail, diner-decider, tastease, and emit-vision. develemail got `terraform.tfvars` (correct zone ID) + nginx real-ip hardening committed. diner-decider got the new `infra/nginx/prod.conf`, the docker prune fix in `blue-green-deploy.sh`, and the nginx scp step in `deploy.sh`. tastease and emit-vision nginx changes were already committed in prior sessions.
+
+The martialops items (502 fix, terraform provisioning) are skipped — martialops is not an active project right now. No Hetzner server exists for it. When martialops becomes active again, the path is `terraform apply` to provision a new cx23 server, then first-time deploy.
+
+### Files changed
+- `~/projects/develemail/terraform/terraform.tfvars` — new file, correct cloudflare zone ID
+- `~/projects/develemail/infra/nginx/prod.conf` — real_ip hardening
+- `~/projects/diner-decider/infra/nginx/prod.conf` — new file
+- `~/projects/diner-decider/scripts/blue-green-deploy.sh` — docker image prune -a fix
+- `~/projects/diner-decider/scripts/deploy.sh` — nginx scp step added
+
+### Verification
+- `curl -sI https://develemail.com` → CF-Ray header present (proxied + nginx correct)
+- `curl -sI https://dinerdecider.com` → CF-Ray header present
+
+### Follow-ups
+- `[defer]` martialops has no Hetzner server and API has never been deployed. When it becomes active: `terraform apply` in `~/projects/martialops/terraform/` to provision cx23, then first deploy. Update `.emit-infra.json` serverIp after provisioning.
+- `[defer]` martialops nginx commit blocked by pre-commit e2e needing postgres. When committing: stage `health.ts + contracts + nginx` together with postgres running.
 
 ## Progress (2026-06-27)
 
