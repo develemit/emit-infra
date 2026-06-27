@@ -6,15 +6,13 @@ file to promote items into proper sprints when the list grows worth addressing.
 - (sprint 76, 2026-06-20) Docker layer progress output (hundreds of `\r`-terminated lines) appears in deploy logs — noisy but readable. Could add `--quiet` to docker push/pull in individual deploy scripts if it becomes a problem.
 - (sprint 79, 2026-06-20) `ansi-to-html` is instantiated with `escapeXML: false` — if logs contain HTML-like strings (e.g. JSX error output with `<div>`), those render as raw HTML. Acceptable for now; revisit if it produces unexpected rendering.
 - (sprint 85, 2026-06-20) Disk trend regression uses last 48h window only. Bursty disk usage could skew the slope. A 7-day window would be smoother — adjust the cutoff constant in `apps/api/src/routes/history.ts` if needed.
-- (sprint 87, 2026-06-21) CI flakiness page doesn't auto-refresh. Could add a 60s polling interval so it stays live without a manual reload.
-- (sprint 87, 2026-06-21) CI flakiness page project rows aren't linked to the project detail page. A click on the project name could navigate to `/projects/<name>` for drill-down.
-
-<!-- follow-up-scan: date=2026-06-27 through=88 clean=false -->
-> _Sprint scan: incremental scan completed 2026-06-27 through sprint-88. 3 discoveries → sprint-89, sprint-90, sprint-91. Prior scan: 2026-06-15 through sprint-59._
-
 - (sprint 60, 2026-06-16) emit-vision `infra/scripts/migrate.sh` fallback path (`docker run`) needs `GHCR_ORG` + `IMAGE_TAG` env vars — verify ops runbook mentions these when using the fallback
-- (sprint 61, 2026-06-16) martialops `/healthz` is staged but not committed — commit when postgres is available locally (health.ts + pnpm-lock.yaml + packages/contracts/openapi.json + packages/contracts/src/generated/types.ts)
-- (sprint 61, 2026-06-16) Validate production `/healthz` on each domain after next deploy to confirm `emit-infra status` surfaces live build numbers
+- (sprint 72, 2026-06-18) emit-vision has two containers both named "backup" (pg-backup and ch-backup share the suffix) — could disambiguate with a longer name extraction if needed
+- (sprint 91, 2026-06-27) If a dead man's switch independent of emit-infra's Mac uptime is desired for emit-vision, add a healthchecks.io check via a lightweight cron container (the `uptime-ping` Docker service referenced in the original sprint no longer exists)
+
+<!-- follow-up-scan: date=2026-06-27 through=91 clean=false -->
+> _Sprint scan: incremental scan 2026-06-27 through sprint-91. Discoveries: sprint-92 (CI page polish), sprint-93 (martialops launch). Prior scan: 2026-06-27 through sprint-88._
+
 - (sprint 04, 2026-06-03) `pnpm build` fails on `/_error` and `/500` static pre-render — `<Html>` outside pages/_document error in Next.js 15.5.19 (upstream bug; dev server and typecheck/lint are clean) `[hold]`
 - (sprint 04, 2026-06-03) Provision wizard uses local Zod schema mirroring `ProjectConfigSchema` — consider extracting shared browser-safe types into `@emit-infra/types`; run `/plan-sprint "shared types package"` to plan `[hold]`
 - (sprint 05, 2026-06-03) POST /ops/chat not end-to-end tested with live ANTHROPIC_API_KEY — functional validation requires a real key `[hold]`
@@ -25,13 +23,14 @@ file to promote items into proper sprints when the list grows worth addressing.
 - (sprint 34, 2026-06-11) Switch certbot HTTP-01 from `certbot --nginx` (rewrites config in-place) to `certbot certonly --webroot` with manual ssl cert path injection so Ansible stays in control of the nginx config file. Complex architectural change — run `/plan-sprint "certbot certonly webroot migration"` before queuing. `[hold]`
 - (sprint 40, 2026-06-11) Blue-green slot-aware port selection in `emit-infra status` — active slot may use a different API port than `config.deploy.appPort`. Revisit once blue-green is production-proven on emit-vision. `[hold]`
 
-- (sprint 88, 2026-06-27) martialops `api.martialops.app` returns 502 — API container not running on `178.104.195.59`. nginx and Cloudflare proxy are correct; deploy or start the container. → sprint-89
-- (sprint 88, 2026-06-27) martialops www/apex DNS still points to old server `178.156.218.94` — those vhosts were excluded from sprint-88 scope. Revisit when martialops www is ready to go live.
-- (sprint 88, 2026-06-27) martialops terraform state empty — `terraform import` needed before IaC can manage the existing server. → sprint-89
-- (sprint 72, 2026-06-18) emit-vision has two containers both named "backup" (pg-backup and ch-backup share the suffix) — could disambiguate with a longer name extraction if needed
-
 ## ✅ Converted to Sprints
 
+- ~~(sprint 87, 2026-06-21) CI flakiness page doesn't auto-refresh~~ → sprint-92 (2026-06-27)
+- ~~(sprint 87, 2026-06-21) CI flakiness page project rows not linked to project detail~~ → sprint-92 (2026-06-27)
+- ~~(sprint 61, 2026-06-16) martialops /healthz staged but not committed~~ → sprint-93 (2026-06-27)
+- ~~(sprint 88, 2026-06-27) martialops www/apex DNS still points to old server 178.156.218.94~~ → sprint-93 (2026-06-27)
+- ~~(sprint 88, 2026-06-27) martialops terraform state empty + API never deployed + wrong serverIp~~ → sprint-93 (2026-06-27)
+- ~~(sprint 61, 2026-06-16) Validate production /healthz on each domain~~ → resolved by sprint-91: emit-vision healthCheck added; tastease already wired (2026-06-27)
 - ~~(sprint 78, 2026-06-20) SHA clipboard-copy on deploy rows removed when rows became links~~ → sprint-80 restored as copy icon with stopPropagation (2026-06-27)
 - ~~(sprint 78, 2026-06-20) Log viewer starts at top; CI/deploy tail is most useful — auto-scroll to bottom on load~~ → sprint-79 implemented scrollBottom prop on Terminal (2026-06-27)
 - ~~(sprint 72, 2026-06-18) martialops and tastease unreachable via domain — may need serverIp in .emit-infra.json~~ → resolved in sprint-88 session; serverIp added to all four project configs (2026-06-27)
