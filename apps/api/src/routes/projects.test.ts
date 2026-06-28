@@ -40,6 +40,7 @@ describe('GET /projects/:name/status', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ status: 200 }))
     app = Fastify({ logger: false })
     await app.register(projectRoutes)
     await app.ready()
@@ -47,6 +48,7 @@ describe('GET /projects/:name/status', () => {
 
   afterEach(async () => {
     await app.close()
+    vi.unstubAllGlobals()
   })
 
   it('returns 404 when project is not found', async () => {
@@ -113,5 +115,104 @@ describe('GET /projects', () => {
 
     expect(res.statusCode).toBe(200)
     expect(res.json()).toEqual([])
+  })
+})
+
+describe('GET /projects/:name/backup-status', () => {
+  let app: FastifyInstance
+
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    app = Fastify({ logger: false })
+    await app.register(projectRoutes)
+    await app.ready()
+  })
+
+  afterEach(async () => { await app.close() })
+
+  it('returns parsed backup status on happy path', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    vi.mocked(sshExec).mockResolvedValue(JSON.stringify({ lastRun: '2024-01-01T00:00:00Z', status: 'ok' }))
+
+    const res = await app.inject({ method: 'GET', url: '/projects/myapp/backup-status' })
+
+    expect(res.statusCode).toBe(200)
+    const data = res.json() as { lastRun: string; status: string }
+    expect(data.status).toBe('ok')
+  })
+
+  it('returns 500 when SSH returns corrupt JSON', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    vi.mocked(sshExec).mockResolvedValue('NOT VALID JSON {{{')
+
+    const res = await app.inject({ method: 'GET', url: '/projects/myapp/backup-status' })
+
+    expect(res.statusCode).toBe(500)
+    expect(res.json()).toEqual({ error: 'invalid status file' })
+  })
+
+  it('returns 404 when no backup status file exists (empty output)', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    vi.mocked(sshExec).mockResolvedValue('')
+
+    const res = await app.inject({ method: 'GET', url: '/projects/myapp/backup-status' })
+
+    expect(res.statusCode).toBe(404)
+    expect(res.json()).toEqual({ error: 'no backup status' })
+  })
+
+  it('returns 404 when project not found', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([])
+
+    const res = await app.inject({ method: 'GET', url: '/projects/missing/backup-status' })
+
+    expect(res.statusCode).toBe(404)
+    expect(res.json()).toEqual({ error: 'not found' })
+  })
+})
+
+describe('GET /projects/:name/containers', () => {
+  let app: FastifyInstance
+
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    app = Fastify({ logger: false })
+    await app.register(projectRoutes)
+    await app.ready()
+  })
+
+  afterEach(async () => { await app.close() })
+
+  it('returns parsed container list on happy path', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    vi.mocked(sshExec).mockResolvedValue('myapp-web|nginx:latest|Up 5 minutes|running|42')
+
+    const res = await app.inject({ method: 'GET', url: '/projects/myapp/containers' })
+
+    expect(res.statusCode).toBe(200)
+    const data = res.json() as Array<{ name: string; state: string; buildNumber: string }>
+    expect(data).toHaveLength(1)
+    expect(data[0]?.name).toBe('myapp-web')
+    expect(data[0]?.state).toBe('running')
+    expect(data[0]?.buildNumber).toBe('42')
+  })
+
+  it('returns empty array when no containers running', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    vi.mocked(sshExec).mockResolvedValue('')
+
+    const res = await app.inject({ method: 'GET', url: '/projects/myapp/containers' })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual([])
+  })
+
+  it('returns 404 when project not found', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([])
+
+    const res = await app.inject({ method: 'GET', url: '/projects/missing/containers' })
+
+    expect(res.statusCode).toBe(404)
+    expect(res.json()).toEqual({ error: 'not found' })
   })
 })
