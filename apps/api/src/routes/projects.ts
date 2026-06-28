@@ -38,7 +38,8 @@ async function checkHttp(domain: string): Promise<number | null> {
       signal: AbortSignal.timeout(5000),
     })
     return res.status
-  } catch {
+  } catch (err) {
+    console.warn(`HTTP check failed for ${domain}: ${err}`)
     return null
   }
 }

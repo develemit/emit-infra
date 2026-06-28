@@ -8,7 +8,10 @@ export function useMemoryTrend(name: string): MemoryTrend | null {
   useEffect(() => {
     let cancelled = false
     async function fetch() {
-      const result = await getMemoryTrend(name).catch(() => null)
+      const result = await getMemoryTrend(name).catch((err) => {
+        console.warn('memory-trend fetch failed:', err)
+        return null
+      })
       if (!cancelled) setTrend(result)
     }
     void fetch()

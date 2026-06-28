@@ -8,7 +8,10 @@ export function useDiskTrend(name: string): DiskTrend | null {
   useEffect(() => {
     let cancelled = false
     async function fetch() {
-      const result = await getDiskTrend(name).catch(() => null)
+      const result = await getDiskTrend(name).catch((err) => {
+        console.warn('disk-trend fetch failed:', err)
+        return null
+      })
       if (!cancelled) setTrend(result)
     }
     void fetch()

@@ -63,9 +63,32 @@ export interface Container {
 }
 
 async function apiFetch<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, { cache: 'no-store', headers: authHeaders() })
-  if (!res.ok) throw new Error(`API error ${res.status}: ${path}`)
-  return res.json() as Promise<T>
+  const MAX_RETRIES = 2
+  const delays = [300, 600]
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const res = await fetch(`${API_BASE}${path}`, { cache: 'no-store', headers: authHeaders() })
+      if (!res.ok) {
+        if (res.status >= 500) {
+          if (attempt < MAX_RETRIES) {
+            await new Promise(r => setTimeout(r, delays[attempt]))
+            continue
+          }
+        }
+        throw new Error(`API error ${res.status}: ${path}`)
+      }
+      return res.json() as Promise<T>
+    } catch (err) {
+      if (attempt < MAX_RETRIES && err instanceof TypeError) {
+        await new Promise(r => setTimeout(r, delays[attempt]))
+        continue
+      }
+      throw err
+    }
+  }
+
+  throw new Error(`API error after retries: ${path}`)
 }
 
 export function getProjects(): Promise<ProjectSummary[]> {
