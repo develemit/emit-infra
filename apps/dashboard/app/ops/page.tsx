@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { getApiBase, getStatus, getProjects, type ProjectStatus } from '@/lib/api'
+import { getApiBase, getStatus, getProjects, getDeployHistory, getCiHistory, type ProjectStatus, type DeployHistoryEntry, type CiHistoryEntry } from '@/lib/api'
 import { Icon } from '@/components/icon'
 import { ChatThread } from '@/components/ops/chat-thread'
 import { ChatInput } from '@/components/ops/chat-input'
@@ -26,22 +26,62 @@ function getConfirmText(toolName: string, projectName: string) {
   }
 }
 
-function buildContextString(name: string, domain: string, status: ProjectStatus): string {
+function formatTime(isoString: string): string {
+  const date = new Date(isoString)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffH = Math.floor(diffMs / (1000 * 60 * 60))
+  if (diffH < 1) return 'just now'
+  if (diffH < 24) return `${diffH}h ago`
+  const diffD = Math.floor(diffH / 24)
+  return `${diffD}d ago`
+}
+
+function buildContextString(
+  name: string,
+  domain: string,
+  status: ProjectStatus,
+  deploys: DeployHistoryEntry[] = [],
+  ciRuns: CiHistoryEntry[] = [],
+): string {
   const lines: (string | null)[] = [
-    `Project: ${name}`,
-    `Domain: ${domain}`,
-    status.buildNumber ? `Build: #${status.buildNumber}` : null,
-    status.uptime ? `Uptime: ${status.uptime}` : null,
-    status.memory != null ? `Memory: ${status.memory}% (${status.memUsed ?? '?'} / ${status.memTotal ?? '?'})` : null,
-    status.disk != null ? `Disk: ${status.disk}% (${status.diskUsed ?? '?'} / ${status.diskTotal ?? '?'})` : null,
+    `Project: ${name}  Domain: ${domain}`,
+  ]
+
+  // Status line
+  const statusParts = [
+    status.httpStatus ? `HTTP ${status.httpStatus}` : null,
+    status.disk != null ? `Disk: ${status.disk}%` : null,
+    status.memory != null ? `Mem: ${status.memory}%` : null,
+    status.sslExpiry ? `SSL: ${status.sslExpiry}` : null,
     status.nginxStatus ? `Nginx: ${status.nginxStatus}` : null,
     status.redisStatus ? `Redis: ${status.redisStatus}` : null,
-    status.queueFailed != null
-      ? (status.queueFailed > 0
-          ? `Queue: ${status.queueFailed} failed · ${status.queueWait ?? 0} waiting`
-          : `Queue: OK · ${status.queueWait ?? 0} waiting`)
-      : null,
   ]
+  if (statusParts.some(p => p)) {
+    lines.push(`Status: ${statusParts.filter(Boolean).join('  ')}`)
+  }
+
+  // Last deploy
+  if (deploys.length > 0) {
+    const last = deploys[0]!
+    const shaShort = last.sha.slice(0, 7)
+    const time = formatTime(last.completedAt)
+    lines.push(`Last deploy: ${shaShort} (${last.branch}) ${last.durationSec}s ${last.status} — "${last.message || 'no message'}"  ${time}`)
+  }
+
+  // Deploy health
+  if (deploys.length > 0) {
+    const succeeded = deploys.filter(d => d.status === 'success').length
+    lines.push(`Deploy health: ${succeeded}/${Math.min(3, deploys.length)} recent succeeded`)
+  }
+
+  // CI health
+  if (ciRuns.length > 0) {
+    const passed = ciRuns.filter(r => r.status === 'success').length
+    const avgDuration = Math.round(ciRuns.reduce((sum, r) => sum + r.durationSec, 0) / ciRuns.length)
+    lines.push(`CI health: ${passed}/${Math.min(10, ciRuns.length)} recent passed  Avg: ${avgDuration}s`)
+  }
+
   return lines.filter(Boolean).join('\n')
 }
 
@@ -66,11 +106,25 @@ function OpsPageInner() {
 
   useEffect(() => {
     if (!contextProject) return
-    void Promise.all([getStatus(contextProject), getProjects()]).then(([status, projects]) => {
+    void Promise.all([
+      getStatus(contextProject),
+      getProjects(),
+      getDeployHistory(contextProject, 3).catch(() => ({ deploys: [] })),
+      getCiHistory(contextProject, 10).catch(() => ({ runs: [] })),
+    ]).then(([status, projects, deployRes, ciRes]) => {
       const project = projects.find(p => p.config.name === contextProject)
       const domain = project?.config.domain ?? contextProject
-      setStatusContext(buildContextString(contextProject, domain, status))
+      const context = buildContextString(
+        contextProject,
+        domain,
+        status,
+        deployRes.deploys,
+        ciRes.runs,
+      )
+      setStatusContext(context)
       setContextBuildLabel(status.buildNumber ? `Build #${status.buildNumber}` : 'unknown build')
+    }).catch(err => {
+      console.error('Failed to fetch context:', err)
     })
   }, [contextProject])
 
