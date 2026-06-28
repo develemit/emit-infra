@@ -1,8 +1,7 @@
 'use client'
 import { useParams } from 'next/navigation'
-import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { getStatus, getContainers, getProjects, getApiBase, type ProjectSummary, type ProjectStatus, type Container } from '@/lib/api'
+import { getApiBase } from '@/lib/api'
 import { Icon } from '@/components/icon'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -19,98 +18,31 @@ import { DeployPanel } from '@/components/deploy-panel'
 import { RollbackPanel } from '@/components/rollback-panel'
 import { SecretsSyncPanel } from '@/components/secrets-sync-panel'
 import { DestroyModal } from '@/components/destroy-modal'
-import { deriveHealth } from '@/lib/health'
-import { useMetricHistory, computeUptimePct } from '@/lib/metric-history'
-import { useServerMetrics } from '@/lib/use-server-metrics'
-import { useDeployMarkers } from '@/lib/use-deploy-markers'
-import { useCiHistory } from '@/lib/use-ci-history'
-import { useDiskTrend } from '@/lib/use-disk-trend'
-import { useMemoryTrend } from '@/lib/use-memory-trend'
-import { useBackupStatus } from '@/lib/use-backup-status'
+import { useProjectDetail } from '@/lib/use-project-detail'
 
 export default function ProjectDetailPage() {
   const params = useParams()
   const name = typeof params['name'] === 'string' ? decodeURIComponent(params['name']) : ''
   const apiBase = getApiBase()
 
-  const [project, setProject] = useState<ProjectSummary | null>(null)
-  const [status, setStatus] = useState<ProjectStatus | null>(null)
-  const [containers, setContainers] = useState<Container[] | null>(null)
-  const [deploying, setDeploying] = useState(false)
-  const [showRollback, setShowRollback] = useState(false)
-  const [showSecretsSync, setShowSecretsSync] = useState(false)
-  const [showDestroy, setShowDestroy] = useState(false)
-  const [lastPolledAt, setLastPolledAt] = useState<number>(0)
-  const [polledAgo, setPolledAgo] = useState('')
-  const [rangeHours, setRangeHours] = useState(24)
-
-  const deployUrl = `${apiBase}/projects/${encodeURIComponent(name)}/deploy`
-
-  const fetchData = useCallback(async () => {
-    const [ps, s, c] = await Promise.all([getProjects(), getStatus(name), getContainers(name)])
-    setProject(ps.find(p => p.config.name === name) ?? null)
-    setStatus(s)
-    setContainers(c)
-    setLastPolledAt(Date.now())
-  }, [name])
-
-  useEffect(() => {
-    void fetchData()
-    const interval = setInterval(() => void fetchData(), 30_000)
-    return () => clearInterval(interval)
-  }, [fetchData])
-
-  useEffect(() => {
-    const tick = setInterval(() => {
-      if (lastPolledAt === 0) {
-        setPolledAgo('')
-        return
-      }
-      const elapsed = Date.now() - lastPolledAt
-      const seconds = Math.floor(elapsed / 1000)
-      if (seconds <= 3) {
-        setPolledAgo('just now')
-      } else if (seconds < 60) {
-        setPolledAgo(`${seconds}s ago`)
-      } else {
-        const minutes = Math.floor(seconds / 60)
-        setPolledAgo(`${minutes}m ago`)
-      }
-    }, 1000)
-    return () => clearInterval(tick)
-  }, [lastPolledAt])
-
-  const { variant, label } = deriveHealth(status)
-  const domain = project?.config.domain ?? ''
-  const repoUrl = project?.config.github?.repo ? `https://github.com/${project.config.github.repo}/commit/` : undefined
-  const loading = status === null
-  const up = !!status && !status.error && status.httpStatus === 200
-  const mem = status?.memory ?? null
-  const disk = status?.disk ?? null
-  const localHistory = useMetricHistory(name, mem, disk, up)
-  const uptimePct = computeUptimePct(localHistory)
-  const { points: serverPoints } = useServerMetrics(name, rangeHours)
-  const { deploys } = useDeployMarkers(name)
-  const { runs: ciRuns } = useCiHistory(name)
-  const diskTrend = useDiskTrend(name)
-  const memoryTrend = useMemoryTrend(name)
-  const backupStatus = useBackupStatus(name)
-
-  const chartHistory = serverPoints.length >= 2
-    ? serverPoints.map(p => ({ t: p.t * 1000, cpu: p.cpu, mem: p.mem, disk: p.disk }))
-    : localHistory.map(p => ({ t: p.t, mem: p.mem, disk: p.disk }))
-  const fullChartPoints = serverPoints.length >= 2
-    ? serverPoints.map(p => ({ t: p.t * 1000, cpu: p.cpu, mem: p.mem, disk: p.disk }))
-    : []
-  const networkPoints = serverPoints.length >= 2
-    ? serverPoints.map(p => ({ t: p.t * 1000, netRxBytes: p.netRxBytes, netTxBytes: p.netTxBytes }))
-    : []
-  const latestMetric = serverPoints.length > 0 ? serverPoints[serverPoints.length - 1] : null
-  const deployMarkers = deploys.map(d => ({ completedAt: d.completedAt, sha: d.sha, status: d.status }))
+  const {
+    project, status, containers,
+    deploying, setDeploying,
+    showRollback, setShowRollback,
+    showSecretsSync, setShowSecretsSync,
+    showDestroy, setShowDestroy,
+    rangeHours, setRangeHours,
+    polledAgo, loading, domain, repoUrl,
+    variant, label,
+    chartHistory, fullChartPoints, networkPoints,
+    latestMetric, deployMarkers,
+    deploys, ciRuns,
+    diskTrend, memoryTrend, backupStatus,
+    uptimePct, fetchData, deployUrl,
+  } = useProjectDetail(name)
 
   return (
     <div className="flex flex-col min-h-full">
-      {/* Desktop topbar */}
       <div
         className="hidden lg:flex items-center gap-3 px-6 border-b border-border shrink-0"
         style={{ height: 56 }}
@@ -163,8 +95,6 @@ export default function ProjectDetailPage() {
           <Icon name="trash" size={13} />Destroy
         </button>
       </div>
-
-      {/* Mobile sticky header */}
       <div
         className="lg:hidden sticky top-0 z-40 flex items-center gap-2.5 px-4 border-b border-border bg-elev"
         style={{ height: 52 }}
@@ -177,8 +107,6 @@ export default function ProjectDetailPage() {
         <div className="flex-1" />
         <Badge variant={variant} dot loading={variant === 'muted'}>{label}</Badge>
       </div>
-
-      {/* Content */}
       <div className="flex-1 p-4 lg:p-6 pb-[160px] lg:pb-6">
         <div className="flex flex-col gap-4 max-w-[1000px]">
           {loading ? (
@@ -210,12 +138,12 @@ export default function ProjectDetailPage() {
                 const ageHours = (Date.now() - new Date(backupStatus.lastRun).getTime()) / 3_600_000
                 const failed = backupStatus.status === 'failed'
                 const color = failed || ageHours >= 48 ? 'var(--err)' : ageHours >= 25 ? 'var(--warn, #e5a00d)' : 'var(--ok, #22c55e)'
-                const label = failed
+                const bkpLabel = failed
                   ? `backup failed · ${Math.round(ageHours)}h ago`
                   : `backup ${Math.round(ageHours)}h ago`
                 return (
                   <div className="text-[12px] font-mono px-3 py-2 rounded-lg border" style={{ color, borderColor: 'var(--border)', background: 'var(--card-2)' }}>
-                    {label}
+                    {bkpLabel}
                   </div>
                 )
               })()}
@@ -264,8 +192,6 @@ export default function ProjectDetailPage() {
           )}
         </div>
       </div>
-
-      {/* Mobile sticky footer (above tab bar) */}
       <div
         className="lg:hidden fixed bottom-16 left-0 right-0 z-40 flex flex-col gap-2 px-4 py-3 border-t border-border bg-elev"
       >
