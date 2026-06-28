@@ -1,6 +1,6 @@
 import { Icon } from '@/components/icon'
 import { Meter } from '@/components/ui/meter'
-import type { ProjectSummary, ProjectStatus } from '@/lib/api'
+import type { ProjectSummary, ProjectStatus, MetricPoint } from '@/lib/api'
 
 interface StatTileProps {
   icon: string
@@ -73,6 +73,7 @@ interface HealthCardProps {
   polledAgo?: string
   onRefresh?: () => void
   uptimePct?: number | null
+  latestMetric?: MetricPoint | null
 }
 
 function sizeLabel(label: string, used?: string, total?: string): string {
@@ -80,7 +81,7 @@ function sizeLabel(label: string, used?: string, total?: string): string {
   return label
 }
 
-export function HealthCard({ project, status, polledAgo, onRefresh, uptimePct }: HealthCardProps) {
+export function HealthCard({ project, status, polledAgo, onRefresh, uptimePct, latestMetric }: HealthCardProps) {
   const disk = status.disk ?? 0
   const mem = status.memory ?? 0
   const diskLabel = sizeLabel('Disk', status.diskUsed, status.diskTotal)
@@ -94,6 +95,9 @@ export function HealthCard({ project, status, polledAgo, onRefresh, uptimePct }:
   const redis = redisLabel(status.redisStatus)
   const queue = queueLabel(status.queueFailed, status.queueWait)
   const deployed = deployedAgo(status.deployedAt)
+  const nginx4xx = latestMetric?.nginx4xx ?? 0
+  const nginx5xx = latestMetric?.nginx5xx ?? 0
+  const hasNginxErrors = nginx4xx > 0 || nginx5xx > 0
 
   return (
     <div className="rounded-xl border border-border bg-card" style={{ padding: 18 }}>
@@ -132,6 +136,9 @@ export function HealthCard({ project, status, polledAgo, onRefresh, uptimePct }:
         />
         {status.redisStatus && <StatTile icon="database" label="Redis" value={redis.value} color={redis.color} />}
         {queue && <StatTile icon="layers" label="Queue" value={queue.value} color={queue.color} mono={false} />}
+        {hasNginxErrors && (
+          <StatTile icon="alert" label="Nginx Errors" value={`4xx: ${nginx4xx} · 5xx: ${nginx5xx}`} color="var(--err)" mono={false} />
+        )}
       </div>
 
       {/* Mobile: 2-col stat grid */}
@@ -149,6 +156,9 @@ export function HealthCard({ project, status, polledAgo, onRefresh, uptimePct }:
         />
         {status.redisStatus && <StatTile icon="database" label="Redis" value={redis.value} color={redis.color} />}
         {queue && <StatTile icon="layers" label="Queue" value={queue.value} color={queue.color} mono={false} />}
+        {hasNginxErrors && (
+          <StatTile icon="alert" label="Nginx Errors" value={`4xx: ${nginx4xx} · 5xx: ${nginx5xx}`} color="var(--err)" mono={false} />
+        )}
       </div>
 
       {/* Desktop: side-by-side lg meters */}

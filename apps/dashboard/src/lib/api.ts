@@ -206,6 +206,8 @@ export interface MetricPoint {
   diskTotalGb: string
   netRxBytes: number
   netTxBytes: number
+  nginx4xx?: number
+  nginx5xx?: number
   containers: { name: string; cpu: number; memMb: number; restarts: number }[]
 }
 
