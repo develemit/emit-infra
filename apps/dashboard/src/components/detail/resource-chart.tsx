@@ -1,4 +1,5 @@
 'use client'
+import { useRouter } from 'next/navigation'
 import { Icon } from '@/components/icon'
 
 export interface ChartPoint {
@@ -56,6 +57,7 @@ function LegendLine({ color, label }: { color: string; label: string }) {
 }
 
 export function ResourceChart({ name, history, deploys, uptimePct }: Props) {
+  const router = useRouter()
   const hasData = history.length >= 2
   const hasCpu = hasData && history.some(p => p.cpu != null && p.cpu > 0)
   const gradId = `mf-${name.replace(/\W/g, '-')}`
@@ -144,8 +146,14 @@ export function ResourceChart({ name, history, deploys, uptimePct }: Props) {
               {/* Deploy markers */}
               {visibleDeploys.map((d, i) => {
                 const x = deployX(d.completedAt, t0, span)
+                const href = d.sha ? `/projects/${encodeURIComponent(name)}/deploy-log/${encodeURIComponent(d.sha)}` : null
                 return (
-                  <g key={i}>
+                  <g
+                    key={i}
+                    onClick={href ? () => router.push(href) : undefined}
+                    style={{ cursor: href ? 'pointer' : 'default' }}
+                  >
+                    <title>{d.sha ? `${d.sha.slice(0, 7)} — click to view deploy log` : 'deploy'}</title>
                     <line x1={x} x2={x} y1={0} y2={H} stroke="#22d3ee" strokeWidth="1" opacity="0.6" strokeDasharray="2 2" />
                     <circle cx={x} cy={3} r={2.5} fill="#22d3ee" opacity="0.8" />
                   </g>

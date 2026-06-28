@@ -84,6 +84,27 @@ function deployAge(deployedAt: string | null | undefined): string {
   return 'just now'
 }
 
+function rowLevel(r: FleetRow): 'fail' | 'warn' | 'ok' {
+  const disk = r.status?.disk
+  const mem = r.status?.memory
+  const http = r.status?.httpStatus
+  const bh = backupAgeHours(r.backup?.lastRun)
+  const ssl = sslDays(r.status?.sslExpiry)
+  if (disk !== undefined && disk > 90) return 'fail'
+  if (mem !== undefined && mem > 90) return 'fail'
+  if (http != null && (http < 200 || http >= 400)) return 'fail'
+  if (r.ciPassRate !== null && r.ciPassRate < 0.7) return 'fail'
+  if (bh !== null && bh > 49) return 'fail'
+  if (r.backup?.status === 'failed') return 'fail'
+  if (disk !== undefined && disk > 75) return 'warn'
+  if (mem !== undefined && mem > 75) return 'warn'
+  if (http != null && http >= 300) return 'warn'
+  if (r.ciPassRate !== null && r.ciPassRate < 0.9) return 'warn'
+  if (bh !== null && bh > 25) return 'warn'
+  if (ssl !== null && ssl < 30) return 'warn'
+  return 'ok'
+}
+
 function httpColor(code: number | null | undefined): string {
   if (code == null) return 'var(--fg-muted)'
   if (code >= 200 && code < 300) return 'var(--ok, #22c55e)'
@@ -105,6 +126,7 @@ function SkeletonRow() {
 
 export default function FleetHealthPage() {
   const [rows, setRows] = useState<FleetRow[] | null>(null)
+  const [filter, setFilter] = useState<'all' | 'warn' | 'fail'>('all')
 
   useEffect(() => {
     let cancelled = false
@@ -148,6 +170,22 @@ export default function FleetHealthPage() {
       </div>
 
       <div className="px-5 md:px-8 py-5">
+        {/* Filter buttons */}
+        <div className="flex items-center gap-1 mb-4">
+          {(['all', 'warn', 'fail'] as const).map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`text-[12px] font-mono px-3 py-1 rounded-lg border transition-colors ${
+                filter === f
+                  ? 'bg-card-2 border-border text-fg'
+                  : 'border-transparent text-subtle hover:text-fg hover:border-border'
+              }`}
+            >
+              {f === 'all' ? 'All' : f === 'warn' ? 'Warning' : 'Failing'}
+            </button>
+          ))}
+        </div>
         {/* Desktop table */}
         <div className="hidden md:block rounded-xl border border-border bg-card overflow-x-auto" style={{ padding: 18 }}>
           <table className="w-full">
@@ -163,7 +201,7 @@ export default function FleetHealthPage() {
             <tbody>
               {rows === null ? (
                 <><SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow /></>
-              ) : rows.map(r => (
+              ) : rows.filter(r => filter === 'all' || (filter === 'fail' ? rowLevel(r) === 'fail' : rowLevel(r) !== 'ok')).map(r => (
                 <tr key={r.name} className="border-t border-border hover:bg-card-hover transition-colors">
                   <td className="py-3 pr-4">
                     <Link href={`/projects/${encodeURIComponent(r.name)}`} className="font-mono text-[13px] font-medium text-fg hover:underline">
@@ -206,7 +244,7 @@ export default function FleetHealthPage() {
                 <div className="w-full h-3 rounded bg-card-2 animate-pulse" />
               </div>
             ))
-          ) : rows.map(r => (
+          ) : rows.filter(r => filter === 'all' || (filter === 'fail' ? rowLevel(r) === 'fail' : rowLevel(r) !== 'ok')).map(r => (
             <div key={r.name} className="rounded-xl border border-border bg-card p-4">
               <div className="flex items-center justify-between mb-2">
                 <Link href={`/projects/${encodeURIComponent(r.name)}`} className="font-mono text-[13px] font-medium text-fg hover:underline">

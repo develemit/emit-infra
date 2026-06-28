@@ -33,6 +33,13 @@ function deriveStats(name: string, runs: CiHistoryEntry[]): ProjectCiStats {
   }
 }
 
+function statsLevel(s: ProjectCiStats): 'fail' | 'warn' | 'ok' {
+  if (s.total === 0) return 'ok'
+  if (s.passRate < 0.7) return 'fail'
+  if (s.passRate < 0.9) return 'warn'
+  return 'ok'
+}
+
 function rateColor(rate: number): string {
   if (rate < 0) return 'var(--fg-muted)'
   if (rate >= 0.9) return 'var(--ok, #22c55e)'
@@ -59,6 +66,7 @@ function SkeletonRow() {
 
 export default function CiPage() {
   const [stats, setStats] = useState<ProjectCiStats[] | null>(null)
+  const [filter, setFilter] = useState<'all' | 'warn' | 'fail'>('all')
 
   useEffect(() => {
     let cancelled = false
@@ -111,6 +119,22 @@ export default function CiPage() {
       </div>
 
       <div className="px-5 md:px-8 py-5">
+        {/* Filter buttons */}
+        <div className="flex items-center gap-1 mb-4">
+          {(['all', 'warn', 'fail'] as const).map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`text-[12px] font-mono px-3 py-1 rounded-lg border transition-colors ${
+                filter === f
+                  ? 'bg-card-2 border-border text-fg'
+                  : 'border-transparent text-subtle hover:text-fg hover:border-border'
+              }`}
+            >
+              {f === 'all' ? 'All' : f === 'warn' ? 'Warning' : 'Failing'}
+            </button>
+          ))}
+        </div>
         {/* Desktop table */}
         <div className="hidden md:block rounded-xl border border-border bg-card" style={{ padding: 18 }}>
           <div className="flex items-center gap-4 pb-3 text-[11px] font-mono text-subtle uppercase tracking-wider">
@@ -129,7 +153,7 @@ export default function CiPage() {
               <SkeletonRow />
             </>
           ) : (
-            stats.map(s => (
+            stats.filter(s => filter === 'all' || (filter === 'fail' ? statsLevel(s) === 'fail' : statsLevel(s) !== 'ok')).map(s => (
               <div
                 key={s.name}
                 className="flex items-center gap-4 py-3 border-t border-border"
@@ -176,7 +200,7 @@ export default function CiPage() {
               ))}
             </>
           ) : (
-            stats.map(s => (
+            stats.filter(s => filter === 'all' || (filter === 'fail' ? statsLevel(s) === 'fail' : statsLevel(s) !== 'ok')).map(s => (
               <div key={s.name} className="rounded-xl border border-border bg-card p-4">
                 <div className="flex items-center justify-between mb-2">
                   <Link href={`/projects/${encodeURIComponent(s.name)}`} className="text-[13px] font-medium text-fg hover:underline">{s.name}</Link>
