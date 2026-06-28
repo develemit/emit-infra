@@ -27,6 +27,7 @@ interface DeployHistoryEntry {
   completedAt: string
   durationSec: number
   servicesBuilt: string[]
+  message?: string
 }
 
 interface CiHistoryEntry {
@@ -36,6 +37,7 @@ interface CiHistoryEntry {
   startedAt: string
   completedAt: string
   durationSec: number
+  message?: string
 }
 
 const MAX_METRIC_POINTS = 500

@@ -222,6 +222,7 @@ export interface DeployHistoryEntry {
   completedAt: string
   durationSec: number
   servicesBuilt: string[]
+  message?: string
 }
 
 export interface DeployHistoryResponse {
@@ -235,6 +236,7 @@ export interface CiHistoryEntry {
   startedAt: string
   completedAt: string
   durationSec: number
+  message?: string
 }
 
 export interface CiHistoryResponse {

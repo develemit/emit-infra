@@ -20,6 +20,7 @@ _EMIT_CI_UTILS_LOADED=1
 
 _EMIT_SHA=""
 _EMIT_BRANCH=""
+_EMIT_MSG=""
 _EMIT_STARTED=""
 _EMIT_STARTED_EPOCH=0
 _EMIT_CI_STEP=0
@@ -56,27 +57,38 @@ _emit_services_json() {
 
 deploy_set_services() { _EMIT_SERVICES_BUILT="$*"; }
 
+_emit_write_atomic() {
+  local content="$1" dest="$2" tmp="${2}.tmp"
+  printf '%s\n' "$content" > "$tmp" && mv "$tmp" "$dest"
+}
+
 ci_init() {
   _EMIT_CI_TOTAL=$1
   _EMIT_CI_STEP=0
   _EMIT_SHA=$(git rev-parse HEAD)
   _EMIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+  _EMIT_MSG=$(git log -1 --format="%s" HEAD 2>/dev/null || true)
+  _EMIT_MSG="${_EMIT_MSG//\"/\\\"}"
   _EMIT_STARTED=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
   _EMIT_STARTED_EPOCH=$(date +%s)
   if mkdir -p ".ci-logs" 2>/dev/null; then
     _EMIT_LOG_FILE=".ci-logs/${_EMIT_SHA}.log"
     exec > >(tee -a "$_EMIT_LOG_FILE") 2>&1
   fi
-  printf '{"status":"running","sha":"%s","branch":"%s","startedAt":"%s","progress":{"step":0,"total":%d,"pct":0,"label":"starting"}}\n' \
-    "$_EMIT_SHA" "$_EMIT_BRANCH" "$_EMIT_STARTED" "$_EMIT_CI_TOTAL" > .ci-status.json
+  _emit_write_atomic \
+    "$(printf '{"status":"running","sha":"%s","branch":"%s","startedAt":"%s","progress":{"step":0,"total":%d,"pct":0,"label":"starting"}}' \
+      "$_EMIT_SHA" "$_EMIT_BRANCH" "$_EMIT_STARTED" "$_EMIT_CI_TOTAL")" \
+    .ci-status.json
 }
 
 ci_step() {
   _EMIT_CI_STEP=$((_EMIT_CI_STEP + 1))
   local pct=$((_EMIT_CI_STEP * 100 / _EMIT_CI_TOTAL))
-  printf '{"status":"running","sha":"%s","branch":"%s","startedAt":"%s","progress":{"step":%d,"total":%d,"pct":%d,"label":"%s"}}\n' \
-    "$_EMIT_SHA" "$_EMIT_BRANCH" "$_EMIT_STARTED" \
-    "$_EMIT_CI_STEP" "$_EMIT_CI_TOTAL" "$pct" "$1" > .ci-status.json
+  _emit_write_atomic \
+    "$(printf '{"status":"running","sha":"%s","branch":"%s","startedAt":"%s","progress":{"step":%d,"total":%d,"pct":%d,"label":"%s"}}' \
+      "$_EMIT_SHA" "$_EMIT_BRANCH" "$_EMIT_STARTED" \
+      "$_EMIT_CI_STEP" "$_EMIT_CI_TOTAL" "$pct" "$1")" \
+    .ci-status.json
 }
 
 ci_done() {
@@ -84,11 +96,13 @@ ci_done() {
   completed_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
   local duration=$(( $(date +%s) - _EMIT_STARTED_EPOCH ))
 
-  printf '{"status":"%s","sha":"%s","branch":"%s","completedAt":"%s"}\n' \
-    "$1" "$_EMIT_SHA" "$_EMIT_BRANCH" "$completed_at" > .ci-status.json
+  _emit_write_atomic \
+    "$(printf '{"status":"%s","sha":"%s","branch":"%s","completedAt":"%s"}' \
+      "$1" "$_EMIT_SHA" "$_EMIT_BRANCH" "$completed_at")" \
+    .ci-status.json
 
-  printf '{"status":"%s","sha":"%s","branch":"%s","startedAt":"%s","completedAt":"%s","durationSec":%d}\n' \
-    "$1" "$_EMIT_SHA" "$_EMIT_BRANCH" "$_EMIT_STARTED" "$completed_at" "$duration" >> .ci-history.jsonl
+  printf '{"status":"%s","sha":"%s","branch":"%s","startedAt":"%s","completedAt":"%s","durationSec":%d,"message":"%s"}\n' \
+    "$1" "$_EMIT_SHA" "$_EMIT_BRANCH" "$_EMIT_STARTED" "$completed_at" "$duration" "$_EMIT_MSG" >> .ci-history.jsonl
 
   _emit_truncate_history .ci-history.jsonl
   [[ -d ".ci-logs" ]] && _emit_rotate_logs .ci-logs
@@ -99,22 +113,28 @@ deploy_init() {
   _EMIT_DEPLOY_STEP=0
   _EMIT_SHA=$(git rev-parse HEAD)
   _EMIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+  _EMIT_MSG=$(git log -1 --format="%s" HEAD 2>/dev/null || true)
+  _EMIT_MSG="${_EMIT_MSG//\"/\\\"}"
   _EMIT_STARTED=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
   _EMIT_STARTED_EPOCH=$(date +%s)
   if mkdir -p ".deploy-logs" 2>/dev/null; then
     _EMIT_DEPLOY_LOG_FILE=".deploy-logs/${_EMIT_SHA}.log"
     exec > >(tee -a "$_EMIT_DEPLOY_LOG_FILE") 2>&1
   fi
-  printf '{"status":"deploying","sha":"%s","branch":"%s","startedAt":"%s","progress":{"step":0,"total":%d,"pct":0,"label":"starting"}}\n' \
-    "$_EMIT_SHA" "$_EMIT_BRANCH" "$_EMIT_STARTED" "$_EMIT_DEPLOY_TOTAL" > .deploy-status.json
+  _emit_write_atomic \
+    "$(printf '{"status":"deploying","sha":"%s","branch":"%s","startedAt":"%s","progress":{"step":0,"total":%d,"pct":0,"label":"starting"}}' \
+      "$_EMIT_SHA" "$_EMIT_BRANCH" "$_EMIT_STARTED" "$_EMIT_DEPLOY_TOTAL")" \
+    .deploy-status.json
 }
 
 deploy_step() {
   _EMIT_DEPLOY_STEP=$((_EMIT_DEPLOY_STEP + 1))
   local pct=$((_EMIT_DEPLOY_STEP * 100 / _EMIT_DEPLOY_TOTAL))
-  printf '{"status":"deploying","sha":"%s","branch":"%s","startedAt":"%s","progress":{"step":%d,"total":%d,"pct":%d,"label":"%s"}}\n' \
-    "$_EMIT_SHA" "$_EMIT_BRANCH" "$_EMIT_STARTED" \
-    "$_EMIT_DEPLOY_STEP" "$_EMIT_DEPLOY_TOTAL" "$pct" "$1" > .deploy-status.json
+  _emit_write_atomic \
+    "$(printf '{"status":"deploying","sha":"%s","branch":"%s","startedAt":"%s","progress":{"step":%d,"total":%d,"pct":%d,"label":"%s"}}' \
+      "$_EMIT_SHA" "$_EMIT_BRANCH" "$_EMIT_STARTED" \
+      "$_EMIT_DEPLOY_STEP" "$_EMIT_DEPLOY_TOTAL" "$pct" "$1")" \
+    .deploy-status.json
 }
 
 deploy_done() {
@@ -122,11 +142,13 @@ deploy_done() {
   completed_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
   local duration=$(( $(date +%s) - _EMIT_STARTED_EPOCH ))
 
-  printf '{"status":"%s","sha":"%s","branch":"%s","completedAt":"%s"}\n' \
-    "$1" "$_EMIT_SHA" "$_EMIT_BRANCH" "$completed_at" > .deploy-status.json
+  _emit_write_atomic \
+    "$(printf '{"status":"%s","sha":"%s","branch":"%s","completedAt":"%s"}' \
+      "$1" "$_EMIT_SHA" "$_EMIT_BRANCH" "$completed_at")" \
+    .deploy-status.json
 
-  printf '{"status":"%s","sha":"%s","branch":"%s","startedAt":"%s","completedAt":"%s","durationSec":%d,"servicesBuilt":%s}\n' \
-    "$1" "$_EMIT_SHA" "$_EMIT_BRANCH" "$_EMIT_STARTED" "$completed_at" "$duration" "$(_emit_services_json)" >> .deploy-history.jsonl
+  printf '{"status":"%s","sha":"%s","branch":"%s","startedAt":"%s","completedAt":"%s","durationSec":%d,"servicesBuilt":%s,"message":"%s"}\n' \
+    "$1" "$_EMIT_SHA" "$_EMIT_BRANCH" "$_EMIT_STARTED" "$completed_at" "$duration" "$(_emit_services_json)" "$_EMIT_MSG" >> .deploy-history.jsonl
 
   _emit_truncate_history .deploy-history.jsonl
   [[ -d ".deploy-logs" ]] && _emit_rotate_logs .deploy-logs

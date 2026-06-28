@@ -96,6 +96,9 @@ export function CiTimeline({ runs, name, repoUrl }: Props) {
                     <span>{formatTimestamp(r.completedAt)}</span>
                     <span>{formatDuration(r.durationSec)}</span>
                   </div>
+                  {r.message && (
+                    <div className="mt-0.5 text-[11px] text-subtle truncate max-w-[420px]">{r.message}</div>
+                  )}
                 </div>
               </div>
             )

@@ -101,6 +101,9 @@ export function DeployTimeline({ deploys, name, repoUrl }: Props) {
                       <span className="truncate max-w-[200px]">{d.servicesBuilt.join(', ')}</span>
                     )}
                   </div>
+                  {d.message && (
+                    <div className="mt-0.5 text-[11px] text-subtle truncate max-w-[420px]">{d.message}</div>
+                  )}
                 </div>
               </div>
             )
