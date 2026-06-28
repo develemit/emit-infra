@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import type { DeployMarker } from './resource-chart'
+import { toPolyline, deployX, formatTimeLabel, formatTooltipTime, timeLabels, filterVisibleDeploys, getChartDimensions, type HoverState } from './full-chart-helpers'
 
 export interface FullChartPoint {
   t: number
@@ -15,55 +16,7 @@ interface Props {
   hours: number
 }
 
-interface HoverState {
-  pct: number
-  point: FullChartPoint
-  deploy: DeployMarker | null
-}
-
-const W = 800
-const H = 200
-
-function toPolyline(points: FullChartPoint[], key: 'cpu' | 'mem' | 'disk'): string {
-  if (points.length < 2) return ''
-  const t0 = points[0]!.t
-  const span = (points[points.length - 1]!.t - t0) || 1
-  return points
-    .map(p => {
-      const x = ((p.t - t0) / span) * W
-      const y = (1 - p[key] / 100) * H
-      return `${x.toFixed(1)},${y.toFixed(1)}`
-    })
-    .join(' ')
-}
-
-function deployX(completedAt: string, t0: number, span: number): number {
-  return ((new Date(completedAt).getTime() - t0) / span) * W
-}
-
-function formatTimeLabel(ts: number, hours: number): string {
-  const d = new Date(ts)
-  if (hours <= 24) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
-  return d.toLocaleDateString([], { month: 'short', day: 'numeric' })
-}
-
-function formatTooltipTime(ts: number): string {
-  return new Date(ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
-}
-
-function timeLabels(points: FullChartPoint[], hours: number): { x: number; label: string }[] {
-  if (points.length < 2) return []
-  const t0 = points[0]!.t
-  const tEnd = points[points.length - 1]!.t
-  const span = tEnd - t0 || 1
-  const count = hours <= 24 ? 6 : hours <= 168 ? 7 : 6
-  const labels: { x: number; label: string }[] = []
-  for (let i = 0; i <= count; i++) {
-    const t = t0 + (span * i) / count
-    labels.push({ x: ((t - t0) / span) * W, label: formatTimeLabel(t, hours) })
-  }
-  return labels
-}
+const { W, H } = getChartDimensions()
 
 function LegendItem({ color, vertical, label }: { color: string; vertical?: boolean; label: string }) {
   return (
@@ -97,10 +50,7 @@ export function FullChart({ points, deploys, hours }: Props) {
   const memFill = hasData ? `0,${H} ${memLine} ${W},${H}` : ''
   const y80 = ((1 - 0.8) * H).toFixed(1)
 
-  const visibleDeploys = (deploys ?? []).filter(d => {
-    const ts = new Date(d.completedAt).getTime()
-    return ts >= t0 && ts <= t0 + span
-  })
+  const visibleDeploys = filterVisibleDeploys(deploys ?? [], t0, span)
 
   const xLabels = hasData ? timeLabels(points, hours) : []
 
@@ -148,21 +98,18 @@ export function FullChart({ points, deploys, hours }: Props) {
         </div>
       ) : (
         <div className="relative" style={{ paddingLeft: 36, paddingBottom: 20 }}>
-          {/* Y-axis */}
           <div className="absolute left-0" style={{ top: 0, bottom: 20, width: 32 }}>
             <span className="absolute right-1 top-0 text-[9px] font-mono text-subtle leading-none">100%</span>
             <span className="absolute right-1 text-[9px] font-mono text-subtle leading-none" style={{ top: '50%', transform: 'translateY(-50%)' }}>50%</span>
             <span className="absolute right-1 bottom-0 text-[9px] font-mono text-subtle leading-none">0%</span>
           </div>
 
-          {/* Chart */}
           <div
             className="relative"
             style={{ height: 200, cursor: 'crosshair' }}
             onMouseMove={onMouseMove}
             onMouseLeave={() => setHover(null)}
           >
-            {/* Hover tooltip */}
             {hover && (
               <div
                 className="absolute z-10 pointer-events-none"
@@ -233,7 +180,6 @@ export function FullChart({ points, deploys, hours }: Props) {
             </svg>
           </div>
 
-          {/* X-axis time labels */}
           <div className="relative" style={{ height: 16 }}>
             {xLabels.map((lbl, i) => (
               <span

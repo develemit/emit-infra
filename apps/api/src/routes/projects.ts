@@ -57,7 +57,7 @@ async function readProjectConfig(name: string): Promise<Record<string, unknown> 
   }
 }
 
-export async function projectRoutes(app: FastifyInstance) {
+export async function projectRoutes(app: FastifyInstance): Promise<void> {
   app.get('/projects', async () => {
     return (await discoverProjects()).map(({ config, configPath, projectDir }) => ({
       config,
@@ -72,7 +72,7 @@ export async function projectRoutes(app: FastifyInstance) {
 
   app.post<{ Params: { name: string }; Body: { config: Record<string, unknown> } }>(
     '/projects/:name/register',
-    async (req, reply) => {
+    async (req, reply): Promise<void> => {
       const { name } = req.params
       const projectDir = join(homedir(), 'projects', name)
       if (!existsSync(projectDir)) {
@@ -84,7 +84,7 @@ export async function projectRoutes(app: FastifyInstance) {
       }
       const config = { name, ...req.body.config }
       await writeFile(configPath, JSON.stringify(config, null, 2) + '\n')
-      return { ok: true, configPath }
+      return void reply.send({ ok: true, configPath })
     },
   )
 
@@ -100,13 +100,13 @@ export async function projectRoutes(app: FastifyInstance) {
     }
   })
 
-  app.get<{ Params: { name: string } }>('/projects/:name/status', async (req, reply) => {
+  app.get<{ Params: { name: string } }>('/projects/:name/status', async (req, reply): Promise<void> => {
     const project = await findProject(req.params.name)
-    if (!project) return reply.status(404).send({ error: 'not found' })
+    if (!project) return void reply.status(404).send({ error: 'not found' })
 
     const cached = statusCache.get(req.params.name)
     if (cached !== undefined) {
-      return cached ?? reply.status(503).send({ error: 'unreachable' })
+      return void (cached ? reply.send(cached) : reply.status(503).send({ error: 'unreachable' }))
     }
 
     const key = sshKeyPath(project.config.sshKeyName)
@@ -152,14 +152,14 @@ export async function projectRoutes(app: FastifyInstance) {
         deployedAt: deployedAtLine || null,
       }
       statusCache.set(req.params.name, data)
-      return data
+      return void reply.send(data)
     } catch {
       statusCache.set(req.params.name, null)
-      return reply.status(503).send({ error: 'unreachable' })
+      return void reply.status(503).send({ error: 'unreachable' })
     }
   })
 
-  app.get<{ Params: { name: string } }>('/projects/:name/docker-usage', async (req, reply) => {
+  app.get<{ Params: { name: string } }>('/projects/:name/docker-usage', async (req, reply): Promise<void> => {
     const project = await findProject(req.params.name)
     if (!project) return reply.status(404).send({ error: 'not found' })
 
@@ -176,13 +176,13 @@ export async function projectRoutes(app: FastifyInstance) {
         const [type, total, active, size, reclaimable] = line.split('\t')
         return { type: type ?? '', total: parseInt(total ?? '0', 10), active: parseInt(active ?? '0', 10), size: size ?? '', reclaimable: reclaimable ?? '' }
       })
-      return rows
+      return void reply.send(rows)
     } catch {
-      return reply.status(503).send({ error: 'unreachable' })
+      return void reply.status(503).send({ error: 'unreachable' })
     }
   })
 
-  app.post<{ Params: { name: string } }>('/projects/:name/prune', async (req, reply) => {
+  app.post<{ Params: { name: string } }>('/projects/:name/prune', async (req, reply): Promise<void> => {
     const project = await findProject(req.params.name)
     if (!project) return reply.status(404).send({ error: 'not found' })
 
@@ -192,7 +192,7 @@ export async function projectRoutes(app: FastifyInstance) {
     try {
       const result = await sshExec(host, 'docker system prune -af 2>&1; echo "---"; docker system df', key)
       statusCache.invalidate(req.params.name)
-      return { ok: true, output: result }
+      return void reply.send({ ok: true, output: result })
     } catch {
       return reply.status(503).send({ error: 'unreachable' })
     }
@@ -200,7 +200,7 @@ export async function projectRoutes(app: FastifyInstance) {
 
   app.post<{ Params: { name: string; container: string } }>(
     '/projects/:name/containers/:container/restart',
-    async (req, reply) => {
+    async (req, reply): Promise<void> => {
       const project = await findProject(req.params.name)
       if (!project) return reply.status(404).send({ error: 'not found' })
 
@@ -210,14 +210,14 @@ export async function projectRoutes(app: FastifyInstance) {
       try {
         const output = await sshExec(host, `docker restart ${req.params.container}`, key)
         containersCache.invalidate(req.params.name)
-        return { ok: true, output }
+        return void reply.send({ ok: true, output })
       } catch (err) {
-        return { ok: false, output: String(err) }
+        return void reply.send({ ok: false, output: String(err) })
       }
     },
   )
 
-  app.get<{ Params: { name: string } }>('/projects/:name/backup-status', async (req, reply) => {
+  app.get<{ Params: { name: string } }>('/projects/:name/backup-status', async (req, reply): Promise<void> => {
     const project = await findProject(req.params.name)
     if (!project) return reply.status(404).send({ error: 'not found' })
 
@@ -226,55 +226,55 @@ export async function projectRoutes(app: FastifyInstance) {
 
     try {
       const raw = await sshExec(host, `cat /opt/${req.params.name}/.backup-status.json 2>/dev/null || echo ""`, key)
-      if (!raw.trim()) return reply.status(404).send({ error: 'no backup status' })
+      if (!raw.trim()) return void reply.status(404).send({ error: 'no backup status' })
       try {
-        return JSON.parse(raw.trim()) as unknown
+        return void reply.send(JSON.parse(raw.trim()) as unknown)
       } catch {
         console.warn(`[backup-status] JSON parse error for ${req.params.name}: ${raw.slice(0, 100)}`)
-        return reply.status(500).send({ error: 'invalid status file' })
+        return void reply.status(500).send({ error: 'invalid status file' })
       }
     } catch {
       return reply.status(503).send({ error: 'unreachable' })
     }
   })
 
-  app.get<{ Params: { name: string } }>('/projects/:name/ci-status', async (req, reply) => {
+  app.get<{ Params: { name: string } }>('/projects/:name/ci-status', async (req, reply): Promise<void> => {
     const filePath = join(homedir(), 'projects', req.params.name, '.ci-status.json')
     try {
       const raw = await readFile(filePath, 'utf8')
       try {
-        return JSON.parse(raw) as unknown
+        return void reply.send(JSON.parse(raw) as unknown)
       } catch {
         console.warn(`[ci-status] JSON parse error for ${req.params.name}: ${raw.slice(0, 100)}`)
-        return reply.status(500).send({ error: 'invalid status file' })
+        return void reply.status(500).send({ error: 'invalid status file' })
       }
     } catch {
-      return reply.status(404).send({ error: 'not found' })
+      return void reply.status(404).send({ error: 'not found' })
     }
   })
 
-  app.get<{ Params: { name: string } }>('/projects/:name/deploy-status', async (req, reply) => {
+  app.get<{ Params: { name: string } }>('/projects/:name/deploy-status', async (req, reply): Promise<void> => {
     const filePath = join(homedir(), 'projects', req.params.name, '.deploy-status.json')
     try {
       const raw = await readFile(filePath, 'utf8')
       try {
-        return JSON.parse(raw) as unknown
+        return void reply.send(JSON.parse(raw) as unknown)
       } catch {
         console.warn(`[deploy-status] JSON parse error for ${req.params.name}: ${raw.slice(0, 100)}`)
-        return reply.status(500).send({ error: 'invalid status file' })
+        return void reply.status(500).send({ error: 'invalid status file' })
       }
     } catch {
-      return reply.status(404).send({ error: 'not found' })
+      return void reply.status(404).send({ error: 'not found' })
     }
   })
 
-  app.get<{ Params: { name: string } }>('/projects/:name/containers', async (req, reply) => {
+  app.get<{ Params: { name: string } }>('/projects/:name/containers', async (req, reply): Promise<void> => {
     const project = await findProject(req.params.name)
-    if (!project) return reply.status(404).send({ error: 'not found' })
+    if (!project) return void reply.status(404).send({ error: 'not found' })
 
     const cached = containersCache.get(req.params.name)
     if (cached !== undefined) {
-      return cached ?? reply.status(503).send({ error: 'unreachable' })
+      return void (cached ? reply.send(cached) : reply.status(503).send({ error: 'unreachable' }))
     }
 
     const key = sshKeyPath(project.config.sshKeyName)
@@ -292,10 +292,10 @@ export async function projectRoutes(app: FastifyInstance) {
           return { name, image, status, state, buildNumber: buildNumber || undefined } as Container
         })
       containersCache.set(req.params.name, containers)
-      return containers
+      return void reply.send(containers)
     } catch {
       containersCache.set(req.params.name, null)
-      return reply.status(503).send({ error: 'unreachable' })
+      return void reply.status(503).send({ error: 'unreachable' })
     }
   })
 }

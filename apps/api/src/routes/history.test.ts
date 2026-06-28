@@ -22,7 +22,7 @@ import { readFile } from 'node:fs/promises'
 import { historyRoutes } from './history.js'
 
 const mockProject = {
-  config: { name: 'myapp', domain: '1.2.3.4', region: 'nbg1' as const, sshKeyName: 'emit-deploy', github: { repo: 'user/myapp' } },
+  config: { name: 'myapp', domain: '1.2.3.4', region: 'nbg1' as const, serverType: 'cx22', sshKeyName: 'emit-deploy', github: { repo: 'user/myapp' } },
   configPath: '/projects/myapp/.emit-infra.json',
   projectDir: '/projects/myapp',
 }

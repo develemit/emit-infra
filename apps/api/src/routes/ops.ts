@@ -23,15 +23,15 @@ interface ChatBody {
 type PendingConf = { toolName: string; projectName: string }
 type ToolResult = { toolName: string; target: string; result: unknown }
 
-export async function opsRoutes(app: FastifyInstance) {
+export async function opsRoutes(app: FastifyInstance): Promise<void> {
   app.get('/ops/session', async () => ({ sessionId: randomUUID() }))
 
-  app.delete<{ Params: { id: string } }>('/ops/session/:id', async (req, reply) => {
+  app.delete<{ Params: { id: string } }>('/ops/session/:id', async (req, reply): Promise<void> => {
     clearHistory(req.params.id)
     return reply.send({ ok: true })
   })
 
-  app.post<{ Body: ChatBody }>('/ops/chat', async (req, reply) => {
+  app.post<{ Body: ChatBody }>('/ops/chat', async (req, reply): Promise<void> => {
     const { sessionId, message, confirmationFor, systemContext } = req.body
 
     // SSE execution path — runs Ansible/Terraform after user confirms
