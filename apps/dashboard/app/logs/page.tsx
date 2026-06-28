@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Icon } from '@/components/icon'
 import { getProjects } from '@/lib/api'
 import type { ProjectSummary } from '@/lib/api'
@@ -38,7 +39,16 @@ export default function LogsPage() {
               ))}
             </>
           ) : projects.length === 0 ? (
-            <p className="text-sm text-subtle">No projects found.</p>
+            <div className="flex flex-col items-start gap-3 px-4 py-6 rounded-xl bg-card border border-border">
+              <Icon name="server" size={20} style={{ color: 'var(--fg-muted)' }} />
+              <div>
+                <p className="text-sm font-medium text-fg mb-1">No projects found</p>
+                <p className="text-xs text-subtle">Add a project to start viewing logs.</p>
+              </div>
+              <Link href="/provision" className="text-xs font-mono text-accent hover:text-accent-bright transition-colors">
+                Go to provision →
+              </Link>
+            </div>
           ) : (
             projects.map(p => (
               <button

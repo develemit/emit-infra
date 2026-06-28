@@ -160,7 +160,7 @@ export function ProjectCard({ project, status, onRetry }: Props) {
           className="flex items-center gap-2 rounded-lg px-3 py-2 text-[12px] text-err border border-err-line bg-err-soft"
         >
           <Icon name="alert" size={15} style={{ color: 'var(--err)', flexShrink: 0 }} />
-          <span>SSH unreachable — last seen 2h ago</span>
+          <span>SSH unreachable — last seen {deployedAgoStr ? `${deployedAgoStr.replace(' ago', '')} ago` : '—'}</span>
           {onRetry && (
             <button
               type="button"

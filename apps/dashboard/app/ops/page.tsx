@@ -93,6 +93,7 @@ function OpsPageInner() {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [loading, setLoading] = useState(false)
+  const [resetting, setResetting] = useState(false)
   const [contextProject, setContextProject] = useState<string | null>(projectName)
   const [statusContext, setStatusContext] = useState<string | null>(null)
   const [contextBuildLabel, setContextBuildLabel] = useState<string>('')
@@ -193,16 +194,21 @@ function OpsPageInner() {
   }
 
   async function handleNewConversation() {
-    if (sessionId) {
-      await fetch(`${apiBase}/ops/session/${sessionId}`, { method: 'DELETE' }).catch(() => {})
-    }
-    setMessages([])
+    setResetting(true)
     try {
-      const res = await fetch(`${apiBase}/ops/session`)
-      const data = await res.json() as { sessionId: string }
-      setSessionId(data.sessionId)
-    } catch {
-      // keep existing session id
+      if (sessionId) {
+        await fetch(`${apiBase}/ops/session/${sessionId}`, { method: 'DELETE' }).catch(() => {})
+      }
+      setMessages([])
+      try {
+        const res = await fetch(`${apiBase}/ops/session`)
+        const data = await res.json() as { sessionId: string }
+        setSessionId(data.sessionId)
+      } catch {
+        // keep existing session id
+      }
+    } finally {
+      setResetting(false)
     }
   }
 
@@ -223,9 +229,10 @@ function OpsPageInner() {
         <div className="flex-1" />
         <button
           onClick={() => void handleNewConversation()}
-          className="text-[12px] text-subtle hover:text-fg transition-colors"
+          disabled={resetting}
+          className="text-[12px] text-subtle hover:text-fg disabled:opacity-50 transition-colors"
         >
-          New conversation
+          {resetting ? 'Resetting…' : 'New conversation'}
         </button>
       </div>
 
