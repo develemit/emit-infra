@@ -2,8 +2,17 @@ import type { FastifyInstance } from 'fastify'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { readFile } from 'node:fs/promises'
+import { z } from 'zod/v4'
 import { readJsonl, downsample } from '../lib/jsonl.js'
 import { findProject } from '../lib/project-helpers.js'
+
+const NameParam = z.object({ name: z.string().min(1).max(100) })
+const ShaParam = z.object({
+  name: z.string().min(1).max(100),
+  sha: z.string().min(7).max(40).regex(/^[a-f0-9]+$/, 'invalid sha'),
+})
+const HoursQuery = z.object({ hours: z.coerce.number().int().min(1).max(720).default(24) })
+const LimitQuery = z.object({ limit: z.coerce.number().int().min(1).max(200).default(50) })
 
 interface MetricPoint {
   t: number
@@ -47,19 +56,18 @@ const MAX_HOURS = 720
 const MAX_HISTORY_LIMIT = 200
 
 export async function historyRoutes(app: FastifyInstance) {
-  app.get<{
-    Params: { name: string }
-    Querystring: { hours?: string }
-  }>('/projects/:name/metrics', async (req, reply) => {
-    const project = await findProject(req.params.name)
+  app.get('/projects/:name/metrics', async (req, reply) => {
+    const params = NameParam.safeParse(req.params)
+    if (!params.success) return reply.status(400).send({ error: params.error.message })
+    const query = HoursQuery.safeParse(req.query)
+    if (!query.success) return reply.status(400).send({ error: query.error.message })
+
+    const project = await findProject(params.data.name)
     if (!project) return reply.status(404).send({ error: 'not found' })
 
-    const hours = Math.min(
-      Math.max(Number(req.query.hours) || 24, 1),
-      MAX_HOURS,
-    )
+    const hours = query.data.hours
     const cutoff = Math.floor(Date.now() / 1000) - hours * 3600
-    const filePath = join(homedir(), 'projects', req.params.name, '.metrics.jsonl')
+    const filePath = join(homedir(), 'projects', params.data.name, '.metrics.jsonl')
 
     const points = await readJsonl<MetricPoint>(
       filePath,
@@ -73,51 +81,46 @@ export async function historyRoutes(app: FastifyInstance) {
     return { points: downsampled, range: { from, to } }
   })
 
-  app.get<{
-    Params: { name: string }
-    Querystring: { limit?: string }
-  }>('/projects/:name/deploy-history', async (req, reply) => {
-    const project = await findProject(req.params.name)
+  app.get('/projects/:name/deploy-history', async (req, reply) => {
+    const params = NameParam.safeParse(req.params)
+    if (!params.success) return reply.status(400).send({ error: params.error.message })
+    const query = LimitQuery.safeParse(req.query)
+    if (!query.success) return reply.status(400).send({ error: query.error.message })
+
+    const project = await findProject(params.data.name)
     if (!project) return reply.status(404).send({ error: 'not found' })
 
-    const limit = Math.min(
-      Math.max(Number(req.query.limit) || 50, 1),
-      MAX_HISTORY_LIMIT,
-    )
-    const filePath = join(homedir(), 'projects', req.params.name, '.deploy-history.jsonl')
-
+    const filePath = join(homedir(), 'projects', params.data.name, '.deploy-history.jsonl')
     const all = await readJsonl<DeployHistoryEntry>(filePath)
-    const deploys = all.slice(-limit).reverse()
+    const deploys = all.slice(-query.data.limit).reverse()
 
     return { deploys }
   })
 
-  app.get<{
-    Params: { name: string }
-    Querystring: { limit?: string }
-  }>('/projects/:name/ci-history', async (req, reply) => {
-    const project = await findProject(req.params.name)
+  app.get('/projects/:name/ci-history', async (req, reply) => {
+    const params = NameParam.safeParse(req.params)
+    if (!params.success) return reply.status(400).send({ error: params.error.message })
+    const query = LimitQuery.safeParse(req.query)
+    if (!query.success) return reply.status(400).send({ error: query.error.message })
+
+    const project = await findProject(params.data.name)
     if (!project) return reply.status(404).send({ error: 'not found' })
 
-    const limit = Math.min(
-      Math.max(Number(req.query.limit) || 50, 1),
-      MAX_HISTORY_LIMIT,
-    )
-    const filePath = join(homedir(), 'projects', req.params.name, '.ci-history.jsonl')
-
+    const filePath = join(homedir(), 'projects', params.data.name, '.ci-history.jsonl')
     const all = await readJsonl<CiHistoryEntry>(filePath)
-    const runs = all.slice(-limit).reverse()
+    const runs = all.slice(-query.data.limit).reverse()
 
     return { runs }
   })
 
-  app.get<{ Params: { name: string; sha: string } }>(
+  app.get(
     '/projects/:name/ci-log/:sha',
     async (req, reply) => {
-      if (req.params.sha.includes('/')) return reply.status(400).send({ error: 'invalid sha' })
-      const project = await findProject(req.params.name)
+      const params = ShaParam.safeParse(req.params)
+      if (!params.success) return reply.status(400).send({ error: params.error.message })
+      const project = await findProject(params.data.name)
       if (!project) return reply.status(404).send({ error: 'not found' })
-      const filePath = join(homedir(), 'projects', req.params.name, '.ci-logs', `${req.params.sha}.log`)
+      const filePath = join(homedir(), 'projects', params.data.name, '.ci-logs', `${params.data.sha}.log`)
       try {
         const content = await readFile(filePath, 'utf8')
         return reply.type('text/plain').send(content)
@@ -127,13 +130,14 @@ export async function historyRoutes(app: FastifyInstance) {
     },
   )
 
-  app.get<{ Params: { name: string; sha: string } }>(
+  app.get(
     '/projects/:name/deploy-log/:sha',
     async (req, reply) => {
-      if (req.params.sha.includes('/')) return reply.status(400).send({ error: 'invalid sha' })
-      const project = await findProject(req.params.name)
+      const params = ShaParam.safeParse(req.params)
+      if (!params.success) return reply.status(400).send({ error: params.error.message })
+      const project = await findProject(params.data.name)
       if (!project) return reply.status(404).send({ error: 'not found' })
-      const filePath = join(homedir(), 'projects', req.params.name, '.deploy-logs', `${req.params.sha}.log`)
+      const filePath = join(homedir(), 'projects', params.data.name, '.deploy-logs', `${params.data.sha}.log`)
       try {
         const content = await readFile(filePath, 'utf8')
         return reply.type('text/plain').send(content)
@@ -143,14 +147,16 @@ export async function historyRoutes(app: FastifyInstance) {
     },
   )
 
-  app.get<{ Params: { name: string } }>(
+  app.get(
     '/projects/:name/disk-trend',
     async (req, reply) => {
-      const project = await findProject(req.params.name)
+      const params = NameParam.safeParse(req.params)
+      if (!params.success) return reply.status(400).send({ error: params.error.message })
+      const project = await findProject(params.data.name)
       if (!project) return reply.status(404).send({ error: 'not found' })
 
       const cutoff = Math.floor(Date.now() / 1000) - 48 * 3600
-      const filePath = join(homedir(), 'projects', req.params.name, '.metrics.jsonl')
+      const filePath = join(homedir(), 'projects', params.data.name, '.metrics.jsonl')
       const points = await readJsonl<MetricPoint>(
         filePath,
         (p) => typeof p.t === 'number' && p.t >= cutoff && typeof p.disk === 'number' && !('error' in p),
@@ -181,14 +187,16 @@ export async function historyRoutes(app: FastifyInstance) {
     },
   )
 
-  app.get<{ Params: { name: string } }>(
+  app.get(
     '/projects/:name/memory-trend',
     async (req, reply) => {
-      const project = await findProject(req.params.name)
+      const params = NameParam.safeParse(req.params)
+      if (!params.success) return reply.status(400).send({ error: params.error.message })
+      const project = await findProject(params.data.name)
       if (!project) return reply.status(404).send({ error: 'not found' })
 
       const cutoff = Math.floor(Date.now() / 1000) - 48 * 3600
-      const filePath = join(homedir(), 'projects', req.params.name, '.metrics.jsonl')
+      const filePath = join(homedir(), 'projects', params.data.name, '.metrics.jsonl')
       const points = await readJsonl<MetricPoint>(
         filePath,
         (p) => typeof p.t === 'number' && p.t >= cutoff && typeof p.mem === 'number' && !('error' in p),
@@ -219,16 +227,17 @@ export async function historyRoutes(app: FastifyInstance) {
     },
   )
 
-  app.get<{
-    Params: { name: string }
-    Querystring: { hours?: string }
-  }>('/projects/:name/container-restarts', async (req, reply) => {
-    const project = await findProject(req.params.name)
+  app.get('/projects/:name/container-restarts', async (req, reply) => {
+    const params = NameParam.safeParse(req.params)
+    if (!params.success) return reply.status(400).send({ error: params.error.message })
+    const query = HoursQuery.safeParse(req.query)
+    if (!query.success) return reply.status(400).send({ error: query.error.message })
+
+    const project = await findProject(params.data.name)
     if (!project) return reply.status(404).send({ error: 'not found' })
 
-    const hours = Math.min(Math.max(Number(req.query.hours) || 24, 1), MAX_HOURS)
-    const cutoff = Math.floor(Date.now() / 1000) - hours * 3600
-    const filePath = join(homedir(), 'projects', req.params.name, '.metrics.jsonl')
+    const cutoff = Math.floor(Date.now() / 1000) - query.data.hours * 3600
+    const filePath = join(homedir(), 'projects', params.data.name, '.metrics.jsonl')
 
     const points = await readJsonl<MetricPoint>(
       filePath,

@@ -1,13 +1,20 @@
 import type { FastifyInstance } from 'fastify'
+import { z } from 'zod/v4'
 import { sshExec } from '@emit-infra/core'
 import { writeEvent } from '../lib/write-sse.js'
 import { openSse, sseError } from '../lib/open-sse.js'
 import { findProject, sshKeyPath } from '../lib/project-helpers.js'
 
+const NameParam = z.object({ name: z.string().min(1).max(100) })
+const RollbackBody = z.object({
+  timestamp: z.string().min(1).max(100).regex(/^[a-zA-Z0-9_.-]+$/, 'invalid timestamp format').optional(),
+})
 
 export async function rollbackRoutes(app: FastifyInstance) {
-  app.get<{ Params: { name: string } }>('/projects/:name/rollback/snapshots', async (req, reply) => {
-    const project = await findProject(req.params.name)
+  app.get('/projects/:name/rollback/snapshots', async (req, reply) => {
+    const params = NameParam.safeParse(req.params)
+    if (!params.success) return reply.status(400).send({ error: params.error.message })
+    const project = await findProject(params.data.name)
     if (!project) return reply.status(404).send({ error: 'not found' })
 
     const key = sshKeyPath(project.config.sshKeyName)
@@ -32,17 +39,22 @@ export async function rollbackRoutes(app: FastifyInstance) {
     }
   })
 
-  app.post<{ Params: { name: string }; Body: { timestamp?: string } }>(
+  app.post(
     '/projects/:name/rollback',
     async (req, reply) => {
-      const project = await findProject(req.params.name)
+      const params = NameParam.safeParse(req.params)
+      if (!params.success) return reply.status(400).send({ error: params.error.message })
+      const body = RollbackBody.safeParse(req.body)
+      if (!body.success) return reply.status(400).send({ error: body.error.message })
+
+      const project = await findProject(params.data.name)
       if (!project) return reply.status(404).send({ error: 'not found' })
 
       const key = sshKeyPath(project.config.sshKeyName)
       const host = project.config.serverIp ?? project.config.domain
       const appDir = project.config.deploy?.appDir ?? '/app'
       const composeFile = project.config.deploy?.composeDest ?? 'docker-compose.yml'
-      const tagStr = req.body?.timestamp ?? 'rollback'
+      const tagStr = body.data.timestamp ?? 'rollback'
 
       openSse(reply)
 

@@ -3,10 +3,16 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
+import { z } from 'zod/v4'
 import { execa } from 'execa'
 import { writeEvent } from '../lib/write-sse.js'
 import { openSse, sseError } from '../lib/open-sse.js'
 import { findProject } from '../lib/project-helpers.js'
+
+const NameParam = z.object({ name: z.string().min(1).max(100) })
+const SecretsSyncBody = z.object({
+  envFile: z.string().min(1).max(500).refine(s => !s.includes('..'), 'path traversal not allowed').optional(),
+})
 
 function parseEnvFile(content: string): [string, string][] {
   return content
@@ -33,14 +39,19 @@ function findLocalhostValues(entries: [string, string][]): [string, string][] {
 
 
 export async function secretsSyncRoutes(app: FastifyInstance) {
-  app.post<{ Params: { name: string }; Body?: { envFile?: string } }>(
+  app.post(
     '/projects/:name/secrets-sync',
     async (req, reply) => {
-      const project = await findProject(req.params.name)
+      const params = NameParam.safeParse(req.params)
+      if (!params.success) return reply.status(400).send({ error: params.error.message })
+      const body = SecretsSyncBody.safeParse(req.body)
+      if (!body.success) return reply.status(400).send({ error: body.error.message })
+
+      const project = await findProject(params.data.name)
       if (!project) return reply.status(404).send({ error: 'not found' })
 
-      const projectDir = join(homedir(), 'projects', req.params.name)
-      const envFilePath = req.body?.envFile
+      const projectDir = join(homedir(), 'projects', params.data.name)
+      const envFilePath = body.data.envFile
         ?? (existsSync(join(projectDir, '.env.prod'))
           ? join(projectDir, '.env.prod')
           : join(projectDir, '.env'))
@@ -48,7 +59,7 @@ export async function secretsSyncRoutes(app: FastifyInstance) {
       openSse(reply)
 
       if (!existsSync(envFilePath)) {
-        return sseError(reply.raw, `No env file found (.env.prod or .env) in ~/projects/${req.params.name}/`)
+        return sseError(reply.raw, `No env file found (.env.prod or .env) in ~/projects/${params.data.name}/`)
       }
 
       const content = await readFile(envFilePath, 'utf-8')

@@ -2,12 +2,17 @@ import type { FastifyInstance } from 'fastify'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { access, mkdir, writeFile } from 'node:fs/promises'
+import { z } from 'zod/v4'
 import { runAnsible, runTerraform, getTerraformOutput, sshMuxArgs } from '@emit-infra/core'
 import { scaffoldProject, writeInventory } from '../lib/scaffold-project.js'
 import { writeEvent } from '../lib/write-sse.js'
 import { openSse, sseError } from '../lib/open-sse.js'
 import { streamProcess } from '../lib/stream-process.js'
 import { findProject, sshKeyPath } from '../lib/project-helpers.js'
+
+const NameParam = z.object({ name: z.string().min(1).max(100).regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/, 'invalid project name') })
+const ProvisionBody = z.object({ config: z.record(z.string(), z.unknown()).optional() })
+const LogsQuery = z.object({ service: z.string().min(1).max(200).regex(/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/, 'invalid service name').optional() })
 
 const OPERATION_TIMEOUT_MS = 15 * 60 * 1000
 
@@ -19,11 +24,14 @@ function operationTimeout(): Promise<never> {
 
 
 export async function operationRoutes(app: FastifyInstance) {
-  app.post<{ Params: { name: string } }>('/projects/:name/deploy', async (req, reply) => {
-    const project = await findProject(req.params.name)
+  app.post('/projects/:name/deploy', async (req, reply) => {
+    const params = NameParam.safeParse(req.params)
+    if (!params.success) return reply.status(400).send({ error: params.error.message })
+
+    const project = await findProject(params.data.name)
     if (!project) return reply.status(404).send({ error: 'not found' })
 
-    const name = req.params.name
+    const name = params.data.name
     const inventory = join(homedir(), 'projects', name, 'inventory.ini')
 
     openSse(reply)
@@ -59,12 +67,17 @@ export async function operationRoutes(app: FastifyInstance) {
     reply.raw.end()
   })
 
-  app.post<{ Params: { name: string }; Body: { config?: Record<string, unknown> } }>(
+  app.post(
     '/projects/:name/provision',
     async (req, reply) => {
-    const name = req.params.name
+    const params = NameParam.safeParse(req.params)
+    if (!params.success) return reply.status(400).send({ error: params.error.message })
+    const body = ProvisionBody.safeParse(req.body)
+    if (!body.success) return reply.status(400).send({ error: body.error.message })
+
+    const name = params.data.name
     const existing = await findProject(name)
-    const config = req.body?.config
+    const config = body.data.config
 
     if (!existing) {
       if (!config) return reply.status(404).send({ error: 'not found' })
@@ -120,11 +133,14 @@ export async function operationRoutes(app: FastifyInstance) {
   },
   )
 
-  app.post<{ Params: { name: string } }>('/projects/:name/destroy', async (req, reply) => {
-    const project = await findProject(req.params.name)
+  app.post('/projects/:name/destroy', async (req, reply) => {
+    const params = NameParam.safeParse(req.params)
+    if (!params.success) return reply.status(400).send({ error: params.error.message })
+
+    const project = await findProject(params.data.name)
     if (!project) return reply.status(404).send({ error: 'not found' })
 
-    const name = req.params.name
+    const name = params.data.name
     const terraformDir = join(homedir(), 'projects', name, 'terraform')
 
     openSse(reply)
@@ -152,15 +168,20 @@ export async function operationRoutes(app: FastifyInstance) {
     reply.raw.end()
   })
 
-  app.get<{ Params: { name: string }; Querystring: { service?: string } }>(
+  app.get(
     '/projects/:name/logs',
     async (req, reply) => {
-      const project = await findProject(req.params.name)
+      const params = NameParam.safeParse(req.params)
+      if (!params.success) return reply.status(400).send({ error: params.error.message })
+      const query = LogsQuery.safeParse(req.query)
+      if (!query.success) return reply.status(400).send({ error: query.error.message })
+
+      const project = await findProject(params.data.name)
       if (!project) return reply.status(404).send({ error: 'not found' })
 
       const key = sshKeyPath(project.config.sshKeyName)
       const host = project.config.serverIp ?? project.config.domain
-      const service = req.query.service ?? ''
+      const service = query.data.service ?? ''
 
       reply.hijack()
       reply.raw.writeHead(200, {
