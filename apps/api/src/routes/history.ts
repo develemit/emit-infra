@@ -216,4 +216,30 @@ export async function historyRoutes(app: FastifyInstance) {
       return { mem: currentMem, pctPerDay, projectedDaysUntilFull }
     },
   )
+
+  app.get<{
+    Params: { name: string }
+    Querystring: { hours?: string }
+  }>('/projects/:name/container-restarts', async (req, reply) => {
+    const project = await findProject(req.params.name)
+    if (!project) return reply.status(404).send({ error: 'not found' })
+
+    const hours = Math.min(Math.max(Number(req.query.hours) || 24, 1), MAX_HOURS)
+    const cutoff = Math.floor(Date.now() / 1000) - hours * 3600
+    const filePath = join(homedir(), 'projects', req.params.name, '.metrics.jsonl')
+
+    const points = await readJsonl<MetricPoint>(
+      filePath,
+      (p) => typeof p.t === 'number' && p.t >= cutoff && Array.isArray(p.containers) && !('error' in p),
+    )
+
+    const result: Record<string, { t: number; restarts: number }[]> = {}
+    for (const point of points) {
+      for (const c of point.containers) {
+        if (!result[c.name]) result[c.name] = []
+        result[c.name]!.push({ t: point.t, restarts: c.restarts })
+      }
+    }
+    return result
+  })
 }

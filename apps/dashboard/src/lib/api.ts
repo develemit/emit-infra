@@ -284,6 +284,14 @@ export async function getMemoryTrend(name: string): Promise<MemoryTrend | null> 
   return res.json() as Promise<MemoryTrend>
 }
 
+export type ContainerRestartSeries = Record<string, { t: number; restarts: number }[]>
+
+export async function getContainerRestarts(name: string, hours = 24): Promise<ContainerRestartSeries> {
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/container-restarts?hours=${hours}`, { cache: 'no-store' })
+  if (!res.ok) return {}
+  return res.json() as Promise<ContainerRestartSeries>
+}
+
 export interface BackupStatus {
   lastRun: string
   status: 'ok' | 'failed'

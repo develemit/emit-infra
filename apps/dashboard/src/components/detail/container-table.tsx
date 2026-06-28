@@ -5,6 +5,31 @@ import { Icon } from '@/components/icon'
 import { Badge, type BadgeVariant } from '@/components/ui/badge'
 import type { Container, MetricPoint } from '@/lib/api'
 import { restartContainer } from '@/lib/api'
+import { useContainerRestarts } from '@/lib/use-container-restarts'
+
+function RestartSparkline({ points }: { points: { t: number; restarts: number }[] }) {
+  if (points.length < 2) return null
+  const maxR = Math.max(...points.map(p => p.restarts))
+  if (maxR === 0) return null
+
+  const W = 60, H = 16
+  const pts = points.map((p, i) => {
+    const x = (i / (points.length - 1)) * W
+    const y = H - (p.restarts / maxR) * (H - 2) - 1
+    return `${x.toFixed(1)},${y.toFixed(1)}`
+  }).join(' ')
+
+  const oneHourAgo = Date.now() / 1000 - 3600
+  const recent = points.filter(p => p.t >= oneHourAgo)
+  const increased = recent.length >= 2 && recent[recent.length - 1].restarts > recent[0].restarts
+  const color = increased ? 'var(--err)' : 'var(--fg-muted)'
+
+  return (
+    <svg width={W} height={H} style={{ display: 'block', flexShrink: 0 }}>
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
 
 function stateBadge(state: string): BadgeVariant {
   const s = state.toLowerCase()
@@ -130,6 +155,7 @@ function sortByMemory(containers: Container[], metrics: Map<string, ContainerMet
 export function ContainerTable({ containers, projectName, onRefetch, latestMetric }: ContainerTableProps) {
   const [restartingSet, setRestartingSet] = useState<Set<string>>(new Set())
   const cMetrics = metricsMap(latestMetric)
+  const restartSeries = useContainerRestarts(projectName)
   const sorted = latestMetric ? sortByMemory(containers, cMetrics) : sortContainers(containers)
   const runningCount = containers.filter(c => c.state.toLowerCase() === 'running').length
   const logsBase = `/projects/${encodeURIComponent(projectName)}/logs`
@@ -203,8 +229,15 @@ export function ContainerTable({ containers, projectName, onRefetch, latestMetri
                       <td className="font-mono text-[12px] text-subtle py-3 pr-3 whitespace-nowrap">
                         {cm ? `${cm.memMb.toFixed(0)} MB` : '—'}
                       </td>
-                      <td className="font-mono text-[12px] py-3 pr-3 whitespace-nowrap" style={{ color: cm && cm.restarts > 0 ? 'var(--err)' : 'var(--subtle)' }}>
-                        {cm ? cm.restarts : '—'}
+                      <td className="font-mono text-[12px] py-3 pr-3 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <span style={{ color: cm && cm.restarts > 0 ? 'var(--err)' : 'var(--subtle)' }}>
+                            {cm ? cm.restarts : '—'}
+                          </span>
+                          {restartSeries[c.name] && (
+                            <RestartSparkline points={restartSeries[c.name]} />
+                          )}
+                        </div>
                       </td>
                       <td className="py-3 pr-3">
                         <Badge variant={stateBadge(c.state)} dot>{c.state}</Badge>
