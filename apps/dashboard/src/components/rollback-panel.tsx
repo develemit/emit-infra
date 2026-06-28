@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { Terminal } from '@/components/ui/terminal'
 import { Icon } from '@/components/icon'
 import { getRollbackSnapshots, rollbackProject } from '@/lib/api'
+import { useToast } from '@/components/ui/toast'
 
 interface RollbackPanelProps {
   name: string
@@ -72,9 +73,16 @@ export function RollbackPanel({ name, onClose }: RollbackPanelProps) {
   const [sseBody, setSseBody] = useState('')
   const [active, setActive] = useState(false)
 
+  const { showToast } = useToast()
   const { lines, exit } = useRollbackSse(sseUrl, sseBody, active)
   const running = active && exit === undefined
   const done = active && exit !== undefined
+
+  useEffect(() => {
+    if (exit === undefined) return
+    if (exit === 0) showToast('Rollback completed', 'success')
+    else showToast('Rollback failed', 'error')
+  }, [exit, showToast])
 
   useEffect(() => {
     void getRollbackSnapshots(name).then(snaps => {

@@ -5,6 +5,7 @@ import './globals.css'
 import { Shell } from '@/components/shell/shell'
 import { SwRegister } from '@/components/sw-register'
 import { SplashGate } from '@/components/splash-screen'
+import { ToastProvider } from '@/components/ui/toast'
 
 export const metadata: Metadata = {
   title: 'Emit Infra',
@@ -41,9 +42,11 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body>
-        <Shell>{children}</Shell>
-        <SwRegister />
-        <SplashGate />
+        <ToastProvider>
+          <Shell>{children}</Shell>
+          <SwRegister />
+          <SplashGate />
+        </ToastProvider>
       </body>
     </html>
   )

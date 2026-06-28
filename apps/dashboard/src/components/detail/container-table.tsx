@@ -6,6 +6,7 @@ import { Badge, type BadgeVariant } from '@/components/ui/badge'
 import type { Container, MetricPoint } from '@/lib/api'
 import { restartContainer } from '@/lib/api'
 import { useContainerRestarts } from '@/lib/use-container-restarts'
+import { useToast } from '@/components/ui/toast'
 
 function RestartSparkline({ points }: { points: { t: number; restarts: number }[] }) {
   if (points.length < 2) return null
@@ -70,12 +71,16 @@ function MContainer({
 }) {
   const [restarting, setRestarting] = useState(false)
   const variant = stateBadge(c.state)
+  const { showToast } = useToast()
 
   async function handleRestart() {
     setRestarting(true)
     try {
       await restartContainer(projectName, c.name)
+      showToast(`Restarted ${c.name}`, 'success')
       onRefetch?.()
+    } catch {
+      showToast(`Failed to restart ${c.name}`, 'error')
     } finally {
       setRestarting(false)
     }
@@ -154,6 +159,7 @@ function sortByMemory(containers: Container[], metrics: Map<string, ContainerMet
 
 export function ContainerTable({ containers, projectName, onRefetch, latestMetric }: ContainerTableProps) {
   const [restartingSet, setRestartingSet] = useState<Set<string>>(new Set())
+  const { showToast } = useToast()
   const cMetrics = metricsMap(latestMetric)
   const restartSeries = useContainerRestarts(projectName)
   const sorted = latestMetric ? sortByMemory(containers, cMetrics) : sortContainers(containers)
@@ -164,7 +170,10 @@ export function ContainerTable({ containers, projectName, onRefetch, latestMetri
     setRestartingSet(prev => new Set(prev).add(containerName))
     try {
       await restartContainer(projectName, containerName)
+      showToast(`Restarted ${containerName}`, 'success')
       onRefetch?.()
+    } catch {
+      showToast(`Failed to restart ${containerName}`, 'error')
     } finally {
       setRestartingSet(prev => {
         const next = new Set(prev)

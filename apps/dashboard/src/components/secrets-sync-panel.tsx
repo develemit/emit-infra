@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { Terminal } from '@/components/ui/terminal'
 import { Icon } from '@/components/icon'
 import { syncSecrets } from '@/lib/api'
+import { useToast } from '@/components/ui/toast'
 
 interface SecretsSyncPanelProps {
   name: string
@@ -18,10 +19,17 @@ export function SecretsSyncPanel({ name, onClose }: SecretsSyncPanelProps) {
   const [lines, setLines] = useState<string[]>([])
   const [exit, setExit] = useState<number | undefined>()
 
+  const { showToast } = useToast()
   const { url } = syncSecrets(name)
   const running = exit === undefined
   const failed = exit !== undefined && exit !== 0
   const title = `secrets-sync · ${name}`
+
+  useEffect(() => {
+    if (exit === undefined) return
+    if (exit === 0) showToast('Secrets synced', 'success')
+    else showToast('Secrets sync failed', 'error')
+  }, [exit, showToast])
 
   useEffect(() => {
     const ctrl = new AbortController()

@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { Terminal } from '@/components/ui/terminal'
 import { Icon } from '@/components/icon'
+import { useToast } from '@/components/ui/toast'
 
 interface DeployPanelProps {
   url: string
@@ -53,9 +54,16 @@ function useDeploySse(url: string) {
 }
 
 export function DeployPanel({ url, name, onClose }: DeployPanelProps) {
+  const { showToast } = useToast()
   const { lines, exit } = useDeploySse(url)
   const running = exit === undefined
   const title = `deploy · ${name}`
+
+  useEffect(() => {
+    if (exit === undefined) return
+    if (exit === 0) showToast(`Deployed ${name}`, 'success')
+    else showToast(`Deploy failed for ${name}`, 'error')
+  }, [exit, name, showToast])
 
   const termContent = lines.map((l, i) => (
     <div key={i} className="ec-ln">{l}</div>
