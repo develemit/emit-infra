@@ -269,6 +269,19 @@ export async function getDiskTrend(name: string): Promise<DiskTrend | null> {
   return res.json() as Promise<DiskTrend>
 }
 
+export interface MemoryTrend {
+  mem: number
+  pctPerDay: number
+  projectedDaysUntilFull: number | null
+}
+
+export async function getMemoryTrend(name: string): Promise<MemoryTrend | null> {
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/memory-trend`, { cache: 'no-store' })
+  if (res.status === 404) return null
+  if (!res.ok) return null
+  return res.json() as Promise<MemoryTrend>
+}
+
 export interface BackupStatus {
   lastRun: string
   status: 'ok' | 'failed'

@@ -33,8 +33,9 @@ function sslDaysLeft(expiry: string | null | undefined): { value: string; color?
   if (isNaN(expiryDate.getTime())) return { value: '—' }
   const days = Math.floor((expiryDate.getTime() - Date.now()) / 86_400_000)
   if (days < 0) return { value: 'Expired', color: 'var(--err)' }
-  if (days < 14) return { value: `${days}d`, color: 'var(--warn, #e5a00d)' }
-  return { value: `${days}d` }
+  if (days < 7) return { value: `${days}d`, color: 'var(--err)' }
+  if (days < 30) return { value: `${days}d`, color: 'var(--warn, #e5a00d)' }
+  return { value: `${days}d`, color: 'var(--ok, #22c55e)' }
 }
 
 function nginxLabel(status: string | null | undefined): { value: string; color?: string } {

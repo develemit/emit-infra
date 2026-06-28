@@ -41,8 +41,9 @@ function sslDaysLeft(expiry: string | null | undefined): { value: string; color?
   if (isNaN(expiryDate.getTime())) return { value: '—', days: Infinity }
   const days = Math.floor((expiryDate.getTime() - Date.now()) / 86_400_000)
   if (days < 0) return { value: 'Expired', color: 'var(--err)', days }
-  if (days < 14) return { value: `${days}d`, color: 'var(--warn, #e5a00d)', days }
-  return { value: `${days}d`, days }
+  if (days < 7) return { value: `${days}d`, color: 'var(--err)', days }
+  if (days < 30) return { value: `${days}d`, color: 'var(--warn, #e5a00d)', days }
+  return { value: `${days}d`, color: 'var(--ok, #22c55e)', days }
 }
 
 function deployedAgo(epoch: string | null | undefined): string {
@@ -101,7 +102,7 @@ export function ProjectCard({ project, status, onRetry }: Props) {
       {/* Region badge */}
       <div className="flex flex-wrap gap-1.5">
         <Badge variant="region">{region}</Badge>
-        {status?.sslExpiry && ssl.days <= 30 && (
+        {status?.sslExpiry && (
           <span className="text-[11px] font-mono px-1.5 py-0.5 rounded" style={{ color: ssl.color, background: 'var(--card-2)', border: '1px solid var(--border)' }}>
             SSL {ssl.value}
           </span>

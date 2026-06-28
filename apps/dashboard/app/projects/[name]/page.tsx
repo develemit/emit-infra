@@ -25,6 +25,7 @@ import { useServerMetrics } from '@/lib/use-server-metrics'
 import { useDeployMarkers } from '@/lib/use-deploy-markers'
 import { useCiHistory } from '@/lib/use-ci-history'
 import { useDiskTrend } from '@/lib/use-disk-trend'
+import { useMemoryTrend } from '@/lib/use-memory-trend'
 import { useBackupStatus } from '@/lib/use-backup-status'
 
 export default function ProjectDetailPage() {
@@ -92,6 +93,7 @@ export default function ProjectDetailPage() {
   const { deploys } = useDeployMarkers(name)
   const { runs: ciRuns } = useCiHistory(name)
   const diskTrend = useDiskTrend(name)
+  const memoryTrend = useMemoryTrend(name)
   const backupStatus = useBackupStatus(name)
 
   const chartHistory = serverPoints.length >= 2
@@ -197,6 +199,11 @@ export default function ProjectDetailPage() {
               {diskTrend !== null && diskTrend.projectedDaysUntilFull !== null && diskTrend.disk > 75 && (
                 <div className="text-[12px] font-mono px-3 py-2 rounded-lg border" style={{ color: 'var(--warn, #e5a00d)', borderColor: 'var(--border)', background: 'var(--card-2)' }}>
                   Disk trending: +{diskTrend.pctPerDay.toFixed(1)}%/day · full in ~{Math.round(diskTrend.projectedDaysUntilFull)}d
+                </div>
+              )}
+              {memoryTrend !== null && memoryTrend.projectedDaysUntilFull !== null && memoryTrend.mem > 75 && (
+                <div className="text-[12px] font-mono px-3 py-2 rounded-lg border" style={{ color: 'var(--warn, #e5a00d)', borderColor: 'var(--border)', background: 'var(--card-2)' }}>
+                  Mem trending: +{memoryTrend.pctPerDay.toFixed(1)}%/day · full in ~{Math.round(memoryTrend.projectedDaysUntilFull)}d
                 </div>
               )}
               {backupStatus !== null && (() => {
