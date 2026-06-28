@@ -5,14 +5,14 @@ file to promote items into proper sprints when the list grows worth addressing.
 
 - (sprint 76, 2026-06-20) Docker layer progress output (hundreds of `\r`-terminated lines) appears in deploy logs — noisy but readable. Could add `--quiet` to docker push/pull in individual deploy scripts if it becomes a problem.
 - (sprint 79, 2026-06-20) `ansi-to-html` is instantiated with `escapeXML: false` — if logs contain HTML-like strings (e.g. JSX error output with `<div>`), those render as raw HTML. Acceptable for now; revisit if it produces unexpected rendering.
-- (sprint 85, 2026-06-20) Disk trend regression uses last 48h window only. Bursty disk usage could skew the slope. A 7-day window would be smoother — adjust the cutoff constant in `apps/api/src/routes/history.ts` if needed.
+~~- (sprint 85, 2026-06-20) Disk trend regression uses last 48h window only. Bursty disk usage could skew the slope. A 7-day window would be smoother — adjust the cutoff constant in `apps/api/src/routes/history.ts` if needed.~~
 - (sprint 60, 2026-06-16) emit-vision `infra/scripts/migrate.sh` fallback path (`docker run`) needs `GHCR_ORG` + `IMAGE_TAG` env vars — verify ops runbook mentions these when using the fallback
 - (sprint 72, 2026-06-18) emit-vision has two containers both named "backup" (pg-backup and ch-backup share the suffix) — could disambiguate with a longer name extraction if needed
-- (sprint 91, 2026-06-27) If a dead man's switch independent of emit-infra's Mac uptime is desired for emit-vision, add a healthchecks.io check via a lightweight cron container (the `uptime-ping` Docker service referenced in the original sprint no longer exists)
+~~- (sprint 91, 2026-06-27) If a dead man's switch independent of emit-infra's Mac uptime is desired for emit-vision, add a healthchecks.io check via a lightweight cron container (the `uptime-ping` Docker service referenced in the original sprint no longer exists)~~
 - (sprint 93 demoted, 2026-06-27) martialops server provision + first deploy — no Hetzner server exists; nginx vhost on tastease points to `proxy_pass http://127.0.0.1:4000` with no container. Steps: `terraform apply` in `~/projects/martialops/terraform/` (cx23 nbg1, ~€6/mo — confirm with user first), update `.emit-infra.json` serverIp, run `scripts/deploy.sh`, commit staged `/healthz` route + nginx config (requires postgres locally for pre-commit hook), update Cloudflare DNS for `api.martialops.app`, `www.martialops.app`, and `martialops.app` apex. See sprint-93 file in git history for full task breakdown. `[hold]`
 
-<!-- follow-up-scan: date=2026-06-27 through=91 clean=false -->
-> _Sprint scan: incremental scan 2026-06-27 through sprint-91. Discoveries: sprint-92 (CI page polish), sprint-93 (martialops launch). Prior scan: 2026-06-27 through sprint-88._
+<!-- follow-up-scan: date=2026-06-28 through=111 clean=false -->
+> _Sprint scan: incremental scan 2026-06-28 through sprint-111. Discoveries: sprint-112 (test coverage expansion), sprint-113 (fleet/CI filter counts), sprint-114 (SSE auth token-in-query), sprint-115 (healthchecks.io DMS), sprint-116 (disk/memory trend 7d window). Prior scan: 2026-06-27 through sprint-91._
 
 - (sprint 04, 2026-06-03) `pnpm build` fails on `/_error` and `/500` static pre-render — `<Html>` outside pages/_document error in Next.js 15.5.19 (upstream bug; dev server and typecheck/lint are clean) `[hold]`
 - (sprint 04, 2026-06-03) Provision wizard uses local Zod schema mirroring `ProjectConfigSchema` — consider extracting shared browser-safe types into `@emit-infra/types`; run `/plan-sprint "shared types package"` to plan `[hold]`
@@ -25,6 +25,14 @@ file to promote items into proper sprints when the list grows worth addressing.
 - (sprint 40, 2026-06-11) Blue-green slot-aware port selection in `emit-infra status` — active slot may use a different API port than `config.deploy.appPort`. Revisit once blue-green is production-proven on emit-vision. `[hold]`
 
 ## ✅ Converted to Sprints
+
+- ~~(sprint 85, 2026-06-20) Disk trend 48h window too short~~ → sprint-116 (2026-06-28)
+- ~~(sprint 91, 2026-06-27) healthchecks.io DMS for emit-vision Mac uptime independence~~ → sprint-115 (2026-06-28)
+- ~~(sprint 102, 2026-06-28) SSE endpoints bypass auth (EventSource can't send custom headers)~~ → sprint-114 (2026-06-28)
+- ~~(sprint 103, 2026-06-28) SSE streaming has no retry / auth gap~~ → sprint-114 (2026-06-28)
+- ~~(sprint 106, 2026-06-28) Fleet/CI filter buttons show no counts~~ → sprint-113 (2026-06-28)
+- ~~(sprint 107–111, 2026-06-28) Test coverage gaps: hooks (use-project-detail, use-ops-chat), helpers (full-chart-helpers, container-row), trend API routes~~ → sprint-112 (2026-06-28)
+- ~~(sprint 108/111, 2026-06-28) Coverage thresholds at 50% — raise after more tests~~ → sprint-112 (2026-06-28)
 
 - ~~(sprint 87, 2026-06-21) CI flakiness page doesn't auto-refresh~~ → sprint-92 (2026-06-27)
 - ~~(sprint 87, 2026-06-21) CI flakiness page project rows not linked to project detail~~ → sprint-92 (2026-06-27)
