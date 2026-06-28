@@ -226,7 +226,12 @@ export async function projectRoutes(app: FastifyInstance) {
     try {
       const raw = await sshExec(host, `cat /opt/${req.params.name}/.backup-status.json 2>/dev/null || echo ""`, key)
       if (!raw.trim()) return reply.status(404).send({ error: 'no backup status' })
-      return JSON.parse(raw.trim()) as unknown
+      try {
+        return JSON.parse(raw.trim()) as unknown
+      } catch {
+        console.warn(`[backup-status] JSON parse error for ${req.params.name}: ${raw.slice(0, 100)}`)
+        return reply.status(500).send({ error: 'invalid status file' })
+      }
     } catch {
       return reply.status(503).send({ error: 'unreachable' })
     }
@@ -236,7 +241,12 @@ export async function projectRoutes(app: FastifyInstance) {
     const filePath = join(homedir(), 'projects', req.params.name, '.ci-status.json')
     try {
       const raw = await readFile(filePath, 'utf8')
-      return JSON.parse(raw) as unknown
+      try {
+        return JSON.parse(raw) as unknown
+      } catch {
+        console.warn(`[ci-status] JSON parse error for ${req.params.name}: ${raw.slice(0, 100)}`)
+        return reply.status(500).send({ error: 'invalid status file' })
+      }
     } catch {
       return reply.status(404).send({ error: 'not found' })
     }
@@ -246,7 +256,12 @@ export async function projectRoutes(app: FastifyInstance) {
     const filePath = join(homedir(), 'projects', req.params.name, '.deploy-status.json')
     try {
       const raw = await readFile(filePath, 'utf8')
-      return JSON.parse(raw) as unknown
+      try {
+        return JSON.parse(raw) as unknown
+      } catch {
+        console.warn(`[deploy-status] JSON parse error for ${req.params.name}: ${raw.slice(0, 100)}`)
+        return reply.status(500).send({ error: 'invalid status file' })
+      }
     } catch {
       return reply.status(404).send({ error: 'not found' })
     }

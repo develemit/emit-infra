@@ -114,15 +114,15 @@ export async function historyRoutes(app: FastifyInstance) {
   app.get<{ Params: { name: string; sha: string } }>(
     '/projects/:name/ci-log/:sha',
     async (req, reply) => {
-      if (req.params.sha.includes('/')) return reply.status(400).send('invalid sha')
+      if (req.params.sha.includes('/')) return reply.status(400).send({ error: 'invalid sha' })
       const project = await findProject(req.params.name)
-      if (!project) return reply.status(404).send('not found')
+      if (!project) return reply.status(404).send({ error: 'not found' })
       const filePath = join(homedir(), 'projects', req.params.name, '.ci-logs', `${req.params.sha}.log`)
       try {
         const content = await readFile(filePath, 'utf8')
         return reply.type('text/plain').send(content)
       } catch {
-        return reply.status(404).send('log not found')
+        return reply.status(404).send({ error: 'log not found' })
       }
     },
   )
@@ -130,15 +130,15 @@ export async function historyRoutes(app: FastifyInstance) {
   app.get<{ Params: { name: string; sha: string } }>(
     '/projects/:name/deploy-log/:sha',
     async (req, reply) => {
-      if (req.params.sha.includes('/')) return reply.status(400).send('invalid sha')
+      if (req.params.sha.includes('/')) return reply.status(400).send({ error: 'invalid sha' })
       const project = await findProject(req.params.name)
-      if (!project) return reply.status(404).send('not found')
+      if (!project) return reply.status(404).send({ error: 'not found' })
       const filePath = join(homedir(), 'projects', req.params.name, '.deploy-logs', `${req.params.sha}.log`)
       try {
         const content = await readFile(filePath, 'utf8')
         return reply.type('text/plain').send(content)
       } catch {
-        return reply.status(404).send('log not found')
+        return reply.status(404).send({ error: 'log not found' })
       }
     },
   )
