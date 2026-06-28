@@ -9,6 +9,7 @@ const NAV = [
   { id: 'logs', href: '/logs', label: 'Logs', icon: 'logs' },
   { id: 'ci', href: '/ci', label: 'CI', icon: 'zap' },
   { id: 'ops', href: '/ops', label: 'Ops', icon: 'ops' },
+  { id: 'health', href: '/health', label: 'Fleet', icon: 'layers' },
 ] as const
 
 interface TabBarProps {
