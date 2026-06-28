@@ -12,7 +12,22 @@ import { startStatusMonitor } from './lib/status-monitor.js'
 
 const app = Fastify({ logger: process.env['NODE_ENV'] === 'development' ? { level: 'warn' } : true })
 
-await app.register(cors, { origin: '*' })
+await app.register(cors, { origin: '*', allowedHeaders: ['Content-Type', 'Authorization'] })
+
+// Shared-secret auth — only active when API_SECRET env var is set (skip in dev)
+const API_SECRET = process.env['API_SECRET']
+if (API_SECRET) {
+  app.addHook('onRequest', async (req, reply) => {
+    if (req.method === 'OPTIONS' || req.url === '/health') return
+    const auth = req.headers['authorization']
+    if (auth !== `Bearer ${API_SECRET}`) {
+      return reply.status(401).send({ error: 'unauthorized' })
+    }
+  })
+}
+
+app.get('/health', async () => ({ ok: true }))
+
 await app.register(projectRoutes)
 await app.register(operationRoutes)
 await app.register(rollbackRoutes)

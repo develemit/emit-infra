@@ -1,7 +1,13 @@
 const API_BASE = process.env['NEXT_PUBLIC_API_URL'] ?? '/api'
+const API_SECRET = process.env['NEXT_PUBLIC_API_SECRET']
 
 export function getApiBase(): string {
   return API_BASE
+}
+
+function authHeaders(): Record<string, string> {
+  if (!API_SECRET) return {}
+  return { Authorization: `Bearer ${API_SECRET}` }
 }
 
 export type SseEvent =
@@ -57,7 +63,7 @@ export interface Container {
 }
 
 async function apiFetch<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, { cache: 'no-store' })
+  const res = await fetch(`${API_BASE}${path}`, { cache: 'no-store', headers: authHeaders() })
   if (!res.ok) throw new Error(`API error ${res.status}: ${path}`)
   return res.json() as Promise<T>
 }
@@ -67,14 +73,14 @@ export function getProjects(): Promise<ProjectSummary[]> {
 }
 
 export async function getStatus(name: string): Promise<ProjectStatus> {
-  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/status`, { cache: 'no-store' })
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/status`, { cache: 'no-store', headers: authHeaders() })
   if (res.status === 503) return res.json() as Promise<ProjectStatus>
   if (!res.ok) throw new Error(`API error ${res.status}`)
   return res.json() as Promise<ProjectStatus>
 }
 
 export async function getContainers(name: string): Promise<Container[]> {
-  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/containers`, { cache: 'no-store' })
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/containers`, { cache: 'no-store', headers: authHeaders() })
   if (res.status === 503) return []
   if (!res.ok) throw new Error(`API error ${res.status}`)
   const data = await res.json() as Container[] | { error: string }
@@ -95,7 +101,7 @@ export async function registerProject(
 ): Promise<void> {
   const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/register`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ config }),
   })
   if (!res.ok) throw new Error(`Register failed: ${res.status}`)
@@ -119,7 +125,7 @@ export async function restartContainer(
 ): Promise<{ ok: boolean; output: string }> {
   const res = await fetch(
     `${API_BASE}/projects/${encodeURIComponent(name)}/containers/${encodeURIComponent(container)}/restart`,
-    { method: 'POST', cache: 'no-store' },
+    { method: 'POST', cache: 'no-store', headers: authHeaders() },
   )
   if (!res.ok) throw new Error(`Restart failed: ${res.status}`)
   return res.json() as Promise<{ ok: boolean; output: string }>
@@ -145,7 +151,7 @@ export type DeployStatus = CiStatus
 
 export async function getCiStatus(name: string): Promise<CiStatus | null> {
   try {
-    const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/ci-status`, { cache: 'no-store' })
+    const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/ci-status`, { cache: 'no-store', headers: authHeaders() })
     if (!res.ok) return null
     return res.json() as Promise<CiStatus>
   } catch {
@@ -155,7 +161,7 @@ export async function getCiStatus(name: string): Promise<CiStatus | null> {
 
 export async function getDeployStatus(name: string): Promise<DeployStatus | null> {
   try {
-    const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/deploy-status`, { cache: 'no-store' })
+    const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/deploy-status`, { cache: 'no-store', headers: authHeaders() })
     if (!res.ok) return null
     return res.json() as Promise<DeployStatus>
   } catch {
@@ -167,6 +173,7 @@ export async function pruneDocker(name: string): Promise<{ ok: boolean; output: 
   const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/prune`, {
     method: 'POST',
     cache: 'no-store',
+    headers: authHeaders(),
   })
   if (!res.ok) throw new Error(`Prune failed: ${res.status}`)
   return res.json() as Promise<{ ok: boolean; output: string }>
@@ -267,7 +274,7 @@ export interface DiskTrend {
 }
 
 export async function getDiskTrend(name: string): Promise<DiskTrend | null> {
-  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/disk-trend`, { cache: 'no-store' })
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/disk-trend`, { cache: 'no-store', headers: authHeaders() })
   if (res.status === 404) return null
   if (!res.ok) return null
   return res.json() as Promise<DiskTrend>
@@ -280,7 +287,7 @@ export interface MemoryTrend {
 }
 
 export async function getMemoryTrend(name: string): Promise<MemoryTrend | null> {
-  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/memory-trend`, { cache: 'no-store' })
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/memory-trend`, { cache: 'no-store', headers: authHeaders() })
   if (res.status === 404) return null
   if (!res.ok) return null
   return res.json() as Promise<MemoryTrend>
@@ -289,7 +296,7 @@ export async function getMemoryTrend(name: string): Promise<MemoryTrend | null> 
 export type ContainerRestartSeries = Record<string, { t: number; restarts: number }[]>
 
 export async function getContainerRestarts(name: string, hours = 24): Promise<ContainerRestartSeries> {
-  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/container-restarts?hours=${hours}`, { cache: 'no-store' })
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/container-restarts?hours=${hours}`, { cache: 'no-store', headers: authHeaders() })
   if (!res.ok) return {}
   return res.json() as Promise<ContainerRestartSeries>
 }
@@ -300,21 +307,21 @@ export interface BackupStatus {
 }
 
 export async function getBackupStatus(name: string): Promise<BackupStatus | null> {
-  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/backup-status`, { cache: 'no-store' })
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/backup-status`, { cache: 'no-store', headers: authHeaders() })
   if (res.status === 404) return null
   if (!res.ok) return null
   return res.json() as Promise<BackupStatus>
 }
 
 export async function getCiLog(name: string, sha: string): Promise<string> {
-  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/ci-log/${encodeURIComponent(sha)}`, { cache: 'no-store' })
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/ci-log/${encodeURIComponent(sha)}`, { cache: 'no-store', headers: authHeaders() })
   if (res.status === 404) return ''
   if (!res.ok) throw new Error(`getCiLog failed: ${res.status}`)
   return res.text()
 }
 
 export async function getDeployLog(name: string, sha: string): Promise<string> {
-  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/deploy-log/${encodeURIComponent(sha)}`, { cache: 'no-store' })
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/deploy-log/${encodeURIComponent(sha)}`, { cache: 'no-store', headers: authHeaders() })
   if (res.status === 404) return ''
   if (!res.ok) throw new Error(`getDeployLog failed: ${res.status}`)
   return res.text()
