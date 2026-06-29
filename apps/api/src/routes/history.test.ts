@@ -202,3 +202,100 @@ describe('GET /projects/:name/deploy-log/:sha', () => {
     expect(res.statusCode).toBe(404)
   })
 })
+
+describe('GET /projects/:name/disk-trend', () => {
+  let app: FastifyInstance
+  beforeEach(async () => { vi.clearAllMocks(); app = makeApp(); await app.ready() })
+  afterEach(async () => { await app.close() })
+
+  it('returns disk trend data on happy path (enough points)', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    const now = Math.floor(Date.now() / 1000)
+    const pts = Array.from({ length: 6 }, (_, i) => ({
+      t: now - (5 - i) * 3600, disk: 50 + i, mem: 30, cpu: 10, memUsedMb: 300, memTotalMb: 1000,
+      diskUsedGb: '10G', diskTotalGb: '20G', netRxBytes: 0, netTxBytes: 0, containers: [],
+    }))
+    vi.mocked(readJsonl).mockResolvedValue(pts)
+
+    const res = await app.inject({ method: 'GET', url: '/projects/myapp/disk-trend' })
+    expect(res.statusCode).toBe(200)
+    const data = res.json() as { disk: number; pctPerDay: number; projectedDaysUntilFull: number | null }
+    expect(typeof data.disk).toBe('number')
+    expect(typeof data.pctPerDay).toBe('number')
+  })
+
+  it('returns pctPerDay=0 when fewer than 5 points', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    vi.mocked(readJsonl).mockResolvedValue([
+      { t: 1000, disk: 55, mem: 30, cpu: 0, memUsedMb: 300, memTotalMb: 1000,
+        diskUsedGb: '10G', diskTotalGb: '20G', netRxBytes: 0, netTxBytes: 0, containers: [] },
+    ])
+
+    const res = await app.inject({ method: 'GET', url: '/projects/myapp/disk-trend' })
+    expect(res.statusCode).toBe(200)
+    const data = res.json() as { pctPerDay: number }
+    expect(data.pctPerDay).toBe(0)
+  })
+
+  it('returns 404 when project not found', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([])
+    const res = await app.inject({ method: 'GET', url: '/projects/missing/disk-trend' })
+    expect(res.statusCode).toBe(404)
+  })
+})
+
+describe('GET /projects/:name/memory-trend', () => {
+  let app: FastifyInstance
+  beforeEach(async () => { vi.clearAllMocks(); app = makeApp(); await app.ready() })
+  afterEach(async () => { await app.close() })
+
+  it('returns memory trend data on happy path (enough points)', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    const now = Math.floor(Date.now() / 1000)
+    const pts = Array.from({ length: 6 }, (_, i) => ({
+      t: now - (5 - i) * 3600, mem: 40 + i, disk: 50, cpu: 10, memUsedMb: 400, memTotalMb: 1000,
+      diskUsedGb: '10G', diskTotalGb: '20G', netRxBytes: 0, netTxBytes: 0, containers: [],
+    }))
+    vi.mocked(readJsonl).mockResolvedValue(pts)
+
+    const res = await app.inject({ method: 'GET', url: '/projects/myapp/memory-trend' })
+    expect(res.statusCode).toBe(200)
+    const data = res.json() as { mem: number; pctPerDay: number; projectedDaysUntilFull: number | null }
+    expect(typeof data.mem).toBe('number')
+    expect(typeof data.pctPerDay).toBe('number')
+  })
+
+  it('returns 404 when project not found', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([])
+    const res = await app.inject({ method: 'GET', url: '/projects/missing/memory-trend' })
+    expect(res.statusCode).toBe(404)
+  })
+})
+
+describe('GET /projects/:name/container-restarts', () => {
+  let app: FastifyInstance
+  beforeEach(async () => { vi.clearAllMocks(); app = makeApp(); await app.ready() })
+  afterEach(async () => { await app.close() })
+
+  it('returns restart timelines per container on happy path', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    const pts = [
+      { t: 1000, mem: 30, disk: 50, cpu: 10, memUsedMb: 300, memTotalMb: 1000,
+        diskUsedGb: '10G', diskTotalGb: '20G', netRxBytes: 0, netTxBytes: 0,
+        containers: [{ name: 'api', cpu: 5, memMb: 100, restarts: 2 }] },
+    ]
+    vi.mocked(readJsonl).mockResolvedValue(pts)
+
+    const res = await app.inject({ method: 'GET', url: '/projects/myapp/container-restarts' })
+    expect(res.statusCode).toBe(200)
+    const data = res.json() as Record<string, { t: number; restarts: number }[]>
+    expect(data['api']).toBeDefined()
+    expect(data['api']![0]!.restarts).toBe(2)
+  })
+
+  it('returns 404 when project not found', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([])
+    const res = await app.inject({ method: 'GET', url: '/projects/missing/container-restarts' })
+    expect(res.statusCode).toBe(404)
+  })
+})

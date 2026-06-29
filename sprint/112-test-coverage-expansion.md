@@ -56,13 +56,35 @@ Coverage thresholds in both `apps/api/vitest.config.ts` and `apps/dashboard/vite
 
 ## Acceptance criteria
 
-- [ ] `use-project-detail.test.ts` exists with ≥3 passing tests
-- [ ] `use-ops-chat.test.ts` exists with ≥4 passing tests
-- [ ] `full-chart-helpers.test.ts` exists with ≥5 passing tests
-- [ ] disk-trend, memory-trend, and container-restarts routes have test coverage in API test suite
-- [ ] Both vitest configs have `lines: 65, functions: 65`
-- [ ] `pnpm nx test api --skip-nx-cache` passes
-- [ ] `pnpm nx test dashboard --skip-nx-cache` passes
+- [x] `use-project-detail.test.ts` exists with ≥3 passing tests
+- [x] `use-ops-chat.test.ts` exists with ≥4 passing tests
+- [x] `full-chart-helpers.test.ts` exists with ≥5 passing tests
+- [x] disk-trend, memory-trend, and container-restarts routes have test coverage in API test suite
+- [x] Both vitest configs have `lines: 65, functions: 65`
+- [x] `pnpm nx test api --skip-nx-cache` passes
+- [x] `pnpm nx test dashboard --skip-nx-cache` passes
+
+## Completed
+
+**Date:** 2026-06-28
+
+### Summary
+Added `use-project-detail.test.ts` (4 tests: loading state, status populated, fetchData refetch, deployUrl derivation), `use-ops-chat.test.ts` (4 tests: session init, submit message, clearContext, handleNewConversation), and `full-chart-helpers.test.ts` (9 tests covering toPolyline, deployX, formatTimeLabel, formatTooltipTime, timeLabels, filterVisibleDeploys). Extended `history.test.ts` with 7 new tests covering disk-trend (happy path, insufficient points, 404), memory-trend (happy path, 404), and container-restarts (happy path, 404). Added `@` path alias to dashboard vitest config and raised thresholds to 65% in both configs. API: 35 tests total. Dashboard: 29 tests total.
+
+### Files changed
+- (new) `apps/dashboard/src/lib/use-project-detail.test.ts` — 4 tests
+- (new) `apps/dashboard/src/lib/use-ops-chat.test.ts` — 4 tests
+- (new) `apps/dashboard/src/components/detail/full-chart-helpers.test.ts` — 9 tests
+- `apps/api/src/routes/history.test.ts` — +7 tests (disk-trend, memory-trend, container-restarts)
+- `apps/api/vitest.config.ts` — thresholds raised from 50 to 65
+- `apps/dashboard/vitest.config.ts` — added `@` alias + thresholds raised from 50 to 65
+
+### Verification
+- `pnpm nx test api --skip-nx-cache`: 35/35 pass
+- `pnpm nx test dashboard --skip-nx-cache`: 29/29 pass
+
+### Follow-ups
+- `[defer]` container-row.tsx React components still untested — defer to visual-test sprint
 
 ## Out of scope
 
