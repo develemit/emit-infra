@@ -155,7 +155,7 @@ export async function historyRoutes(app: FastifyInstance) {
       const project = await findProject(params.data.name)
       if (!project) return reply.status(404).send({ error: 'not found' })
 
-      const cutoff = Math.floor(Date.now() / 1000) - 48 * 3600
+      const cutoff = Math.floor(Date.now() / 1000) - 7 * 24 * 3600
       const filePath = join(homedir(), 'projects', params.data.name, '.metrics.jsonl')
       const points = await readJsonl<MetricPoint>(
         filePath,
@@ -195,7 +195,7 @@ export async function historyRoutes(app: FastifyInstance) {
       const project = await findProject(params.data.name)
       if (!project) return reply.status(404).send({ error: 'not found' })
 
-      const cutoff = Math.floor(Date.now() / 1000) - 48 * 3600
+      const cutoff = Math.floor(Date.now() / 1000) - 7 * 24 * 3600
       const filePath = join(homedir(), 'projects', params.data.name, '.metrics.jsonl')
       const points = await readJsonl<MetricPoint>(
         filePath,

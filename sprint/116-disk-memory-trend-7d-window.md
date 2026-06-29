@@ -31,8 +31,25 @@ The client-side hooks (`apps/dashboard/src/lib/use-disk-trend.ts` and `use-memor
 
 ## Acceptance criteria
 
-- [ ] Both disk-trend and memory-trend cutoffs use `7 * 24 * 3600` (168h)
-- [ ] `pnpm nx typecheck api --skip-nx-cache` clean
+- [x] Both disk-trend and memory-trend cutoffs use `7 * 24 * 3600` (168h)
+- [x] `pnpm nx typecheck api --skip-nx-cache` clean
+
+## Completed
+
+**Date:** 2026-06-29
+
+### Summary
+Changed the disk-trend and memory-trend cutoff windows from 48 hours to 7 days (168 hours) in the history route handlers. This gives the linear regression a smoother, less bursty signal for projecting disk/memory exhaustion dates.
+
+### Files changed
+- `apps/api/src/routes/history.ts` — changed both `48 * 3600` cutoffs to `7 * 24 * 3600`
+
+### Verification
+- `pnpm nx typecheck api --skip-nx-cache`: clean
+- Code inspection: both cutoff lines at 158 and 198 confirmed updated
+
+### Follow-ups
+- none
 
 ## Out of scope
 
