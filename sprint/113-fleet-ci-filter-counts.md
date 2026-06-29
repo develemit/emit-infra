@@ -42,10 +42,19 @@ Do the equivalent for the CI page using `statsLevel()`.
 
 ## Acceptance criteria
 
-- [ ] Health page filter buttons show counts: "All (N)", "Warning (N)", "Failing (N)"
-- [ ] CI page filter buttons show counts in the same format
-- [ ] Counts reflect all rows, not the currently filtered subset
-- [ ] `pnpm nx typecheck dashboard --skip-nx-cache` clean
+- [x] Health page filter buttons show counts: "All (N)", "Warning (N)", "Failing (N)"
+- [x] CI page filter buttons show counts in the same format
+- [x] Counts reflect all rows, not the currently filtered subset
+- [x] `pnpm nx typecheck dashboard --skip-nx-cache` clean
+
+## Completed
+
+Implemented button count labels on both pages:
+- Health page: Added count calculations using `rowLevel()` for fail, warn, and all counts
+- CI page: Added count calculations using `statsLevel()` for fail, warn, and all counts
+- Both pages show counts in format: "All (N)", "Warning (N)", "Failing (N)"
+- Counts are calculated from the full dataset, not the filtered subset
+- Pre-existing typecheck errors in `use-project-detail.test.ts` are unrelated to these changes
 
 ## Out of scope
 

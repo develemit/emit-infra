@@ -121,19 +121,50 @@ export default function CiPage() {
       <div className="px-5 md:px-8 py-5">
         {/* Filter buttons */}
         <div className="flex items-center gap-1 mb-4">
-          {(['all', 'warn', 'fail'] as const).map(f => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`text-[12px] font-mono px-3 py-1 rounded-lg border transition-colors ${
-                filter === f
-                  ? 'bg-card-2 border-border text-fg'
-                  : 'border-transparent text-subtle hover:text-fg hover:border-border'
-              }`}
-            >
-              {f === 'all' ? 'All' : f === 'warn' ? 'Warning' : 'Failing'}
-            </button>
-          ))}
+          {stats && (() => {
+            const failCount = stats.filter(s => statsLevel(s) === 'fail').length
+            const warnCount = stats.filter(s => statsLevel(s) !== 'ok' && statsLevel(s) !== 'fail').length
+            const allCount = stats.length
+            return (
+              <>
+                {(['all', 'warn', 'fail'] as const).map(f => {
+                  const count = f === 'all' ? allCount : f === 'warn' ? warnCount : failCount
+                  const label = f === 'all' ? 'All' : f === 'warn' ? 'Warning' : 'Failing'
+                  return (
+                    <button
+                      key={f}
+                      onClick={() => setFilter(f)}
+                      className={`text-[12px] font-mono px-3 py-1 rounded-lg border transition-colors ${
+                        filter === f
+                          ? 'bg-card-2 border-border text-fg'
+                          : 'border-transparent text-subtle hover:text-fg hover:border-border'
+                      }`}
+                    >
+                      {label} ({count})
+                    </button>
+                  )
+                })}
+              </>
+            )
+          })()}
+          {!stats && (
+            <>
+              {(['all', 'warn', 'fail'] as const).map(f => (
+                <button
+                  key={f}
+                  onClick={() => setFilter(f)}
+                  className={`text-[12px] font-mono px-3 py-1 rounded-lg border transition-colors ${
+                    filter === f
+                      ? 'bg-card-2 border-border text-fg'
+                      : 'border-transparent text-subtle hover:text-fg hover:border-border'
+                  }`}
+                  disabled
+                >
+                  {f === 'all' ? 'All' : f === 'warn' ? 'Warning' : 'Failing'}
+                </button>
+              ))}
+            </>
+          )}
         </div>
         {/* Desktop table */}
         <div className="hidden md:block rounded-xl border border-border bg-card" style={{ padding: 18 }}>
