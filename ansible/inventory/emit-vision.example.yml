@@ -106,6 +106,12 @@ all:
       # Docker compose file name in the app directory (used in deploy playbooks)
       compose_dest: "docker-compose.yml"
 
+      # ── Dead man's switch (healthchecks.io) ─────────────────────────
+      # The infra stack's dms-ping service pings this URL every 5 min.
+      # Create a check at healthchecks.io (15-min period, 5-min grace)
+      # and add HEALTHCHECKS_URL=<ping-url> to the .env file.
+      # If the Hetzner server goes offline, healthchecks.io fires an alert.
+
       # Commands to run after deploy via `docker compose exec`
       # Example: run migrations, cache warming, smoke tests
       # post_deploy_exec:
