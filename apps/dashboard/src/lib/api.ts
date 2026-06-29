@@ -351,7 +351,10 @@ export async function getDeployLog(name: string, sha: string): Promise<string> {
 }
 
 export function openSseStream(path: string): EventSource {
-  return new EventSource(`${API_BASE}${path}`)
+  const base = `${API_BASE}${path}`
+  if (!API_SECRET) return new EventSource(base)
+  const sep = path.includes('?') ? '&' : '?'
+  return new EventSource(`${base}${sep}token=${encodeURIComponent(API_SECRET)}`)
 }
 
 export function provisionProject(

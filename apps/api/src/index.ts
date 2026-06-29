@@ -19,7 +19,8 @@ const API_SECRET = process.env['API_SECRET']
 if (API_SECRET) {
   app.addHook('onRequest', async (req, reply) => {
     if (req.method === 'OPTIONS' || req.url === '/health') return
-    const auth = req.headers['authorization']
+    const tokenParam = (req.query as Record<string, string | undefined>)['token']
+    const auth = req.headers['authorization'] ?? (tokenParam ? `Bearer ${tokenParam}` : undefined)
     if (auth !== `Bearer ${API_SECRET}`) {
       return reply.status(401).send({ error: 'unauthorized' })
     }
