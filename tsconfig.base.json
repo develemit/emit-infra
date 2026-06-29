@@ -16,7 +16,8 @@
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "paths": {
-      "@emit-infra/core": ["packages/core/src/index.ts"]
+      "@emit-infra/core": ["packages/core/src/index.ts"],
+      "@emit-infra/types": ["packages/types/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]
