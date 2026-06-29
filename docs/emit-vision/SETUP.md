@@ -148,3 +148,42 @@ Managed resources:
 Team-tier customers at 10M events/mo each begin to stress disk at 5–6 concurrent
 customers. Mitigation: 64 KB/event + 1 MB/batch hard limits (sprint 74) and SDK-side
 truncation (sprint 75).
+
+## Running migrations
+
+Database and ClickHouse migrations run automatically on every deploy. However, you can
+run them manually using the `infra/scripts/migrate.sh` script if needed (e.g., to apply
+a hotfix schema change outside the normal deploy cycle).
+
+### Required environment variables
+
+- **`SERVER_IP`** — Hetzner floating IP address. Already in `secrets.prod.env`.
+- **`GHCR_ORG`** — GitHub organization that owns the container registry (e.g. `develemit`).
+  The script pulls from `ghcr.io/$GHCR_ORG/emit-api:$IMAGE_TAG`.
+- **`IMAGE_TAG`** — (Optional) Image tag to pull. Defaults to `latest` if unset. Set this
+  to a specific tag (e.g. `v1.2.3`) to run migrations against a known version.
+
+### Example invocation
+
+From the emit-vision monorepo root:
+
+```bash
+set -a && source infra/secrets.prod.env && set +a
+GHCR_ORG=develemit IMAGE_TAG=latest bash infra/scripts/migrate.sh
+```
+
+This passes `SERVER_IP` from secrets and runs migrations on the production server.
+
+### How the script works
+
+The script connects to the server via SSH and runs both database and ClickHouse migrations.
+For each migration type:
+
+1. **Primary path:** Attempts `docker compose exec` into the running API container
+   (fast, used during a normal running deployment)
+2. **Fallback path:** If the container is not running, falls back to `docker run`
+   (used during incident response when the app is down; requires `GHCR_ORG` and `IMAGE_TAG`)
+
+The fallback is most relevant when responding to a production incident: if the app
+crashed or is stopped, you can still run migrations by pulling a known image tag,
+executing the migrations in a temporary container, and letting it exit.
