@@ -1,3 +1,5 @@
+import type { ProjectConfig } from '@emit-infra/types'
+
 const API_BASE = process.env['NEXT_PUBLIC_API_URL'] ?? '/api'
 const API_SECRET = process.env['NEXT_PUBLIC_API_SECRET']
 
@@ -15,12 +17,7 @@ export type SseEvent =
   | { type: 'done'; exitCode: number }
   | { type: 'error'; message: string }
 
-export interface ProjectConfig {
-  name: string
-  domain: string
-  region: string
-  github?: { repo: string }
-}
+export type { ProjectConfig }
 
 export interface ProjectSummary {
   config: ProjectConfig
