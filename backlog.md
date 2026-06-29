@@ -11,6 +11,8 @@ file to promote items into proper sprints when the list grows worth addressing.
 ~~- (sprint 91, 2026-06-27) If a dead man's switch independent of emit-infra's Mac uptime is desired for emit-vision, add a healthchecks.io check via a lightweight cron container (the `uptime-ping` Docker service referenced in the original sprint no longer exists)~~
 - (sprint 93 demoted, 2026-06-27) martialops server provision + first deploy — no Hetzner server exists; nginx vhost on tastease points to `proxy_pass http://127.0.0.1:4000` with no container. Steps: `terraform apply` in `~/projects/martialops/terraform/` (cx23 nbg1, ~€6/mo — confirm with user first), update `.emit-infra.json` serverIp, run `scripts/deploy.sh`, commit staged `/healthz` route + nginx config (requires postgres locally for pre-commit hook), update Cloudflare DNS for `api.martialops.app`, `www.martialops.app`, and `martialops.app` apex. See sprint-93 file in git history for full task breakdown. `[hold]`
 
+- (sprint 113, 2026-06-28) `apps/dashboard/app/health/page.tsx` grew to 308 lines after adding filter counts — extract filter logic or helper into a sibling file to bring it under 300
+
 <!-- follow-up-scan: date=2026-06-28 through=111 clean=false -->
 > _Sprint scan: incremental scan 2026-06-28 through sprint-111. Discoveries: sprint-112 (test coverage expansion), sprint-113 (fleet/CI filter counts), sprint-114 (SSE auth token-in-query), sprint-115 (healthchecks.io DMS), sprint-116 (disk/memory trend 7d window). Prior scan: 2026-06-27 through sprint-91._
 
