@@ -36,7 +36,7 @@ vi.mock('@/lib/use-backup-status', () => ({
 
 import * as api from '@/lib/api'
 
-const mockStatus = { disk: 55, memory: 40, httpStatus: 200 as const, error: false }
+const mockStatus = { disk: 55, memory: 40, httpStatus: 200 as const, error: '' }
 
 describe('useProjectDetail', () => {
   beforeEach(() => {
