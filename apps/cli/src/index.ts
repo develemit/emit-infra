@@ -6,6 +6,7 @@ import { registerProvision } from './commands/provision.js'
 import { registerConfigure } from './commands/configure.js'
 import { registerDeploy } from './commands/deploy.js'
 import { registerStatus } from './commands/status.js'
+import { registerLogs } from './commands/logs.js'
 import { registerSecretsSync } from './commands/secrets-sync.js'
 import { registerDestroy } from './commands/destroy.js'
 import { registerAudit } from './commands/audit.js'
@@ -28,6 +29,7 @@ registerProvision(program)
 registerConfigure(program)
 registerDeploy(program)
 registerStatus(program)
+registerLogs(program)
 registerSecretsSync(program)
 registerDestroy(program)
 registerAudit(program)
