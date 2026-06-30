@@ -17,10 +17,8 @@ file to promote items into proper sprints when the list grows worth addressing.
 - (sprint 114, 2026-06-28) SSE reconnection on token expiry not handled — tokens are static per deployment so acceptable for now; revisit if token rotation is added
 - (sprint 115, 2026-06-29) **[manual ops]** Activate healthchecks.io DMS for emit-vision: create a check (15-min period, 5-min grace) at healthchecks.io, add `HEALTHCHECKS_URL=<ping-url>` to Hetzner `.env`, run `docker compose -f infra/docker/docker-compose.infra.yml up -d dms-ping`
 
-- (sprint 121, 2026-06-29) Remove `python3-certbot-nginx` from the apt install list in `ansible/roles/nginx/tasks/main.yml` — no longer used now that `certbot --nginx` is replaced with `certonly --webroot`
-
-<!-- follow-up-scan: date=2026-06-29 through=118 clean=true -->
-> _Sprint scan: incremental scan 2026-06-29 through sprint-118. No new discoveries (sprints 117–118 had no follow-ups). Prior scan: 2026-06-29 through sprint-116._
+<!-- follow-up-scan: date=2026-06-29 through=122 clean=true -->
+> _Sprint scan: incremental scan 2026-06-29 through sprint-122. Sprints 119–120 and 122: clean. Sprint-121: 1 defer (python3-certbot-nginx cleanup → sprint-123). Prior scan: 2026-06-29 through sprint-118._
 
 - (sprint 04, 2026-06-03) `pnpm build` fails on `/_error` and `/500` static pre-render — `<Html>` outside pages/_document error in Next.js 15.5.19 (upstream bug; dev server and typecheck/lint are clean) `[hold]`
 ~~- (sprint 04, 2026-06-03) Provision wizard uses local Zod schema mirroring `ProjectConfigSchema` — consider extracting shared browser-safe types into `@emit-infra/types`; run `/plan-sprint "shared types package"` to plan~~
@@ -34,6 +32,7 @@ file to promote items into proper sprints when the list grows worth addressing.
 
 ## ✅ Converted to Sprints
 
+- ~~(sprint 121, 2026-06-29) Remove `python3-certbot-nginx` from apt install list~~ → sprint-123 (2026-06-29)
 - ~~(sprint 112, 2026-06-28) container-row.tsx React components untested~~ → sprint-122 (2026-06-29)
 - ~~(sprint 04, 2026-06-03) Shared browser-safe types @emit-infra/types~~ → sprint-119 + sprint-120 (2026-06-29)
 - ~~(sprint 34, 2026-06-11) certbot --nginx rewrites Ansible-managed nginx config~~ → sprint-121 (2026-06-29)
