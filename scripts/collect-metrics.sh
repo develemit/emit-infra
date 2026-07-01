@@ -61,10 +61,25 @@ if [ -f /var/log/nginx/access.log ]; then
     | awk "{c=substr(\$9,1,1); if(c==\"4\") f++; if(c==\"5\") s++} END {printf \"nginx_4xx=%d nginx_5xx=%d\", f+0, s+0}")"
 fi
 
-printf "CPU:%d MEM:%d/%d MEMPCT:%d DISK:%s/%s/%s NET:%d/%d NGINX4XX:%d NGINX5XX:%d CONTAINERS:%s\n" \
+queue_failed=null
+queue_wait=null
+if command -v docker >/dev/null 2>&1; then
+  redis_cid=$(docker ps --filter "name=redis" --filter "status=running" --format "{{.ID}}" 2>/dev/null | head -1)
+  if [ -n "$redis_cid" ]; then
+    q=$(docker exec "$redis_cid" timeout 5 redis-cli eval \
+      "local f=0;local w=0;for _,k in ipairs(redis.call(\"KEYS\",\"bull:*:failed\")) do f=f+redis.call(\"LLEN\",k) end;for _,k in ipairs(redis.call(\"KEYS\",\"bull:*:wait\")) do w=w+redis.call(\"LLEN\",k) end;return tostring(f)..\":\"..tostring(w)" \
+      0 2>/dev/null || echo "")
+    if echo "$q" | grep -qE "^[0-9]+:[0-9]+$"; then
+      queue_failed=$(echo "$q" | cut -d: -f1)
+      queue_wait=$(echo "$q" | cut -d: -f2)
+    fi
+  fi
+fi
+
+printf "CPU:%d MEM:%d/%d MEMPCT:%d DISK:%s/%s/%s NET:%d/%d NGINX4XX:%d NGINX5XX:%d QUEUEFAILED:%s QUEUEWAIT:%s CONTAINERS:%s\n" \
   "$cpu_pct" "$mem_used" "$mem_total" "$mem_pct" \
   "$disk_pct" "$disk_used" "$disk_total" \
-  "$net_rx" "$net_tx" "$nginx_4xx" "$nginx_5xx" "$containers"
+  "$net_rx" "$net_tx" "$nginx_4xx" "$nginx_5xx" "$queue_failed" "$queue_wait" "$containers"
 '
 
 _truncate() {
@@ -93,7 +108,7 @@ collect_one() {
     return 0
   fi
 
-  local cpu mem_used mem_total mem_pct disk_pct disk_used disk_total net_rx net_tx nginx_4xx nginx_5xx containers
+  local cpu mem_used mem_total mem_pct disk_pct disk_used disk_total net_rx net_tx nginx_4xx nginx_5xx queue_failed queue_wait containers
   cpu=$(echo "$ssh_out" | sed -n 's/^CPU:\([0-9]*\).*/\1/p')
   mem_used=$(echo "$ssh_out" | sed -n 's/.*MEM:\([0-9]*\)\/.*/\1/p')
   mem_total=$(echo "$ssh_out" | sed -n 's/.*MEM:[0-9]*\/\([0-9]*\).*/\1/p')
@@ -105,12 +120,15 @@ collect_one() {
   net_tx=$(echo "$ssh_out" | sed -n 's/.*NET:[0-9]*\/\([0-9]*\).*/\1/p')
   nginx_4xx=$(echo "$ssh_out" | sed -n 's/.*NGINX4XX:\([0-9]*\).*/\1/p')
   nginx_5xx=$(echo "$ssh_out" | sed -n 's/.*NGINX5XX:\([0-9]*\).*/\1/p')
+  queue_failed=$(echo "$ssh_out" | sed -n 's/.*QUEUEFAILED:\([^ ]*\).*/\1/p')
+  queue_wait=$(echo "$ssh_out" | sed -n 's/.*QUEUEWAIT:\([^ ]*\).*/\1/p')
   containers=$(echo "$ssh_out" | sed -n 's/.*CONTAINERS://p')
 
-  printf '{"t":%d,"cpu":%s,"mem":%s,"memUsedMb":%s,"memTotalMb":%s,"disk":%s,"diskUsedGb":"%s","diskTotalGb":"%s","netRxBytes":%s,"netTxBytes":%s,"nginx4xx":%s,"nginx5xx":%s,"containers":%s}\n' \
+  printf '{"t":%d,"cpu":%s,"mem":%s,"memUsedMb":%s,"memTotalMb":%s,"disk":%s,"diskUsedGb":"%s","diskTotalGb":"%s","netRxBytes":%s,"netTxBytes":%s,"nginx4xx":%s,"nginx5xx":%s,"queueFailed":%s,"queueWait":%s,"containers":%s}\n' \
     "$ts" "${cpu:-0}" "${mem_pct:-0}" "${mem_used:-0}" "${mem_total:-0}" \
     "${disk_pct:-0}" "${disk_used:-0}" "${disk_total:-0}" \
-    "${net_rx:-0}" "${net_tx:-0}" "${nginx_4xx:-0}" "${nginx_5xx:-0}" "${containers:-[]}" >> "$metrics_file"
+    "${net_rx:-0}" "${net_tx:-0}" "${nginx_4xx:-0}" "${nginx_5xx:-0}" \
+    "${queue_failed:-null}" "${queue_wait:-null}" "${containers:-[]}" >> "$metrics_file"
 
   echo "  ✓ $name ($host): cpu=${cpu:-0}% mem=${mem_pct:-0}% disk=${disk_pct:-0}%"
 }
