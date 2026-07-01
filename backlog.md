@@ -26,8 +26,8 @@ file to promote items into proper sprints when the list grows worth addressing.
 - (sprint 114, 2026-06-28) SSE reconnection on token expiry not handled — tokens are static per deployment so acceptable for now; revisit if token rotation is added
 - (sprint 115, 2026-06-29) **[manual ops]** Activate healthchecks.io DMS for emit-vision: create a check (15-min period, 5-min grace) at healthchecks.io, add `HEALTHCHECKS_URL=<ping-url>` to Hetzner `.env`, run `docker compose -f infra/docker/docker-compose.infra.yml up -d dms-ping`
 
-<!-- follow-up-scan: date=2026-07-01 through=150 clean=false -->
-> _Sprint scan: incremental scan 2026-07-01 through sprint-150. Sprints 123–129 (milestone-08): 4 defers converted to sprints 151–154, 1 deferred to backlog. Sprints 130–150: 7 defers — 3 already in backlog, 4 newly added. Prior scan: 2026-06-29 through sprint-122._
+<!-- follow-up-scan: date=2026-07-01 through=154 clean=true -->
+> _Sprint scan: incremental scan 2026-07-01 through sprint-154. Sprints 151–154: all follow-ups marked `none` — clean. Prior scan: 2026-07-01 through sprint-150._
 
 - (sprint 04, 2026-06-03) `pnpm build` fails on `/_error` and `/500` static pre-render — `<Html>` outside pages/_document error in Next.js 15.5.19 (upstream bug; dev server and typecheck/lint are clean) `[hold]`
 ~~- (sprint 04, 2026-06-03) Provision wizard uses local Zod schema mirroring `ProjectConfigSchema` — consider extracting shared browser-safe types into `@emit-infra/types`; run `/plan-sprint "shared types package"` to plan~~
