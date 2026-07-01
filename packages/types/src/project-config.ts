@@ -57,6 +57,7 @@ export const ProjectConfigSchema = z.object({
         .default([]),
     })
     .optional(),
+  requiredEnvKeys: z.string().array().optional(),
 })
 
 export type ProjectConfig = z.infer<typeof ProjectConfigSchema>
