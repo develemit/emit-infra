@@ -29,6 +29,7 @@ export const ProjectConfigSchema = z.object({
     .object({
       version: z.string().default('16'),
       backupBucket: z.string().optional(),
+      backupRetainDays: z.number().int().min(1).default(7),
     })
     .optional(),
   nginx: z

@@ -46,6 +46,7 @@ export async function operationRoutes(app: FastifyInstance) {
       if (project.config.postgres.backupBucket) {
         deployVars['postgres_backup_bucket'] = project.config.postgres.backupBucket
       }
+      deployVars['postgres_backup_retain_days'] = project.config.postgres.backupRetainDays ?? 7
     }
 
     let exitCode = 0
