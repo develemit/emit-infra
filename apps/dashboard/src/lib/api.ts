@@ -393,6 +393,18 @@ export async function getBackupDownloadUrl(name: string, key: string): Promise<s
   return body.url
 }
 
+export async function updateBackupRetainDays(name: string, days: number): Promise<void> {
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/config`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ postgres: { backupRetainDays: days } }),
+  })
+  if (!res.ok) {
+    const body = await res.json() as { error?: string }
+    throw new Error(body.error ?? 'Failed to update')
+  }
+}
+
 export function provisionProject(
   name: string,
   config: Record<string, unknown>,

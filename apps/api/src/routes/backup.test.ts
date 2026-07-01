@@ -48,7 +48,7 @@ const mockProjectWithBucket = {
     serverType: 'cx22',
     sshKeyName: 'emit-deploy',
     github: { repo: 'user/myapp' },
-    postgres: { backupBucket: 'my-backup-bucket', backupRetainDays: 7 },
+    postgres: { version: '16', backupBucket: 'my-backup-bucket', backupRetainDays: 7 },
   },
   configPath: '/projects/myapp/.emit-infra.json',
   projectDir: '/projects/myapp',

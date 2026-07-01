@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { Icon } from '@/components/icon'
 import type { ProjectSummary } from '@/lib/api'
+import { updateBackupRetainDays } from '@/lib/api'
 import type { useBackups } from '@/lib/use-backups'
 
 function formatBytes(n: number): string {
@@ -47,9 +48,24 @@ interface BackupPanelProps {
   backups: BackupsHook
 }
 
-export function BackupPanel({ project: _project, backups }: BackupPanelProps) {
+export function BackupPanel({ project, backups }: BackupPanelProps) {
   const { backups: list, loading, triggering, error, deleteError, deleteBackup, triggerBackup, downloadBackup } = backups
   const [confirmKey, setConfirmKey] = useState<string | null>(null)
+  const [retainDays, setRetainDays] = useState<number>(project.config.postgres?.backupRetainDays ?? 7)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+
+  async function handleSaveRetainDays() {
+    setSaving(true)
+    setSaveError(null)
+    try {
+      await updateBackupRetainDays(project.config.name, retainDays)
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Save failed')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   function handleDeleteClick(key: string) {
     if (confirmKey === key) {
@@ -138,6 +154,27 @@ export function BackupPanel({ project: _project, backups }: BackupPanelProps) {
           ))}
         </div>
       )}
+
+      <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border">
+        <span className="text-[12px] text-subtle shrink-0">Retain backups for</span>
+        <input
+          type="number"
+          min={1}
+          max={365}
+          value={retainDays}
+          onChange={e => setRetainDays(Math.max(1, Math.min(365, parseInt(e.target.value, 10) || 1)))}
+          className="w-16 px-2 h-[28px] rounded-lg border border-border bg-card text-[12px] font-mono text-fg text-center"
+        />
+        <span className="text-[12px] text-subtle shrink-0">days</span>
+        <button
+          onClick={() => void handleSaveRetainDays()}
+          disabled={saving}
+          className="px-3 h-[28px] rounded-lg text-[12px] font-medium text-accent-fg bg-accent hover:opacity-90 disabled:opacity-50 transition-opacity"
+        >
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+        {saveError && <span className="text-[12px] text-err font-mono">{saveError}</span>}
+      </div>
     </div>
   )
 }

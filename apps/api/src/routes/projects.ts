@@ -3,6 +3,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { readFile, readdir, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
+import { z } from 'zod'
 import { sshExec } from '@emit-infra/core'
 import { discoverProjects, discoverUnregistered } from '../lib/discover-projects.js'
 import { createTtlCache } from '../lib/ttl-cache.js'
@@ -85,6 +86,36 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
       const config = { name, ...req.body.config }
       await writeFile(configPath, JSON.stringify(config, null, 2) + '\n')
       return void reply.send({ ok: true, configPath })
+    },
+  )
+
+  const PatchConfigBody = z.object({
+    postgres: z.object({
+      backupRetainDays: z.number().int().min(1).max(365),
+    }).partial(),
+  }).partial()
+
+  app.patch<{ Params: { name: string }; Body: unknown }>(
+    '/projects/:name/config',
+    async (req, reply): Promise<void> => {
+      const project = await findProject(req.params.name)
+      if (!project) return void reply.status(404).send({ error: 'not found' })
+
+      const parsed = PatchConfigBody.safeParse(req.body)
+      if (!parsed.success) {
+        return void reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid' })
+      }
+
+      const raw = await readFile(project.configPath, 'utf8')
+      const current = JSON.parse(raw) as Record<string, unknown>
+
+      if (parsed.data.postgres) {
+        const existing = (current['postgres'] ?? {}) as Record<string, unknown>
+        current['postgres'] = { ...existing, ...parsed.data.postgres }
+      }
+
+      await writeFile(project.configPath, JSON.stringify(current, null, 2) + '\n')
+      return void reply.send({ ok: true })
     },
   )
 

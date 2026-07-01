@@ -25,7 +25,32 @@ Add a settings control to the BackupPanel that lets users view and update `backu
 
 ## Acceptance criteria
 
-- [ ] Current `backupRetainDays` displayed as editable number input in BackupPanel
-- [ ] Save writes the new value and refreshes the panel config
-- [ ] Invalid values (non-integer, < 1, > 365) rejected by API with 400
-- [ ] `pnpm nx typecheck api --skip-nx-cache && pnpm nx typecheck dashboard --skip-nx-cache` pass clean
+- [x] Current `backupRetainDays` displayed as editable number input in BackupPanel
+- [x] Save writes the new value and refreshes the panel config
+- [x] Invalid values (non-integer, < 1, > 365) rejected by API with 400
+- [x] `pnpm nx typecheck api --skip-nx-cache && pnpm nx typecheck dashboard --skip-nx-cache` pass clean
+
+## Completed
+
+**Date:** 2026-07-01
+
+### Summary
+Added `PATCH /projects/:name/config` to the API, which reads the current `.emit-infra.json`, deep-merges the incoming `postgres` partial (validated via Zod: `backupRetainDays` must be integer 1–365), and writes it back. The route returns 400 on invalid input and 404 if the project doesn't exist.
+
+Added `updateBackupRetainDays(name, days)` to the dashboard `api.ts`. Updated `BackupPanel` with a footer row: a number input (min=1, max=365) pre-filled from `project.config.postgres?.backupRetainDays ?? 7`, a Save button that calls the API, and an inline error span that shows if the save fails.
+
+Also fixed a latent type error in `backup.test.ts` where the mock postgres config was missing the required `version` field — adding `version: '16'` matched the schema default.
+
+### Files changed
+- `apps/api/src/routes/projects.ts` — added `z` import and `PATCH /projects/:name/config` route
+- `apps/dashboard/src/lib/api.ts` — added `updateBackupRetainDays`
+- `apps/dashboard/src/components/detail/backup-panel.tsx` — retention days footer with number input + Save button
+- `apps/api/src/routes/backup.test.ts` — fixed mock postgres missing `version` field
+
+### Verification
+- `pnpm nx typecheck api --skip-nx-cache`: clean
+- `pnpm nx typecheck dashboard --skip-nx-cache`: clean
+- `pnpm nx test api --skip-nx-cache`: 54/54 pass
+
+### Follow-ups
+- none
