@@ -8,6 +8,7 @@ import { opsRoutes } from './routes/ops.js'
 import { billingRoutes } from './routes/billing.js'
 import { pushRoutes } from './routes/push.js'
 import { historyRoutes } from './routes/history.js'
+import { diskRoutes } from './routes/disk.js'
 import { startStatusMonitor } from './lib/status-monitor.js'
 
 const app = Fastify({ logger: process.env['NODE_ENV'] === 'development' ? { level: 'warn' } : true })
@@ -37,6 +38,7 @@ await app.register(opsRoutes)
 await app.register(billingRoutes)
 await app.register(pushRoutes)
 await app.register(historyRoutes)
+await app.register(diskRoutes)
 
 const port = Number(process.env['PORT'] ?? 7001)
 await app.listen({ port, host: '0.0.0.0' })

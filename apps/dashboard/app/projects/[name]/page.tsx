@@ -19,6 +19,7 @@ import { RollbackPanel } from '@/components/rollback-panel'
 import { SecretsSyncPanel } from '@/components/secrets-sync-panel'
 import { DestroyModal } from '@/components/destroy-modal'
 import { BackupPanel } from '@/components/detail/backup-panel'
+import { DiskDirsPanel } from '@/components/detail/disk-dirs-panel'
 import { useProjectDetail } from '@/lib/use-project-detail'
 
 export default function ProjectDetailPage() {
@@ -129,6 +130,9 @@ export default function ProjectDetailPage() {
                 <div className="text-[12px] font-mono px-3 py-2 rounded-lg border" style={{ color: 'var(--warn, #e5a00d)', borderColor: 'var(--border)', background: 'var(--card-2)' }}>
                   Disk trending: +{diskTrend.pctPerDay.toFixed(1)}%/day · full in ~{Math.round(diskTrend.projectedDaysUntilFull)}d
                 </div>
+              )}
+              {status !== null && !status?.error && (
+                <DiskDirsPanel name={name} />
               )}
               {memoryTrend !== null && memoryTrend.projectedDaysUntilFull !== null && memoryTrend.mem > 75 && (
                 <div className="text-[12px] font-mono px-3 py-2 rounded-lg border" style={{ color: 'var(--warn, #e5a00d)', borderColor: 'var(--border)', background: 'var(--card-2)' }}>

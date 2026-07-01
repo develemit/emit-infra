@@ -51,6 +51,11 @@ export interface ProjectStatus {
   error?: string
 }
 
+export interface DiskDir {
+  path: string
+  bytes: number
+}
+
 export interface Container {
   name: string
   image: string
@@ -394,4 +399,11 @@ export function provisionProject(
     url: `${API_BASE}/projects/${encodeURIComponent(name)}/provision`,
     body: JSON.stringify({ config }),
   }
+}
+
+export async function getDiskDirs(name: string): Promise<DiskDir[]> {
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/disk-dirs`, { cache: 'no-store', headers: authHeaders() })
+  if (!res.ok) return []
+  const body = await res.json() as { dirs: DiskDir[] }
+  return body.dirs
 }
