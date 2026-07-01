@@ -3,6 +3,15 @@
 Deferred follow-ups from completed sprints. Run `/plan-sprint` referencing this
 file to promote items into proper sprints when the list grows worth addressing.
 
+- (sprint 130, 2026-07-01) `/var/lib/docker` in disk-dirs requires sudo — graceful fallback already in place via `2>/dev/null`, but some server hardening configs may deny the fallback silently
+- (sprint 131, 2026-07-01) `reltuples` estimate in pg-table-sizes may be stale if ANALYZE hasn't run recently — acceptable for display but worth noting if counts look wildly off
+- (sprint 133, 2026-07-01) `/var/spool/cron/crontabs/root` requires sudo on some servers — gracefully returns empty via `2>/dev/null`
+- (sprint 135, 2026-07-01) IPv6 UFW rules appear as separate blocks in `ufw status numbered`; currently captured if they match the regex, acceptable for now
+- (sprint 124, 2026-07-01) `getTerraformOutput` is duplicated in `status.ts` and `logs.ts` — extract to a shared helper when a third consumer appears
+- (sprint 139, 2026-07-01) The awk in response-times.ts assumes request_time is the second-to-last nginx log field; projects with non-standard log formats may return `{ available: false }` — can be addressed with a configurable field index if needed
+- (sprint 141, 2026-07-01) collect-metrics.sh uses `docker ps --filter name=redis` which matches any container with "redis" in the name; projects with non-standard container names may not be detected — can add config field for redis container name if needed
+- (sprint 146, 2026-07-01) cert.ts parses `LastTriggerUSec` as microseconds; if systemctl on older Ubuntu versions returns a different format, `renewTimerLastRan` may be wrong — verify on target servers
+
 - (sprint 76, 2026-06-20) Docker layer progress output (hundreds of `\r`-terminated lines) appears in deploy logs — noisy but readable. Could add `--quiet` to docker push/pull in individual deploy scripts if it becomes a problem.
 - (sprint 79, 2026-06-20) `ansi-to-html` is instantiated with `escapeXML: false` — if logs contain HTML-like strings (e.g. JSX error output with `<div>`), those render as raw HTML. Acceptable for now; revisit if it produces unexpected rendering.
 ~~- (sprint 85, 2026-06-20) Disk trend regression uses last 48h window only. Bursty disk usage could skew the slope. A 7-day window would be smoother — adjust the cutoff constant in `apps/api/src/routes/history.ts` if needed.~~
@@ -17,8 +26,8 @@ file to promote items into proper sprints when the list grows worth addressing.
 - (sprint 114, 2026-06-28) SSE reconnection on token expiry not handled — tokens are static per deployment so acceptable for now; revisit if token rotation is added
 - (sprint 115, 2026-06-29) **[manual ops]** Activate healthchecks.io DMS for emit-vision: create a check (15-min period, 5-min grace) at healthchecks.io, add `HEALTHCHECKS_URL=<ping-url>` to Hetzner `.env`, run `docker compose -f infra/docker/docker-compose.infra.yml up -d dms-ping`
 
-<!-- follow-up-scan: date=2026-06-29 through=122 clean=true -->
-> _Sprint scan: incremental scan 2026-06-29 through sprint-122. Sprints 119–120 and 122: clean. Sprint-121: 1 defer (python3-certbot-nginx cleanup → sprint-123). Prior scan: 2026-06-29 through sprint-118._
+<!-- follow-up-scan: date=2026-07-01 through=150 clean=false -->
+> _Sprint scan: incremental scan 2026-07-01 through sprint-150. Sprints 123–129 (milestone-08): 4 defers converted to sprints 151–154, 1 deferred to backlog. Sprints 130–150: 7 defers — 3 already in backlog, 4 newly added. Prior scan: 2026-06-29 through sprint-122._
 
 - (sprint 04, 2026-06-03) `pnpm build` fails on `/_error` and `/500` static pre-render — `<Html>` outside pages/_document error in Next.js 15.5.19 (upstream bug; dev server and typecheck/lint are clean) `[hold]`
 ~~- (sprint 04, 2026-06-03) Provision wizard uses local Zod schema mirroring `ProjectConfigSchema` — consider extracting shared browser-safe types into `@emit-infra/types`; run `/plan-sprint "shared types package"` to plan~~
@@ -32,6 +41,10 @@ file to promote items into proper sprints when the list grows worth addressing.
 
 ## ✅ Converted to Sprints
 
+- ~~(sprint 125, 2026-07-01) Route-level tests for backup routes (key validation, 404 on missing bucket, parse edge cases)~~ → sprint-151 (2026-07-01)
+- ~~(sprint 126, 2026-07-01) BackupPanel delete failure silently re-fetches — add inline error state~~ → sprint-152 (2026-07-01)
+- ~~(sprint 128, 2026-07-01) Dashboard UI for editing `backupRetainDays` per project~~ → sprint-153 (2026-07-01)
+- ~~(sprint 129, 2026-07-01) Dashboard UI to surface `backup` SSE events in deploy terminal~~ → sprint-154 (2026-07-01)
 - ~~(sprint 121, 2026-06-29) Remove `python3-certbot-nginx` from apt install list~~ → sprint-123 (2026-06-29)
 - ~~(sprint 112, 2026-06-28) container-row.tsx React components untested~~ → sprint-122 (2026-06-29)
 - ~~(sprint 04, 2026-06-03) Shared browser-safe types @emit-infra/types~~ → sprint-119 + sprint-120 (2026-06-29)
