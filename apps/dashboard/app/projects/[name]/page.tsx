@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { HealthCard } from '@/components/detail/health-card'
 import { ResponseTimePanel } from '@/components/detail/response-time-panel'
+import { CertPanel } from '@/components/detail/cert-panel'
 import { ContainerTable } from '@/components/detail/container-table'
 import { ResourceChart } from '@/components/detail/resource-chart'
 import { RangeSelector } from '@/components/detail/range-selector'
@@ -135,6 +136,9 @@ export default function ProjectDetailPage() {
               )}
               {status?.nginxStatus === 'active' && (
                 <ResponseTimePanel name={name} />
+              )}
+              {status?.sslExpiry != null && (
+                <CertPanel name={name} />
               )}
               {diskTrend !== null && diskTrend.projectedDaysUntilFull !== null && diskTrend.disk > 75 && (
                 <div className="text-[12px] font-mono px-3 py-2 rounded-lg border" style={{ color: 'var(--warn, #e5a00d)', borderColor: 'var(--border)', background: 'var(--card-2)' }}>

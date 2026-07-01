@@ -493,3 +493,21 @@ export async function getIncidents(name: string): Promise<IncidentsResponse> {
   if (!res.ok) return { incidents: [], mttrSec: null }
   return res.json() as Promise<IncidentsResponse>
 }
+
+export interface CertDetails {
+  issuer: string
+  subject: string
+  serial: string
+  notBefore: string
+  notAfter: string
+  sans: string[]
+  renewTimerLastRan: string | null
+  daysUntilExpiry: number
+}
+
+export async function getCertDetails(name: string): Promise<CertDetails | null> {
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/cert-details`, { cache: 'no-store', headers: authHeaders() })
+  if (res.status === 404 || res.status === 503) return null
+  if (!res.ok) return null
+  return res.json() as Promise<CertDetails>
+}
