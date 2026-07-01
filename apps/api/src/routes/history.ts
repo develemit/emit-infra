@@ -13,6 +13,7 @@ const ShaParam = z.object({
 })
 const HoursQuery = z.object({ hours: z.coerce.number().int().min(1).max(720).default(24) })
 const LimitQuery = z.object({ limit: z.coerce.number().int().min(1).max(200).default(50) })
+const DaysQuery = z.object({ days: z.coerce.number().int().min(1).max(365).default(90) })
 
 interface MetricPoint {
   t: number
@@ -51,6 +52,20 @@ interface CiHistoryEntry {
   completedAt: string
   durationSec: number
   message?: string
+}
+
+interface IncidentRecord {
+  type: 'ssh' | 'http'
+  projectName: string
+  event: 'down' | 'up'
+  t: number
+}
+
+interface Incident {
+  startedAt: number
+  resolvedAt: number | null
+  durationSec: number | null
+  resolved: boolean
 }
 
 const MAX_METRIC_POINTS = 500
@@ -254,5 +269,68 @@ export async function historyRoutes(app: FastifyInstance) {
       }
     }
     return result
+  })
+
+  app.get('/projects/:name/incidents', async (req, reply) => {
+    const params = NameParam.safeParse(req.params)
+    if (!params.success) return reply.status(400).send({ error: params.error.message })
+    const query = DaysQuery.safeParse(req.query)
+    if (!query.success) return reply.status(400).send({ error: query.error.message })
+
+    const project = await findProject(params.data.name)
+    if (!project) return reply.status(404).send({ error: 'not found' })
+
+    const cutoff = Math.floor(Date.now() / 1000) - query.data.days * 24 * 3600
+    const filePath = join(homedir(), 'projects', params.data.name, '.incidents.jsonl')
+
+    const records = await readJsonl<IncidentRecord>(
+      filePath,
+      (r) => typeof r.t === 'number' && r.t >= cutoff && r.type === 'ssh',
+    )
+
+    // Pair up→down and down→up transitions into resolved incidents
+    const incidents: Incident[] = []
+    let openDownAt: number | null = null
+
+    for (const record of records) {
+      if (record.event === 'down') {
+        if (openDownAt === null) {
+          openDownAt = record.t
+        }
+      } else if (record.event === 'up') {
+        if (openDownAt !== null) {
+          incidents.push({
+            startedAt: openDownAt,
+            resolvedAt: record.t,
+            durationSec: record.t - openDownAt,
+            resolved: true,
+          })
+          openDownAt = null
+        }
+      }
+    }
+
+    // If there's an open incident, add it as unresolved
+    if (openDownAt !== null) {
+      incidents.push({
+        startedAt: openDownAt,
+        resolvedAt: null,
+        durationSec: null,
+        resolved: false,
+      })
+    }
+
+    // Compute MTTR (mean time to recovery)
+    const resolvedIncidents = incidents.filter((i) => i.resolved)
+    let mttrSec: number | null = null
+    if (resolvedIncidents.length > 0) {
+      const totalDuration = resolvedIncidents.reduce((sum, i) => sum + (i.durationSec ?? 0), 0)
+      mttrSec = totalDuration / resolvedIncidents.length
+    }
+
+    // Sort most recent first
+    incidents.sort((a, b) => b.startedAt - a.startedAt)
+
+    return { incidents, mttrSec }
   })
 }
