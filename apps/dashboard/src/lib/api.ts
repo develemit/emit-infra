@@ -463,3 +463,13 @@ export async function getSecretsDrift(name: string): Promise<SecretsDrift | null
   if (!res.ok) return null
   return res.json() as Promise<SecretsDrift>
 }
+
+export type ResponseTimes =
+  | { available: false }
+  | { available: true; p50ms: number; p95ms: number; p99ms: number; sampleCount: number }
+
+export async function getResponseTimes(name: string): Promise<ResponseTimes> {
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/response-times`, { cache: 'no-store', headers: authHeaders() })
+  if (!res.ok) return { available: false }
+  return res.json() as Promise<ResponseTimes>
+}
