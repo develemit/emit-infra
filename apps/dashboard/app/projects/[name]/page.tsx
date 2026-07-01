@@ -18,6 +18,7 @@ import { DeployTimeline } from '@/components/detail/deploy-timeline'
 import { IncidentPanel } from '@/components/detail/incident-panel'
 import { CiTimeline } from '@/components/detail/ci-timeline'
 import { DockerUsage } from '@/components/detail/docker-usage'
+import { CostPanel } from '@/components/detail/cost-panel'
 import { CronPanel } from '@/components/detail/cron-panel'
 import { UfwPanel } from '@/components/detail/ufw-panel'
 import { DeployPanel } from '@/components/deploy-panel'
@@ -201,6 +202,7 @@ export default function ProjectDetailPage() {
               <IncidentPanel name={name} />
               <CiTimeline runs={ciRuns} name={name} repoUrl={repoUrl} />
               <DockerUsage projectName={name} onPrune={fetchData} />
+              <CostPanel name={name} />
               {status !== null && !status?.error && (
                 <CronPanel name={name} />
               )}

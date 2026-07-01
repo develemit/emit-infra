@@ -511,3 +511,23 @@ export async function getCertDetails(name: string): Promise<CertDetails | null> 
   if (!res.ok) return null
   return res.json() as Promise<CertDetails>
 }
+
+export interface ProjectCost {
+  server: {
+    eurPerMonth: number | null
+    type: string
+    region: string
+  } | null
+  storage: {
+    usdPerMonth: number | null
+    totalBytes: number
+    bucketName: string
+  } | null
+}
+
+export async function getProjectCost(name: string): Promise<ProjectCost | null> {
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/cost`, { cache: 'no-store', headers: authHeaders() })
+  if (res.status === 404 || res.status === 503) return null
+  if (!res.ok) return null
+  return res.json() as Promise<ProjectCost>
+}
