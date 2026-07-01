@@ -15,6 +15,7 @@ import { DeployTimeline } from '@/components/detail/deploy-timeline'
 import { CiTimeline } from '@/components/detail/ci-timeline'
 import { DockerUsage } from '@/components/detail/docker-usage'
 import { CronPanel } from '@/components/detail/cron-panel'
+import { UfwPanel } from '@/components/detail/ufw-panel'
 import { DeployPanel } from '@/components/deploy-panel'
 import { RollbackPanel } from '@/components/rollback-panel'
 import { SecretsSyncPanel } from '@/components/secrets-sync-panel'
@@ -184,6 +185,9 @@ export default function ProjectDetailPage() {
               <DockerUsage projectName={name} onPrune={fetchData} />
               {status !== null && !status?.error && (
                 <CronPanel name={name} />
+              )}
+              {status !== null && !status?.error && (
+                <UfwPanel name={name} />
               )}
               {deploying && (
                 <DeployPanel

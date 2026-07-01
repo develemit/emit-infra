@@ -434,3 +434,21 @@ export async function getCronJobs(name: string): Promise<CronJob[]> {
   const body = await res.json() as { jobs: CronJob[] }
   return body.jobs
 }
+
+export interface UfwRule {
+  num: number
+  to: string
+  action: string
+  from: string
+}
+
+export interface UfwStatus {
+  status: 'active' | 'inactive'
+  rules: UfwRule[]
+}
+
+export async function getUfwRules(name: string): Promise<UfwStatus> {
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/ufw-rules`, { cache: 'no-store', headers: authHeaders() })
+  if (!res.ok) return { status: 'inactive', rules: [] }
+  return res.json() as Promise<UfwStatus>
+}
