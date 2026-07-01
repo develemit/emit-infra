@@ -11,6 +11,27 @@ function formatBytes(n: number): string {
   return `${(n / (1024 * 1024 * 1024)).toFixed(2)} GB`
 }
 
+function BackupSparkline({ sizes }: { sizes: number[] }) {
+  if (sizes.length < 2) return null
+
+  const W = 120, H = 32
+  const min = Math.min(...sizes)
+  const max = Math.max(...sizes)
+  const range = max - min || 1
+
+  const pts = sizes.map((v, i) => {
+    const x = (i / (sizes.length - 1)) * W
+    const y = H - ((v - min) / range) * H
+    return `${x.toFixed(1)},${y.toFixed(1)}`
+  }).join(' ')
+
+  return (
+    <svg width={W} height={H} style={{ display: 'block', flexShrink: 0 }}>
+      <polyline points={pts} fill="none" stroke="var(--fg-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 function ageLabel(iso: string): string {
   const secs = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
   if (secs < 60) return 'just now'
@@ -39,12 +60,34 @@ export function BackupPanel({ project: _project, backups }: BackupPanelProps) {
     }
   }
 
+  const sortedByAge = [...list].sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime())
+  const sizes = sortedByAge.reverse().map(b => b.sizeBytes)
+  const oldestSize = sizes.length > 0 ? sizes[0] : 0
+  const newestSize = sizes.length > 0 ? sizes[sizes.length - 1] : 0
+  const deltaBytesAbsolute = Math.abs(newestSize - oldestSize)
+  const deltaMB = deltaBytesAbsolute / (1024 * 1024)
+  const deltaSign = newestSize > oldestSize ? '+' : newestSize < oldestSize ? '−' : null
+  const deltaColor = newestSize > oldestSize ? 'var(--warn)' : newestSize < oldestSize ? 'var(--ok)' : undefined
+
   return (
     <div className="rounded-xl border border-border bg-card" style={{ padding: 18 }}>
       <div className="flex items-center gap-2 mb-4">
         <Icon name="database" size={16} style={{ color: 'var(--fg-muted)' }} />
         <span className="text-[13.5px] font-semibold text-fg">Backups</span>
         <div className="flex-1" />
+        {sizes.length >= 2 && (
+          <div className="flex flex-col items-center gap-1 mr-3">
+            <span className="text-[11px] text-subtle">Size trend</span>
+            <div className="flex items-center gap-1.5">
+              <BackupSparkline sizes={sizes} />
+              {deltaSign && (
+                <span className="text-[11px] font-medium" style={{ color: deltaColor }}>
+                  {deltaSign}{deltaMB.toFixed(1)} MB
+                </span>
+              )}
+            </div>
+          </div>
+        )}
         <button
           onClick={() => void triggerBackup()}
           disabled={triggering}
