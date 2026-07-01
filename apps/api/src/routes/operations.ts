@@ -3,7 +3,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { access, mkdir, writeFile } from 'node:fs/promises'
 import { z } from 'zod/v4'
-import { runAnsible, runTerraform, getTerraformOutput, sshMuxArgs } from '@emit-infra/core'
+import { runAnsible, runTerraform, getTerraformOutput, sshMuxArgs, sshExec } from '@emit-infra/core'
 import { scaffoldProject, writeInventory } from '../lib/scaffold-project.js'
 import { writeEvent } from '../lib/write-sse.js'
 import { openSse, sseError } from '../lib/open-sse.js'
@@ -33,11 +33,27 @@ export async function operationRoutes(app: FastifyInstance) {
 
     const name = params.data.name
     const inventory = join(homedir(), 'projects', name, 'inventory.ini')
+    const key = sshKeyPath(project.config.sshKeyName)
+    const host = project.config.serverIp ?? project.config.domain
 
     openSse(reply)
 
     try { await access(inventory) } catch {
       return sseError(reply.raw, `inventory.ini not found at ~/projects/${name}/inventory.ini`)
+    }
+
+    if (project.config.postgres?.backupBucket) {
+      writeEvent(reply.raw, { type: 'backup', status: 'started', message: 'Taking pre-deploy snapshot…' })
+      try {
+        await Promise.race([
+          sshExec(host, `/usr/local/bin/emit-db-backup-${name} 2>&1`, key),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('backup timeout')), 30_000)),
+        ])
+        writeEvent(reply.raw, { type: 'backup', status: 'ok', message: 'Pre-deploy snapshot complete' })
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        writeEvent(reply.raw, { type: 'backup', status: 'warn', message: `Pre-deploy snapshot failed (continuing): ${msg}` })
+      }
     }
 
     const deployVars: Record<string, unknown> = { project_name: name }
