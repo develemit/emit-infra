@@ -240,6 +240,8 @@ export interface MetricPoint {
   netTxBytes: number
   nginx4xx?: number
   nginx5xx?: number
+  queueFailed?: number | null
+  queueWait?: number | null
   containers: { name: string; cpu: number; memMb: number; restarts: number }[]
 }
 

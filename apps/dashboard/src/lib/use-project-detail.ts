@@ -101,7 +101,7 @@ export function useProjectDetail(name: string) {
     rangeHours, setRangeHours,
     polledAgo, loading, domain, repoUrl,
     variant, label,
-    chartHistory, fullChartPoints, networkPoints,
+    chartHistory, fullChartPoints, networkPoints, serverPoints,
     latestMetric, deployMarkers,
     deploys, ciRuns,
     diskTrend, memoryTrend, backupStatus, backups,

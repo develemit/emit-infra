@@ -12,6 +12,7 @@ import { ResourceChart } from '@/components/detail/resource-chart'
 import { RangeSelector } from '@/components/detail/range-selector'
 import { FullChart } from '@/components/detail/full-chart'
 import { NetworkChart } from '@/components/detail/network-chart'
+import { QueueChart } from '@/components/detail/queue-chart'
 import { DeployTimeline } from '@/components/detail/deploy-timeline'
 import { CiTimeline } from '@/components/detail/ci-timeline'
 import { DockerUsage } from '@/components/detail/docker-usage'
@@ -41,7 +42,7 @@ export default function ProjectDetailPage() {
     rangeHours, setRangeHours,
     polledAgo, loading, domain, repoUrl,
     variant, label,
-    chartHistory, fullChartPoints, networkPoints,
+    chartHistory, fullChartPoints, networkPoints, serverPoints,
     latestMetric, deployMarkers,
     deploys, ciRuns,
     diskTrend, memoryTrend, backupStatus, backups,
@@ -184,6 +185,9 @@ export default function ProjectDetailPage() {
               )}
               {networkPoints.length >= 2 && (
                 <NetworkChart points={networkPoints} deploys={deployMarkers} hours={rangeHours} />
+              )}
+              {serverPoints.some(p => p.queueFailed != null) && (
+                <QueueChart points={serverPoints} />
               )}
               {containers !== null && (
                 <ContainerTable containers={containers} projectName={name} onRefetch={fetchData} latestMetric={latestMetric} />
