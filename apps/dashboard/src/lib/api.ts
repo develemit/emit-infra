@@ -407,3 +407,16 @@ export async function getDiskDirs(name: string): Promise<DiskDir[]> {
   const body = await res.json() as { dirs: DiskDir[] }
   return body.dirs
 }
+
+export interface PgTable {
+  name: string
+  totalBytes: number
+  rowEstimate: number
+}
+
+export async function getPgTableSizes(name: string): Promise<PgTable[]> {
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/pg-table-sizes`, { cache: 'no-store', headers: authHeaders() })
+  if (!res.ok) return []
+  const body = await res.json() as { tables: PgTable[] }
+  return body.tables
+}
