@@ -37,6 +37,8 @@ const PATHS: Record<string, string> = {
   copy: 'M9 9h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V11a2 2 0 0 1 2-2zM5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1',
   activity: 'M22 12h-4l-3 9L9 3l-3 9H2',
   layers: 'M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5',
+  download: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3',
+  hash: 'M4 9h16M4 15h16M10 3l-1 18M15 3l-1 18',
 }
 
 interface IconProps {

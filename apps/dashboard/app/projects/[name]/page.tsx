@@ -18,6 +18,7 @@ import { DeployPanel } from '@/components/deploy-panel'
 import { RollbackPanel } from '@/components/rollback-panel'
 import { SecretsSyncPanel } from '@/components/secrets-sync-panel'
 import { DestroyModal } from '@/components/destroy-modal'
+import { BackupPanel } from '@/components/detail/backup-panel'
 import { useProjectDetail } from '@/lib/use-project-detail'
 
 export default function ProjectDetailPage() {
@@ -37,7 +38,7 @@ export default function ProjectDetailPage() {
     chartHistory, fullChartPoints, networkPoints,
     latestMetric, deployMarkers,
     deploys, ciRuns,
-    diskTrend, memoryTrend, backupStatus,
+    diskTrend, memoryTrend, backupStatus, backups,
     uptimePct, fetchData, deployUrl,
   } = useProjectDetail(name)
 
@@ -147,6 +148,9 @@ export default function ProjectDetailPage() {
                   </div>
                 )
               })()}
+              {project?.config.postgres?.backupBucket && (
+                <BackupPanel project={project} backups={backups} />
+              )}
               <div className="flex items-center justify-between">
                 <span className="text-[13px] font-semibold text-fg">Health Detail</span>
                 <RangeSelector value={rangeHours} onChange={setRangeHours} />

@@ -12,6 +12,7 @@ import { useCiHistory } from '@/lib/use-ci-history'
 import { useDiskTrend } from '@/lib/use-disk-trend'
 import { useMemoryTrend } from '@/lib/use-memory-trend'
 import { useBackupStatus } from '@/lib/use-backup-status'
+import { useBackups } from '@/lib/use-backups'
 import type { DeployMarker } from '@/components/detail/resource-chart'
 
 export function useProjectDetail(name: string) {
@@ -72,6 +73,7 @@ export function useProjectDetail(name: string) {
   const diskTrend = useDiskTrend(name)
   const memoryTrend = useMemoryTrend(name)
   const backupStatus = useBackupStatus(name)
+  const backups = useBackups(name)
 
   const chartHistory = serverPoints.length >= 2
     ? serverPoints.map(p => ({ t: p.t * 1000, cpu: p.cpu, mem: p.mem, disk: p.disk }))
@@ -102,7 +104,7 @@ export function useProjectDetail(name: string) {
     chartHistory, fullChartPoints, networkPoints,
     latestMetric, deployMarkers,
     deploys, ciRuns,
-    diskTrend, memoryTrend, backupStatus,
+    diskTrend, memoryTrend, backupStatus, backups,
     uptimePct, fetchData, deployUrl,
   }
 }
