@@ -11,10 +11,12 @@ export function useBackups(name: string) {
   const [loading, setLoading] = useState(true)
   const [triggering, setTriggering] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const fetchBackups = useCallback(async () => {
     setLoading(true)
     setError(null)
+    setDeleteError(null)
     try {
       const result = await listBackups(name)
       setBackups(result)
@@ -30,9 +32,13 @@ export function useBackups(name: string) {
   }, [fetchBackups])
 
   async function deleteBackup(key: string) {
+    setDeleteError(null)
     setBackups(prev => prev.filter(b => b.key !== key))
     const result = await apiDeleteBackup(name, key)
     if (result.ok) {
+      void fetchBackups()
+    } else {
+      setDeleteError('Delete failed — check server logs')
       void fetchBackups()
     }
   }
@@ -52,5 +58,5 @@ export function useBackups(name: string) {
     window.open(url, '_blank')
   }
 
-  return { backups, loading, triggering, error, fetchBackups, deleteBackup, triggerBackup, downloadBackup }
+  return { backups, loading, triggering, error, deleteError, fetchBackups, deleteBackup, triggerBackup, downloadBackup }
 }

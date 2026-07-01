@@ -48,7 +48,7 @@ interface BackupPanelProps {
 }
 
 export function BackupPanel({ project: _project, backups }: BackupPanelProps) {
-  const { backups: list, loading, triggering, error, deleteBackup, triggerBackup, downloadBackup } = backups
+  const { backups: list, loading, triggering, error, deleteError, deleteBackup, triggerBackup, downloadBackup } = backups
   const [confirmKey, setConfirmKey] = useState<string | null>(null)
 
   function handleDeleteClick(key: string) {
@@ -102,6 +102,10 @@ export function BackupPanel({ project: _project, backups }: BackupPanelProps) {
 
       {error && (
         <div className="text-[12px] text-err font-mono mb-3">{error}</div>
+      )}
+
+      {deleteError && (
+        <div className="text-[12px] text-err font-mono mb-3">{deleteError}</div>
       )}
 
       {loading ? (

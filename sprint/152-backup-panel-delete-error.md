@@ -25,7 +25,24 @@ When a backup delete fails, show an inline error message below the failing row i
 
 ## Acceptance criteria
 
-- [ ] Delete API failure sets `deleteError` and renders a visible error message
-- [ ] Success clears any existing error
-- [ ] Manual refresh (Refresh button) clears the error
-- [ ] `pnpm nx typecheck dashboard --skip-nx-cache` passes clean
+- [x] Delete API failure sets `deleteError` and renders a visible error message
+- [x] Success clears any existing error
+- [x] Manual refresh (Refresh button) clears the error
+- [x] `pnpm nx typecheck dashboard --skip-nx-cache` passes clean
+
+## Completed
+
+**Date:** 2026-07-01
+
+### Summary
+Added `deleteError: string | null` state to `useBackups`. It is cleared at the start of each delete attempt, cleared by `fetchBackups` (so the Refresh button clears it), and set to `'Delete failed — check server logs'` when the API returns `!result.ok`. The optimistic removal still happens immediately; a re-fetch restores the list on failure. `BackupPanel` destructures `deleteError` and renders it inline between the fetch-error block and the loading/list block, using the same `text-err font-mono` styling.
+
+### Files changed
+- `apps/dashboard/src/lib/use-backups.ts` — added `deleteError` state, clear on attempt/refresh, set on API failure
+- `apps/dashboard/src/components/detail/backup-panel.tsx` — destructure and render `deleteError` inline
+
+### Verification
+- `pnpm nx typecheck dashboard --skip-nx-cache`: clean
+
+### Follow-ups
+- none
