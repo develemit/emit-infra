@@ -12,6 +12,7 @@ import { diskRoutes } from './routes/disk.js'
 import { postgresRoutes } from './routes/postgres.js'
 import { cronRoutes } from './routes/cron.js'
 import { ufwRoutes } from './routes/ufw.js'
+import { secretsRoutes } from './routes/secrets.js'
 import { startStatusMonitor } from './lib/status-monitor.js'
 
 const app = Fastify({ logger: process.env['NODE_ENV'] === 'development' ? { level: 'warn' } : true })
@@ -45,6 +46,7 @@ await app.register(diskRoutes)
 await app.register(postgresRoutes)
 await app.register(cronRoutes)
 await app.register(ufwRoutes)
+await app.register(secretsRoutes)
 
 const port = Number(process.env['PORT'] ?? 7001)
 await app.listen({ port, host: '0.0.0.0' })
