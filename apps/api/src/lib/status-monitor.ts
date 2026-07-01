@@ -6,10 +6,25 @@
  * when no browser tab is open.
  */
 
+import { appendFile } from 'node:fs/promises'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import { sshExec } from '@emit-infra/core'
 import { discoverProjects } from './discover-projects.js'
 import { sshKeyPath } from './project-helpers.js'
 import { sendToAll } from './push.js'
+
+interface IncidentRecord {
+  type: 'ssh' | 'http'
+  projectName: string
+  event: 'down' | 'up'
+  t: number
+}
+
+function writeIncident(record: IncidentRecord): void {
+  const path = join(homedir(), 'projects', record.projectName, '.incidents.jsonl')
+  appendFile(path, JSON.stringify(record) + '\n').catch(() => {/* write failures are best-effort */})
+}
 
 const POLL_MS = 60_000
 const sshState = new Map<string, 'up' | 'down'>()
@@ -50,6 +65,7 @@ async function poll(): Promise<void> {
           url: `/projects/${encodeURIComponent(config.name)}`,
           tag: `down:${config.name}`,
         }).catch(() => {/* push failures are best-effort */})
+        writeIncident({ type: 'ssh', projectName: config.name, event: 'down', t: Math.floor(Date.now() / 1000) })
       } else if (prev === 'down' && next === 'up') {
         await sendToAll({
           title: config.name,
@@ -57,6 +73,7 @@ async function poll(): Promise<void> {
           url: `/projects/${encodeURIComponent(config.name)}`,
           tag: `up:${config.name}`,
         }).catch(() => {/* push failures are best-effort */})
+        writeIncident({ type: 'ssh', projectName: config.name, event: 'up', t: Math.floor(Date.now() / 1000) })
       }
 
       sshState.set(config.name, next)
@@ -72,6 +89,7 @@ async function poll(): Promise<void> {
             url: `/projects/${encodeURIComponent(config.name)}`,
             tag: `http-down:${config.name}`,
           }).catch(() => {/* push failures are best-effort */})
+          writeIncident({ type: 'http', projectName: config.name, event: 'down', t: Math.floor(Date.now() / 1000) })
         } else if (httpPrev === 'down' && httpNext === 'up') {
           await sendToAll({
             title: config.name,
@@ -79,6 +97,7 @@ async function poll(): Promise<void> {
             url: `/projects/${encodeURIComponent(config.name)}`,
             tag: `http-up:${config.name}`,
           }).catch(() => {/* push failures are best-effort */})
+          writeIncident({ type: 'http', projectName: config.name, event: 'up', t: Math.floor(Date.now() / 1000) })
         }
 
         httpState.set(config.name, httpNext)
