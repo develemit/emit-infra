@@ -14,6 +14,7 @@ import { NetworkChart } from '@/components/detail/network-chart'
 import { DeployTimeline } from '@/components/detail/deploy-timeline'
 import { CiTimeline } from '@/components/detail/ci-timeline'
 import { DockerUsage } from '@/components/detail/docker-usage'
+import { CronPanel } from '@/components/detail/cron-panel'
 import { DeployPanel } from '@/components/deploy-panel'
 import { RollbackPanel } from '@/components/rollback-panel'
 import { SecretsSyncPanel } from '@/components/secrets-sync-panel'
@@ -181,6 +182,9 @@ export default function ProjectDetailPage() {
               <DeployTimeline deploys={deploys} name={name} repoUrl={repoUrl} />
               <CiTimeline runs={ciRuns} name={name} repoUrl={repoUrl} />
               <DockerUsage projectName={name} onPrune={fetchData} />
+              {status !== null && !status?.error && (
+                <CronPanel name={name} />
+              )}
               {deploying && (
                 <DeployPanel
                   url={deployUrl}
