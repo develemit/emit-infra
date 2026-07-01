@@ -14,9 +14,10 @@ type SseEvent =
   | { type: 'line'; stream: string; text: string }
   | { type: 'done'; exitCode: number }
   | { type: 'error'; message: string }
+  | { type: 'backup'; status: 'started' | 'ok' | 'warn'; message: string }
 
 function useDeploySse(url: string) {
-  const [lines, setLines] = useState<string[]>([])
+  const [lines, setLines] = useState<{ text: string; color?: string }[]>([])
   const [exit, setExit] = useState<number | undefined>()
 
   useEffect(() => {
@@ -37,9 +38,14 @@ function useDeploySse(url: string) {
             const data = part.split('\n').find(l => l.startsWith('data:'))
             if (!data) continue
             const ev = JSON.parse(data.slice(5).trim()) as SseEvent
-            if (ev.type === 'line') setLines(p => [...p, ev.text])
+            if (ev.type === 'line') setLines(p => [...p, { text: ev.text }])
             else if (ev.type === 'done') setExit(ev.exitCode)
-            else if (ev.type === 'error') { setLines(p => [...p, `error: ${ev.message}`]); setExit(1) }
+            else if (ev.type === 'error') { setLines(p => [...p, { text: `error: ${ev.message}` }]); setExit(1) }
+            else if (ev.type === 'backup') {
+              const color = ev.status === 'ok' ? 'var(--ok)' : ev.status === 'warn' ? 'var(--warn)' : 'var(--fg-muted)'
+              const prefix = ev.status === 'ok' ? '✓' : ev.status === 'warn' ? '⚠' : '●'
+              setLines(p => [...p, { text: `${prefix} Backup: ${ev.message}`, color }])
+            }
           }
         }
       } catch {
@@ -66,7 +72,7 @@ export function DeployPanel({ url, name, onClose }: DeployPanelProps) {
   }, [exit, name, showToast])
 
   const termContent = lines.map((l, i) => (
-    <div key={i} className="ec-ln">{l}</div>
+    <div key={i} className="ec-ln" style={l.color ? { color: l.color } : undefined}>{l.text}</div>
   ))
 
   const closeBtn = !running && (

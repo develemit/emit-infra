@@ -30,7 +30,23 @@ Surface `{ type: 'backup', status, message }` SSE events in the deploy terminal 
 
 ## Acceptance criteria
 
-- [ ] `backup` SSE events render in the deploy terminal (not silently dropped)
-- [ ] `started` / `ok` / `warn` status each has distinct visual treatment
-- [ ] Existing `line` and `done` event handling is unchanged
-- [ ] `pnpm nx typecheck dashboard --skip-nx-cache` passes clean
+- [x] `backup` SSE events render in the deploy terminal (not silently dropped)
+- [x] `started` / `ok` / `warn` status each has distinct visual treatment
+- [x] Existing `line` and `done` event handling is unchanged
+- [x] `pnpm nx typecheck dashboard --skip-nx-cache` passes clean
+
+## Completed
+
+**Date:** 2026-07-01
+
+### Summary
+Added `backup` to the local `SseEvent` union in `deploy-panel.tsx`. Changed the `lines` state from `string[]` to `{ text: string; color?: string }[]` so each line can carry an optional color. Backup events map to `● Backup: …` (dim gray, `var(--fg-muted)`), `✓ Backup: …` (green, `var(--ok)`), and `⚠ Backup: …` (yellow, `var(--warn)`). The `termContent` render uses inline `style={{ color }}` when present. Existing `line`, `done`, and `error` handling is unchanged in behavior.
+
+### Files changed
+- `apps/dashboard/src/components/deploy-panel.tsx` — added `backup` to SseEvent, changed lines state to carry optional color, added backup handler, updated termContent render
+
+### Verification
+- `pnpm nx typecheck dashboard --skip-nx-cache`: clean
+
+### Follow-ups
+- none
