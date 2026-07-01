@@ -14,6 +14,7 @@ import { cronRoutes } from './routes/cron.js'
 import { ufwRoutes } from './routes/ufw.js'
 import { secretsRoutes } from './routes/secrets.js'
 import { responseTimeRoutes } from './routes/response-times.js'
+import { certRoutes } from './routes/cert.js'
 import { startStatusMonitor } from './lib/status-monitor.js'
 
 const app = Fastify({ logger: process.env['NODE_ENV'] === 'development' ? { level: 'warn' } : true })
@@ -49,6 +50,7 @@ await app.register(cronRoutes)
 await app.register(ufwRoutes)
 await app.register(secretsRoutes)
 await app.register(responseTimeRoutes)
+await app.register(certRoutes)
 
 const port = Number(process.env['PORT'] ?? 7001)
 await app.listen({ port, host: '0.0.0.0' })
