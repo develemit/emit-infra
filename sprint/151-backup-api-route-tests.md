@@ -32,7 +32,23 @@ Write route-level tests for the four backup endpoints: list, delete, trigger, an
 
 ## Acceptance criteria
 
-- [ ] At least 8 test cases across the three endpoints
-- [ ] Invalid key patterns (e.g. `../../etc/passwd`, `backup.sql`) return 400
-- [ ] Missing bucket returns 404, not 503
-- [ ] `pnpm nx test api --skip-nx-cache` passes clean
+- [x] At least 8 test cases across the three endpoints
+- [x] Invalid key patterns (e.g. `../../etc/passwd`, `backup.sql`) return 400
+- [x] Missing bucket returns 404, not 503
+- [x] `pnpm nx test api --skip-nx-cache` passes clean
+
+## Completed
+
+**Date:** 2026-07-01
+
+### Summary
+Created `apps/api/src/routes/backup.test.ts` with 14 route-level tests covering all four backup endpoints (list, delete, trigger, download). Tests mock `findProject` directly from `../lib/project-helpers.js` and `sshExec` from `@emit-infra/core`, following the existing pattern from `projects.test.ts`. Two mock project fixtures are used: one without a `postgres.backupBucket` (for 404 tests) and one with it configured (for success paths). URL-encoded path traversal attempts (`%2E%2E%2F`) ensure Fastify routes to the handler before key validation fires.
+
+### Files changed
+- (new) `apps/api/src/routes/backup.test.ts` — 14 tests across GET /backups, DELETE /backups/:key, POST /backups/trigger, GET /backups/:key/download
+
+### Verification
+- `pnpm nx test api --skip-nx-cache`: 54/54 pass (14 new + 40 existing)
+
+### Follow-ups
+- none
