@@ -23,6 +23,7 @@ import { DestroyModal } from '@/components/destroy-modal'
 import { BackupPanel } from '@/components/detail/backup-panel'
 import { PgTableSizesPanel } from '@/components/detail/pg-table-sizes-panel'
 import { DiskDirsPanel } from '@/components/detail/disk-dirs-panel'
+import { SecretsPanel } from '@/components/detail/secrets-panel'
 import { useProjectDetail } from '@/lib/use-project-detail'
 
 export default function ProjectDetailPage() {
@@ -157,6 +158,9 @@ export default function ProjectDetailPage() {
               })()}
               {project?.config.postgres?.backupBucket && (
                 <BackupPanel project={project} backups={backups} />
+              )}
+              {project?.config.requiredEnvKeys != null && (
+                <SecretsPanel name={name} />
               )}
               {project?.config.postgres != null && (
                 <PgTableSizesPanel name={name} />

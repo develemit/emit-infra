@@ -452,3 +452,14 @@ export async function getUfwRules(name: string): Promise<UfwStatus> {
   if (!res.ok) return { status: 'inactive', rules: [] }
   return res.json() as Promise<UfwStatus>
 }
+
+export type SecretsDrift =
+  | { status: 'unconfigured' }
+  | { status: 'ok' | 'drift'; missing: string[]; extra: string[]; present: string[] }
+
+export async function getSecretsDrift(name: string): Promise<SecretsDrift | null> {
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/secrets-drift`, { cache: 'no-store', headers: authHeaders() })
+  if (res.status === 503) return null
+  if (!res.ok) return null
+  return res.json() as Promise<SecretsDrift>
+}
