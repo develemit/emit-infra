@@ -475,3 +475,21 @@ export async function getResponseTimes(name: string): Promise<ResponseTimes> {
   if (!res.ok) return { available: false }
   return res.json() as Promise<ResponseTimes>
 }
+
+export interface Incident {
+  startedAt: string
+  resolvedAt: string | null
+  durationSec: number
+  resolved: boolean
+}
+
+export interface IncidentsResponse {
+  incidents: Incident[]
+  mttrSec: number | null
+}
+
+export async function getIncidents(name: string): Promise<IncidentsResponse> {
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/incidents`, { cache: 'no-store', headers: authHeaders() })
+  if (!res.ok) return { incidents: [], mttrSec: null }
+  return res.json() as Promise<IncidentsResponse>
+}

@@ -14,6 +14,7 @@ import { FullChart } from '@/components/detail/full-chart'
 import { NetworkChart } from '@/components/detail/network-chart'
 import { QueueChart } from '@/components/detail/queue-chart'
 import { DeployTimeline } from '@/components/detail/deploy-timeline'
+import { IncidentPanel } from '@/components/detail/incident-panel'
 import { CiTimeline } from '@/components/detail/ci-timeline'
 import { DockerUsage } from '@/components/detail/docker-usage'
 import { CronPanel } from '@/components/detail/cron-panel'
@@ -193,6 +194,7 @@ export default function ProjectDetailPage() {
                 <ContainerTable containers={containers} projectName={name} onRefetch={fetchData} latestMetric={latestMetric} />
               )}
               <DeployTimeline deploys={deploys} name={name} repoUrl={repoUrl} />
+              <IncidentPanel name={name} />
               <CiTimeline runs={ciRuns} name={name} repoUrl={repoUrl} />
               <DockerUsage projectName={name} onPrune={fetchData} />
               {status !== null && !status?.error && (
