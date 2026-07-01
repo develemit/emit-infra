@@ -238,6 +238,101 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
     }
   })
 
+  const BACKUP_KEY_RE = /^[a-zA-Z0-9][a-zA-Z0-9_.-]*\.dump$/
+
+  app.get<{ Params: { name: string } }>('/projects/:name/backups', async (req, reply): Promise<void> => {
+    const project = await findProject(req.params.name)
+    if (!project) return void reply.status(404).send({ error: 'not found' })
+    const bucket = project.config.postgres?.backupBucket
+    if (!bucket) return void reply.status(404).send({ error: 'no backup bucket configured' })
+
+    const key = sshKeyPath(project.config.sshKeyName)
+    const host = project.config.serverIp ?? project.config.domain
+    const name = req.params.name
+
+    const cmd = `source /opt/${name}/.env && AWS_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID" AWS_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY" AWS_DEFAULT_REGION="auto" aws s3 ls "s3://${bucket}/" --endpoint-url "https://$CF_ACCOUNT_ID.r2.cloudflarestorage.com"`
+
+    try {
+      const raw = await sshExec(host, cmd, key)
+      const backups = raw
+        .split('\n')
+        .filter(l => l.trim())
+        .map(line => {
+          const parts = line.trim().split(/\s+/)
+          if (parts.length < 4) return null
+          const [date, time, size, backupKey] = parts
+          if (!date || !time || !size || !backupKey) return null
+          return { key: backupKey, sizeBytes: parseInt(size, 10), lastModified: `${date}T${time}Z` }
+        })
+        .filter((b): b is { key: string; sizeBytes: number; lastModified: string } => b !== null)
+        .sort((a, b) => b.lastModified.localeCompare(a.lastModified))
+      return void reply.send({ backups })
+    } catch {
+      return void reply.status(503).send({ error: 'unreachable' })
+    }
+  })
+
+  app.delete<{ Params: { name: string; key: string } }>('/projects/:name/backups/:key', async (req, reply): Promise<void> => {
+    const project = await findProject(req.params.name)
+    if (!project) return void reply.status(404).send({ error: 'not found' })
+    const bucket = project.config.postgres?.backupBucket
+    if (!bucket) return void reply.status(404).send({ error: 'no backup bucket configured' })
+    if (!BACKUP_KEY_RE.test(req.params.key)) return void reply.status(400).send({ error: 'invalid key' })
+
+    const sshKey = sshKeyPath(project.config.sshKeyName)
+    const host = project.config.serverIp ?? project.config.domain
+    const name = req.params.name
+    const backupKey = req.params.key
+
+    const cmd = `source /opt/${name}/.env && AWS_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID" AWS_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY" AWS_DEFAULT_REGION="auto" aws s3 rm "s3://${bucket}/${backupKey}" --endpoint-url "https://$CF_ACCOUNT_ID.r2.cloudflarestorage.com"`
+
+    try {
+      await sshExec(host, cmd, sshKey)
+      return void reply.send({ ok: true })
+    } catch (err) {
+      return void reply.send({ ok: false, error: String(err) })
+    }
+  })
+
+  app.post<{ Params: { name: string } }>('/projects/:name/backups/trigger', async (req, reply): Promise<void> => {
+    const project = await findProject(req.params.name)
+    if (!project) return void reply.status(404).send({ error: 'not found' })
+    if (!project.config.postgres?.backupBucket) return void reply.status(404).send({ error: 'no backup bucket configured' })
+
+    const sshKey = sshKeyPath(project.config.sshKeyName)
+    const host = project.config.serverIp ?? project.config.domain
+    const name = req.params.name
+
+    try {
+      const output = await sshExec(host, `/usr/local/bin/emit-db-backup-${name} 2>&1`, sshKey)
+      return void reply.send({ ok: true, output })
+    } catch (err) {
+      return void reply.send({ ok: false, output: String(err) })
+    }
+  })
+
+  app.get<{ Params: { name: string; key: string } }>('/projects/:name/backups/:key/download', async (req, reply): Promise<void> => {
+    const project = await findProject(req.params.name)
+    if (!project) return void reply.status(404).send({ error: 'not found' })
+    const bucket = project.config.postgres?.backupBucket
+    if (!bucket) return void reply.status(404).send({ error: 'no backup bucket configured' })
+    if (!BACKUP_KEY_RE.test(req.params.key)) return void reply.status(400).send({ error: 'invalid key' })
+
+    const sshKey = sshKeyPath(project.config.sshKeyName)
+    const host = project.config.serverIp ?? project.config.domain
+    const name = req.params.name
+    const backupKey = req.params.key
+
+    const cmd = `source /opt/${name}/.env && AWS_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID" AWS_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY" AWS_DEFAULT_REGION="auto" aws s3 presign "s3://${bucket}/${backupKey}" --endpoint-url "https://$CF_ACCOUNT_ID.r2.cloudflarestorage.com" --expires-in 3600`
+
+    try {
+      const url = (await sshExec(host, cmd, sshKey)).trim()
+      return void reply.send({ url })
+    } catch {
+      return void reply.status(503).send({ error: 'unreachable' })
+    }
+  })
+
   app.get<{ Params: { name: string } }>('/projects/:name/ci-status', async (req, reply): Promise<void> => {
     const filePath = join(homedir(), 'projects', req.params.name, '.ci-status.json')
     try {
