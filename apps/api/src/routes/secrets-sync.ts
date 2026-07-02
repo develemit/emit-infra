@@ -5,9 +5,10 @@ import { readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { z } from 'zod/v4'
 import { execa } from 'execa'
+import { sshExec } from '@emit-infra/core'
 import { writeEvent } from '../lib/write-sse.js'
 import { openSse, sseError } from '../lib/open-sse.js'
-import { findProject } from '../lib/project-helpers.js'
+import { findProject, sshKeyPath } from '../lib/project-helpers.js'
 
 const NameParam = z.object({ name: z.string().min(1).max(100) })
 const SecretsSyncBody = z.object({
@@ -39,6 +40,46 @@ function findLocalhostValues(entries: [string, string][]): [string, string][] {
 
 
 export async function secretsSyncRoutes(app: FastifyInstance) {
+  // POST /projects/:name/secrets-apply — write local .env to /opt/<name>/.env via SSH
+  app.post<{ Params: { name: string } }>(
+    '/projects/:name/secrets-apply',
+    async (req, reply) => {
+      const params = NameParam.safeParse(req.params)
+      if (!params.success) return reply.status(400).send({ error: params.error.message })
+
+      const project = await findProject(params.data.name)
+      if (!project) return reply.status(404).send({ error: 'not found' })
+
+      const name = params.data.name
+      const projectDir = join(homedir(), 'projects', name)
+      const envFilePath = existsSync(join(projectDir, '.env.prod'))
+        ? join(projectDir, '.env.prod')
+        : join(projectDir, '.env')
+
+      if (!existsSync(envFilePath)) {
+        return reply.status(404).send({ ok: false, error: `No env file found in ~/projects/${name}/` })
+      }
+
+      const content = await readFile(envFilePath, 'utf-8')
+      const entries = parseEnvFile(content)
+
+      if (entries.length === 0) {
+        return reply.send({ ok: false, error: 'No secrets found in env file' })
+      }
+
+      const b64 = Buffer.from(entries.map(([k, v]) => `${k}=${v}`).join('\n') + '\n').toString('base64')
+      const key = sshKeyPath(project.config.sshKeyName)
+      const host = project.config.serverIp ?? project.config.domain
+
+      try {
+        await sshExec(host, `echo -n '${b64}' | base64 -d > /opt/${name}/.env`, key)
+        return reply.send({ ok: true })
+      } catch (err) {
+        return reply.status(503).send({ ok: false, error: err instanceof Error ? err.message : 'SSH error' })
+      }
+    },
+  )
+
   app.post(
     '/projects/:name/secrets-sync',
     async (req, reply) => {

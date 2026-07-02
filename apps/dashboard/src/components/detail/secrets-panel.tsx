@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { Icon } from '@/components/icon'
 import { Badge } from '@/components/ui/badge'
-import { getSecretsDrift, type SecretsDrift } from '@/lib/api'
+import { getSecretsDrift, applySecrets, type SecretsDrift } from '@/lib/api'
 
 interface SecretsPanelProps {
   name: string
@@ -11,6 +11,9 @@ interface SecretsPanelProps {
 export function SecretsPanel({ name }: SecretsPanelProps) {
   const [drift, setDrift] = useState<SecretsDrift | null>(null)
   const [loading, setLoading] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+  const [synced, setSynced] = useState(false)
+  const [syncError, setSyncError] = useState<string | null>(null)
 
   const fetchDrift = async () => {
     setLoading(true)
@@ -21,6 +24,20 @@ export function SecretsPanel({ name }: SecretsPanelProps) {
       setDrift(null)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleSync = async () => {
+    setSyncing(true)
+    setSyncError(null)
+    const result = await applySecrets(name)
+    setSyncing(false)
+    if (result.ok) {
+      setSynced(true)
+      setTimeout(() => setSynced(false), 2000)
+      void fetchDrift()
+    } else {
+      setSyncError(result.error ?? 'Sync failed')
     }
   }
 
@@ -46,6 +63,20 @@ export function SecretsPanel({ name }: SecretsPanelProps) {
         <span className="text-[12px] text-subtle font-mono mr-3">
           {missing.length} missing · {extra.length} extra · {present.length} present
         </span>
+        {missing.length > 0 && (
+          <button
+            onClick={() => void handleSync()}
+            disabled={syncing || synced}
+            className="inline-flex items-center gap-1.5 px-3 h-[30px] rounded-lg text-[12px] font-medium text-ok-fg bg-ok hover:opacity-90 disabled:opacity-50 transition-opacity"
+          >
+            {syncing
+              ? <><Icon name="refresh" size={12} />Syncing…</>
+              : synced
+              ? <><Icon name="check" size={12} />Synced!</>
+              : <><Icon name="deploy" size={12} />Sync to server</>
+            }
+          </button>
+        )}
         <button
           onClick={() => void fetchDrift()}
           disabled={loading}
@@ -57,6 +88,10 @@ export function SecretsPanel({ name }: SecretsPanelProps) {
           }
         </button>
       </div>
+
+      {syncError && (
+        <div className="text-[12px] text-err font-mono mb-2">{syncError}</div>
+      )}
 
       {loading ? (
         <div className="text-[12px] text-subtle font-mono">Loading…</div>
