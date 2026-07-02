@@ -56,7 +56,8 @@ export function BackupPanel({ project, backups }: BackupPanelProps) {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [runningBackup, setRunningBackup] = useState(false)
   const [triggerTime, setTriggerTime] = useState<number | null>(null)
-  const [backupResult, setBackupResult] = useState<'complete' | 'failed' | null>(null)
+  const [backupResult, setBackupResult] = useState<'complete' | 'failed' | 'timeout' | null>(null)
+  const [elapsedSecs, setElapsedSecs] = useState(0)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -75,6 +76,7 @@ export function BackupPanel({ project, backups }: BackupPanelProps) {
     timeoutRef.current = setTimeout(() => {
       if (pollRef.current) clearInterval(pollRef.current)
       setRunningBackup(false)
+      setBackupResult('timeout')
     }, 600_000)
     return () => {
       if (pollRef.current) clearInterval(pollRef.current)
@@ -82,8 +84,20 @@ export function BackupPanel({ project, backups }: BackupPanelProps) {
     }
   }, [runningBackup, triggerTime, project.config.name, fetchBackups])
 
+  useEffect(() => {
+    if (!runningBackup) { setElapsedSecs(0); return }
+    const id = setInterval(() => setElapsedSecs(s => s + 1), 1_000)
+    return () => clearInterval(id)
+  }, [runningBackup])
+
+  function fmtElapsed(secs: number): string {
+    if (secs < 60) return `${secs}s`
+    return `${Math.floor(secs / 60)}m ${secs % 60}s`
+  }
+
   async function handleTriggerBackup() {
     setBackupResult(null)
+    setElapsedSecs(0)
     setTriggerTime(Date.now())
     setRunningBackup(true)
     try {
@@ -154,7 +168,9 @@ export function BackupPanel({ project, backups }: BackupPanelProps) {
           className="inline-flex items-center gap-1.5 px-3 h-[30px] rounded-lg text-[12px] font-medium text-accent-fg bg-accent hover:opacity-90 disabled:opacity-50 transition-opacity"
         >
           {triggering || runningBackup
-            ? <><Icon name="refresh" size={12} />Running…</>
+            ? <><Icon name="refresh" size={12} />Running… {fmtElapsed(elapsedSecs)}</>
+            : backupResult === 'timeout'
+            ? <><Icon name="alert" size={12} />Status unknown — check logs</>
             : backupResult === 'complete'
             ? <><Icon name="check" size={12} />Backup complete</>
             : backupResult === 'failed'
