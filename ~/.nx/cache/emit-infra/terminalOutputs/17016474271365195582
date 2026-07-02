@@ -5,5 +5,23 @@
    - Network:      http://192.168.1.7:7013
 
  [32m[1m✓[22m[39m Starting...
- [32m[1m✓[22m[39m Ready in 1100ms
+ [32m[1m✓[22m[39m Ready in 1056ms
+ [32m[1m✓[22m[39m Compiled /projects in 367ms (661 modules)
+ GET /projects [32m200[39m in 567ms
+ [32m[1m✓[22m[39m Compiled / in 152ms (665 modules)
+ GET / [32m200[39m in 288ms
+ GET / [32m200[39m in 51ms
+ [32m[1m✓[22m[39m Compiled /projects/[name] in 253ms (716 modules)
+ GET /projects/tastease [32m200[39m in 631ms
+ [32m[1m✓[22m[39m Compiled /projects/[name]/deploy-log/[sha] in 160ms (743 modules)
+ GET /projects/tastease/deploy-log/1e4773d30e1dfae2591091b5e65da96ff80edb84 [32m200[39m in 385ms
+ GET /projects/tastease [32m200[39m in 119ms
+ [32m[1m✓[22m[39m Compiled in 597ms (309 modules)
+ GET /projects [32m200[39m in 34ms
+ [32m[1m✓[22m[39m Compiled in 81ms (309 modules)
+ GET /projects [32m200[39m in 11ms
+ [32m[1m✓[22m[39m Compiled in 54ms (309 modules)
+ GET /projects [32m200[39m in 11ms
+ [32m[1m✓[22m[39m Compiled in 45ms (309 modules)
+ GET /projects [32m200[39m in 12ms
 [?25h

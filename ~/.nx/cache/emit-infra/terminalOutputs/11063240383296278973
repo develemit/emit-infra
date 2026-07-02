@@ -1,0 +1,48 @@
+> next dev --port 7013
+
+   [1m[38;2;173;127;168m▲ Next.js 15.5.19[39m[22m
+   - Local:        http://localhost:7013
+   - Network:      http://192.168.1.238:7013
+
+ [32m[1m✓[22m[39m Starting...
+ [32m[1m✓[22m[39m Ready in 1106ms
+ [32m[1m✓[22m[39m Compiled /projects in 466ms (664 modules)
+ GET /projects [32m200[39m in 684ms
+ [32m[1m✓[22m[39m Compiled in 529ms (274 modules)
+ GET /projects [32m200[39m in 22ms
+ [32m[1m✓[22m[39m Compiled in 83ms (274 modules)
+ GET /projects [32m200[39m in 13ms
+ [32m[1m✓[22m[39m Compiled in 72ms (260 modules)
+ [32m[1m✓[22m[39m Compiled in 231ms (678 modules)
+ GET /projects [32m200[39m in 97ms
+ [32m[1m✓[22m[39m Compiled in 71ms (664 modules)
+ [32m[1m✓[22m[39m Compiled in 53ms (664 modules)
+ [32m[1m✓[22m[39m Compiled in 103ms (678 modules)
+ GET /projects [32m200[39m in 31ms
+ [32m[1m✓[22m[39m Compiled in 89ms (274 modules)
+ GET /projects [32m200[39m in 20ms
+ [32m[1m✓[22m[39m Compiled in 60ms (274 modules)
+ GET /projects [32m200[39m in 11ms
+ [32m[1m✓[22m[39m Compiled in 46ms (274 modules)
+ GET /projects [32m200[39m in 11ms
+ [32m[1m✓[22m[39m Compiled in 61ms (274 modules)
+ GET /projects [32m200[39m in 13ms
+ [32m[1m✓[22m[39m Compiled in 65ms (274 modules)
+ GET /projects [32m200[39m in 21ms
+ [32m[1m✓[22m[39m Compiled in 54ms (274 modules)
+ GET /projects [32m200[39m in 12ms
+ [32m[1m✓[22m[39m Compiled in 69ms (274 modules)
+ GET /projects [32m200[39m in 13ms
+ [32m[1m✓[22m[39m Compiled in 43ms (274 modules)
+ GET /projects [32m200[39m in 12ms
+ [32m[1m✓[22m[39m Compiled in 55ms (274 modules)
+ GET /projects [32m200[39m in 12ms
+ [32m[1m✓[22m[39m Compiled in 61ms (274 modules)
+ GET /projects [32m200[39m in 13ms
+ [32m[1m✓[22m[39m Compiled / in 198ms (668 modules)
+ GET / [32m200[39m in 371ms
+ [32m[1m✓[22m[39m Compiled /projects/[name] in 325ms (729 modules)
+ GET /projects/emit-vision [32m200[39m in 750ms
+ GET /projects/emit-vision [32m200[39m in 1110ms
+ GET /projects/emit-vision [32m200[39m in 107ms
+[?25h

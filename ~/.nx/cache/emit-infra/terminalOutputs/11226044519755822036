@@ -1,0 +1,1803 @@
+> next dev --port 7013
+
+   [1m[38;2;173;127;168m▲ Next.js 15.5.19[39m[22m
+   - Local:        http://localhost:7013
+   - Network:      http://192.168.1.238:7013
+
+ [32m[1m✓[22m[39m Starting...
+ [32m[1m✓[22m[39m Ready in 1068ms
+Failed to proxy http://localhost:7001/projects [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+ [32m[1m✓[22m[39m Compiled /_error in 288ms (382 modules)
+ [32m[1m✓[22m[39m Compiled in 170ms (286 modules)
+ [32m[1m✓[22m[39m Compiled /projects in 476ms (917 modules)
+ GET /projects [32m200[39m in 684ms
+ [32m[1m✓[22m[39m Compiled in 466ms (430 modules)
+ GET /projects [32m200[39m in 15ms
+ [32m[1m✓[22m[39m Compiled in 53ms (430 modules)
+ GET /projects [32m200[39m in 12ms
+Failed to proxy http://localhost:7001/projects/test-smoke/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+ [32m[1m✓[22m[39m Compiled /_error in 179ms (1013 modules)
+Failed to proxy http://localhost:7001/projects/test-smoke/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+[Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+Failed to proxy http://localhost:7001/projects/emit-vision/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+[Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+[Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+[Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+[Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+[Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+[Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+[Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+[Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+[Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+[Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+[Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+[Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+[Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+[Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+[Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+[Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+[Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+[Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+[Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+[Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+[Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+[Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+[Error: read ECONNRESET] {
+  errno: [33m-54[39m,
+  code: [32m'ECONNRESET'[39m,
+  syscall: [32m'read'[39m
+}
+Failed to proxy http://localhost:7001/projects/develemail/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+ [32m[1m✓[22m[39m Compiled in 177ms (1027 modules)
+ [32m[1m✓[22m[39m Compiled in 110ms (1027 modules)
+ [32m[1m✓[22m[39m Compiled in 108ms (1027 modules)
+ [32m[1m✓[22m[39m Compiled in 118ms (1027 modules)
+ [32m[1m✓[22m[39m Compiled in 103ms (1027 modules)
+ [32m[1m✓[22m[39m Compiled in 100ms (1027 modules)
+ [32m[1m✓[22m[39m Compiled in 89ms (1027 modules)
+ [32m[1m✓[22m[39m Compiled in 109ms (1027 modules)
+ [32m[1m✓[22m[39m Compiled in 101ms (1027 modules)
+ [32m[1m✓[22m[39m Compiled in 97ms (1027 modules)
+ [32m[1m✓[22m[39m Compiled in 107ms (1027 modules)
+ [32m[1m✓[22m[39m Compiled in 93ms (1027 modules)
+ [32m[1m✓[22m[39m Compiled in 96ms (931 modules)
+ [32m[1m✓[22m[39m Compiled in 114ms (931 modules)
+ [32m[1m✓[22m[39m Compiled in 95ms (931 modules)
+ [32m[1m✓[22m[39m Compiled in 154ms (931 modules)
+ [32m[1m✓[22m[39m Compiled in 177ms (931 modules)
+ [32m[1m✓[22m[39m Compiled in 50ms (430 modules)
+ [32m[1m✓[22m[39m Compiled in 77ms (430 modules)
+ [32m[1m✓[22m[39m Compiled in 162ms (931 modules)
+ [32m[1m✓[22m[39m Compiled in 164ms (934 modules)
+ [32m[1m✓[22m[39m Compiled in 84ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 56ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 69ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 56ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 57ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 50ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 57ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 50ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 59ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 43ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 47ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 191ms (934 modules)
+ [32m[1m✓[22m[39m Compiled in 48ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 52ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 61ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 62ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 42ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 67ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 65ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 63ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 66ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 61ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 69ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 56ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 46ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 59ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 52ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 58ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 54ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 53ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 56ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 48ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 44ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 76ms (920 modules)
+ [32m[1m✓[22m[39m Compiled in 79ms (920 modules)
+ [32m[1m✓[22m[39m Compiled in 48ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 52ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 84ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 57ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 82ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 54ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 52ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 47ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 68ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 73ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 69ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 53ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 53ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 72ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 70ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 53ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 48ms (431 modules)
+Failed to proxy http://localhost:7001/projects/test-smoke/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+ [32m[1m✓[22m[39m Compiled /_error in 132ms (1016 modules)
+ [32m[1m✓[22m[39m Compiled in 69ms (432 modules)
+ [32m[1m✓[22m[39m Compiled in 55ms (431 modules)
+Failed to proxy http://localhost:7001/projects/test-smoke/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+ [32m[1m✓[22m[39m Compiled /_error in 100ms (1016 modules)
+Failed to proxy http://localhost:7001/projects/tastease/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+ [32m[1m✓[22m[39m Compiled in 92ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 76ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 65ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 61ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 59ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 50ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 45ms (431 modules)
+Failed to proxy http://localhost:7001/projects/test-smoke/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+ [37m[1m○[22m[39m Compiling /_error ...
+Failed to proxy http://localhost:7001/projects/tastease/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+ [32m[1m✓[22m[39m Compiled /_error in 178.1s (1016 modules)
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+ [32m[1m✓[22m[39m Compiled in 75ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 58ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 51ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 62ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 48ms (431 modules)
+ [32m[1m✓[22m[39m Compiled in 54ms (431 modules)
+Failed to proxy http://localhost:7001/projects/test-smoke/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+ [32m[1m✓[22m[39m Compiled /_error in 106ms (1016 modules)
+ [32m[1m✓[22m[39m Compiled in 213ms (1030 modules)
+ GET /projects [32m200[39m in 194ms
+[?25h
