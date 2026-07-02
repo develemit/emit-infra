@@ -616,3 +616,30 @@ export async function getScaleAdvice(name: string): Promise<ScaleAdvice | null> 
   const body = await res.json() as { advice: ScaleAdvice | null }
   return body.advice
 }
+
+export interface ProjectConfigPatch {
+  serverType?: string
+  sshKeyName?: string
+  region?: string
+  domain?: string
+  serverIp?: string
+  postgres?: {
+    version?: string
+    backupBucket?: string
+    backupRetainDays?: number
+  }
+  requiredEnvKeys?: string[]
+}
+
+export async function updateProjectConfig(name: string, patch: ProjectConfigPatch): Promise<void> {
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/config`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(patch),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({})) as { error?: string }
+    throw new Error(body.error ?? `PATCH failed: ${res.status}`)
+  }
+}
+

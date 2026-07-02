@@ -76,12 +76,32 @@ Sprint 153 added `PATCH /projects/:name/config` for `backupRetainDays` only. The
 
 ## Acceptance criteria
 
-- [ ] `PATCH /projects/:name/config` accepts all ProjectConfig fields listed above
-- [ ] Attempting to change `name` via the PATCH body returns 400
-- [ ] Deep merge: patching `postgres.backupBucket` doesn't wipe `postgres.backupRetainDays`
-- [ ] Settings panel is collapsed by default, expands on button click
-- [ ] Each section saves independently with its own button
-- [ ] Both typechecks pass clean
+- [x] `PATCH /projects/:name/config` accepts all ProjectConfig fields listed above
+- [x] Attempting to change `name` via the PATCH body returns 400
+- [x] Deep merge: patching `postgres.backupBucket` doesn't wipe `postgres.backupRetainDays`
+- [x] Settings panel is collapsed by default, expands on button click
+- [x] Each section saves independently with its own button
+- [x] Both typechecks pass clean
+
+## Completed
+
+**Date:** 2026-07-02
+
+### Summary
+Expanded `PatchConfigBody` in `projects.ts` to accept all settable ProjectConfig fields (serverType, sshKeyName, region, domain, serverIp, postgres sub-object, requiredEnvKeys). Added explicit `name` rejection check before schema validation. Updated merge logic: top-level fields spread via `Object.assign`, postgres deep-merged. Added `updateProjectConfig(name, patch)` and `ProjectConfigPatch` to `api.ts` (`getSshKeys` was already exported). Created `ProjectSettingsPanel` (161 lines) with collapsible toggle, four independent save sections (Server/SSH/Database/Access), per-section `useSave` hook with 2s saved flash, SSH key dropdown populated from `/projects/ssh-keys` on expand. Mounted at bottom of project detail page.
+
+### Files changed
+- `apps/api/src/routes/projects.ts` — expanded `PatchConfigBody`, added `name` rejection, updated merge logic
+- `apps/dashboard/src/lib/api.ts` — added `ProjectConfigPatch`, `updateProjectConfig`
+- (new) `apps/dashboard/src/components/detail/project-settings-panel.tsx` — collapsible settings form
+- `apps/dashboard/app/projects/[name]/page.tsx` — import and mount `ProjectSettingsPanel`
+
+### Verification
+- `pnpm nx typecheck api --skip-nx-cache`: clean
+- `pnpm nx typecheck dashboard --skip-nx-cache`: clean
+
+### Follow-ups
+- `[defer]` `apps/dashboard/src/lib/api.ts` exceeds 650 lines — split into domain modules in a future sprint
 
 ## Out of scope
 

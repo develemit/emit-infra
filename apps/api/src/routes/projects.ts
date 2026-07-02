@@ -90,9 +90,18 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
   )
 
   const PatchConfigBody = z.object({
+    name: z.never().optional(),
+    serverType: z.string().optional(),
+    sshKeyName: z.string().optional(),
+    region: z.string().optional(),
+    domain: z.string().optional(),
+    serverIp: z.string().optional(),
     postgres: z.object({
-      backupRetainDays: z.number().int().min(1).max(365),
-    }).partial(),
+      version: z.string().optional(),
+      backupBucket: z.string().optional(),
+      backupRetainDays: z.number().int().min(1).max(365).optional(),
+    }).optional(),
+    requiredEnvKeys: z.string().array().optional(),
   }).partial()
 
   app.patch<{ Params: { name: string }; Body: unknown }>(
@@ -100,6 +109,10 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
     async (req, reply): Promise<void> => {
       const project = await findProject(req.params.name)
       if (!project) return void reply.status(404).send({ error: 'not found' })
+
+      if (typeof req.body === 'object' && req.body !== null && 'name' in req.body) {
+        return void reply.status(400).send({ error: 'cannot change project name' })
+      }
 
       const parsed = PatchConfigBody.safeParse(req.body)
       if (!parsed.success) {
@@ -109,9 +122,12 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
       const raw = await readFile(project.configPath, 'utf8')
       const current = JSON.parse(raw) as Record<string, unknown>
 
-      if (parsed.data.postgres) {
+      const { postgres, ...topLevel } = parsed.data
+      Object.assign(current, topLevel)
+
+      if (postgres) {
         const existing = (current['postgres'] ?? {}) as Record<string, unknown>
-        current['postgres'] = { ...existing, ...parsed.data.postgres }
+        current['postgres'] = { ...existing, ...postgres }
       }
 
       await writeFile(project.configPath, JSON.stringify(current, null, 2) + '\n')

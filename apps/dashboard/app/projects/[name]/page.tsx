@@ -34,6 +34,7 @@ import { PgTableSizesPanel } from '@/components/detail/pg-table-sizes-panel'
 import { DiskDirsPanel } from '@/components/detail/disk-dirs-panel'
 import { DiskBreakdownPanel } from '@/components/detail/disk-breakdown-panel'
 import { SecretsPanel } from '@/components/detail/secrets-panel'
+import { ProjectSettingsPanel } from '@/components/detail/project-settings-panel'
 import { useProjectDetail } from '@/lib/use-project-detail'
 
 export default function ProjectDetailPage() {
@@ -260,6 +261,7 @@ export default function ProjectDetailPage() {
               {status !== null && !status?.error && (
                 <UfwPanel name={name} />
               )}
+              {project && <ProjectSettingsPanel project={project} />}
               {deployWarning && !deploying && (
                 <div className="rounded-lg border border-warn bg-card p-3 flex items-center gap-3">
                   <span className="text-[12px] text-warn font-mono flex-1">{deployWarning}</span>
