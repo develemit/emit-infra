@@ -49,11 +49,31 @@ The existing deploy timeline shows individual deploys but makes it hard to spot 
 
 ## Acceptance criteria
 
-- [ ] `GET /projects/:name/deploy-cadence` returns 30 days of data with correct `total` and `failures` counts
-- [ ] Days with zero deploys are included (filled gaps)
-- [ ] Chart renders bars with red failure segments when failures > 0
-- [ ] Empty state shows when no deploys in the last 30 days
-- [ ] Both typechecks pass clean
+- [x] `GET /projects/:name/deploy-cadence` returns 30 days of data with correct `total` and `failures` counts
+- [x] Days with zero deploys are included (filled gaps)
+- [x] Chart renders bars with red failure segments when failures > 0
+- [x] Empty state shows when no deploys in the last 30 days
+- [x] Both typechecks pass clean
+
+## Completed
+
+**Date:** 2026-07-02
+
+### Summary
+Added `GET /projects/:name/deploy-cadence` to `historyRoutes` in `history.ts`. The route reads `.deploy-history.jsonl`, buckets entries by `YYYY-MM-DD`, fills in every day for the last 30 days, and returns ascending-sorted `{ days }`. Failures are counted by checking `status !== 'success'`. Created `DeployCadenceChart` — an SVG bar chart that renders stacked rect elements (success in `var(--fg-muted)`, failures in `var(--err)`) and date labels every 7th day. Mounted the chart above `DeployTimeline` in the project detail page, fetched via a `useEffect` → local state pattern.
+
+### Files changed
+- `apps/api/src/routes/history.ts` — added `GET /projects/:name/deploy-cadence`
+- `apps/dashboard/src/lib/api.ts` — added `DeployCadenceDay` interface and `getDeployCadence`
+- (new) `apps/dashboard/src/components/detail/deploy-cadence-chart.tsx` — SVG bar chart component
+- `apps/dashboard/app/projects/[name]/page.tsx` — import, state, useEffect, and mount
+
+### Verification
+- `pnpm nx typecheck dashboard --skip-nx-cache`: clean
+- `pnpm nx typecheck api --skip-nx-cache`: clean
+
+### Follow-ups
+- none
 
 ## Out of scope
 

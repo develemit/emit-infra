@@ -543,3 +543,16 @@ export async function getProjectCost(name: string): Promise<ProjectCost | null> 
   if (!res.ok) return null
   return res.json() as Promise<ProjectCost>
 }
+
+export interface DeployCadenceDay {
+  date: string
+  total: number
+  failures: number
+}
+
+export async function getDeployCadence(name: string): Promise<DeployCadenceDay[]> {
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/deploy-cadence`, { cache: 'no-store', headers: authHeaders() })
+  if (!res.ok) return []
+  const body = await res.json() as { days: DeployCadenceDay[] }
+  return body.days
+}

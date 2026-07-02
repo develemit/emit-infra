@@ -333,4 +333,45 @@ export async function historyRoutes(app: FastifyInstance) {
 
     return { incidents, mttrSec }
   })
+
+  app.get('/projects/:name/deploy-cadence', async (req, reply) => {
+    const params = NameParam.safeParse(req.params)
+    if (!params.success) return reply.status(400).send({ error: params.error.message })
+
+    const project = await findProject(params.data.name)
+    if (!project) return reply.status(404).send({ error: 'not found' })
+
+    const filePath = join(homedir(), 'projects', params.data.name, '.deploy-history.jsonl')
+    const all = await readJsonl<DeployHistoryEntry>(filePath)
+
+    // Bucket by date
+    const buckets: Record<string, { total: number; failures: number }> = {}
+    for (const entry of all) {
+      const date = new Date(entry.startedAt).toISOString().slice(0, 10)
+      if (!buckets[date]) {
+        buckets[date] = { total: 0, failures: 0 }
+      }
+      buckets[date]!.total += 1
+      if (entry.status !== 'success') {
+        buckets[date]!.failures += 1
+      }
+    }
+
+    // Fill in last 30 days
+    const today = new Date()
+    today.setUTCHours(0, 0, 0, 0)
+    const days: Array<{ date: string; total: number; failures: number }> = []
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(today)
+      d.setUTCDate(d.getUTCDate() - i)
+      const dateStr = d.toISOString().slice(0, 10)
+      days.push({
+        date: dateStr,
+        total: buckets[dateStr]?.total ?? 0,
+        failures: buckets[dateStr]?.failures ?? 0,
+      })
+    }
+
+    return { days }
+  })
 }

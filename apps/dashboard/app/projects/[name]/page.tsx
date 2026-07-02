@@ -1,8 +1,8 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { getApiBase } from '@/lib/api'
+import { getApiBase, getDeployCadence, type DeployCadenceDay } from '@/lib/api'
 import { Icon } from '@/components/icon'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -16,6 +16,7 @@ import { FullChart } from '@/components/detail/full-chart'
 import { NetworkChart } from '@/components/detail/network-chart'
 import { QueueChart } from '@/components/detail/queue-chart'
 import { DeployTimeline } from '@/components/detail/deploy-timeline'
+import { DeployCadenceChart } from '@/components/detail/deploy-cadence-chart'
 import { IncidentPanel } from '@/components/detail/incident-panel'
 import { CiTimeline } from '@/components/detail/ci-timeline'
 import { DockerUsage } from '@/components/detail/docker-usage'
@@ -54,6 +55,11 @@ export default function ProjectDetailPage() {
   } = useProjectDetail(name)
 
   const [deployWarning, setDeployWarning] = useState<string | null>(null)
+  const [cadenceDays, setCadenceDays] = useState<DeployCadenceDay[]>([])
+
+  useEffect(() => {
+    getDeployCadence(name).then(setCadenceDays).catch(() => {})
+  }, [name])
 
   function handleDeployClick() {
     setDeployWarning(null)
@@ -212,6 +218,7 @@ export default function ProjectDetailPage() {
               {containers !== null && (
                 <ContainerTable containers={containers} projectName={name} onRefetch={fetchData} latestMetric={latestMetric} />
               )}
+              <DeployCadenceChart days={cadenceDays} />
               <DeployTimeline deploys={deploys} name={name} repoUrl={repoUrl} />
               <IncidentPanel name={name} />
               <CiTimeline runs={ciRuns} name={name} repoUrl={repoUrl} />
