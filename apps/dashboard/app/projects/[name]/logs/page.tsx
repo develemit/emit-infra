@@ -34,6 +34,8 @@ export default function LogsPage() {
   const [services, setServices] = useState<string[]>([])
   const svcColorMap = useRef<Map<string, string>>(new Map())
   const esRef = useRef<EventSource | null>(null)
+  const [isFollowing, setIsFollowing] = useState(true)
+  const termWrapperRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     getContainers(name)
@@ -83,6 +85,17 @@ export default function LogsPage() {
     start()
     return stop
   }, [start, stop])
+
+  useEffect(() => {
+    const el = termWrapperRef.current
+    if (!el) return
+    function handleScroll(e: Event) {
+      const target = e.target as HTMLElement
+      setIsFollowing(target.scrollTop + target.clientHeight >= target.scrollHeight - 10)
+    }
+    el.addEventListener('scroll', handleScroll, { capture: true, passive: true })
+    return () => el.removeEventListener('scroll', handleScroll, { capture: true })
+  }, [])
 
   const controls = (
     <>
@@ -170,7 +183,7 @@ export default function LogsPage() {
       </div>
 
       {/* Terminal fills remaining height */}
-      <div className="flex-1 min-h-0 p-3 lg:p-4">
+      <div ref={termWrapperRef} className="flex-1 min-h-0 p-3 lg:p-4 relative">
         <Terminal
           title={`${name} · tail -f`}
           running={running && follow}
@@ -180,6 +193,16 @@ export default function LogsPage() {
         >
           {termLines}
         </Terminal>
+        {!isFollowing && running && (
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 pointer-events-none">
+            <span
+              className="text-[11px] font-mono px-3 py-1.5 rounded-full"
+              style={{ background: 'var(--card-2)', border: '1px solid var(--border)', color: 'var(--subtle)' }}
+            >
+              Live paused — scroll to bottom to resume
+            </span>
+          </div>
+        )}
       </div>
     </div>
   )

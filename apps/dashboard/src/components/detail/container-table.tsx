@@ -138,16 +138,20 @@ export function ContainerTable({ containers, projectName, onRefetch, latestMetri
 
           {/* Mobile cards */}
           <div className="lg:hidden flex flex-col gap-2">
-            {sorted.map(c => (
-              <MobileContainerRow
-                key={c.name}
-                c={c}
-                logsHref={`${logsBase}?service=${encodeURIComponent(c.name)}`}
-                projectName={projectName}
-                onRefetch={onRefetch}
-                metrics={cMetrics.get(c.name)}
-              />
-            ))}
+            {sorted.length === 0 ? (
+              <p className="text-sm text-subtle py-2">No containers found.</p>
+            ) : (
+              sorted.map(c => (
+                <MobileContainerRow
+                  key={c.name}
+                  c={c}
+                  logsHref={`${logsBase}?service=${encodeURIComponent(c.name)}`}
+                  projectName={projectName}
+                  onRefetch={onRefetch}
+                  metrics={cMetrics.get(c.name)}
+                />
+              ))
+            )}
           </div>
         </>
       )}

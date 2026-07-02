@@ -73,22 +73,43 @@ export function ProjectSettingsPanel({ project }: Props) {
 
   const [envKeys, setEnvKeys] = useState((cfg.requiredEnvKeys ?? []).join(', '))
 
+  const [domainError, setDomainError] = useState<string | null>(null)
+  const [envKeysError, setEnvKeysError] = useState<string | null>(null)
+
   useEffect(() => {
     if (open) getSshKeys().then(setSshKeys).catch(() => {})
   }, [open])
 
-  const [serverState, saveServer] = useSave(() =>
-    updateProjectConfig(name, { serverType, region, domain, serverIp: serverIp || undefined }),
-  )
+  const [serverState, saveServer] = useSave(() => {
+    // Validate domain
+    if (domain) {
+      const domainRe = /^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$/
+      if (!domainRe.test(domain)) {
+        setDomainError('Invalid domain format')
+        return Promise.reject(new Error('Invalid domain format'))
+      }
+    }
+    setDomainError(null)
+    return updateProjectConfig(name, { serverType, region, domain, serverIp: serverIp || undefined })
+  })
   const [sshState, saveSsh] = useSave(() =>
     updateProjectConfig(name, { sshKeyName }),
   )
   const [dbState, saveDb] = useSave(() =>
     updateProjectConfig(name, { postgres: { version: pgVersion || undefined, backupBucket: pgBucket || undefined } }),
   )
-  const [accessState, saveAccess] = useSave(() =>
-    updateProjectConfig(name, { requiredEnvKeys: envKeys.split(',').map(k => k.trim()).filter(Boolean) }),
-  )
+  const [accessState, saveAccess] = useSave(() => {
+    // Validate env keys
+    const keys = envKeys.split(',').map(k => k.trim()).filter(Boolean)
+    const keyRe = /^[A-Z_][A-Z0-9_]*$/
+    const badKey = keys.find(k => !keyRe.test(k))
+    if (badKey) {
+      setEnvKeysError(`Invalid key: "${badKey}" — must be uppercase with underscores`)
+      return Promise.reject(new Error(`Invalid key: "${badKey}" — must be uppercase with underscores`))
+    }
+    setEnvKeysError(null)
+    return updateProjectConfig(name, { requiredEnvKeys: keys })
+  })
 
   return (
     <div id="settings" className="rounded-xl border border-border bg-card" style={{ padding: 18 }}>
@@ -112,7 +133,10 @@ export function ProjectSettingsPanel({ project }: Props) {
             <div className="grid grid-cols-2 gap-3">
               <Field label="Server type"><input className={inputCls} value={serverType} onChange={e => setServerType(e.target.value)} /></Field>
               <Field label="Region"><input className={inputCls} value={region} onChange={e => setRegion(e.target.value)} /></Field>
-              <Field label="Domain"><input className={inputCls} value={domain} onChange={e => setDomain(e.target.value)} /></Field>
+              <Field label="Domain">
+                <input className={inputCls} value={domain} onChange={e => setDomain(e.target.value)} />
+                {domainError && <p className="text-[11px] mt-1" style={{ color: 'var(--err)' }}>{domainError}</p>}
+              </Field>
               <Field label="Server IP (optional)"><input className={inputCls} value={serverIp} onChange={e => setServerIp(e.target.value)} /></Field>
             </div>
             <SaveButton state={serverState} onClick={saveServer} />
@@ -153,6 +177,7 @@ export function ProjectSettingsPanel({ project }: Props) {
                 value={envKeys}
                 onChange={e => setEnvKeys(e.target.value)}
               />
+              {envKeysError && <p className="text-[11px] mt-1" style={{ color: 'var(--err)' }}>{envKeysError}</p>}
             </Field>
             <SaveButton state={accessState} onClick={saveAccess} />
           </div>
