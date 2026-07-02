@@ -1,0 +1,18 @@
+import { authHeaders, getApiBase } from './api-auth.js'
+
+const API_BASE = getApiBase()
+
+export type SecretsDrift =
+  | { status: 'unconfigured' }
+  | { status: 'ok' | 'drift'; missing: string[]; extra: string[]; present: string[] }
+
+export function syncSecrets(name: string): { url: string } {
+  return { url: `${API_BASE}/projects/${encodeURIComponent(name)}/secrets-sync` }
+}
+
+export async function getSecretsDrift(name: string): Promise<SecretsDrift | null> {
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/secrets-drift`, { cache: 'no-store', headers: authHeaders() })
+  if (res.status === 503) return null
+  if (!res.ok) return null
+  return res.json() as Promise<SecretsDrift>
+}
