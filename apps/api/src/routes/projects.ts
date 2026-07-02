@@ -245,18 +245,26 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
     }
   })
 
+  const ContainerRestartParam = z.object({
+    name: z.string().min(1).max(100),
+    container: z.string().min(1).max(200).regex(/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/),
+  })
+
   app.post<{ Params: { name: string; container: string } }>(
     '/projects/:name/containers/:container/restart',
     async (req, reply): Promise<void> => {
-      const project = await findProject(req.params.name)
+      const params = ContainerRestartParam.safeParse(req.params)
+      if (!params.success) return reply.status(400).send({ error: 'invalid params' })
+
+      const project = await findProject(params.data.name)
       if (!project) return reply.status(404).send({ error: 'not found' })
 
       const key = sshKeyPath(project.config.sshKeyName)
       const host = project.config.serverIp ?? project.config.domain
 
       try {
-        const output = await sshExec(host, `docker restart ${req.params.container}`, key)
-        containersCache.invalidate(req.params.name)
+        const output = await sshExec(host, `docker restart ${params.data.container}`, key)
+        containersCache.invalidate(params.data.name)
         return void reply.send({ ok: true, output })
       } catch (err) {
         return void reply.send({ ok: false, output: String(err) })

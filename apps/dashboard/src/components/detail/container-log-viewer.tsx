@@ -44,8 +44,8 @@ function useContainerLogs(url: string | null) {
             else if (ev.type === 'error') { setLines(p => [...p, `error: ${ev.message}`]); setExit(1) }
           }
         }
-      } catch {
-        // aborted or network error
+      } catch (err) {
+        if ((err as Error).name !== 'AbortError') console.error('[container-logs] SSE error:', err)
       }
     }
 

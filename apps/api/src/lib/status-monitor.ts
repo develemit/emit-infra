@@ -23,7 +23,7 @@ interface IncidentRecord {
 
 function writeIncident(record: IncidentRecord): void {
   const path = join(homedir(), 'projects', record.projectName, '.incidents.jsonl')
-  appendFile(path, JSON.stringify(record) + '\n').catch(() => {/* write failures are best-effort */})
+  appendFile(path, JSON.stringify(record) + '\n').catch((err) => console.error('[status-monitor] writeIncident failed:', err))
 }
 
 const POLL_MS = 60_000
