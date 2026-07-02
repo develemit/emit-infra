@@ -95,6 +95,8 @@ export function ProjectSettingsPanel({ project }: Props) {
       <button
         onClick={() => setOpen(o => !o)}
         className="flex items-center gap-2 w-full text-left"
+        aria-expanded={open}
+        aria-label="Project settings"
       >
         <Icon name="settings" size={16} style={{ color: 'var(--fg-muted)' }} />
         <span className="text-[13.5px] font-semibold text-fg">Settings</span>

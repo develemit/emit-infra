@@ -42,6 +42,7 @@ export function NginxEndpointsPanel({ available, endpoints }: Props) {
                 <td
                   className="font-mono text-[12px] text-fg py-2 pr-3 truncate"
                   style={{ maxWidth: 260 }}
+                  title={ep.path}
                 >
                   {ep.path}
                 </td>
