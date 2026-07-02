@@ -57,6 +57,18 @@ function parseUfwOutput(raw: string): UfwStatus {
   return { status, rules }
 }
 
+const UfwRuleBody = z.object({
+  rule: z.string().min(1).max(200).regex(
+    /^(allow|deny|reject)\s+[a-zA-Z0-9\s\/\.\-]+$/i,
+    'invalid UFW rule — must start with allow/deny/reject',
+  ),
+})
+
+const UfwDeleteParams = z.object({
+  name: z.string().min(1).max(100).regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/),
+  num: z.coerce.number().int().min(1).max(999),
+})
+
 export async function ufwRoutes(app: FastifyInstance): Promise<void> {
   const nameSchema = z.object({ name: z.string().min(1).max(100).regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/) })
 
@@ -85,6 +97,55 @@ export async function ufwRoutes(app: FastifyInstance): Promise<void> {
         return void reply.send(result)
       } catch {
         ufwCache.set(name, null)
+        return void reply.status(503).send({ error: 'unreachable' })
+      }
+    },
+  )
+
+  app.post<{ Params: { name: string } }>(
+    '/projects/:name/ufw-rules',
+    async (req, reply): Promise<void> => {
+      const parsed = nameSchema.safeParse(req.params)
+      if (!parsed.success) return void reply.status(400).send({ error: 'invalid params' })
+
+      const body = UfwRuleBody.safeParse(req.body)
+      if (!body.success) return void reply.status(400).send({ error: 'invalid body', details: body.error.flatten() })
+
+      const name = parsed.data.name
+      const project = await findProject(name)
+      if (!project) return void reply.status(404).send({ error: 'not found' })
+
+      const key = sshKeyPath(project.config.sshKeyName)
+      const host = project.config.serverIp ?? project.config.domain
+
+      try {
+        const output = await sshExec(host, `sudo ufw ${body.data.rule}`, key)
+        ufwCache.set(name, null)
+        return void reply.status(201).send({ ok: true, output })
+      } catch {
+        return void reply.status(503).send({ error: 'unreachable' })
+      }
+    },
+  )
+
+  app.delete<{ Params: { name: string; num: string } }>(
+    '/projects/:name/ufw-rules/:num',
+    async (req, reply): Promise<void> => {
+      const parsed = UfwDeleteParams.safeParse(req.params)
+      if (!parsed.success) return void reply.status(400).send({ error: 'invalid params' })
+
+      const { name, num } = parsed.data
+      const project = await findProject(name)
+      if (!project) return void reply.status(404).send({ error: 'not found' })
+
+      const key = sshKeyPath(project.config.sshKeyName)
+      const host = project.config.serverIp ?? project.config.domain
+
+      try {
+        const output = await sshExec(host, `sudo ufw --force delete ${num}`, key)
+        ufwCache.set(name, null)
+        return void reply.send({ ok: true, output })
+      } catch {
         return void reply.status(503).send({ error: 'unreachable' })
       }
     },
