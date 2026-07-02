@@ -142,7 +142,7 @@ export function ProjectSettingsPanel({ project }: Props) {
               <Field label="Server type"><input className={inputCls} value={serverType} onChange={e => setServerType(e.target.value)} /></Field>
               <Field label="Region"><input className={inputCls} value={region} onChange={e => setRegion(e.target.value)} /></Field>
               <Field label="Domain">
-                <input className={inputCls} value={domain} onChange={e => setDomain(e.target.value)} />
+                <input className={inputCls} value={domain} onChange={e => { setDomain(e.target.value); setDomainError(null) }} />
                 {domainError && <p className="text-[11px] mt-1" style={{ color: 'var(--err)' }}>{domainError}</p>}
               </Field>
               <Field label="Server IP (optional)"><input className={inputCls} value={serverIp} onChange={e => setServerIp(e.target.value)} /></Field>
@@ -203,7 +203,7 @@ export function ProjectSettingsPanel({ project }: Props) {
                 className="rounded-lg border border-border bg-card-2 px-2 py-1.5 text-[12px] font-mono text-fg focus:outline-none focus:ring-1 focus:ring-accent resize-none"
                 rows={3}
                 value={envKeys}
-                onChange={e => setEnvKeys(e.target.value)}
+                onChange={e => { setEnvKeys(e.target.value); setEnvKeysError(null) }}
               />
               {envKeysError && <p className="text-[11px] mt-1" style={{ color: 'var(--err)' }}>{envKeysError}</p>}
             </Field>

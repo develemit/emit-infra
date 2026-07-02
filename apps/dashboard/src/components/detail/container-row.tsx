@@ -64,10 +64,12 @@ export function MobileContainerRow({
   metrics?: ContainerMetrics
 }) {
   const [restarting, setRestarting] = useState(false)
+  const [confirmRestart, setConfirmRestart] = useState(false)
   const variant = stateBadge(c.state)
   const { showToast } = useToast()
 
   async function handleRestart() {
+    setConfirmRestart(false)
     setRestarting(true)
     try {
       await restartContainer(projectName, c.name)
@@ -89,14 +91,32 @@ export function MobileContainerRow({
         <span className="font-mono font-semibold text-[13px] text-fg">{c.name}</span>
         <div className="flex items-center gap-2">
           <Badge variant={variant} dot>{c.state}</Badge>
-          <button
-            onClick={handleRestart}
-            disabled={restarting}
-            className="text-subtle hover:text-fg transition-colors disabled:opacity-40"
-            title="Restart container"
-          >
-            <Icon name="refresh" size={13} />
-          </button>
+          {confirmRestart ? (
+            <>
+              <button
+                onClick={() => void handleRestart()}
+                className="text-[11px] font-mono transition-colors"
+                style={{ color: 'var(--warn)' }}
+              >
+                Confirm
+              </button>
+              <button
+                onClick={() => setConfirmRestart(false)}
+                className="text-[11px] font-mono text-subtle transition-colors"
+              >
+                Cancel
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => setConfirmRestart(true)}
+              disabled={restarting}
+              className="text-subtle hover:text-fg transition-colors disabled:opacity-40"
+              title="Restart container"
+            >
+              <Icon name="refresh" size={13} />
+            </button>
+          )}
           <Link href={logsHref} className="text-subtle hover:text-fg transition-colors">
             <Icon name="file" size={13} />
           </Link>
