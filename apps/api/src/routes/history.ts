@@ -116,6 +116,7 @@ export async function historyRoutes(app: FastifyInstance) {
     const points = await readJsonl<MetricPoint>(
       filePath,
       (p) => typeof p.t === 'number' && p.t >= cutoff && !('error' in p),
+      { tail: 50_000 },
     )
 
     const downsampled = downsample(points, MAX_METRIC_POINTS)
@@ -135,7 +136,7 @@ export async function historyRoutes(app: FastifyInstance) {
     if (!project) return reply.status(404).send({ error: 'not found' })
 
     const filePath = join(homedir(), 'projects', params.data.name, '.deploy-history.jsonl')
-    const all = await readJsonl<DeployHistoryEntry>(filePath)
+    const all = await readJsonl<DeployHistoryEntry>(filePath, undefined, { tail: 50_000 })
     const deploys = all.slice(-query.data.limit).reverse()
 
     return { deploys }
@@ -151,7 +152,7 @@ export async function historyRoutes(app: FastifyInstance) {
     if (!project) return reply.status(404).send({ error: 'not found' })
 
     const filePath = join(homedir(), 'projects', params.data.name, '.ci-history.jsonl')
-    const all = await readJsonl<CiHistoryEntry>(filePath)
+    const all = await readJsonl<CiHistoryEntry>(filePath, undefined, { tail: 50_000 })
     const runs = all.slice(-query.data.limit).reverse()
 
     return { runs }
@@ -204,6 +205,7 @@ export async function historyRoutes(app: FastifyInstance) {
       const points = await readJsonl<MetricPoint>(
         filePath,
         (p) => typeof p.t === 'number' && p.t >= cutoff && typeof p.disk === 'number' && !('error' in p),
+        { tail: 50_000 },
       )
 
       if (points.length < 5) {
@@ -244,6 +246,7 @@ export async function historyRoutes(app: FastifyInstance) {
       const points = await readJsonl<MetricPoint>(
         filePath,
         (p) => typeof p.t === 'number' && p.t >= cutoff && typeof p.mem === 'number' && !('error' in p),
+        { tail: 50_000 },
       )
 
       if (points.length < 5) {
@@ -286,6 +289,7 @@ export async function historyRoutes(app: FastifyInstance) {
     const points = await readJsonl<MetricPoint>(
       filePath,
       (p) => typeof p.t === 'number' && p.t >= cutoff && Array.isArray(p.containers) && !('error' in p),
+      { tail: 50_000 },
     )
 
     const result: Record<string, { t: number; restarts: number }[]> = {}
@@ -313,6 +317,7 @@ export async function historyRoutes(app: FastifyInstance) {
     const records = await readJsonl<IncidentRecord>(
       filePath,
       (r) => typeof r.t === 'number' && r.t >= cutoff && r.type === 'ssh',
+      { tail: 50_000 },
     )
 
     const incidents = pairIncidents(records)
@@ -339,7 +344,7 @@ export async function historyRoutes(app: FastifyInstance) {
     if (!project) return reply.status(404).send({ error: 'not found' })
 
     const filePath = join(homedir(), 'projects', params.data.name, '.deploy-history.jsonl')
-    const all = await readJsonl<DeployHistoryEntry>(filePath)
+    const all = await readJsonl<DeployHistoryEntry>(filePath, undefined, { tail: 50_000 })
 
     // Bucket by date
     const buckets: Record<string, { total: number; failures: number }> = {}
@@ -386,6 +391,7 @@ export async function historyRoutes(app: FastifyInstance) {
     const records = await readJsonl<IncidentRecord>(
       filePath,
       (r) => typeof r.t === 'number' && r.type === 'ssh',
+      { tail: 50_000 },
     )
 
     const incidents = pairIncidents(records)

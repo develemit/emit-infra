@@ -4,6 +4,7 @@ import { existsSync } from 'node:fs'
 export async function readJsonl<T>(
   filePath: string,
   filterFn?: (item: T) => boolean,
+  opts?: { tail?: number },
 ): Promise<T[]> {
   if (!existsSync(filePath)) return []
   const raw = await readFile(filePath, 'utf8')
@@ -17,6 +18,7 @@ export async function readJsonl<T>(
       // skip malformed lines
     }
   }
+  if (opts?.tail !== undefined) return items.slice(-opts.tail)
   return items
 }
 
