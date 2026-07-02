@@ -582,3 +582,20 @@ export async function getSla(name: string): Promise<SlaData | null> {
   if (!res.ok) return null
   return res.json() as Promise<SlaData>
 }
+
+export interface NginxEndpoint {
+  path: string
+  requests: number
+  errors: number
+  errorRate: number
+}
+
+export type NginxEndpointsData =
+  | { available: false }
+  | { available: true; endpoints: NginxEndpoint[] }
+
+export async function getNginxEndpoints(name: string): Promise<NginxEndpointsData> {
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/nginx-endpoints`, { cache: 'no-store', headers: authHeaders() })
+  if (!res.ok) return { available: false }
+  return res.json() as Promise<NginxEndpointsData>
+}

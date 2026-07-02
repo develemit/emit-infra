@@ -2,12 +2,13 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { getApiBase, getDeployCadence, getSla, getDiskBreakdown, type DeployCadenceDay, type SlaData, type DiskCategory } from '@/lib/api'
+import { getApiBase, getDeployCadence, getSla, getDiskBreakdown, getNginxEndpoints, type DeployCadenceDay, type SlaData, type DiskCategory, type NginxEndpointsData } from '@/lib/api'
 import { Icon } from '@/components/icon'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { HealthCard } from '@/components/detail/health-card'
 import { ResponseTimePanel } from '@/components/detail/response-time-panel'
+import { NginxEndpointsPanel } from '@/components/detail/nginx-endpoints-panel'
 import { CertPanel } from '@/components/detail/cert-panel'
 import { ContainerTable } from '@/components/detail/container-table'
 import { ResourceChart } from '@/components/detail/resource-chart'
@@ -60,6 +61,7 @@ export default function ProjectDetailPage() {
   const [cadenceDays, setCadenceDays] = useState<DeployCadenceDay[]>([])
   const [sla, setSla] = useState<SlaData | null>(null)
   const [diskBreakdown, setDiskBreakdown] = useState<DiskCategory[]>([])
+  const [nginxEndpoints, setNginxEndpoints] = useState<NginxEndpointsData | null>(null)
 
   useEffect(() => {
     getDeployCadence(name).then(setCadenceDays).catch(() => {})
@@ -71,6 +73,10 @@ export default function ProjectDetailPage() {
 
   useEffect(() => {
     getDiskBreakdown(name).then(r => setDiskBreakdown(r.categories)).catch(() => {})
+  }, [name])
+
+  useEffect(() => {
+    getNginxEndpoints(name).then(setNginxEndpoints).catch(() => {})
   }, [name])
 
   function handleDeployClick() {
@@ -169,6 +175,9 @@ export default function ProjectDetailPage() {
               )}
               {status?.nginxStatus === 'active' && (
                 <ResponseTimePanel name={name} />
+              )}
+              {status?.nginxStatus === 'active' && nginxEndpoints && (
+                <NginxEndpointsPanel available={nginxEndpoints.available} endpoints={nginxEndpoints.available ? nginxEndpoints.endpoints : []} />
               )}
               {status?.sslExpiry != null && (
                 <CertPanel name={name} />

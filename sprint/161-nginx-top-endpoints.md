@@ -50,11 +50,32 @@ The existing `ResponseTimePanel` shows aggregate P50/P95/P99 latency but gives n
 
 ## Acceptance criteria
 
-- [ ] `GET /projects/:name/nginx-endpoints` returns ranked endpoint list with request counts and error counts
-- [ ] `{ available: false }` returned when nginx log is absent or awk yields no output
-- [ ] Error rate > 5% renders red in the panel
-- [ ] Panel is guarded by `nginxStatus === 'active'` in page.tsx
-- [ ] Both typechecks pass clean
+- [x] `GET /projects/:name/nginx-endpoints` returns ranked endpoint list with request counts and error counts
+- [x] `{ available: false }` returned when nginx log is absent or awk yields no output
+- [x] Error rate > 5% renders red in the panel
+- [x] Panel is guarded by `nginxStatus === 'active'` in page.tsx
+- [x] Both typechecks pass clean
+
+## Completed
+
+**Date:** 2026-07-02
+
+### Summary
+Created `nginx-endpoints.ts` with `GET /projects/:name/nginx-endpoints` (300s TTL). Runs a two-pass awk command (combined with `&&` and a `---END1---` delimiter) to count total requests and error requests (4xx/5xx) by path from nginx access logs. Merges results into `NginxEndpoint[]` sorted by requests descending; returns `{ available: false }` if delimiter not found or no output. Created `NginxEndpointsPanel` table component (max 10 rows, error rate > 5% in red). Mounted in page.tsx guarded by `nginxStatus === 'active'`, next to `ResponseTimePanel`.
+
+### Files changed
+- (new) `apps/api/src/routes/nginx-endpoints.ts` — two-pass awk nginx endpoints route
+- `apps/api/src/index.ts` — register `nginxEndpointsRoutes`
+- `apps/dashboard/src/lib/api.ts` — added `NginxEndpoint`, `NginxEndpointsData`, `getNginxEndpoints`
+- (new) `apps/dashboard/src/components/detail/nginx-endpoints-panel.tsx` — table panel
+- `apps/dashboard/app/projects/[name]/page.tsx` — import, state, useEffect, conditional mount
+
+### Verification
+- `pnpm nx typecheck api --skip-nx-cache`: clean
+- `pnpm nx typecheck dashboard --skip-nx-cache`: clean
+
+### Follow-ups
+- `[defer]` `apps/dashboard/src/lib/api.ts` is now 600+ lines (well over the 300-line target); should be split into domain-specific modules in a future sprint
 
 ## Out of scope
 
