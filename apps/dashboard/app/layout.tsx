@@ -6,6 +6,7 @@ import { Shell } from '@/components/shell/shell'
 import { SwRegister } from '@/components/sw-register'
 import { SplashGate } from '@/components/splash-screen'
 import { ToastProvider } from '@/components/ui/toast'
+import { CommandPalette } from '@/components/command-palette'
 
 export const metadata: Metadata = {
   title: 'Emit Infra',
@@ -44,6 +45,7 @@ export default function RootLayout({
       <body>
         <ToastProvider>
           <Shell>{children}</Shell>
+          <CommandPalette />
           <SwRegister />
           <SplashGate />
         </ToastProvider>
