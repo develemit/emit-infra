@@ -13,9 +13,7 @@ export interface NginxEndpoint {
   errorRate: number
 }
 
-type NginxEndpointsResult =
-  | { available: false }
-  | { available: true; endpoints: NginxEndpoint[] }
+type NginxEndpointsResult = { available: boolean; endpoints: NginxEndpoint[] }
 
 const cache = createTtlCache<NginxEndpointsResult | null>(NGINX_ENDPOINTS_TTL)
 
@@ -44,7 +42,7 @@ function parseCountLines(block: string): Map<string, number> {
 
 function parseOutput(raw: string): NginxEndpointsResult {
   const delimIdx = raw.indexOf(DELIM)
-  if (delimIdx === -1) return { available: false }
+  if (delimIdx === -1) return { available: false, endpoints: [] }
 
   const block1 = raw.slice(0, delimIdx)
   const block2 = raw.slice(delimIdx + DELIM.length)
@@ -52,7 +50,7 @@ function parseOutput(raw: string): NginxEndpointsResult {
   const totalMap = parseCountLines(block1)
   const errorMap = parseCountLines(block2)
 
-  if (totalMap.size === 0) return { available: false }
+  if (totalMap.size === 0) return { available: false, endpoints: [] }
 
   const endpoints: NginxEndpoint[] = []
   for (const [path, requests] of totalMap) {

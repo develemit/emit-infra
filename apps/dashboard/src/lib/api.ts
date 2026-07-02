@@ -590,13 +590,14 @@ export interface NginxEndpoint {
   errorRate: number
 }
 
-export type NginxEndpointsData =
-  | { available: false }
-  | { available: true; endpoints: NginxEndpoint[] }
+export interface NginxEndpointsData {
+  available: boolean
+  endpoints: NginxEndpoint[]
+}
 
 export async function getNginxEndpoints(name: string): Promise<NginxEndpointsData> {
   const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/nginx-endpoints`, { cache: 'no-store', headers: authHeaders() })
-  if (!res.ok) return { available: false }
+  if (!res.ok) return { available: false, endpoints: [] }
   return res.json() as Promise<NginxEndpointsData>
 }
 

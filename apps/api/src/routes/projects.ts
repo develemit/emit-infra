@@ -71,7 +71,15 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
     return discoverUnregistered()
   })
 
-  app.post<{ Params: { name: string }; Body: { config: Record<string, unknown> } }>(
+  const RegisterBody = z.object({
+    config: z.object({
+      name: z.string().min(1),
+      domain: z.string().min(1),
+      sshKeyName: z.string().min(1),
+    }).strict().passthrough(),
+  })
+
+  app.post<{ Params: { name: string }; Body: unknown }>(
     '/projects/:name/register',
     async (req, reply): Promise<void> => {
       const { name } = req.params
@@ -83,7 +91,17 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
       if (existsSync(configPath)) {
         return reply.status(409).send({ error: 'already registered' })
       }
-      const config = { name, ...req.body.config }
+
+      const parsed = RegisterBody.safeParse(req.body)
+      if (!parsed.success) {
+        const details = parsed.error.issues.map(issue => ({
+          path: issue.path.join('.'),
+          message: issue.message,
+        }))
+        return reply.status(400).send({ error: 'validation failed', details })
+      }
+
+      const config = { ...parsed.data.config, name }
       await writeFile(configPath, JSON.stringify(config, null, 2) + '\n')
       return void reply.send({ ok: true, configPath })
     },

@@ -7,7 +7,7 @@ interface Props {
 }
 
 export function NginxEndpointsPanel({ available, endpoints }: Props) {
-  if (!available) {
+  if (!available || endpoints.length === 0) {
     return (
       <div className="rounded-xl border border-border bg-card" style={{ padding: 18 }}>
         <span className="text-[13.5px] font-semibold text-fg">Top Endpoints</span>
