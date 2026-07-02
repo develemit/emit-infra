@@ -80,6 +80,25 @@ interface SlaData {
 
 const slaCache = createTtlCache<SlaData>(120_000)
 
+function pairIncidents(records: IncidentRecord[]): Incident[] {
+  const incidents: Incident[] = []
+  let openDownAt: number | null = null
+  for (const record of records) {
+    if (record.event === 'down') {
+      if (openDownAt === null) openDownAt = record.t
+    } else if (record.event === 'up') {
+      if (openDownAt !== null) {
+        incidents.push({ startedAt: openDownAt, resolvedAt: record.t, durationSec: record.t - openDownAt, resolved: true })
+        openDownAt = null
+      }
+    }
+  }
+  if (openDownAt !== null) {
+    incidents.push({ startedAt: openDownAt, resolvedAt: null, durationSec: null, resolved: false })
+  }
+  return incidents
+}
+
 export async function historyRoutes(app: FastifyInstance) {
   app.get('/projects/:name/metrics', async (req, reply) => {
     const params = NameParam.safeParse(req.params)
@@ -296,37 +315,7 @@ export async function historyRoutes(app: FastifyInstance) {
       (r) => typeof r.t === 'number' && r.t >= cutoff && r.type === 'ssh',
     )
 
-    // Pair up→down and down→up transitions into resolved incidents
-    const incidents: Incident[] = []
-    let openDownAt: number | null = null
-
-    for (const record of records) {
-      if (record.event === 'down') {
-        if (openDownAt === null) {
-          openDownAt = record.t
-        }
-      } else if (record.event === 'up') {
-        if (openDownAt !== null) {
-          incidents.push({
-            startedAt: openDownAt,
-            resolvedAt: record.t,
-            durationSec: record.t - openDownAt,
-            resolved: true,
-          })
-          openDownAt = null
-        }
-      }
-    }
-
-    // If there's an open incident, add it as unresolved
-    if (openDownAt !== null) {
-      incidents.push({
-        startedAt: openDownAt,
-        resolvedAt: null,
-        durationSec: null,
-        resolved: false,
-      })
-    }
+    const incidents = pairIncidents(records)
 
     // Compute MTTR (mean time to recovery)
     const resolvedIncidents = incidents.filter((i) => i.resolved)
@@ -399,37 +388,7 @@ export async function historyRoutes(app: FastifyInstance) {
       (r) => typeof r.t === 'number' && r.type === 'ssh',
     )
 
-    // Pair up→down and down→up transitions into resolved incidents
-    const incidents: Incident[] = []
-    let openDownAt: number | null = null
-
-    for (const record of records) {
-      if (record.event === 'down') {
-        if (openDownAt === null) {
-          openDownAt = record.t
-        }
-      } else if (record.event === 'up') {
-        if (openDownAt !== null) {
-          incidents.push({
-            startedAt: openDownAt,
-            resolvedAt: record.t,
-            durationSec: record.t - openDownAt,
-            resolved: true,
-          })
-          openDownAt = null
-        }
-      }
-    }
-
-    // If there's an open incident, add it as unresolved
-    if (openDownAt !== null) {
-      incidents.push({
-        startedAt: openDownAt,
-        resolvedAt: null,
-        durationSec: null,
-        resolved: false,
-      })
-    }
+    const incidents = pairIncidents(records)
 
     const now = Math.floor(Date.now() / 1000)
     const window7d = 7 * 86400
