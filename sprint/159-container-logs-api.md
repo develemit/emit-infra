@@ -56,12 +56,29 @@ When a container shows as "restarting" or "unhealthy" in the ContainerTable, the
 
 ## Acceptance criteria
 
-- [ ] `GET /projects/:name/containers/:container/logs` opens an SSE stream
-- [ ] Invalid container name (e.g. `../../etc/passwd`) returns 400 before opening SSE
-- [ ] Missing project returns 404
-- [ ] Lines stream as `{ type: 'line', stream: 'stdout', text }` events
-- [ ] Stream ends with `{ type: 'done', exitCode: 0 }` when docker logs exits naturally
-- [ ] `pnpm nx typecheck api --skip-nx-cache` passes clean
+- [x] `GET /projects/:name/containers/:container/logs` opens an SSE stream
+- [x] Invalid container name (e.g. `../../etc/passwd`) returns 400 before opening SSE
+- [x] Missing project returns 404
+- [x] Lines stream as `{ type: 'line', stream: 'stdout', text }` events
+- [x] Stream ends with `{ type: 'done', exitCode: 0 }` when docker logs exits naturally
+- [x] `pnpm nx typecheck api --skip-nx-cache` passes clean
+
+## Completed
+
+**Date:** 2026-07-02
+
+### Summary
+Created `container-logs.ts` with `containerLogsRoutes` exporting `GET /projects/:name/containers/:container/logs`. Validates both params (name and container) via regex before project lookup. Uses the same SSH streaming pattern as the existing logs route in `operations.ts`: `openSse` → `streamProcess('ssh', sshArgs)` → `writeEvent` per event, 5-minute `AbortController` timeout, client-disconnect abort on `req.raw.close`. Registered in `index.ts`.
+
+### Files changed
+- (new) `apps/api/src/routes/container-logs.ts` — SSE route for `docker logs` streaming
+- `apps/api/src/index.ts` — import and register `containerLogsRoutes`
+
+### Verification
+- `pnpm nx typecheck api --skip-nx-cache`: clean
+
+### Follow-ups
+- none
 
 ## Out of scope
 
