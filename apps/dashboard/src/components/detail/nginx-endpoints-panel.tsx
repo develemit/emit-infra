@@ -21,7 +21,32 @@ export function NginxEndpointsPanel({ available, endpoints }: Props) {
   return (
     <div className="rounded-xl border border-border bg-card" style={{ padding: 18 }}>
       <span className="text-[13.5px] font-semibold text-fg">Top Endpoints</span>
-      <div className="mt-4 overflow-x-auto">
+      <div className="mt-4 block lg:hidden">
+        <div className="space-y-3">
+          {rows.map(ep => (
+            <div key={ep.path} className="flex flex-col gap-2 pb-3 border-b border-border last:border-0 last:pb-0">
+              <div className="font-mono text-[12px] text-fg truncate" title={ep.path}>{ep.path}</div>
+              <div className="flex gap-4 text-[12px]">
+                <div className="font-mono text-subtle">
+                  <div className="text-[10px] uppercase tracking-wide text-subtle">Requests</div>
+                  <div className="text-fg">{ep.requests.toLocaleString()}</div>
+                </div>
+                <div className="font-mono text-subtle">
+                  <div className="text-[10px] uppercase tracking-wide text-subtle">Errors</div>
+                  <div className="text-fg">{ep.errors.toLocaleString()}</div>
+                </div>
+                <div className="font-mono">
+                  <div className="text-[10px] uppercase tracking-wide text-subtle">Error Rate</div>
+                  <div style={{ color: ep.errorRate > 0.05 ? 'var(--err)' : 'var(--fg)' }}>
+                    {(ep.errorRate * 100).toFixed(1)}%
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="mt-4 hidden lg:block overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr>

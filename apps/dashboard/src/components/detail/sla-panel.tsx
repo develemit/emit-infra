@@ -29,7 +29,7 @@ interface SlaPanelProps {
 export function SlaPanel({ sla }: SlaPanelProps) {
   return (
     <div className="rounded-xl border border-border bg-card p-4">
-      <div className="flex gap-6">
+      <div className="flex flex-col sm:flex-row gap-6">
         <SlaStat label="7-day uptime" value={sla.uptime7d} />
         <SlaStat label="30-day uptime" value={sla.uptime30d} />
       </div>

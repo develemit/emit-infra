@@ -61,7 +61,7 @@ export function CronPanel({ name }: CronPanelProps) {
                   </span>
                 )}
               </div>
-              <div className="text-[12px] font-mono text-fg truncate max-w-[320px]">{job.command}</div>
+              <div className="text-[12px] font-mono text-fg truncate max-w-[320px]" title={job.command}>{job.command}</div>
               <div className="text-[11px] font-mono text-subtle mt-1">{job.source}</div>
             </div>
           ))}

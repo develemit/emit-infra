@@ -37,10 +37,7 @@ export function DiskDirsPanel({ name }: DiskDirsPanelProps) {
     void fetchDirs()
   }, [name])
 
-  if (dirs.length === 0 && !loading) return null
-
-  const total = dirs.reduce((sum, d) => sum + d.bytes, 0)
-  const maxBytes = Math.max(...dirs.map(d => d.bytes), 1)
+  const maxBytes = dirs.length > 0 ? Math.max(...dirs.map(d => d.bytes), 1) : 1
 
   return (
     <div className="rounded-xl border border-border bg-card" style={{ padding: 18 }}>
@@ -66,7 +63,7 @@ export function DiskDirsPanel({ name }: DiskDirsPanelProps) {
         </div>
       )}
 
-      {dirs.length > 0 && (
+      {dirs.length > 0 ? (
         <div className="space-y-3">
           {dirs.map(dir => {
             const pct = (dir.bytes / maxBytes) * 100
@@ -88,6 +85,8 @@ export function DiskDirsPanel({ name }: DiskDirsPanelProps) {
             )
           })}
         </div>
+      ) : (
+        <div className="text-subtle font-mono text-[12px]">No directory data yet</div>
       )}
     </div>
   )
