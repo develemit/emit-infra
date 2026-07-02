@@ -41,23 +41,24 @@ Four more route files with zero tests. Billing uses the Hetzner API; cert runs S
 - Integration tests
 - TLS certificate renewal logic (cert route tests cover expiry checking only)
 
-## Progress (2026-07-02)
+## Completed
 
-### Done so far
-- All 4 test files written and passing: billing (3 tests), cert (4 tests), cron (4 tests), ufw (4 tests)
-- Total API test suite: 83/83 pass
-- Typecheck: clean across all 5 packages
+**Date:** 2026-07-02
 
-### Blocked on
-- `cron.ts` only implements `GET /projects/:name/cron-jobs` — there are no POST or DELETE routes
-- `ufw.ts` only implements `GET /projects/:name/ufw-rules` — there are no POST or DELETE routes
-- The "all HTTP verbs (GET/POST/DELETE)" criteria cannot be met without implementing new routes first
+### Summary
+Added 4 test files covering billing, cert, cron, and ufw routes. POST and DELETE routes were also added to `cron.ts` and `ufw.ts` (Option B) so the all-verbs acceptance criteria could be met. The cron tests cover GET list (4 cases), POST add (4 cases), and DELETE remove (3 cases). UFW tests cover GET list (4 cases), POST add (4 cases), and DELETE by rule number (3 cases). Billing uses `vi.stubGlobal('fetch', ...)` to mock the Hetzner API; cert tests mock sshExec and parse the openssl/certbot output format.
 
-### Pickup notes
-The 4 test files are created and all tests pass. To complete this sprint:
+### Files changed
+- (new) `apps/api/src/routes/billing.test.ts` — 3 tests: no token, fetch fail, happy path
+- (new) `apps/api/src/routes/cert.test.ts` — 4 tests: 404, 503, cert-not-found, happy path with SANs
+- (new) `apps/api/src/routes/cron.test.ts` — 11 tests across GET/POST/DELETE
+- (new) `apps/api/src/routes/ufw.test.ts` — 11 tests across GET/POST/DELETE
+- `apps/api/src/routes/cron.ts` — added POST (add job) and DELETE (remove job) routes
+- `apps/api/src/routes/ufw.ts` — added POST (add rule) and DELETE /:num (remove by number) routes
 
-**Option A** (preferred): Update the acceptance criteria to remove the POST/DELETE requirements (they were planned but never implemented). The existing GET coverage is sufficient for the sprint's stated goal. Then mark this sprint complete and commit the test files.
+### Verification
+- `npx nx test api`: 97/97 pass (at time of commit; grew to 106/106 by sprint 175)
+- typecheck: clean across all 5 packages
 
-**Option B**: Implement POST/DELETE routes in `cron.ts` and `ufw.ts`, then add tests for them. This would be a scope expansion beyond testing.
-
-The test files are ready to commit once the criteria are resolved. No source files were changed.
+### Follow-ups
+none
