@@ -18,6 +18,13 @@ vi.mock('@emit-infra/core', () => ({
   runAnsible: vi.fn(),
 }))
 
+vi.mock('node:fs/promises', () => ({
+  readFile: vi.fn().mockRejectedValue(new Error('no file')),
+  readdir: vi.fn().mockResolvedValue([]),
+  writeFile: vi.fn().mockResolvedValue(undefined),
+}))
+
+import { readFile, writeFile } from 'node:fs/promises'
 import { discoverProjects } from '../lib/discover-projects.js'
 import { sshExec } from '@emit-infra/core'
 import { projectRoutes } from './projects.js'
@@ -82,6 +89,23 @@ describe('GET /projects/:name/status', () => {
     expect(data.disk).toBe(42)
     expect(data.memory).toBe(60)
     expect(data.containerCount).toBe(3)
+  })
+
+  it('omits numeric fields instead of sending NaN when SSH output is short', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    vi.mocked(sshExec).mockResolvedValue('up 2 days')
+
+    const res = await app.inject({ method: 'GET', url: '/projects/myapp/status' })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.body).not.toContain('NaN')
+    const data = res.json()
+    expect(data.uptime).toBe('up 2 days')
+    expect(data.disk).toBeUndefined()
+    expect(data.memory).toBeUndefined()
+    expect(data.containerCount).toBeUndefined()
+    expect(data.containerTotal).toBeUndefined()
+    expect(data.containerUnhealthy).toBeUndefined()
   })
 })
 
@@ -214,5 +238,62 @@ describe('GET /projects/:name/containers', () => {
 
     expect(res.statusCode).toBe(404)
     expect(res.json()).toEqual({ error: 'not found' })
+  })
+})
+
+describe('PATCH /projects/:name/config', () => {
+  let app: FastifyInstance
+
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    app = Fastify({ logger: false })
+    await app.register(projectRoutes)
+    await app.ready()
+  })
+
+  afterEach(async () => { await app.close() })
+
+  it('returns 500 with clean error when config file is corrupted', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    vi.mocked(readFile).mockResolvedValue('NOT VALID JSON {{{')
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/projects/myapp/config',
+      payload: { serverType: 'cx32' },
+    })
+
+    expect(res.statusCode).toBe(500)
+    expect(res.json()).toEqual({ error: 'invalid project config' })
+  })
+
+  it('returns 500 with clean error when config file is unreadable', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    vi.mocked(readFile).mockRejectedValue(new Error('ENOENT'))
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/projects/myapp/config',
+      payload: { serverType: 'cx32' },
+    })
+
+    expect(res.statusCode).toBe(500)
+    expect(res.json()).toEqual({ error: 'invalid project config' })
+  })
+
+  it('merges patch into existing config on happy path', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    vi.mocked(readFile).mockResolvedValue(JSON.stringify({ name: 'myapp', domain: '1.2.3.4' }))
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/projects/myapp/config',
+      payload: { serverType: 'cx32' },
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual({ ok: true })
+    const written = vi.mocked(writeFile).mock.calls[0]?.[1] as string
+    expect(JSON.parse(written)).toMatchObject({ name: 'myapp', serverType: 'cx32' })
   })
 })

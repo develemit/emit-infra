@@ -16,9 +16,9 @@ import { findProject, sshKeyPath, SAFE_NAME_RE } from '../lib/project-helpers.js
 const STATUS_TTL = 20_000
 type StatusData = {
   uptime: string
-  disk: number; diskUsed: string; diskTotal: string
-  memory: number; memUsed: string; memTotal: string
-  containerCount: number; containerTotal: number; containerUnhealthy: number
+  disk: number | undefined; diskUsed: string; diskTotal: string
+  memory: number | undefined; memUsed: string; memTotal: string
+  containerCount: number | undefined; containerTotal: number | undefined; containerUnhealthy: number | undefined
   httpStatus: number | null
   serverType: string | undefined; region: string | undefined; ip: string
   buildNumber: string | null
@@ -50,6 +50,13 @@ const statusCache = createTtlCache<StatusData | null>(STATUS_TTL)
 const containersCache = createTtlCache<Container[] | null>(STATUS_TTL)
 const nameSchema = z.object({ name: z.string().min(1).max(100).regex(SAFE_NAME_RE, 'invalid project name') })
 
+
+// SSH probe output can be short (missing cert, no redis, etc.) — never let
+// parseInt turn a missing line into NaN in the JSON response.
+function toInt(s: string | undefined): number | undefined {
+  const n = parseInt(s ?? '', 10)
+  return Number.isNaN(n) ? undefined : n
+}
 
 async function readProjectConfig(name: string): Promise<Record<string, unknown> | null> {
   try {
@@ -144,8 +151,12 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
         return void reply.status(400).send({ error: parsed.error.issues[0]?.message ?? 'invalid' })
       }
 
-      const raw = await readFile(project.configPath, 'utf8')
-      const current = JSON.parse(raw) as Record<string, unknown>
+      let current: Record<string, unknown>
+      try {
+        current = JSON.parse(await readFile(project.configPath, 'utf8')) as Record<string, unknown>
+      } catch {
+        return void reply.status(500).send({ error: 'invalid project config' })
+      }
 
       const { postgres, ...topLevel } = parsed.data
       Object.assign(current, topLevel)
@@ -205,15 +216,15 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
       const memParts = (memLine ?? '').split(' ')
       const data: StatusData = {
         uptime: uptimeLine ?? '',
-        disk: parseInt((diskParts[0] ?? '').replace('%', ''), 10),
+        disk: toInt((diskParts[0] ?? '').replace('%', '')),
         diskUsed: diskParts[1] ?? '',
         diskTotal: diskParts[2] ?? '',
-        memory: parseInt(memParts[0] ?? '', 10),
+        memory: toInt(memParts[0]),
         memUsed: memParts[1] ?? '',
         memTotal: memParts[2] ?? '',
-        containerCount: parseInt(containerLine ?? '', 10),
-        containerTotal: parseInt(totalLine ?? '', 10),
-        containerUnhealthy: parseInt(unhealthyLine ?? '', 10),
+        containerCount: toInt(containerLine),
+        containerTotal: toInt(totalLine),
+        containerUnhealthy: toInt(unhealthyLine),
         httpStatus,
         serverType: projectConfig?.['serverType'] as string | undefined,
         region: projectConfig?.['region'] as string | undefined,

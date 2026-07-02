@@ -88,7 +88,14 @@ export async function executeTool(
       const fmt = '{"name":"{{.Names}}","image":"{{.Image}}","status":"{{.Status}}","state":"{{.State}}"}'
       try {
         const out = await sshExec(host, `docker ps -a --format '${fmt}'`, key)
-        return out.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => JSON.parse(l))
+        return out.split('\n').map((l) => l.trim()).filter(Boolean).flatMap((l) => {
+          try {
+            return [JSON.parse(l) as unknown]
+          } catch {
+            console.warn(`[tool-executor] skipped malformed docker ps line: ${l.slice(0, 100)}`)
+            return []
+          }
+        })
       } catch {
         return { error: 'unreachable' }
       }
