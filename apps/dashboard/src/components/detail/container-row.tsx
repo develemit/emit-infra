@@ -126,6 +126,8 @@ export function DesktopContainerRow({
   projectName,
   isRestarting,
   onRestart,
+  isConfirming,
+  onCancelRestart,
   metrics,
   restartSeries,
   isLogsActive,
@@ -136,6 +138,8 @@ export function DesktopContainerRow({
   projectName: string
   isRestarting: boolean
   onRestart: () => Promise<void>
+  isConfirming?: boolean
+  onCancelRestart?: () => void
   metrics?: ContainerMetrics
   restartSeries?: { t: number; restarts: number }[]
   isLogsActive?: boolean
@@ -177,14 +181,34 @@ export function DesktopContainerRow({
       <td className="font-mono text-[12px] text-subtle py-3 pr-3">{c.status}</td>
       <td className="py-3">
         <div className="flex items-center gap-2">
-          <button
-            onClick={onRestart}
-            disabled={isRestarting}
-            className="text-subtle hover:text-fg transition-colors disabled:opacity-40"
-            title="Restart container"
-          >
-            <Icon name="refresh" size={13} />
-          </button>
+          {isConfirming ? (
+            <>
+              <button
+                onClick={onRestart}
+                className="text-[11px] font-mono transition-colors"
+                style={{ color: 'var(--warn)' }}
+                title="Confirm restart"
+              >
+                Confirm
+              </button>
+              <button
+                onClick={onCancelRestart}
+                className="text-[11px] font-mono text-subtle transition-colors"
+                title="Cancel"
+              >
+                Cancel
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={onRestart}
+              disabled={isRestarting}
+              className="text-subtle hover:text-fg transition-colors disabled:opacity-40"
+              title="Restart container"
+            >
+              <Icon name="refresh" size={13} />
+            </button>
+          )}
           {onViewLogs && (
             <button
               onClick={onViewLogs}

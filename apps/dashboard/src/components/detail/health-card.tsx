@@ -175,24 +175,26 @@ export function HealthCard({ project, status, polledAgo, onRefresh, uptimePct, l
       </div>
 
       {scaleAdvice && (
-        <div
-          className="mt-3 flex items-center gap-2 rounded-lg border px-3 py-2"
-          style={{ borderColor: 'var(--warn)', background: 'transparent' }}
-        >
-          <span
-            className="text-[11px] font-mono px-1.5 py-0.5 rounded border shrink-0"
-            style={{ color: 'var(--warn)', borderColor: 'var(--warn)' }}
+        <a href="#settings" style={{ textDecoration: 'none' }}>
+          <div
+            className="mt-3 flex items-center gap-2 rounded-lg border px-3 py-2"
+            style={{ borderColor: 'var(--warn)', background: 'transparent' }}
           >
-            ↑ {scaleAdvice.nextTier ?? '—'}
-            {scaleAdvice.currentEurMonth != null && scaleAdvice.nextEurMonth != null
-              ? ` +€${(scaleAdvice.nextEurMonth - scaleAdvice.currentEurMonth).toFixed(0)}/mo`
-              : ''}
-          </span>
-          <span className="text-[11px] font-mono flex-1" style={{ color: 'var(--warn)' }}>
-            {scaleAdvice.resource === 'memory' ? 'Memory' : 'Disk'} at {scaleAdvice.sustainedPct}% sustained
-            {scaleAdvice.note === 'disk' ? ' — consider also pruning Docker images' : ''}
-          </span>
-        </div>
+            <span
+              className="text-[11px] font-mono px-1.5 py-0.5 rounded border shrink-0"
+              style={{ color: 'var(--warn)', borderColor: 'var(--warn)' }}
+            >
+              ↑ {scaleAdvice.nextTier ?? '—'}
+              {scaleAdvice.currentEurMonth != null && scaleAdvice.nextEurMonth != null
+                ? ` +€${(scaleAdvice.nextEurMonth - scaleAdvice.currentEurMonth).toFixed(0)}/mo`
+                : ''}
+            </span>
+            <span className="text-[11px] font-mono flex-1" style={{ color: 'var(--warn)' }}>
+              {scaleAdvice.resource === 'memory' ? 'Memory' : 'Disk'} at {scaleAdvice.sustainedPct}% sustained
+              {scaleAdvice.note === 'disk' ? ' — consider also pruning Docker images' : ''}
+            </span>
+          </div>
+        </a>
       )}
     </div>
   )

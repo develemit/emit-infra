@@ -48,6 +48,7 @@ function sortByMemory(containers: Container[], metrics: Map<string, ContainerMet
 export function ContainerTable({ containers, projectName, onRefetch, latestMetric }: ContainerTableProps) {
   const [restartingSet, setRestartingSet] = useState<Set<string>>(new Set())
   const [activeLogsContainer, setActiveLogsContainer] = useState<string | null>(null)
+  const [confirmRestart, setConfirmRestart] = useState<string | null>(null)
   const { showToast } = useToast()
   const cMetrics = metricsMap(latestMetric)
   const restartSeries = useContainerRestarts(projectName)
@@ -113,7 +114,9 @@ export function ContainerTable({ containers, projectName, onRefetch, latestMetri
                       logsHref={href}
                       projectName={projectName}
                       isRestarting={isRestarting}
-                      onRestart={() => handleRestart(c.name)}
+                      onRestart={confirmRestart === c.name ? async () => { await handleRestart(c.name); setConfirmRestart(null) } : async () => setConfirmRestart(c.name)}
+                      isConfirming={confirmRestart === c.name}
+                      onCancelRestart={() => setConfirmRestart(null)}
                       metrics={cm}
                       restartSeries={restartSeries[c.name]}
                       isLogsActive={activeLogsContainer === c.name}

@@ -91,7 +91,7 @@ export function ProjectSettingsPanel({ project }: Props) {
   )
 
   return (
-    <div className="rounded-xl border border-border bg-card" style={{ padding: 18 }}>
+    <div id="settings" className="rounded-xl border border-border bg-card" style={{ padding: 18 }}>
       <button
         onClick={() => setOpen(o => !o)}
         className="flex items-center gap-2 w-full text-left"
