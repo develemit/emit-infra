@@ -101,3 +101,11 @@ file to promote items into proper sprints when the list grows worth addressing.
 - ~~(sprint 44, 2026-06-12) `rollback --list` only queries the first compose image for rollback tags; a multi-image compose stack would silently omit tags for other images~~ → sprint-46 (2026-06-12)
 - ~~(sprint 38, 2026-06-11) `revokeR2Token()` in `packages/core/src/r2.ts` uses `console.warn` for failure logging — accept a logger parameter instead~~ → sprint-45 (2026-06-12)
 - ~~(sprint 09, 2026-06-06) Calling repos with `permissions: contents: read` at the workflow level need `contents: write` for git tag push — add to scaffolded workflow~~ → sprint-47 (2026-06-12)
+- (sprint 172, 2026-07-02) call sites still import from `~/lib/api` barrel — could update to import from specific domain modules for better tree-shaking and faster IDE go-to-definition
+- (sprint 175, 2026-07-02) sprint 175 planned `secrets-sync.test.ts` but drift logic is in `secrets.ts` — if/when `secrets-sync.ts` (the SSE push route) needs unit tests, add them post sprint-176 implementation
+- (sprint 176, 2026-07-02) `secrets-apply` route uses `base64 -d` (GNU coreutils) — verify works on target Ubuntu servers; may fail on non-GNU base64
+- (sprint 176, 2026-07-02) "Sync to server" button only appears for missing keys; extra server-side keys (in `extra[]`) are not cleaned up by the apply route — would need a separate "prune extra" SSH step
+- (sprint 177, 2026-07-02) other polling hooks (`use-server-metrics`, `use-ci-history`, etc.) still use plain `setInterval` — could apply jitter pattern there if lockstep polling at scale is a concern
+- (sprint 177, 2026-07-02) `httpCircuit` resets on API server restart; a failed first probe post-boot could leave a circuit open that delays recovery visibility — acceptable for now
+- (sprint 178, 2026-07-02) backup completion polling has no elapsed-time indicator — "Running…" is the only feedback during a potentially long backup
+- (sprint 178, 2026-07-02) 10-minute polling timeout silently stops with no user message — could show "Backup status unknown — check logs" on timeout
