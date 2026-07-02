@@ -599,3 +599,20 @@ export async function getNginxEndpoints(name: string): Promise<NginxEndpointsDat
   if (!res.ok) return { available: false }
   return res.json() as Promise<NginxEndpointsData>
 }
+
+export interface ScaleAdvice {
+  resource: 'disk' | 'memory'
+  sustainedPct: number
+  currentTier: string
+  nextTier: string | null
+  currentEurMonth: number | null
+  nextEurMonth: number | null
+  note?: 'disk'
+}
+
+export async function getScaleAdvice(name: string): Promise<ScaleAdvice | null> {
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/scale-advice`, { cache: 'no-store', headers: authHeaders() })
+  if (!res.ok) return null
+  const body = await res.json() as { advice: ScaleAdvice | null }
+  return body.advice
+}

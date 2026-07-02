@@ -1,6 +1,6 @@
 import { Icon } from '@/components/icon'
 import { Meter } from '@/components/ui/meter'
-import type { ProjectSummary, ProjectStatus, MetricPoint } from '@/lib/api'
+import type { ProjectSummary, ProjectStatus, MetricPoint, ScaleAdvice } from '@/lib/api'
 
 interface StatTileProps {
   icon: string
@@ -74,6 +74,7 @@ interface HealthCardProps {
   onRefresh?: () => void
   uptimePct?: number | null
   latestMetric?: MetricPoint | null
+  scaleAdvice?: ScaleAdvice | null
 }
 
 function sizeLabel(label: string, used?: string, total?: string): string {
@@ -81,7 +82,7 @@ function sizeLabel(label: string, used?: string, total?: string): string {
   return label
 }
 
-export function HealthCard({ project, status, polledAgo, onRefresh, uptimePct, latestMetric }: HealthCardProps) {
+export function HealthCard({ project, status, polledAgo, onRefresh, uptimePct, latestMetric, scaleAdvice }: HealthCardProps) {
   const disk = status.disk ?? 0
   const mem = status.memory ?? 0
   const diskLabel = sizeLabel('Disk', status.diskUsed, status.diskTotal)
@@ -172,6 +173,27 @@ export function HealthCard({ project, status, polledAgo, onRefresh, uptimePct, l
         <Meter label={diskLabel} value={disk} lg />
         <Meter label={memLabel} value={mem} lg />
       </div>
+
+      {scaleAdvice && (
+        <div
+          className="mt-3 flex items-center gap-2 rounded-lg border px-3 py-2"
+          style={{ borderColor: 'var(--warn)', background: 'transparent' }}
+        >
+          <span
+            className="text-[11px] font-mono px-1.5 py-0.5 rounded border shrink-0"
+            style={{ color: 'var(--warn)', borderColor: 'var(--warn)' }}
+          >
+            ↑ {scaleAdvice.nextTier ?? '—'}
+            {scaleAdvice.currentEurMonth != null && scaleAdvice.nextEurMonth != null
+              ? ` +€${(scaleAdvice.nextEurMonth - scaleAdvice.currentEurMonth).toFixed(0)}/mo`
+              : ''}
+          </span>
+          <span className="text-[11px] font-mono flex-1" style={{ color: 'var(--warn)' }}>
+            {scaleAdvice.resource === 'memory' ? 'Memory' : 'Disk'} at {scaleAdvice.sustainedPct}% sustained
+            {scaleAdvice.note === 'disk' ? ' — consider also pruning Docker images' : ''}
+          </span>
+        </div>
+      )}
     </div>
   )
 }

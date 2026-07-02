@@ -57,11 +57,32 @@ A disk meter showing 87% is a point-in-time reading — it might be a one-off sp
 
 ## Acceptance criteria
 
-- [ ] Returns `{ advice: null }` when disk and memory are below threshold or history is too short
-- [ ] Returns advice with current/next tier and prices when sustained high
-- [ ] Dashboard chip renders when advice is non-null, hidden when null
-- [ ] Disk-specific advice includes the "pruning" note
-- [ ] Both typechecks pass clean
+- [x] Returns `{ advice: null }` when disk and memory are below threshold or history is too short
+- [x] Returns advice with current/next tier and prices when sustained high
+- [x] Dashboard chip renders when advice is non-null, hidden when null
+- [x] Disk-specific advice includes the "pruning" note
+- [x] Both typechecks pass clean
+
+## Completed
+
+**Date:** 2026-07-02
+
+### Summary
+Created `scale-advice.ts` with `GET /projects/:name/scale-advice` (600s TTL). Reads last 12 metric points from `.metrics.jsonl`, checks for 6-of-12 consecutive points with disk ≥ 80% or memory ≥ 80% (disk takes priority), looks up current/next CX tier prices via `getServerTypeMonthlyPrice`, and returns `{ advice }`. Returns `{ advice: null }` when data is insufficient or below threshold. Added `ScaleAdvice` type + `getScaleAdvice` fetch to `api.ts`. Updated `HealthCard` to accept optional `scaleAdvice` prop and render a warn-colored chip below the meters. Disk advice includes the "prune Docker images" note. Fetched in page.tsx via `useEffect` and passed as prop.
+
+### Files changed
+- (new) `apps/api/src/routes/scale-advice.ts` — scale advice route
+- `apps/api/src/index.ts` — register `scaleAdviceRoutes`
+- `apps/dashboard/src/lib/api.ts` — added `ScaleAdvice` interface and `getScaleAdvice`
+- `apps/dashboard/src/components/detail/health-card.tsx` — added `scaleAdvice` prop and chip rendering
+- `apps/dashboard/app/projects/[name]/page.tsx` — import, state, useEffect, prop pass
+
+### Verification
+- `pnpm nx typecheck api --skip-nx-cache`: clean
+- `pnpm nx typecheck dashboard --skip-nx-cache`: clean
+
+### Follow-ups
+- none
 
 ## Out of scope
 

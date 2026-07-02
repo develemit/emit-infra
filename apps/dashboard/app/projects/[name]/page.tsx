@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { getApiBase, getDeployCadence, getSla, getDiskBreakdown, getNginxEndpoints, type DeployCadenceDay, type SlaData, type DiskCategory, type NginxEndpointsData } from '@/lib/api'
+import { getApiBase, getDeployCadence, getSla, getDiskBreakdown, getNginxEndpoints, getScaleAdvice, type DeployCadenceDay, type SlaData, type DiskCategory, type NginxEndpointsData, type ScaleAdvice } from '@/lib/api'
 import { Icon } from '@/components/icon'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -62,6 +62,7 @@ export default function ProjectDetailPage() {
   const [sla, setSla] = useState<SlaData | null>(null)
   const [diskBreakdown, setDiskBreakdown] = useState<DiskCategory[]>([])
   const [nginxEndpoints, setNginxEndpoints] = useState<NginxEndpointsData | null>(null)
+  const [scaleAdvice, setScaleAdvice] = useState<ScaleAdvice | null>(null)
 
   useEffect(() => {
     getDeployCadence(name).then(setCadenceDays).catch(() => {})
@@ -77,6 +78,10 @@ export default function ProjectDetailPage() {
 
   useEffect(() => {
     getNginxEndpoints(name).then(setNginxEndpoints).catch(() => {})
+  }, [name])
+
+  useEffect(() => {
+    getScaleAdvice(name).then(setScaleAdvice).catch(() => {})
   }, [name])
 
   function handleDeployClick() {
@@ -171,7 +176,7 @@ export default function ProjectDetailPage() {
           ) : (
             <>
               {project && status && (
-                <HealthCard project={project} status={status} polledAgo={polledAgo} onRefresh={fetchData} uptimePct={uptimePct} latestMetric={latestMetric} />
+                <HealthCard project={project} status={status} polledAgo={polledAgo} onRefresh={fetchData} uptimePct={uptimePct} latestMetric={latestMetric} scaleAdvice={scaleAdvice} />
               )}
               {status?.nginxStatus === 'active' && (
                 <ResponseTimePanel name={name} />

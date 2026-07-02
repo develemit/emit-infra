@@ -18,6 +18,7 @@ import { certRoutes } from './routes/cert.js'
 import { costRoutes } from './routes/cost.js'
 import { containerLogsRoutes } from './routes/container-logs.js'
 import { nginxEndpointsRoutes } from './routes/nginx-endpoints.js'
+import { scaleAdviceRoutes } from './routes/scale-advice.js'
 import { startStatusMonitor } from './lib/status-monitor.js'
 
 const app = Fastify({ logger: process.env['NODE_ENV'] === 'development' ? { level: 'warn' } : true })
@@ -57,6 +58,7 @@ await app.register(certRoutes)
 await app.register(costRoutes)
 await app.register(containerLogsRoutes)
 await app.register(nginxEndpointsRoutes)
+await app.register(scaleAdviceRoutes)
 
 const port = Number(process.env['PORT'] ?? 7001)
 await app.listen({ port, host: '0.0.0.0' })
