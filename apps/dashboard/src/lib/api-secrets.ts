@@ -1,4 +1,4 @@
-import { authHeaders, getApiBase } from './api-auth.js'
+import { authHeaders, getApiBase } from './api-auth'
 
 const API_BASE = getApiBase()
 

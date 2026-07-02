@@ -96,6 +96,8 @@ export function HealthCard({ project, status, polledAgo, onRefresh, uptimePct, l
   const redis = redisLabel(status.redisStatus)
   const queue = queueLabel(status.queueFailed, status.queueWait)
   const deployed = deployedAgo(status.deployedAt)
+  const activeSlot = status.activeSlot ?? null
+  const slotColor = activeSlot === 'blue' ? '#3b82f6' : activeSlot === 'green' ? '#22c55e' : undefined
   const nginx4xx = latestMetric?.nginx4xx ?? 0
   const nginx5xx = latestMetric?.nginx5xx ?? 0
   const hasNginxErrors = nginx4xx > 0 || nginx5xx > 0
@@ -127,6 +129,7 @@ export function HealthCard({ project, status, polledAgo, onRefresh, uptimePct, l
         <StatTile icon="link" label="Public IP" value={ip} />
         <StatTile icon="hash" label="Build" value={status.buildNumber ?? '—'} />
         <StatTile icon="clock" label="Deployed" value={deployed} mono={false} />
+        {activeSlot && <StatTile icon="layers" label="Active Slot" value={activeSlot} color={slotColor} />}
         <StatTile icon="shield" label="Nginx" value={nginx.value} color={nginx.color} />
         <StatTile icon="lock" label="SSL" value={ssl.value} color={ssl.color} />
         <StatTile
@@ -148,6 +151,7 @@ export function HealthCard({ project, status, polledAgo, onRefresh, uptimePct, l
         <StatTile icon="globe" label="Region" value={region} />
         <StatTile icon="hash" label="Build" value={status.buildNumber ?? '—'} />
         <StatTile icon="clock" label="Deployed" value={deployed} mono={false} />
+        {activeSlot && <StatTile icon="layers" label="Active Slot" value={activeSlot} color={slotColor} />}
         <StatTile icon="shield" label="Nginx" value={nginx.value} color={nginx.color} />
         <StatTile
           icon="activity"

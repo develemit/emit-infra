@@ -1,5 +1,5 @@
-import type { ProjectConfig } from './api-auth.js'
-import { apiFetch, authHeaders, getApiBase } from './api-auth.js'
+import type { ProjectConfig } from './api-auth'
+import { apiFetch, authHeaders, getApiBase } from './api-auth'
 
 const API_BASE = getApiBase()
 
@@ -32,6 +32,7 @@ export interface ProjectStatus {
   queueFailed?: number | null
   queueWait?: number | null
   deployedAt?: string | null
+  activeSlot?: string | null
   error?: string
 }
 

@@ -2,40 +2,30 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { getApiBase, getDeployCadence, getSla, getDiskBreakdown, getNginxEndpoints, getScaleAdvice, type DeployCadenceDay, type SlaData, type DiskCategory, type NginxEndpointsData, type ScaleAdvice } from '@/lib/api'
+import { getApiBase, getSla, getScaleAdvice, type SlaData, type ScaleAdvice } from '@/lib/api'
 import { Icon } from '@/components/icon'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { HealthCard } from '@/components/detail/health-card'
-import { ResponseTimePanel } from '@/components/detail/response-time-panel'
-import { NginxEndpointsPanel } from '@/components/detail/nginx-endpoints-panel'
-import { CertPanel } from '@/components/detail/cert-panel'
 import { ContainerTable } from '@/components/detail/container-table'
 import { ResourceChart } from '@/components/detail/resource-chart'
 import { RangeSelector } from '@/components/detail/range-selector'
 import { FullChart } from '@/components/detail/full-chart'
-import { NetworkChart } from '@/components/detail/network-chart'
-import { QueueChart } from '@/components/detail/queue-chart'
-import { DeployTimeline } from '@/components/detail/deploy-timeline'
-import { DeployCadenceChart } from '@/components/detail/deploy-cadence-chart'
-import { IncidentPanel } from '@/components/detail/incident-panel'
-import { SlaPanel } from '@/components/detail/sla-panel'
-import { CiTimeline } from '@/components/detail/ci-timeline'
-import { DockerUsage } from '@/components/detail/docker-usage'
-import { CostPanel } from '@/components/detail/cost-panel'
-import { CronPanel } from '@/components/detail/cron-panel'
-import { UfwPanel } from '@/components/detail/ufw-panel'
+import { SummaryCard } from '@/components/detail/summary-card'
 import { DeployPanel } from '@/components/deploy-panel'
 import { RollbackPanel } from '@/components/rollback-panel'
 import { SecretsSyncPanel } from '@/components/secrets-sync-panel'
 import { DestroyModal } from '@/components/destroy-modal'
-import { BackupPanel } from '@/components/detail/backup-panel'
-import { PgTableSizesPanel } from '@/components/detail/pg-table-sizes-panel'
-import { DiskDirsPanel } from '@/components/detail/disk-dirs-panel'
-import { DiskBreakdownPanel } from '@/components/detail/disk-breakdown-panel'
-import { SecretsPanel } from '@/components/detail/secrets-panel'
-import { ProjectSettingsPanel } from '@/components/detail/project-settings-panel'
 import { useProjectDetail } from '@/lib/use-project-detail'
+
+function fmtAgo(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime()
+  const m = Math.round(ms / 60_000)
+  if (m < 60) return `${m}m ago`
+  const h = Math.round(m / 60)
+  if (h < 24) return `${h}h ago`
+  return `${Math.round(h / 24)}d ago`
+}
 
 export default function ProjectDetailPage() {
   const params = useParams()
@@ -49,36 +39,21 @@ export default function ProjectDetailPage() {
     showSecretsSync, setShowSecretsSync,
     showDestroy, setShowDestroy,
     rangeHours, setRangeHours,
-    polledAgo, loading, domain, repoUrl,
+    polledAgo, loading, domain,
     variant, label,
-    chartHistory, fullChartPoints, networkPoints, serverPoints,
+    chartHistory, fullChartPoints,
     latestMetric, deployMarkers,
-    deploys, ciRuns,
-    diskTrend, memoryTrend, backupStatus, backups,
+    deploys,
+    diskTrend, memoryTrend, backupStatus,
     uptimePct, fetchData, deployUrl,
   } = useProjectDetail(name)
 
   const [deployWarning, setDeployWarning] = useState<string | null>(null)
-  const [cadenceDays, setCadenceDays] = useState<DeployCadenceDay[]>([])
   const [sla, setSla] = useState<SlaData | null>(null)
-  const [diskBreakdown, setDiskBreakdown] = useState<DiskCategory[]>([])
-  const [nginxEndpoints, setNginxEndpoints] = useState<NginxEndpointsData | null>(null)
   const [scaleAdvice, setScaleAdvice] = useState<ScaleAdvice | null>(null)
 
   useEffect(() => {
-    getDeployCadence(name).then(setCadenceDays).catch(() => {})
-  }, [name])
-
-  useEffect(() => {
     getSla(name).then(setSla).catch(() => {})
-  }, [name])
-
-  useEffect(() => {
-    getDiskBreakdown(name).then(r => setDiskBreakdown(r.categories)).catch(() => {})
-  }, [name])
-
-  useEffect(() => {
-    getNginxEndpoints(name).then(setNginxEndpoints).catch(() => {})
   }, [name])
 
   useEffect(() => {
@@ -95,6 +70,12 @@ export default function ProjectDetailPage() {
     }
     setDeploying(true)
   }
+
+  const base = `/projects/${encodeURIComponent(name)}`
+
+  const sslDaysLeft = status?.sslExpiry != null
+    ? Math.round((new Date(status.sslExpiry).getTime() - Date.now()) / 86_400_000)
+    : null
 
   return (
     <div className="flex flex-col min-h-full">
@@ -113,7 +94,7 @@ export default function ProjectDetailPage() {
         <Badge variant={variant} dot loading={variant === 'muted'}>{label}</Badge>
         <div style={{ width: 1, height: 22, background: 'var(--border)' }} />
         <Link
-          href={`/projects/${encodeURIComponent(name)}/logs`}
+          href={`${base}/logs`}
           className="inline-flex items-center gap-1.5 px-3 h-[32px] rounded-lg text-[12px] font-medium text-fg border border-border hover:bg-card-hover transition-colors"
         >
           <Icon name="file" size={13} />Logs
@@ -179,25 +160,12 @@ export default function ProjectDetailPage() {
               {project && status && (
                 <HealthCard project={project} status={status} polledAgo={polledAgo} onRefresh={fetchData} uptimePct={uptimePct} latestMetric={latestMetric} scaleAdvice={scaleAdvice} />
               )}
-              {status?.nginxStatus === 'active' && (
-                <ResponseTimePanel name={name} />
-              )}
-              {status?.nginxStatus === 'active' && nginxEndpoints && (
-                <NginxEndpointsPanel available={nginxEndpoints.available} endpoints={nginxEndpoints.available ? nginxEndpoints.endpoints : []} />
-              )}
-              {status?.sslExpiry != null && (
-                <CertPanel name={name} />
-              )}
+
+              {/* Alert banners */}
               {diskTrend !== null && diskTrend.projectedDaysUntilFull !== null && diskTrend.disk > 75 && (
                 <div className="text-[12px] font-mono px-3 py-2 rounded-lg border" style={{ color: 'var(--warn, #e5a00d)', borderColor: 'var(--border)', background: 'var(--card-2)' }}>
                   Disk trending: +{diskTrend.pctPerDay.toFixed(1)}%/day · full in ~{Math.round(diskTrend.projectedDaysUntilFull)}d
                 </div>
-              )}
-              {status !== null && !status?.error && (
-                <DiskDirsPanel name={name} />
-              )}
-              {status !== null && !status?.error && (
-                <DiskBreakdownPanel categories={diskBreakdown} />
               )}
               {memoryTrend !== null && memoryTrend.projectedDaysUntilFull !== null && memoryTrend.mem > 75 && (
                 <div className="text-[12px] font-mono px-3 py-2 rounded-lg border" style={{ color: 'var(--warn, #e5a00d)', borderColor: 'var(--border)', background: 'var(--card-2)' }}>
@@ -207,25 +175,16 @@ export default function ProjectDetailPage() {
               {backupStatus !== null && (() => {
                 const ageHours = (Date.now() - new Date(backupStatus.lastRun).getTime()) / 3_600_000
                 const failed = backupStatus.status === 'failed'
-                const color = failed || ageHours >= 48 ? 'var(--err)' : ageHours >= 25 ? 'var(--warn, #e5a00d)' : 'var(--ok, #22c55e)'
-                const bkpLabel = failed
-                  ? `backup failed · ${Math.round(ageHours)}h ago`
-                  : `backup ${Math.round(ageHours)}h ago`
+                const color = failed || ageHours >= 48 ? 'var(--err)' : ageHours >= 25 ? 'var(--warn, #e5a00d)' : null
+                if (!color) return null
                 return (
                   <div className="text-[12px] font-mono px-3 py-2 rounded-lg border" style={{ color, borderColor: 'var(--border)', background: 'var(--card-2)' }}>
-                    {bkpLabel}
+                    {failed ? `backup failed · ${Math.round(ageHours)}h ago` : `backup ${Math.round(ageHours)}h ago`}
                   </div>
                 )
               })()}
-              {project?.config.postgres?.backupBucket && (
-                <BackupPanel project={project} backups={backups} />
-              )}
-              {project?.config.requiredEnvKeys != null && (
-                <SecretsPanel name={name} />
-              )}
-              {project?.config.postgres != null && (
-                <PgTableSizesPanel name={name} />
-              )}
+
+              {/* Resource charts */}
               <div className="flex items-center justify-between">
                 <span className="text-[13px] font-semibold text-fg">Health Detail</span>
                 <RangeSelector value={rangeHours} onChange={setRangeHours} />
@@ -239,29 +198,72 @@ export default function ProjectDetailPage() {
               {fullChartPoints.length >= 2 && (
                 <FullChart points={fullChartPoints} deploys={deployMarkers} hours={rangeHours} />
               )}
-              {networkPoints.length >= 2 && (
-                <NetworkChart points={networkPoints} deploys={deployMarkers} hours={rangeHours} />
-              )}
-              {serverPoints.some(p => p.queueFailed != null) && (
-                <QueueChart points={serverPoints} />
-              )}
+
+              {/* Containers */}
               {containers !== null && (
                 <ContainerTable containers={containers} projectName={name} onRefetch={fetchData} latestMetric={latestMetric} />
               )}
-              <DeployCadenceChart days={cadenceDays} />
-              <DeployTimeline deploys={deploys} name={name} repoUrl={repoUrl} />
-              {sla && <SlaPanel sla={sla} />}
-              <IncidentPanel name={name} />
-              <CiTimeline runs={ciRuns} name={name} repoUrl={repoUrl} />
-              <DockerUsage projectName={name} onPrune={fetchData} />
-              <CostPanel name={name} />
-              {status !== null && !status?.error && (
-                <CronPanel name={name} />
-              )}
-              {status !== null && !status?.error && (
-                <UfwPanel name={name} />
-              )}
-              {project && <ProjectSettingsPanel project={project} />}
+
+              {/* Summary cards */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                <SummaryCard
+                  icon="globe"
+                  title="Networking"
+                  href={`${base}/networking`}
+                  hidden={status?.nginxStatus == null}
+                  stats={[
+                    { label: 'Nginx', value: status?.nginxStatus ?? '–' },
+                    { label: 'SSL', value: sslDaysLeft != null ? `${sslDaysLeft}d left` : '–' },
+                  ]}
+                />
+                <SummaryCard
+                  icon="database"
+                  title="Storage"
+                  href={`${base}/storage`}
+                  stats={[
+                    { label: 'Disk', value: status?.disk != null ? `${status.disk}%` : '–', color: (status?.disk ?? 0) >= 80 ? 'var(--err)' : (status?.disk ?? 0) >= 65 ? 'var(--warn)' : undefined },
+                    { label: 'Trend', value: diskTrend?.projectedDaysUntilFull != null ? `~${Math.round(diskTrend.projectedDaysUntilFull)}d full` : 'stable' },
+                  ]}
+                />
+                <SummaryCard
+                  icon="zap"
+                  title="Pipelines"
+                  href={`${base}/pipelines`}
+                  stats={[
+                    { label: 'Last deploy', value: deploys[0] ? fmtAgo(deploys[0].completedAt) : '–' },
+                    { label: 'Recent', value: `${deploys.length} deploys` },
+                  ]}
+                />
+                <SummaryCard
+                  icon="shield"
+                  title="Reliability"
+                  href={`${base}/reliability`}
+                  stats={[
+                    { label: 'Uptime', value: uptimePct != null ? `${uptimePct.toFixed(1)}%` : '–', color: (uptimePct ?? 100) < 99 ? 'var(--warn)' : undefined },
+                    { label: 'SLA window', value: sla ? `${sla.uptime30d.toFixed(2)}%` : '–' },
+                  ]}
+                />
+                <SummaryCard
+                  icon="lock"
+                  title="Data &amp; Secrets"
+                  href={`${base}/data`}
+                  hidden={!project?.config.postgres?.backupBucket && project?.config.requiredEnvKeys == null}
+                  stats={[
+                    { label: 'Last backup', value: backupStatus ? fmtAgo(backupStatus.lastRun) : '–' },
+                    { label: 'Status', value: backupStatus?.status ?? '–', color: backupStatus?.status === 'failed' ? 'var(--err)' : undefined },
+                  ]}
+                />
+                <SummaryCard
+                  icon="settings"
+                  title="Administration"
+                  href={`${base}/admin`}
+                  stats={[
+                    { label: 'Cron jobs', value: '—' },
+                    { label: 'Firewall', value: '—' },
+                  ]}
+                />
+              </div>
+
               {deployWarning && !deploying && (
                 <div className="rounded-lg border border-warn bg-card p-3 flex items-center gap-3">
                   <span className="text-[12px] text-warn font-mono flex-1">{deployWarning}</span>
@@ -315,7 +317,7 @@ export default function ProjectDetailPage() {
         </button>
         <div className="flex gap-2">
           <Link
-            href={`/projects/${encodeURIComponent(name)}/logs`}
+            href={`${base}/logs`}
             className="flex flex-1 items-center justify-center gap-1.5 rounded-xl text-[13px] font-medium text-fg border border-border hover:bg-card-hover transition-colors"
             style={{ height: 44 }}
           >

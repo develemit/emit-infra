@@ -1,4 +1,4 @@
-import { apiFetch, authHeaders, getApiBase } from './api-auth.js'
+import { apiFetch, authHeaders, getApiBase } from './api-auth'
 
 const API_BASE = getApiBase()
 

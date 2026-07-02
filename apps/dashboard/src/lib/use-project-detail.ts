@@ -8,11 +8,9 @@ import { deriveHealth } from '@/lib/health'
 import { useMetricHistory, computeUptimePct } from '@/lib/metric-history'
 import { useServerMetrics } from '@/lib/use-server-metrics'
 import { useDeployMarkers } from '@/lib/use-deploy-markers'
-import { useCiHistory } from '@/lib/use-ci-history'
 import { useDiskTrend } from '@/lib/use-disk-trend'
 import { useMemoryTrend } from '@/lib/use-memory-trend'
 import { useBackupStatus } from '@/lib/use-backup-status'
-import { useBackups } from '@/lib/use-backups'
 import type { DeployMarker } from '@/components/detail/resource-chart'
 
 export function useProjectDetail(name: string) {
@@ -30,10 +28,11 @@ export function useProjectDetail(name: string) {
   const [rangeHours, setRangeHours] = useState(24)
 
   const fetchData = useCallback(async () => {
-    const [ps, s, c] = await Promise.all([getProjects(), getStatus(name), getContainers(name)])
-    setProject(ps.find(p => p.config.name === name) ?? null)
-    setStatus(s)
-    setContainers(c)
+    await Promise.all([
+      getProjects().then(ps => setProject(ps.find(p => p.config.name === name) ?? null)),
+      getStatus(name).then(s => setStatus(s)),
+      getContainers(name).then(c => setContainers(c)),
+    ])
     setLastPolledAt(Date.now())
   }, [name])
 
@@ -75,9 +74,6 @@ export function useProjectDetail(name: string) {
 
   const { variant, label } = deriveHealth(status, project?.config.warnThresholds)
   const domain = project?.config.domain ?? ''
-  const repoUrl = project?.config.github?.repo
-    ? `https://github.com/${project.config.github.repo}/commit/`
-    : undefined
   const loading = status === null
   const up = !!status && !status.error && status.httpStatus === 200
   const mem = status?.memory ?? null
@@ -87,20 +83,15 @@ export function useProjectDetail(name: string) {
   const uptimePct = computeUptimePct(localHistory)
   const { points: serverPoints } = useServerMetrics(name, rangeHours)
   const { deploys } = useDeployMarkers(name)
-  const { runs: ciRuns } = useCiHistory(name)
   const diskTrend = useDiskTrend(name)
   const memoryTrend = useMemoryTrend(name)
   const backupStatus = useBackupStatus(name)
-  const backups = useBackups(name)
 
   const chartHistory = serverPoints.length >= 2
     ? serverPoints.map(p => ({ t: p.t * 1000, cpu: p.cpu, mem: p.mem, disk: p.disk }))
     : localHistory.map(p => ({ t: p.t, mem: p.mem, disk: p.disk }))
   const fullChartPoints = serverPoints.length >= 2
     ? serverPoints.map(p => ({ t: p.t * 1000, cpu: p.cpu, mem: p.mem, disk: p.disk }))
-    : []
-  const networkPoints = serverPoints.length >= 2
-    ? serverPoints.map(p => ({ t: p.t * 1000, netRxBytes: p.netRxBytes, netTxBytes: p.netTxBytes }))
     : []
   const latestMetric = serverPoints.length > 0 ? serverPoints[serverPoints.length - 1] ?? null : null
   const deployMarkers: DeployMarker[] = deploys.map(d => ({
@@ -117,12 +108,12 @@ export function useProjectDetail(name: string) {
     showSecretsSync, setShowSecretsSync,
     showDestroy, setShowDestroy,
     rangeHours, setRangeHours,
-    polledAgo, loading, domain, repoUrl,
+    polledAgo, loading, domain,
     variant, label,
-    chartHistory, fullChartPoints, networkPoints, serverPoints,
+    chartHistory, fullChartPoints, serverPoints,
     latestMetric, deployMarkers,
-    deploys, ciRuns,
-    diskTrend, memoryTrend, backupStatus, backups,
+    deploys,
+    diskTrend, memoryTrend, backupStatus,
     uptimePct, fetchData, deployUrl,
   }
 }

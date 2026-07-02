@@ -1,6 +1,11 @@
 'use client'
 import type { DeployCadenceDay } from '@/lib/api'
 
+function fmtDate(iso: string): string {
+  const d = new Date(iso + 'T00:00:00')
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' })
+}
+
 interface Props {
   days: DeployCadenceDay[]
 }
@@ -48,7 +53,7 @@ export function DeployCadenceChart({ days }: Props) {
                         y={H - successHeight}
                         width={barWidth - 2}
                         height={successHeight}
-                        fill="var(--fg-muted)"
+                        fill="var(--accent)"
                       />
                     )}
                     {failureHeight > 0 && (
@@ -68,10 +73,10 @@ export function DeployCadenceChart({ days }: Props) {
                     y={H + 14}
                     textAnchor="middle"
                     fontSize="10"
-                    fill="var(--subtle)"
+                    fill="var(--fg)"
                     fontFamily="monospace"
                   >
-                    {day.date}
+                    {fmtDate(day.date)}
                   </text>
                 )}
               </g>
