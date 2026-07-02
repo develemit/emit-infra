@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { getApiBase, getDeployCadence, type DeployCadenceDay } from '@/lib/api'
+import { getApiBase, getDeployCadence, getSla, type DeployCadenceDay, type SlaData } from '@/lib/api'
 import { Icon } from '@/components/icon'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -18,6 +18,7 @@ import { QueueChart } from '@/components/detail/queue-chart'
 import { DeployTimeline } from '@/components/detail/deploy-timeline'
 import { DeployCadenceChart } from '@/components/detail/deploy-cadence-chart'
 import { IncidentPanel } from '@/components/detail/incident-panel'
+import { SlaPanel } from '@/components/detail/sla-panel'
 import { CiTimeline } from '@/components/detail/ci-timeline'
 import { DockerUsage } from '@/components/detail/docker-usage'
 import { CostPanel } from '@/components/detail/cost-panel'
@@ -56,9 +57,14 @@ export default function ProjectDetailPage() {
 
   const [deployWarning, setDeployWarning] = useState<string | null>(null)
   const [cadenceDays, setCadenceDays] = useState<DeployCadenceDay[]>([])
+  const [sla, setSla] = useState<SlaData | null>(null)
 
   useEffect(() => {
     getDeployCadence(name).then(setCadenceDays).catch(() => {})
+  }, [name])
+
+  useEffect(() => {
+    getSla(name).then(setSla).catch(() => {})
   }, [name])
 
   function handleDeployClick() {
@@ -220,6 +226,7 @@ export default function ProjectDetailPage() {
               )}
               <DeployCadenceChart days={cadenceDays} />
               <DeployTimeline deploys={deploys} name={name} repoUrl={repoUrl} />
+              {sla && <SlaPanel sla={sla} />}
               <IncidentPanel name={name} />
               <CiTimeline runs={ciRuns} name={name} repoUrl={repoUrl} />
               <DockerUsage projectName={name} onPrune={fetchData} />

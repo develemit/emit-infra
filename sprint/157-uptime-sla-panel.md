@@ -52,11 +52,31 @@ The incident panel already shows individual incidents and MTTR, but the headline
 
 ## Acceptance criteria
 
-- [ ] `GET /projects/:name/sla` returns correct 7d and 30d uptime percentages
-- [ ] No incidents → returns `{ uptime7d: 100, uptime30d: 100 }`
-- [ ] Partial (unresolved) incidents reduce the uptime correctly
-- [ ] Color coding: green ≥ 99.9%, yellow ≥ 99%, red < 99%
-- [ ] Both typechecks pass clean
+- [x] `GET /projects/:name/sla` returns correct 7d and 30d uptime percentages
+- [x] No incidents → returns `{ uptime7d: 100, uptime30d: 100 }`
+- [x] Partial (unresolved) incidents reduce the uptime correctly
+- [x] Color coding: green ≥ 99.9%, yellow ≥ 99%, red < 99%
+- [x] Both typechecks pass clean
+
+## Completed
+
+**Date:** 2026-07-02
+
+### Summary
+Added `GET /projects/:name/sla` to `historyRoutes`. The route reads `.incidents.jsonl`, filters to SSH records, pairs down/up events using the same state machine as the existing incidents route, and computes downtime overlap with 7d/30d windows (clamped, unresolved incidents run to `now`). TTL-cached at 120s. Created `SlaPanel` with color-coded two-stat tiles. Mounted conditionally in the project detail page before `<IncidentPanel>`.
+
+### Files changed
+- `apps/api/src/routes/history.ts` — added `/projects/:name/sla` route with TTL cache
+- `apps/dashboard/src/lib/api.ts` — added `SlaData` interface and `getSla`
+- (new) `apps/dashboard/src/components/detail/sla-panel.tsx` — two-stat uptime panel
+- `apps/dashboard/app/projects/[name]/page.tsx` — import, state, useEffect, conditional mount
+
+### Verification
+- `pnpm nx typecheck api --skip-nx-cache`: clean
+- `pnpm nx typecheck dashboard --skip-nx-cache`: clean
+
+### Follow-ups
+- none
 
 ## Out of scope
 

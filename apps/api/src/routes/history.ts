@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises'
 import { z } from 'zod/v4'
 import { readJsonl, downsample } from '../lib/jsonl.js'
 import { findProject } from '../lib/project-helpers.js'
+import { createTtlCache } from '../lib/ttl-cache.js'
 
 const NameParam = z.object({ name: z.string().min(1).max(100) })
 const ShaParam = z.object({
@@ -71,6 +72,13 @@ interface Incident {
 const MAX_METRIC_POINTS = 500
 const MAX_HOURS = 720
 const MAX_HISTORY_LIMIT = 200
+
+interface SlaData {
+  uptime7d: number
+  uptime30d: number
+}
+
+const slaCache = createTtlCache<SlaData>(120_000)
 
 export async function historyRoutes(app: FastifyInstance) {
   app.get('/projects/:name/metrics', async (req, reply) => {
@@ -373,5 +381,89 @@ export async function historyRoutes(app: FastifyInstance) {
     }
 
     return { days }
+  })
+
+  app.get('/projects/:name/sla', async (req, reply) => {
+    const params = NameParam.safeParse(req.params)
+    if (!params.success) return reply.status(400).send({ error: params.error.message })
+
+    const project = await findProject(params.data.name)
+    if (!project) return reply.status(404).send({ error: 'not found' })
+
+    const cached = slaCache.get(params.data.name)
+    if (cached) return cached
+
+    const filePath = join(homedir(), 'projects', params.data.name, '.incidents.jsonl')
+    const records = await readJsonl<IncidentRecord>(
+      filePath,
+      (r) => typeof r.t === 'number' && r.type === 'ssh',
+    )
+
+    // Pair up→down and down→up transitions into resolved incidents
+    const incidents: Incident[] = []
+    let openDownAt: number | null = null
+
+    for (const record of records) {
+      if (record.event === 'down') {
+        if (openDownAt === null) {
+          openDownAt = record.t
+        }
+      } else if (record.event === 'up') {
+        if (openDownAt !== null) {
+          incidents.push({
+            startedAt: openDownAt,
+            resolvedAt: record.t,
+            durationSec: record.t - openDownAt,
+            resolved: true,
+          })
+          openDownAt = null
+        }
+      }
+    }
+
+    // If there's an open incident, add it as unresolved
+    if (openDownAt !== null) {
+      incidents.push({
+        startedAt: openDownAt,
+        resolvedAt: null,
+        durationSec: null,
+        resolved: false,
+      })
+    }
+
+    const now = Math.floor(Date.now() / 1000)
+    const window7d = 7 * 86400
+    const window30d = 30 * 86400
+    const cutoff7d = now - window7d
+    const cutoff30d = now - window30d
+
+    const computeUptime = (windowSec: number, cutoff: number) => {
+      let downtimeSec = 0
+
+      for (const incident of incidents) {
+        const startedAt = incident.startedAt
+        const resolvedAt = incident.resolvedAt ?? now
+
+        // Check if incident overlaps with the window
+        if (resolvedAt <= cutoff) continue // Incident ended before window starts
+        if (startedAt >= now) continue // Incident started after now
+
+        // Clamp incident to window
+        const clampedStart = Math.max(startedAt, cutoff)
+        const clampedEnd = Math.min(resolvedAt, now)
+        downtimeSec += clampedEnd - clampedStart
+      }
+
+      const uptimePct = ((windowSec - downtimeSec) / windowSec) * 100
+      return Math.min(100, Math.max(0, parseFloat(uptimePct.toFixed(2))))
+    }
+
+    const result: SlaData = {
+      uptime7d: computeUptime(window7d, cutoff7d),
+      uptime30d: computeUptime(window30d, cutoff30d),
+    }
+
+    slaCache.set(params.data.name, result)
+    return result
   })
 }

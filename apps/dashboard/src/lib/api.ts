@@ -556,3 +556,14 @@ export async function getDeployCadence(name: string): Promise<DeployCadenceDay[]
   const body = await res.json() as { days: DeployCadenceDay[] }
   return body.days
 }
+
+export interface SlaData {
+  uptime7d: number
+  uptime30d: number
+}
+
+export async function getSla(name: string): Promise<SlaData | null> {
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/sla`, { cache: 'no-store', headers: authHeaders() })
+  if (!res.ok) return null
+  return res.json() as Promise<SlaData>
+}
