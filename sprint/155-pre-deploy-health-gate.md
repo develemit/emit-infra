@@ -50,11 +50,27 @@ A deploy on a server that's already at 85% disk or memory is likely to fail mid-
 
 ## Acceptance criteria
 
-- [ ] Clicking Deploy when disk ≥ 80% or memory ≥ 80% shows the warning banner instead of starting the deploy
-- [ ] "Deploy anyway" in the banner starts the deploy normally
-- [ ] "Cancel" dismisses the banner without deploying
-- [ ] Clicking Deploy when conditions are fine still starts immediately (no extra click)
-- [ ] `pnpm nx typecheck dashboard --skip-nx-cache` passes clean
+- [x] Clicking Deploy when disk ≥ 80% or memory ≥ 80% shows the warning banner instead of starting the deploy
+- [x] "Deploy anyway" in the banner starts the deploy normally
+- [x] "Cancel" dismisses the banner without deploying
+- [x] Clicking Deploy when conditions are fine still starts immediately (no extra click)
+- [x] `pnpm nx typecheck dashboard --skip-nx-cache` passes clean
+
+## Completed
+
+**Date:** 2026-07-01
+
+### Summary
+Added `deployWarning` state and a `handleDeployClick` handler to `ProjectDetailPage`. The handler checks `status?.disk >= 80 || status?.memory >= 80` before calling `setDeploying(true)` — if either threshold is met, it sets a warning string and returns early. Both the desktop (header bar) and mobile (fixed bottom bar) deploy buttons were updated to use the shared handler. The warning banner renders above the `DeployPanel` with "Deploy anyway" and "Cancel" options. `onClose` also clears `deployWarning` so stale warnings don't persist after a deploy completes.
+
+### Files changed
+- `apps/dashboard/app/projects/[name]/page.tsx` — added `useState` import, `deployWarning` state, `handleDeployClick`, warning banner JSX, updated both deploy buttons
+
+### Verification
+- `pnpm nx typecheck dashboard --skip-nx-cache`: clean
+
+### Follow-ups
+- none
 
 ## Out of scope
 

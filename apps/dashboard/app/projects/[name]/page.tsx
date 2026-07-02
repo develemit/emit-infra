@@ -1,4 +1,5 @@
 'use client'
+import { useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { getApiBase } from '@/lib/api'
@@ -52,6 +53,19 @@ export default function ProjectDetailPage() {
     uptimePct, fetchData, deployUrl,
   } = useProjectDetail(name)
 
+  const [deployWarning, setDeployWarning] = useState<string | null>(null)
+
+  function handleDeployClick() {
+    setDeployWarning(null)
+    if ((status?.disk ?? 0) >= 80 || (status?.memory ?? 0) >= 80) {
+      setDeployWarning(
+        `Disk at ${status?.disk ?? '?'}%, memory at ${status?.memory ?? '?'}% — server may be under pressure.`
+      )
+      return
+    }
+    setDeploying(true)
+  }
+
   return (
     <div className="flex flex-col min-h-full">
       <div
@@ -93,7 +107,7 @@ export default function ProjectDetailPage() {
           <Icon name="refresh" size={13} />Rollback
         </button>
         <button
-          onClick={() => setDeploying(true)}
+          onClick={handleDeployClick}
           disabled={deploying}
           className="inline-flex items-center gap-1.5 px-3 h-[32px] rounded-lg text-[12px] font-medium text-accent-fg bg-accent hover:opacity-90 disabled:opacity-50 transition-opacity"
         >
@@ -209,11 +223,28 @@ export default function ProjectDetailPage() {
               {status !== null && !status?.error && (
                 <UfwPanel name={name} />
               )}
+              {deployWarning && !deploying && (
+                <div className="rounded-lg border border-warn bg-card p-3 flex items-center gap-3">
+                  <span className="text-[12px] text-warn font-mono flex-1">{deployWarning}</span>
+                  <button
+                    onClick={() => { setDeployWarning(null); setDeploying(true) }}
+                    className="px-3 h-[28px] rounded-lg text-[12px] font-medium text-warn border border-warn hover:bg-warn/10 transition-colors shrink-0"
+                  >
+                    Deploy anyway
+                  </button>
+                  <button
+                    onClick={() => setDeployWarning(null)}
+                    className="text-subtle hover:text-fg shrink-0 text-[12px]"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
               {deploying && (
                 <DeployPanel
                   url={deployUrl}
                   name={name}
-                  onClose={() => setDeploying(false)}
+                  onClose={() => { setDeploying(false); setDeployWarning(null) }}
                 />
               )}
               {showRollback && (
@@ -236,7 +267,7 @@ export default function ProjectDetailPage() {
         className="lg:hidden fixed bottom-16 left-0 right-0 z-40 flex flex-col gap-2 px-4 py-3 border-t border-border bg-elev"
       >
         <button
-          onClick={() => setDeploying(true)}
+          onClick={handleDeployClick}
           disabled={deploying}
           className="flex w-full items-center justify-center gap-2 rounded-xl text-[14px] font-medium text-accent-fg bg-accent hover:opacity-90 disabled:opacity-50 transition-opacity"
           style={{ height: 48 }}
