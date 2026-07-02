@@ -14,6 +14,27 @@ function storageKey(name: string) {
   return `emit-infra:metrics:${name}`
 }
 
+let warnedQuota = false
+
+function persist(name: string, points: MetricPoint[]): void {
+  try {
+    localStorage.setItem(storageKey(name), JSON.stringify(points))
+  } catch {
+    // Quota exceeded — drop the oldest half and retry once.
+    try {
+      localStorage.setItem(
+        storageKey(name),
+        JSON.stringify(points.slice(-Math.floor(MAX_POINTS / 2))),
+      )
+    } catch {
+      if (!warnedQuota) {
+        warnedQuota = true
+        console.warn('[metric-history] localStorage quota exceeded — metric persistence degraded')
+      }
+    }
+  }
+}
+
 /**
  * Persists memory + disk readings in localStorage (24h window).
  * Each new reading from the 30s poll is appended; duplicate calls within
@@ -54,9 +75,7 @@ export function useMetricHistory(
       const next = [...prev, { t: now, mem, disk: disk ?? 0, up }]
         .filter(p => now - p.t < TTL_MS)
         .slice(-MAX_POINTS)
-      try {
-        localStorage.setItem(storageKey(name), JSON.stringify(next))
-      } catch { /* storage quota exceeded */ }
+      persist(name, next)
       return next
     })
   }, [name, mem, disk, up])

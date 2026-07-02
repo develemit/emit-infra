@@ -57,11 +57,15 @@ function loadOrInit(): PushStore {
   }
 }
 
+let cached: PushStore | null = null
+
+// Persisting a store makes it the in-memory cache, so reads after any
+// mutation (add/remove/prune) always see the state that was written.
 function save(store: PushStore): void {
   fs.writeFileSync(PUSH_FILE, JSON.stringify(store, null, 2), { mode: 0o600 })
+  cached = store
 }
 
-let cached: PushStore | null = null
 function getStore(): PushStore {
   if (!cached) cached = loadOrInit()
   return cached
