@@ -38,9 +38,27 @@ export function useProjectDetail(name: string) {
   }, [name])
 
   useEffect(() => {
+    const BASE_MS = 30_000
+    const MAX_MS = 120_000
+    let currentMs = BASE_MS
+    let timeoutId: ReturnType<typeof setTimeout>
+
+    const schedule = () => {
+      const jitter = Math.random() * 10_000 - 5_000
+      timeoutId = setTimeout(async () => {
+        try {
+          await fetchData()
+          currentMs = BASE_MS
+        } catch {
+          currentMs = Math.min(currentMs * 2, MAX_MS)
+        }
+        schedule()
+      }, currentMs + jitter)
+    }
+
     void fetchData()
-    const interval = setInterval(() => void fetchData(), 30_000)
-    return () => clearInterval(interval)
+    schedule()
+    return () => clearTimeout(timeoutId)
   }, [fetchData])
 
   useEffect(() => {

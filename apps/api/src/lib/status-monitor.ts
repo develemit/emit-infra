@@ -29,6 +29,7 @@ function writeIncident(record: IncidentRecord): void {
 const POLL_MS = 60_000
 const sshState = new Map<string, 'up' | 'down'>()
 const httpState = new Map<string, 'up' | 'down'>()
+const httpCircuit = new Map<string, { failures: number; skipUntil: number }>()
 
 async function sshProbe(host: string, key: string): Promise<'up' | 'down'> {
   try {
@@ -39,11 +40,32 @@ async function sshProbe(host: string, key: string): Promise<'up' | 'down'> {
   }
 }
 
+function recordHttpFailure(url: string): void {
+  const entry = httpCircuit.get(url) ?? { failures: 0, skipUntil: 0 }
+  entry.failures += 1
+  if (entry.failures >= 3) {
+    entry.skipUntil = Date.now() + 5 * POLL_MS
+    entry.failures = 0
+  }
+  httpCircuit.set(url, entry)
+}
+
 async function httpProbe(url: string): Promise<'up' | 'down'> {
+  const circuit = httpCircuit.get(url)
+  if (circuit && Date.now() < circuit.skipUntil) {
+    return 'down'
+  }
+
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(10_000) })
-    return res.ok ? 'up' : 'down'
+    if (res.ok) {
+      httpCircuit.delete(url)
+      return 'up'
+    }
+    recordHttpFailure(url)
+    return 'down'
   } catch {
+    recordHttpFailure(url)
     return 'down'
   }
 }
