@@ -56,6 +56,15 @@ export interface DiskDir {
   bytes: number
 }
 
+export interface DiskCategory {
+  path: string
+  humanSize: string
+}
+
+export interface DiskBreakdown {
+  categories: DiskCategory[]
+}
+
 export interface Container {
   name: string
   image: string
@@ -420,6 +429,12 @@ export async function getDiskDirs(name: string): Promise<DiskDir[]> {
   if (!res.ok) return []
   const body = await res.json() as { dirs: DiskDir[] }
   return body.dirs
+}
+
+export async function getDiskBreakdown(name: string): Promise<DiskBreakdown> {
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/disk-breakdown`, { cache: 'no-store', headers: authHeaders() })
+  if (!res.ok) return { categories: [] }
+  return res.json() as Promise<DiskBreakdown>
 }
 
 export interface PgTable {

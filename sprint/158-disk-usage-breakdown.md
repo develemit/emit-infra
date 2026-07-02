@@ -45,10 +45,30 @@ The current disk display shows "42% used (18G of 40G)" but gives no hint of *whe
 
 ## Acceptance criteria
 
-- [ ] `GET /projects/:name/disk-breakdown` returns a `categories` array with `path` and `humanSize`
-- [ ] SSH failure returns 503, missing project returns 404
-- [ ] Categories render inline near the existing disk meter
-- [ ] Both typechecks pass clean
+- [x] `GET /projects/:name/disk-breakdown` returns a `categories` array with `path` and `humanSize`
+- [x] SSH failure returns 503, missing project returns 404
+- [x] Categories render inline near the existing disk meter
+- [x] Both typechecks pass clean
+
+## Completed
+
+**Date:** 2026-07-02
+
+### Summary
+Added `GET /projects/:name/disk-breakdown` to the existing `diskRoutes` in `disk.ts`. Uses `du -sh` on `/var/lib/docker`, `/opt/${name}`, `/var/log`, `/home` with a separate 300s TTL cache, returning human-size strings. Created a compact `DiskBreakdownPanel` companion component (max 6 rows) that pairs alongside the existing `DiskDirsPanel` without duplicating it — different endpoint, different data format (human-size vs bytes).
+
+### Files changed
+- `apps/api/src/routes/disk.ts` — added `GET /projects/:name/disk-breakdown` inside existing `diskRoutes`
+- `apps/dashboard/src/lib/api.ts` — added `DiskCategory`, `DiskBreakdown` interfaces and `getDiskBreakdown`
+- (new) `apps/dashboard/src/components/detail/disk-breakdown-panel.tsx` — compact companion panel
+- `apps/dashboard/app/projects/[name]/page.tsx` — import, state, useEffect, mount
+
+### Verification
+- `pnpm nx typecheck api --skip-nx-cache`: clean
+- `pnpm nx typecheck dashboard --skip-nx-cache`: clean
+
+### Follow-ups
+- none
 
 ## Out of scope
 

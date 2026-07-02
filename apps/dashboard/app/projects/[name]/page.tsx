@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { getApiBase, getDeployCadence, getSla, type DeployCadenceDay, type SlaData } from '@/lib/api'
+import { getApiBase, getDeployCadence, getSla, getDiskBreakdown, type DeployCadenceDay, type SlaData, type DiskCategory } from '@/lib/api'
 import { Icon } from '@/components/icon'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -31,6 +31,7 @@ import { DestroyModal } from '@/components/destroy-modal'
 import { BackupPanel } from '@/components/detail/backup-panel'
 import { PgTableSizesPanel } from '@/components/detail/pg-table-sizes-panel'
 import { DiskDirsPanel } from '@/components/detail/disk-dirs-panel'
+import { DiskBreakdownPanel } from '@/components/detail/disk-breakdown-panel'
 import { SecretsPanel } from '@/components/detail/secrets-panel'
 import { useProjectDetail } from '@/lib/use-project-detail'
 
@@ -58,6 +59,7 @@ export default function ProjectDetailPage() {
   const [deployWarning, setDeployWarning] = useState<string | null>(null)
   const [cadenceDays, setCadenceDays] = useState<DeployCadenceDay[]>([])
   const [sla, setSla] = useState<SlaData | null>(null)
+  const [diskBreakdown, setDiskBreakdown] = useState<DiskCategory[]>([])
 
   useEffect(() => {
     getDeployCadence(name).then(setCadenceDays).catch(() => {})
@@ -65,6 +67,10 @@ export default function ProjectDetailPage() {
 
   useEffect(() => {
     getSla(name).then(setSla).catch(() => {})
+  }, [name])
+
+  useEffect(() => {
+    getDiskBreakdown(name).then(r => setDiskBreakdown(r.categories)).catch(() => {})
   }, [name])
 
   function handleDeployClick() {
@@ -174,6 +180,9 @@ export default function ProjectDetailPage() {
               )}
               {status !== null && !status?.error && (
                 <DiskDirsPanel name={name} />
+              )}
+              {status !== null && !status?.error && (
+                <DiskBreakdownPanel categories={diskBreakdown} />
               )}
               {memoryTrend !== null && memoryTrend.projectedDaysUntilFull !== null && memoryTrend.mem > 75 && (
                 <div className="text-[12px] font-mono px-3 py-2 rounded-lg border" style={{ color: 'var(--warn, #e5a00d)', borderColor: 'var(--border)', background: 'var(--card-2)' }}>
