@@ -73,6 +73,10 @@ export function ProjectSettingsPanel({ project }: Props) {
 
   const [envKeys, setEnvKeys] = useState((cfg.requiredEnvKeys ?? []).join(', '))
 
+  const [diskPct, setDiskPct] = useState(cfg.warnThresholds?.diskPct ?? 80)
+  const [memPct, setMemPct] = useState(cfg.warnThresholds?.memPct ?? 80)
+  const [backupAgeHours, setBackupAgeHours] = useState(cfg.warnThresholds?.backupAgeHours ?? 24)
+
   const [domainError, setDomainError] = useState<string | null>(null)
   const [envKeysError, setEnvKeysError] = useState<string | null>(null)
 
@@ -98,6 +102,10 @@ export function ProjectSettingsPanel({ project }: Props) {
   const [dbState, saveDb] = useSave(() =>
     updateProjectConfig(name, { postgres: { version: pgVersion || undefined, backupBucket: pgBucket || undefined } }),
   )
+  const [thresholdsState, saveThresholds] = useSave(() =>
+    updateProjectConfig(name, { warnThresholds: { diskPct, memPct, backupAgeHours } }),
+  )
+
   const [accessState, saveAccess] = useSave(() => {
     // Validate env keys
     const keys = envKeys.split(',').map(k => k.trim()).filter(Boolean)
@@ -165,6 +173,26 @@ export function ProjectSettingsPanel({ project }: Props) {
               <Field label="Backup bucket"><input className={inputCls} value={pgBucket} onChange={e => setPgBucket(e.target.value)} /></Field>
             </div>
             <SaveButton state={dbState} onClick={saveDb} />
+          </div>
+
+          {/* Thresholds */}
+          <div>
+            <p className="text-[11px] font-semibold text-subtle uppercase tracking-wide mb-3">Thresholds</p>
+            <div className="grid grid-cols-3 gap-3">
+              <Field label="Disk warn %">
+                <input type="number" min={1} max={100} className={inputCls} value={diskPct}
+                  onChange={e => setDiskPct(Math.max(1, Math.min(100, parseInt(e.target.value, 10) || 80)))} />
+              </Field>
+              <Field label="Memory warn %">
+                <input type="number" min={1} max={100} className={inputCls} value={memPct}
+                  onChange={e => setMemPct(Math.max(1, Math.min(100, parseInt(e.target.value, 10) || 80)))} />
+              </Field>
+              <Field label="Backup age warn (h)">
+                <input type="number" min={1} className={inputCls} value={backupAgeHours}
+                  onChange={e => setBackupAgeHours(Math.max(1, parseInt(e.target.value, 10) || 24))} />
+              </Field>
+            </div>
+            <SaveButton state={thresholdsState} onClick={saveThresholds} />
           </div>
 
           {/* Access */}

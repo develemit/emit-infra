@@ -58,6 +58,13 @@ export const ProjectConfigSchema = z.object({
     })
     .optional(),
   requiredEnvKeys: z.string().array().optional(),
+  warnThresholds: z
+    .object({
+      diskPct: z.number().int().min(1).max(100).optional(),
+      memPct: z.number().int().min(1).max(100).optional(),
+      backupAgeHours: z.number().int().min(1).optional(),
+    })
+    .optional(),
 })
 
 export type ProjectConfig = z.infer<typeof ProjectConfigSchema>

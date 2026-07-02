@@ -73,7 +73,7 @@ export function useProjectDetail(name: string) {
     return () => clearInterval(tick)
   }, [lastPolledAt])
 
-  const { variant, label } = deriveHealth(status)
+  const { variant, label } = deriveHealth(status, project?.config.warnThresholds)
   const domain = project?.config.domain ?? ''
   const repoUrl = project?.config.github?.repo
     ? `https://github.com/${project.config.github.repo}/commit/`

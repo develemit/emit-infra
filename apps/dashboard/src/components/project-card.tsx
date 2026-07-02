@@ -59,7 +59,7 @@ function deployedAgo(epoch: string | null | undefined): string {
 export function ProjectCard({ project, status, onRetry }: Props) {
   const [retrying, setRetrying] = useState(false)
   const { name, domain, region } = project.config
-  const { variant, label } = deriveHealth(status)
+  const { variant, label } = deriveHealth(status, project.config.warnThresholds)
   const uptimePct = useUptimePct(name)
   const diskTrend = useDiskTrend(name)
   const showDiskWarning = diskTrend !== null

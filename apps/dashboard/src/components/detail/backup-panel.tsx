@@ -1,8 +1,8 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Icon } from '@/components/icon'
 import type { ProjectSummary } from '@/lib/api'
-import { updateBackupRetainDays } from '@/lib/api'
+import { updateBackupRetainDays, getBackupStatus } from '@/lib/api'
 import type { useBackups } from '@/lib/use-backups'
 
 function formatBytes(n: number): string {
@@ -49,11 +49,49 @@ interface BackupPanelProps {
 }
 
 export function BackupPanel({ project, backups }: BackupPanelProps) {
-  const { backups: list, loading, triggering, error, deleteError, deleteBackup, triggerBackup, downloadBackup } = backups
+  const { backups: list, loading, triggering, error, deleteError, deleteBackup, triggerBackup, downloadBackup, fetchBackups } = backups
   const [confirmKey, setConfirmKey] = useState<string | null>(null)
   const [retainDays, setRetainDays] = useState<number>(project.config.postgres?.backupRetainDays ?? 7)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [runningBackup, setRunningBackup] = useState(false)
+  const [triggerTime, setTriggerTime] = useState<number | null>(null)
+  const [backupResult, setBackupResult] = useState<'complete' | 'failed' | null>(null)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    if (!runningBackup || !triggerTime) return
+    pollRef.current = setInterval(async () => {
+      const status = await getBackupStatus(project.config.name).catch(() => null)
+      if (status && new Date(status.lastRun).getTime() > triggerTime) {
+        if (pollRef.current) clearInterval(pollRef.current)
+        if (timeoutRef.current) clearTimeout(timeoutRef.current)
+        setRunningBackup(false)
+        setBackupResult(status.status === 'ok' ? 'complete' : 'failed')
+        void fetchBackups()
+      }
+    }, 5_000)
+    timeoutRef.current = setTimeout(() => {
+      if (pollRef.current) clearInterval(pollRef.current)
+      setRunningBackup(false)
+    }, 600_000)
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current)
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+    }
+  }, [runningBackup, triggerTime, project.config.name, fetchBackups])
+
+  async function handleTriggerBackup() {
+    setBackupResult(null)
+    setTriggerTime(Date.now())
+    setRunningBackup(true)
+    try {
+      await triggerBackup()
+    } catch {
+      setRunningBackup(false)
+    }
+  }
 
   async function handleSaveRetainDays() {
     setSaving(true)
@@ -75,6 +113,12 @@ export function BackupPanel({ project, backups }: BackupPanelProps) {
       setConfirmKey(key)
     }
   }
+
+  const ageHoursThreshold = project.config.warnThresholds?.backupAgeHours ?? 24
+  const newestModified = list.length > 0
+    ? Math.max(...list.map(b => new Date(b.lastModified).getTime()))
+    : null
+  const backupStale = newestModified !== null && (Date.now() - newestModified) > ageHoursThreshold * 3_600_000
 
   const sortedByAge = [...list].sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime())
   const sizes = sortedByAge.reverse().map(b => b.sizeBytes)
@@ -105,16 +149,26 @@ export function BackupPanel({ project, backups }: BackupPanelProps) {
           </div>
         )}
         <button
-          onClick={() => void triggerBackup()}
-          disabled={triggering}
+          onClick={() => void handleTriggerBackup()}
+          disabled={triggering || runningBackup}
           className="inline-flex items-center gap-1.5 px-3 h-[30px] rounded-lg text-[12px] font-medium text-accent-fg bg-accent hover:opacity-90 disabled:opacity-50 transition-opacity"
         >
-          {triggering
+          {triggering || runningBackup
             ? <><Icon name="refresh" size={12} />Running…</>
+            : backupResult === 'complete'
+            ? <><Icon name="check" size={12} />Backup complete</>
+            : backupResult === 'failed'
+            ? <><Icon name="alert" size={12} />Backup failed</>
             : <><Icon name="deploy" size={12} />Back up now</>
           }
         </button>
       </div>
+
+      {backupStale && !loading && (
+        <div className="text-[12px] text-warn font-mono mb-3">
+          Latest backup is older than {ageHoursThreshold}h — consider running a backup now
+        </div>
+      )}
 
       {error && (
         <div className="text-[12px] text-err font-mono mb-3">{error}</div>

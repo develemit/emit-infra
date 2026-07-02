@@ -6,7 +6,10 @@ export interface HealthResult {
   label: string
 }
 
-export function deriveHealth(status: ProjectStatus | null): HealthResult {
+export function deriveHealth(
+  status: ProjectStatus | null,
+  thresholds?: { diskPct?: number; memPct?: number },
+): HealthResult {
   if (status === null) return { variant: 'muted', label: 'Loading' }
   if (status.error) return { variant: 'err', label: 'Unreachable' }
 
@@ -18,9 +21,12 @@ export function deriveHealth(status: ProjectStatus | null): HealthResult {
   const httpChecked = http !== undefined
   const siteDown = httpChecked && (http === null || http >= 500)
 
+  const diskThreshold = thresholds?.diskPct ?? 80
+  const memThreshold = thresholds?.memPct ?? 80
+
   if (siteDown) return { variant: 'err', label: 'Down' }
   if (unhealthy > 0) return { variant: 'warn', label: 'Degraded' }
-  if (disk >= 80 || mem >= 80) return { variant: 'warn', label: 'Degraded' }
+  if (disk >= diskThreshold || mem >= memThreshold) return { variant: 'warn', label: 'Degraded' }
 
   return { variant: 'ok', label: 'Healthy' }
 }

@@ -120,6 +120,11 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
       backupRetainDays: z.number().int().min(1).max(365).optional(),
     }).optional(),
     requiredEnvKeys: z.string().array().optional(),
+    warnThresholds: z.object({
+      diskPct: z.number().int().min(1).max(100).optional(),
+      memPct: z.number().int().min(1).max(100).optional(),
+      backupAgeHours: z.number().int().min(1).optional(),
+    }).optional(),
   }).partial()
 
   app.patch<{ Params: { name: string }; Body: unknown }>(

@@ -47,6 +47,11 @@ export interface ProjectConfigPatch {
     backupRetainDays?: number
   }
   requiredEnvKeys?: string[]
+  warnThresholds?: {
+    diskPct?: number
+    memPct?: number
+    backupAgeHours?: number
+  }
 }
 
 export function getProjects(): Promise<ProjectSummary[]> {
