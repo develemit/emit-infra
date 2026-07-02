@@ -128,6 +128,8 @@ export function DesktopContainerRow({
   onRestart,
   metrics,
   restartSeries,
+  isLogsActive,
+  onViewLogs,
 }: {
   c: Container
   logsHref: string
@@ -136,6 +138,8 @@ export function DesktopContainerRow({
   onRestart: () => Promise<void>
   metrics?: ContainerMetrics
   restartSeries?: { t: number; restarts: number }[]
+  isLogsActive?: boolean
+  onViewLogs?: () => void
 }) {
   return (
     <tr
@@ -181,6 +185,16 @@ export function DesktopContainerRow({
           >
             <Icon name="refresh" size={13} />
           </button>
+          {onViewLogs && (
+            <button
+              onClick={onViewLogs}
+              className="transition-colors"
+              style={{ color: isLogsActive ? 'var(--fg)' : 'var(--subtle)' }}
+              title="View logs"
+            >
+              <Icon name="file" size={13} />
+            </button>
+          )}
           <Link href={logsHref} className="text-subtle hover:text-fg transition-colors">
             <Icon name="file" size={13} />
           </Link>

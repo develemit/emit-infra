@@ -7,6 +7,7 @@ import { restartContainer } from '@/lib/api'
 import { useContainerRestarts } from '@/lib/use-container-restarts'
 import { useToast } from '@/components/ui/toast'
 import { MobileContainerRow, DesktopContainerRow, RestartSparkline, type ContainerMetrics } from './container-row'
+import { ContainerLogViewer } from './container-log-viewer'
 
 function stateOrder(state: string): number {
   const s = state.toLowerCase()
@@ -46,6 +47,7 @@ function sortByMemory(containers: Container[], metrics: Map<string, ContainerMet
 
 export function ContainerTable({ containers, projectName, onRefetch, latestMetric }: ContainerTableProps) {
   const [restartingSet, setRestartingSet] = useState<Set<string>>(new Set())
+  const [activeLogsContainer, setActiveLogsContainer] = useState<string | null>(null)
   const { showToast } = useToast()
   const cMetrics = metricsMap(latestMetric)
   const restartSeries = useContainerRestarts(projectName)
@@ -114,12 +116,22 @@ export function ContainerTable({ containers, projectName, onRefetch, latestMetri
                       onRestart={() => handleRestart(c.name)}
                       metrics={cm}
                       restartSeries={restartSeries[c.name]}
+                      isLogsActive={activeLogsContainer === c.name}
+                      onViewLogs={() => setActiveLogsContainer(activeLogsContainer === c.name ? null : c.name)}
                     />
                   )
                 })}
               </tbody>
             </table>
           </div>
+
+          {activeLogsContainer && (
+            <ContainerLogViewer
+              projectName={projectName}
+              containerName={activeLogsContainer}
+              onClose={() => setActiveLogsContainer(null)}
+            />
+          )}
 
           {/* Mobile cards */}
           <div className="lg:hidden flex flex-col gap-2">

@@ -56,11 +56,30 @@ Sprint 159 exposed the container log stream via the API. This sprint wires it in
 
 ## Acceptance criteria
 
-- [ ] Each container row (desktop) has a logs icon button
-- [ ] Clicking the button opens an inline Terminal streaming from the sprint-159 route
-- [ ] Clicking again (or the close button) collapses the Terminal and aborts the stream
-- [ ] Only one container's logs are shown at a time
-- [ ] `pnpm nx typecheck dashboard --skip-nx-cache` passes clean
+- [x] Each container row (desktop) has a logs icon button
+- [x] Clicking the button opens an inline Terminal streaming from the sprint-159 route
+- [x] Clicking again (or the close button) collapses the Terminal and aborts the stream
+- [x] Only one container's logs are shown at a time
+- [x] `pnpm nx typecheck dashboard --skip-nx-cache` passes clean
+
+## Completed
+
+**Date:** 2026-07-02
+
+### Summary
+Exported `authHeaders` from `api.ts` (previously private). Created `container-log-viewer.tsx` with `useContainerLogs(url)` hook (fetch-based SSE reader, same pattern as `deploy-panel.tsx`, aborts on `url` change) and `ContainerLogViewer` component that wraps `Terminal`. Added `isLogsActive` and `onViewLogs` optional props to `DesktopContainerRow` — the logs button uses the file icon and highlights when active. `ContainerTable` tracks `activeLogsContainer` state, passes toggle handler to each desktop row, and renders `ContainerLogViewer` below the table rows (desktop only, only one at a time).
+
+### Files changed
+- `apps/dashboard/src/lib/api.ts` — exported `authHeaders`
+- `apps/dashboard/src/components/detail/container-row.tsx` — added `isLogsActive` + `onViewLogs` props to `DesktopContainerRow`
+- `apps/dashboard/src/components/detail/container-table.tsx` — `activeLogsContainer` state, pass toggle to rows, mount `ContainerLogViewer`
+- (new) `apps/dashboard/src/components/detail/container-log-viewer.tsx` — `useContainerLogs` hook + `ContainerLogViewer` component
+
+### Verification
+- `pnpm nx typecheck dashboard --skip-nx-cache`: clean
+
+### Follow-ups
+- none
 
 ## Out of scope
 

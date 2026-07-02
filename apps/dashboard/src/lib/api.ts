@@ -7,7 +7,7 @@ export function getApiBase(): string {
   return API_BASE
 }
 
-function authHeaders(): Record<string, string> {
+export function authHeaders(): Record<string, string> {
   if (!API_SECRET) return {}
   return { Authorization: `Bearer ${API_SECRET}` }
 }
