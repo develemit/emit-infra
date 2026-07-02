@@ -57,17 +57,22 @@ export async function secretsSyncRoutes(app: FastifyInstance) {
         : join(projectDir, '.env')
 
       if (!existsSync(envFilePath)) {
-        return reply.status(404).send({ ok: false, error: `No env file found in ~/projects/${name}/` })
+        return reply.status(404).send({ error: `No env file found in ~/projects/${name}/` })
       }
 
       const content = await readFile(envFilePath, 'utf-8')
       const entries = parseEnvFile(content)
 
       if (entries.length === 0) {
-        return reply.send({ ok: false, error: 'No secrets found in env file' })
+        return reply.status(400).send({ error: 'No secrets found in env file' })
       }
 
       const b64 = Buffer.from(entries.map(([k, v]) => `${k}=${v}`).join('\n') + '\n').toString('base64')
+      // Defense-in-depth: b64 is interpolated into a remote shell command. The
+      // ssh helper has no stdin support, so assert the payload is pure base64.
+      if (!/^[A-Za-z0-9+/=]+$/.test(b64)) {
+        return reply.status(500).send({ error: 'invalid secrets payload' })
+      }
       const key = sshKeyPath(project.config.sshKeyName)
       const host = project.config.serverIp ?? project.config.domain
 
@@ -75,7 +80,7 @@ export async function secretsSyncRoutes(app: FastifyInstance) {
         await sshExec(host, `echo -n '${b64}' | base64 -d > /opt/${name}/.env`, key)
         return reply.send({ ok: true })
       } catch (err) {
-        return reply.status(503).send({ ok: false, error: err instanceof Error ? err.message : 'SSH error' })
+        return reply.status(503).send({ error: err instanceof Error ? err.message : 'SSH error' })
       }
     },
   )

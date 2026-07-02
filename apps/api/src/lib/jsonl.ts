@@ -1,15 +1,11 @@
-import { readFile } from 'node:fs/promises'
+import { readFile, open } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 
-export async function readJsonl<T>(
-  filePath: string,
-  filterFn?: (item: T) => boolean,
-  opts?: { tail?: number },
-): Promise<T[]> {
-  if (!existsSync(filePath)) return []
-  const raw = await readFile(filePath, 'utf8')
+const TAIL_WINDOW_BYTES = 64 * 1024
+
+function parseLines<T>(lines: string[], filterFn?: (item: T) => boolean): T[] {
   const items: T[] = []
-  for (const line of raw.split('\n')) {
+  for (const line of lines) {
     if (!line.trim()) continue
     try {
       const parsed = JSON.parse(line) as T
@@ -18,8 +14,46 @@ export async function readJsonl<T>(
       // skip malformed lines
     }
   }
-  if (opts?.tail !== undefined) return items.slice(-opts.tail)
   return items
+}
+
+// Reads a growing byte window from the end of the file until it holds at
+// least `tail` matching items (or the whole file), so tailing a large JSONL
+// file doesn't load it all into memory.
+async function readJsonlTail<T>(
+  filePath: string,
+  tail: number,
+  filterFn?: (item: T) => boolean,
+): Promise<T[]> {
+  const fh = await open(filePath, 'r')
+  try {
+    const { size } = await fh.stat()
+    let window = Math.min(size, TAIL_WINDOW_BYTES)
+    for (;;) {
+      const start = size - window
+      const buf = Buffer.alloc(window)
+      await fh.read(buf, 0, window, start)
+      const lines = buf.toString('utf8').split('\n')
+      // The first line of a mid-file window is almost certainly partial.
+      const usable = start === 0 ? lines : lines.slice(1)
+      const items = parseLines(usable, filterFn)
+      if (items.length >= tail || start === 0) return items.slice(-tail)
+      window = Math.min(size, window * 2)
+    }
+  } finally {
+    await fh.close()
+  }
+}
+
+export async function readJsonl<T>(
+  filePath: string,
+  filterFn?: (item: T) => boolean,
+  opts?: { tail?: number },
+): Promise<T[]> {
+  if (!existsSync(filePath)) return []
+  if (opts?.tail !== undefined) return readJsonlTail(filePath, opts.tail, filterFn)
+  const raw = await readFile(filePath, 'utf8')
+  return parseLines(raw.split('\n'), filterFn)
 }
 
 export function downsample<T>(points: T[], maxPoints: number): T[] {

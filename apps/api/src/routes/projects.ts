@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { sshExec } from '@emit-infra/core'
 import { discoverProjects, discoverUnregistered } from '../lib/discover-projects.js'
 import { createTtlCache } from '../lib/ttl-cache.js'
-import { findProject, sshKeyPath, SAFE_NAME_RE } from '../lib/project-helpers.js'
+import { findProject, sshKeyPath, SAFE_NAME_RE, SAFE_CONTAINER_RE, SAFE_DOMAIN_RE } from '../lib/project-helpers.js'
 
 // Concurrent dashboard pollers (multiple tabs/instances) hit these on the same
 // interval. Cache the SSH result briefly so they share one round-trip per
@@ -201,12 +201,17 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
     const projectConfig = await readProjectConfig(name)
 
     const domain = project.config.domain
+    // Domain is interpolated into a remote path — only probe the cert when it
+    // looks like a real hostname (bare-IP projects have no letsencrypt cert).
+    const sslProbe = SAFE_DOMAIN_RE.test(domain)
+      ? `openssl x509 -enddate -noout -in /etc/letsencrypt/live/${domain}/fullchain.pem 2>/dev/null | sed 's/notAfter=//' || echo ""`
+      : 'echo ""'
 
     try {
       const [raw, httpStatus] = await Promise.all([
         sshExec(
           host,
-          `uptime -p; df -h / | tail -1 | awk '{print $5, $3, $2}'; free -m | awk 'NR==2{printf "%.0f %dM %dM\\n", $3/$2*100, $3, $2}'; docker ps -q --filter status=running | wc -l; docker ps -aq | wc -l; docker ps -q --filter status=restarting --filter status=dead | wc -l; cat /opt/${name}/.deployed-version 2>/dev/null || echo ""; systemctl is-active nginx 2>/dev/null || echo "unknown"; test -f /etc/nginx/sites-enabled/${name} && echo "configured" || echo "missing"; openssl x509 -enddate -noout -in /etc/letsencrypt/live/${domain}/fullchain.pem 2>/dev/null | sed 's/notAfter=//' || echo ""; cd /opt/${name} && docker compose ps --format '{{.Service}}' 2>/dev/null | grep -qi redis && docker compose exec -T redis timeout 5 redis-cli ping 2>/dev/null || echo ""; cd /opt/${name} && docker compose ps --format '{{.Service}}' 2>/dev/null | grep -qi redis && docker compose exec -T redis timeout 5 redis-cli eval 'local f=0;local w=0;for _,k in ipairs(redis.call("KEYS","bull:*:failed")) do f=f+redis.call("LLEN",k) end;for _,k in ipairs(redis.call("KEYS","bull:*:wait")) do w=w+redis.call("LLEN",k) end;return tostring(f)..":"..tostring(w)' 0 2>/dev/null || echo ""; cat /opt/${name}/.deployed-at 2>/dev/null || echo ""; cat /opt/${name}/.active-slot 2>/dev/null || echo ""`,
+          `uptime -p; df -h / | tail -1 | awk '{print $5, $3, $2}'; free -m | awk 'NR==2{printf "%.0f %dM %dM\\n", $3/$2*100, $3, $2}'; docker ps -q --filter status=running | wc -l; docker ps -aq | wc -l; docker ps -q --filter status=restarting --filter status=dead | wc -l; cat /opt/${name}/.deployed-version 2>/dev/null || echo ""; systemctl is-active nginx 2>/dev/null || echo "unknown"; test -f /etc/nginx/sites-enabled/${name} && echo "configured" || echo "missing"; ${sslProbe}; cd /opt/${name} && docker compose ps --format '{{.Service}}' 2>/dev/null | grep -qi redis && docker compose exec -T redis timeout 5 redis-cli ping 2>/dev/null || echo ""; cd /opt/${name} && docker compose ps --format '{{.Service}}' 2>/dev/null | grep -qi redis && docker compose exec -T redis timeout 5 redis-cli eval 'local f=0;local w=0;for _,k in ipairs(redis.call("KEYS","bull:*:failed")) do f=f+redis.call("LLEN",k) end;for _,k in ipairs(redis.call("KEYS","bull:*:wait")) do w=w+redis.call("LLEN",k) end;return tostring(f)..":"..tostring(w)' 0 2>/dev/null || echo ""; cat /opt/${name}/.deployed-at 2>/dev/null || echo ""; cat /opt/${name}/.active-slot 2>/dev/null || echo ""`,
           key,
         ),
         checkHttp(domain),
@@ -292,7 +297,7 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
 
   const ContainerRestartParam = z.object({
     name: z.string().min(1).max(100).regex(SAFE_NAME_RE, 'invalid project name'),
-    container: z.string().min(1).max(200).regex(/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/),
+    container: z.string().min(1).max(200).regex(SAFE_CONTAINER_RE),
   })
 
   app.post<{ Params: { name: string; container: string } }>(
@@ -312,7 +317,7 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
         containersCache.invalidate(params.data.name)
         return void reply.send({ ok: true, output })
       } catch (err) {
-        return void reply.send({ ok: false, output: String(err) })
+        return void reply.status(503).send({ error: String(err) })
       }
     },
   )
@@ -397,7 +402,7 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
       await sshExec(host, cmd, sshKey)
       return void reply.send({ ok: true })
     } catch (err) {
-      return void reply.send({ ok: false, error: String(err) })
+      return void reply.status(503).send({ error: String(err) })
     }
   })
 
@@ -416,7 +421,7 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
       const output = await sshExec(host, `/usr/local/bin/emit-db-backup-${name} 2>&1`, sshKey)
       return void reply.send({ ok: true, output })
     } catch (err) {
-      return void reply.send({ ok: false, output: String(err) })
+      return void reply.status(503).send({ error: String(err) })
     }
   })
 

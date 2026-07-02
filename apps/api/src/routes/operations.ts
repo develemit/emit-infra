@@ -8,11 +8,11 @@ import { scaffoldProject, writeInventory } from '../lib/scaffold-project.js'
 import { writeEvent } from '../lib/write-sse.js'
 import { openSse, sseError } from '../lib/open-sse.js'
 import { streamProcess } from '../lib/stream-process.js'
-import { findProject, sshKeyPath } from '../lib/project-helpers.js'
+import { findProject, sshKeyPath, SAFE_NAME_RE, SAFE_CONTAINER_RE } from '../lib/project-helpers.js'
 
-const NameParam = z.object({ name: z.string().min(1).max(100).regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/, 'invalid project name') })
+const NameParam = z.object({ name: z.string().min(1).max(100).regex(SAFE_NAME_RE, 'invalid project name') })
 const ProvisionBody = z.object({ config: z.record(z.string(), z.unknown()).optional() })
-const LogsQuery = z.object({ service: z.string().min(1).max(200).regex(/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/, 'invalid service name').optional() })
+const LogsQuery = z.object({ service: z.string().min(1).max(200).regex(SAFE_CONTAINER_RE, 'invalid service name').optional() })
 
 const OPERATION_TIMEOUT_MS = 15 * 60 * 1000
 
@@ -210,7 +210,7 @@ export async function operationRoutes(app: FastifyInstance) {
 
       const name = project.config.name
       const remoteCmd = service
-        ? `docker logs --follow --tail=500 ${service}`
+        ? `docker logs --follow --tail=500 '${service}'`
         : `PROJECTS=$(docker compose ls 2>/dev/null | awk 'NR>1 && $1~/^${name}(-[^ ]+)?$/{print $1}'); [ -z "$PROJECTS" ] && PROJECTS="${name}"; for P in $PROJECTS; do docker compose -p "$P" logs --follow --tail=50 & done; wait`
 
       const sshArgs = [

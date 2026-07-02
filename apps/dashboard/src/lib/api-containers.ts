@@ -1,4 +1,4 @@
-import { apiFetch, authHeaders, getApiBase } from './api-auth.js'
+import { apiFetch, authHeaders, getApiBase } from './api-auth'
 
 const API_BASE = getApiBase()
 
@@ -40,8 +40,7 @@ export async function getContainers(name: string): Promise<Container[]> {
   const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/containers`, { cache: 'no-store', headers: authHeaders() })
   if (res.status === 503) return []
   if (!res.ok) throw new Error(`API error ${res.status}`)
-  const data = await res.json() as Container[] | { error: string }
-  return Array.isArray(data) ? data : []
+  return res.json() as Promise<Container[]>
 }
 
 export function getSshKeys(): Promise<string[]> {
@@ -60,7 +59,10 @@ export async function restartContainer(
     `${API_BASE}/projects/${encodeURIComponent(name)}/containers/${encodeURIComponent(container)}/restart`,
     { method: 'POST', cache: 'no-store', headers: authHeaders() },
   )
-  if (!res.ok) throw new Error(`Restart failed: ${res.status}`)
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({})) as { error?: string }
+    throw new Error(body.error ?? `Restart failed: ${res.status}`)
+  }
   return res.json() as Promise<{ ok: boolean; output: string }>
 }
 

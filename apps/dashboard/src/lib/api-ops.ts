@@ -1,4 +1,4 @@
-import { authHeaders, getApiBase } from './api-auth.js'
+import { authHeaders, getApiBase } from './api-auth'
 
 const API_BASE = getApiBase()
 
@@ -54,7 +54,10 @@ export async function deleteBackup(name: string, key: string): Promise<{ ok: boo
 
 export async function triggerBackup(name: string): Promise<{ ok: boolean; output: string }> {
   const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/backups/trigger`, { method: 'POST', headers: authHeaders() })
-  if (!res.ok) return { ok: false, output: `HTTP ${res.status}` }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({})) as { error?: string }
+    return { ok: false, output: body.error ?? `HTTP ${res.status}` }
+  }
   return res.json() as Promise<{ ok: boolean; output: string }>
 }
 

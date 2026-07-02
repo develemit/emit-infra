@@ -3,7 +3,7 @@ import Fastify from 'fastify'
 import type { FastifyInstance } from 'fastify'
 
 vi.mock('../lib/ttl-cache.js', () => ({
-  createTtlCache: () => ({ get: () => undefined, set: () => {} }),
+  createTtlCache: () => ({ get: () => undefined, set: () => {}, invalidate: () => {} }),
 }))
 
 vi.mock('../lib/discover-projects.js', () => ({
@@ -89,6 +89,25 @@ describe('GET /projects/:name/status', () => {
     expect(data.disk).toBe(42)
     expect(data.memory).toBe(60)
     expect(data.containerCount).toBe(3)
+  })
+
+  it('skips the letsencrypt cert probe when domain is not a hostname', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    vi.mocked(sshExec).mockResolvedValue('up 5 days')
+
+    await app.inject({ method: 'GET', url: '/projects/myapp/status' })
+
+    expect(vi.mocked(sshExec).mock.calls[0]?.[1]).not.toContain('letsencrypt')
+  })
+
+  it('probes the letsencrypt cert when domain is a valid hostname', async () => {
+    const domainProject = { ...mockProject, config: { ...mockProject.config, domain: 'myapp.example.com' } }
+    vi.mocked(discoverProjects).mockResolvedValue([domainProject])
+    vi.mocked(sshExec).mockResolvedValue('up 5 days')
+
+    await app.inject({ method: 'GET', url: '/projects/myapp/status' })
+
+    expect(vi.mocked(sshExec).mock.calls[0]?.[1]).toContain('/etc/letsencrypt/live/myapp.example.com/')
   })
 
   it('omits numeric fields instead of sending NaN when SSH output is short', async () => {
@@ -238,6 +257,39 @@ describe('GET /projects/:name/containers', () => {
 
     expect(res.statusCode).toBe(404)
     expect(res.json()).toEqual({ error: 'not found' })
+  })
+})
+
+describe('POST /projects/:name/containers/:container/restart', () => {
+  let app: FastifyInstance
+
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    app = Fastify({ logger: false })
+    await app.register(projectRoutes)
+    await app.ready()
+  })
+
+  afterEach(async () => { await app.close() })
+
+  it('returns ok with output on success', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    vi.mocked(sshExec).mockResolvedValue('myapp-web')
+
+    const res = await app.inject({ method: 'POST', url: '/projects/myapp/containers/myapp-web/restart' })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual({ ok: true, output: 'myapp-web' })
+  })
+
+  it('returns 503 with { error } when the restart fails', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    vi.mocked(sshExec).mockRejectedValue(new Error('boom'))
+
+    const res = await app.inject({ method: 'POST', url: '/projects/myapp/containers/myapp-web/restart' })
+
+    expect(res.statusCode).toBe(503)
+    expect(res.json()).toEqual({ error: 'Error: boom' })
   })
 })
 

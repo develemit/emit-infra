@@ -4,11 +4,11 @@ import { sshMuxArgs } from '@emit-infra/core'
 import { openSse, sseError } from '../lib/open-sse.js'
 import { writeEvent } from '../lib/write-sse.js'
 import { streamProcess } from '../lib/stream-process.js'
-import { findProject, sshKeyPath } from '../lib/project-helpers.js'
+import { findProject, sshKeyPath, SAFE_NAME_RE, SAFE_CONTAINER_RE } from '../lib/project-helpers.js'
 
 const NameParam = z.object({
-  name: z.string().min(1).max(100).regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/, 'invalid project name'),
-  container: z.string().min(1).max(200).regex(/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/, 'invalid container name'),
+  name: z.string().min(1).max(100).regex(SAFE_NAME_RE, 'invalid project name'),
+  container: z.string().min(1).max(200).regex(SAFE_CONTAINER_RE, 'invalid container name'),
 })
 
 const LOGS_TIMEOUT_MS = 5 * 60 * 1000
