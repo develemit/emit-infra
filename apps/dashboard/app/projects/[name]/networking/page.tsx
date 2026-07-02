@@ -16,13 +16,19 @@ export default function NetworkingPage() {
   const params = useParams()
   const name = typeof params['name'] === 'string' ? decodeURIComponent(params['name']) : ''
 
-  const { points: serverPoints } = useServerMetrics(name, 24)
+  const { points: serverPoints, loading: metricsLoading } = useServerMetrics(name, 24)
   const { deploys } = useDeployMarkers(name)
   const [nginxEndpoints, setNginxEndpoints] = useState<NginxEndpointsData | null>(null)
+  const [nginxSettled, setNginxSettled] = useState(false)
 
   useEffect(() => {
-    getNginxEndpoints(name).then(setNginxEndpoints).catch(() => {})
+    getNginxEndpoints(name)
+      .then(setNginxEndpoints)
+      .catch(() => {})
+      .finally(() => setNginxSettled(true))
   }, [name])
+
+  const loading = metricsLoading || !nginxSettled
 
   const networkPoints = serverPoints.length >= 2
     ? serverPoints.map(p => ({ t: p.t * 1000, netRxBytes: p.netRxBytes, netTxBytes: p.netTxBytes }))
@@ -30,6 +36,15 @@ export default function NetworkingPage() {
   const deployMarkers: DeployMarker[] = deploys.map(d => ({
     completedAt: d.completedAt, sha: d.sha, status: d.status,
   }))
+
+  if (loading) {
+    return (
+      <SubPageShell name={name} title="Networking">
+        <div className="h-[180px] rounded-xl bg-card border border-border animate-pulse" />
+        <div className="h-[180px] rounded-xl bg-card border border-border animate-pulse" />
+      </SubPageShell>
+    )
+  }
 
   return (
     <SubPageShell name={name} title="Networking">
