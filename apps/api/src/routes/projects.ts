@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { sshExec } from '@emit-infra/core'
 import { discoverProjects, discoverUnregistered } from '../lib/discover-projects.js'
 import { createTtlCache } from '../lib/ttl-cache.js'
-import { findProject, sshKeyPath } from '../lib/project-helpers.js'
+import { findProject, sshKeyPath, SAFE_NAME_RE } from '../lib/project-helpers.js'
 
 // Concurrent dashboard pollers (multiple tabs/instances) hit these on the same
 // interval. Cache the SSH result briefly so they share one round-trip per
@@ -29,6 +29,7 @@ type StatusData = {
   queueFailed: number | null
   queueWait: number | null
   deployedAt: string | null
+  activeSlot: string | null
 }
 
 async function checkHttp(domain: string): Promise<number | null> {
@@ -47,6 +48,7 @@ async function checkHttp(domain: string): Promise<number | null> {
 type Container = { name: string; image: string; status: string; state: string; buildNumber?: string }
 const statusCache = createTtlCache<StatusData | null>(STATUS_TTL)
 const containersCache = createTtlCache<Container[] | null>(STATUS_TTL)
+const nameSchema = z.object({ name: z.string().min(1).max(100).regex(SAFE_NAME_RE, 'invalid project name') })
 
 
 async function readProjectConfig(name: string): Promise<Record<string, unknown> | null> {
@@ -171,17 +173,21 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
   })
 
   app.get<{ Params: { name: string } }>('/projects/:name/status', async (req, reply): Promise<void> => {
-    const project = await findProject(req.params.name)
+    const nameCheck = nameSchema.safeParse(req.params)
+    if (!nameCheck.success) return void reply.status(400).send({ error: 'invalid params' })
+    const name = nameCheck.data.name
+
+    const project = await findProject(name)
     if (!project) return void reply.status(404).send({ error: 'not found' })
 
-    const cached = statusCache.get(req.params.name)
+    const cached = statusCache.get(name)
     if (cached !== undefined) {
       return void (cached ? reply.send(cached) : reply.status(503).send({ error: 'unreachable' }))
     }
 
     const key = sshKeyPath(project.config.sshKeyName)
     const host = project.config.serverIp ?? project.config.domain
-    const projectConfig = await readProjectConfig(req.params.name)
+    const projectConfig = await readProjectConfig(name)
 
     const domain = project.config.domain
 
@@ -189,12 +195,12 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
       const [raw, httpStatus] = await Promise.all([
         sshExec(
           host,
-          `uptime -p; df -h / | tail -1 | awk '{print $5, $3, $2}'; free -m | awk 'NR==2{printf "%.0f %dM %dM\\n", $3/$2*100, $3, $2}'; docker ps -q --filter status=running | wc -l; docker ps -aq | wc -l; docker ps -q --filter status=restarting --filter status=dead | wc -l; cat /opt/${req.params.name}/.deployed-version 2>/dev/null || echo ""; systemctl is-active nginx 2>/dev/null || echo "unknown"; test -f /etc/nginx/sites-enabled/${req.params.name} && echo "configured" || echo "missing"; openssl x509 -enddate -noout -in /etc/letsencrypt/live/${domain}/fullchain.pem 2>/dev/null | sed 's/notAfter=//' || echo ""; cd /opt/${req.params.name} && docker compose ps --format '{{.Service}}' 2>/dev/null | grep -qi redis && docker compose exec -T redis timeout 5 redis-cli ping 2>/dev/null || echo ""; cd /opt/${req.params.name} && docker compose ps --format '{{.Service}}' 2>/dev/null | grep -qi redis && docker compose exec -T redis timeout 5 redis-cli eval 'local f=0;local w=0;for _,k in ipairs(redis.call("KEYS","bull:*:failed")) do f=f+redis.call("LLEN",k) end;for _,k in ipairs(redis.call("KEYS","bull:*:wait")) do w=w+redis.call("LLEN",k) end;return tostring(f)..":"..tostring(w)' 0 2>/dev/null || echo ""; cat /opt/${req.params.name}/.deployed-at 2>/dev/null || echo ""`,
+          `uptime -p; df -h / | tail -1 | awk '{print $5, $3, $2}'; free -m | awk 'NR==2{printf "%.0f %dM %dM\\n", $3/$2*100, $3, $2}'; docker ps -q --filter status=running | wc -l; docker ps -aq | wc -l; docker ps -q --filter status=restarting --filter status=dead | wc -l; cat /opt/${name}/.deployed-version 2>/dev/null || echo ""; systemctl is-active nginx 2>/dev/null || echo "unknown"; test -f /etc/nginx/sites-enabled/${name} && echo "configured" || echo "missing"; openssl x509 -enddate -noout -in /etc/letsencrypt/live/${domain}/fullchain.pem 2>/dev/null | sed 's/notAfter=//' || echo ""; cd /opt/${name} && docker compose ps --format '{{.Service}}' 2>/dev/null | grep -qi redis && docker compose exec -T redis timeout 5 redis-cli ping 2>/dev/null || echo ""; cd /opt/${name} && docker compose ps --format '{{.Service}}' 2>/dev/null | grep -qi redis && docker compose exec -T redis timeout 5 redis-cli eval 'local f=0;local w=0;for _,k in ipairs(redis.call("KEYS","bull:*:failed")) do f=f+redis.call("LLEN",k) end;for _,k in ipairs(redis.call("KEYS","bull:*:wait")) do w=w+redis.call("LLEN",k) end;return tostring(f)..":"..tostring(w)' 0 2>/dev/null || echo ""; cat /opt/${name}/.deployed-at 2>/dev/null || echo ""; cat /opt/${name}/.active-slot 2>/dev/null || echo ""`,
           key,
         ),
         checkHttp(domain),
       ])
-      const [uptimeLine, diskLine, memLine, containerLine, totalLine, unhealthyLine, buildNumberLine, nginxStatusLine, nginxConfigLine, sslExpiryLine, redisLine, queueLine, deployedAtLine] = raw.split('\n').map(l => l.trim())
+      const [uptimeLine, diskLine, memLine, containerLine, totalLine, unhealthyLine, buildNumberLine, nginxStatusLine, nginxConfigLine, sslExpiryLine, redisLine, queueLine, deployedAtLine, activeSlotLine] = raw.split('\n').map(l => l.trim())
       const diskParts = (diskLine ?? '').split(' ')
       const memParts = (memLine ?? '').split(' ')
       const data: StatusData = {
@@ -220,17 +226,20 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
         queueFailed: queueLine ? parseInt(queueLine.split(':')[0] ?? '', 10) || 0 : null,
         queueWait: queueLine ? parseInt(queueLine.split(':')[1] ?? '', 10) || 0 : null,
         deployedAt: deployedAtLine || null,
+        activeSlot: activeSlotLine || null,
       }
-      statusCache.set(req.params.name, data)
+      statusCache.set(name, data)
       return void reply.send(data)
     } catch {
-      statusCache.set(req.params.name, null)
+      statusCache.set(name, null)
       return void reply.status(503).send({ error: 'unreachable' })
     }
   })
 
   app.get<{ Params: { name: string } }>('/projects/:name/docker-usage', async (req, reply): Promise<void> => {
-    const project = await findProject(req.params.name)
+    const nameCheck = nameSchema.safeParse(req.params)
+    if (!nameCheck.success) return void reply.status(400).send({ error: 'invalid params' })
+    const project = await findProject(nameCheck.data.name)
     if (!project) return reply.status(404).send({ error: 'not found' })
 
     const key = sshKeyPath(project.config.sshKeyName)
@@ -253,7 +262,9 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
   })
 
   app.post<{ Params: { name: string } }>('/projects/:name/prune', async (req, reply): Promise<void> => {
-    const project = await findProject(req.params.name)
+    const nameCheck = nameSchema.safeParse(req.params)
+    if (!nameCheck.success) return void reply.status(400).send({ error: 'invalid params' })
+    const project = await findProject(nameCheck.data.name)
     if (!project) return reply.status(404).send({ error: 'not found' })
 
     const key = sshKeyPath(project.config.sshKeyName)
@@ -261,7 +272,7 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
 
     try {
       const result = await sshExec(host, 'docker system prune -af 2>&1; echo "---"; docker system df', key)
-      statusCache.invalidate(req.params.name)
+      statusCache.invalidate(nameCheck.data.name)
       return void reply.send({ ok: true, output: result })
     } catch {
       return reply.status(503).send({ error: 'unreachable' })
@@ -269,7 +280,7 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
   })
 
   const ContainerRestartParam = z.object({
-    name: z.string().min(1).max(100),
+    name: z.string().min(1).max(100).regex(SAFE_NAME_RE, 'invalid project name'),
     container: z.string().min(1).max(200).regex(/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/),
   })
 
@@ -296,19 +307,22 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
   )
 
   app.get<{ Params: { name: string } }>('/projects/:name/backup-status', async (req, reply): Promise<void> => {
-    const project = await findProject(req.params.name)
+    const nameCheck = nameSchema.safeParse(req.params)
+    if (!nameCheck.success) return void reply.status(400).send({ error: 'invalid params' })
+    const name = nameCheck.data.name
+    const project = await findProject(name)
     if (!project) return reply.status(404).send({ error: 'not found' })
 
     const key = sshKeyPath(project.config.sshKeyName)
     const host = project.config.serverIp ?? project.config.domain
 
     try {
-      const raw = await sshExec(host, `cat /opt/${req.params.name}/.backup-status.json 2>/dev/null || echo ""`, key)
+      const raw = await sshExec(host, `cat /opt/${name}/.backup-status.json 2>/dev/null || echo ""`, key)
       if (!raw.trim()) return void reply.status(404).send({ error: 'no backup status' })
       try {
         return void reply.send(JSON.parse(raw.trim()) as unknown)
       } catch {
-        console.warn(`[backup-status] JSON parse error for ${req.params.name}: ${raw.slice(0, 100)}`)
+        console.warn(`[backup-status] JSON parse error for ${name}: ${raw.slice(0, 100)}`)
         return void reply.status(500).send({ error: 'invalid status file' })
       }
     } catch {
@@ -319,14 +333,16 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
   const BACKUP_KEY_RE = /^[a-zA-Z0-9][a-zA-Z0-9_.-]*\.dump$/
 
   app.get<{ Params: { name: string } }>('/projects/:name/backups', async (req, reply): Promise<void> => {
-    const project = await findProject(req.params.name)
+    const nameCheck = nameSchema.safeParse(req.params)
+    if (!nameCheck.success) return void reply.status(400).send({ error: 'invalid params' })
+    const name = nameCheck.data.name
+    const project = await findProject(name)
     if (!project) return void reply.status(404).send({ error: 'not found' })
     const bucket = project.config.postgres?.backupBucket
     if (!bucket) return void reply.status(404).send({ error: 'no backup bucket configured' })
 
     const key = sshKeyPath(project.config.sshKeyName)
     const host = project.config.serverIp ?? project.config.domain
-    const name = req.params.name
 
     const cmd = `source /opt/${name}/.env && AWS_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID" AWS_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY" AWS_DEFAULT_REGION="auto" aws s3 ls "s3://${bucket}/" --endpoint-url "https://$CF_ACCOUNT_ID.r2.cloudflarestorage.com"`
 
@@ -351,7 +367,10 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
   })
 
   app.delete<{ Params: { name: string; key: string } }>('/projects/:name/backups/:key', async (req, reply): Promise<void> => {
-    const project = await findProject(req.params.name)
+    const nameCheck = nameSchema.safeParse(req.params)
+    if (!nameCheck.success) return void reply.status(400).send({ error: 'invalid params' })
+    const name = nameCheck.data.name
+    const project = await findProject(name)
     if (!project) return void reply.status(404).send({ error: 'not found' })
     const bucket = project.config.postgres?.backupBucket
     if (!bucket) return void reply.status(404).send({ error: 'no backup bucket configured' })
@@ -359,7 +378,6 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
 
     const sshKey = sshKeyPath(project.config.sshKeyName)
     const host = project.config.serverIp ?? project.config.domain
-    const name = req.params.name
     const backupKey = req.params.key
 
     const cmd = `source /opt/${name}/.env && AWS_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID" AWS_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY" AWS_DEFAULT_REGION="auto" aws s3 rm "s3://${bucket}/${backupKey}" --endpoint-url "https://$CF_ACCOUNT_ID.r2.cloudflarestorage.com"`
@@ -373,13 +391,15 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
   })
 
   app.post<{ Params: { name: string } }>('/projects/:name/backups/trigger', async (req, reply): Promise<void> => {
-    const project = await findProject(req.params.name)
+    const nameCheck = nameSchema.safeParse(req.params)
+    if (!nameCheck.success) return void reply.status(400).send({ error: 'invalid params' })
+    const name = nameCheck.data.name
+    const project = await findProject(name)
     if (!project) return void reply.status(404).send({ error: 'not found' })
     if (!project.config.postgres?.backupBucket) return void reply.status(404).send({ error: 'no backup bucket configured' })
 
     const sshKey = sshKeyPath(project.config.sshKeyName)
     const host = project.config.serverIp ?? project.config.domain
-    const name = req.params.name
 
     try {
       const output = await sshExec(host, `/usr/local/bin/emit-db-backup-${name} 2>&1`, sshKey)
@@ -390,7 +410,10 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
   })
 
   app.get<{ Params: { name: string; key: string } }>('/projects/:name/backups/:key/download', async (req, reply): Promise<void> => {
-    const project = await findProject(req.params.name)
+    const nameCheck = nameSchema.safeParse(req.params)
+    if (!nameCheck.success) return void reply.status(400).send({ error: 'invalid params' })
+    const name = nameCheck.data.name
+    const project = await findProject(name)
     if (!project) return void reply.status(404).send({ error: 'not found' })
     const bucket = project.config.postgres?.backupBucket
     if (!bucket) return void reply.status(404).send({ error: 'no backup bucket configured' })
@@ -398,7 +421,6 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
 
     const sshKey = sshKeyPath(project.config.sshKeyName)
     const host = project.config.serverIp ?? project.config.domain
-    const name = req.params.name
     const backupKey = req.params.key
 
     const cmd = `source /opt/${name}/.env && AWS_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID" AWS_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY" AWS_DEFAULT_REGION="auto" aws s3 presign "s3://${bucket}/${backupKey}" --endpoint-url "https://$CF_ACCOUNT_ID.r2.cloudflarestorage.com" --expires-in 3600`
@@ -442,10 +464,13 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
   })
 
   app.get<{ Params: { name: string } }>('/projects/:name/containers', async (req, reply): Promise<void> => {
-    const project = await findProject(req.params.name)
+    const nameCheck = nameSchema.safeParse(req.params)
+    if (!nameCheck.success) return void reply.status(400).send({ error: 'invalid params' })
+    const cname = nameCheck.data.name
+    const project = await findProject(cname)
     if (!project) return void reply.status(404).send({ error: 'not found' })
 
-    const cached = containersCache.get(req.params.name)
+    const cached = containersCache.get(cname)
     if (cached !== undefined) {
       return void (cached ? reply.send(cached) : reply.status(503).send({ error: 'unreachable' }))
     }
@@ -464,10 +489,10 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
           const [name, image, status, state, buildNumber] = line.split('|')
           return { name, image, status, state, buildNumber: buildNumber || undefined } as Container
         })
-      containersCache.set(req.params.name, containers)
+      containersCache.set(cname, containers)
       return void reply.send(containers)
     } catch {
-      containersCache.set(req.params.name, null)
+      containersCache.set(cname, null)
       return void reply.status(503).send({ error: 'unreachable' })
     }
   })

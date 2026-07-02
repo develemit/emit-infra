@@ -3,9 +3,9 @@ import { z } from 'zod/v4'
 import { sshExec } from '@emit-infra/core'
 import { writeEvent } from '../lib/write-sse.js'
 import { openSse, sseError } from '../lib/open-sse.js'
-import { findProject, sshKeyPath } from '../lib/project-helpers.js'
+import { findProject, sshKeyPath, SAFE_NAME_RE } from '../lib/project-helpers.js'
 
-const NameParam = z.object({ name: z.string().min(1).max(100) })
+const NameParam = z.object({ name: z.string().min(1).max(100).regex(SAFE_NAME_RE, 'invalid project name') })
 const RollbackBody = z.object({
   timestamp: z.string().min(1).max(100).regex(/^[a-zA-Z0-9_.-]+$/, 'invalid timestamp format').optional(),
 })

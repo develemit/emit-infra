@@ -14,6 +14,7 @@ vi.mock('../lib/discover-projects.js', () => ({
 vi.mock('../lib/project-helpers.js', () => ({
   sshKeyPath: vi.fn().mockReturnValue('/home/user/.ssh/emit-deploy'),
   findProject: vi.fn(),
+  SAFE_NAME_RE: /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/,
 }))
 
 vi.mock('@emit-infra/core', () => ({
