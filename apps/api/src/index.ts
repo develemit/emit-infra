@@ -23,6 +23,7 @@ import { containerLogsRoutes } from './routes/container-logs.js'
 import { nginxEndpointsRoutes } from './routes/nginx-endpoints.js'
 import { scaleAdviceRoutes } from './routes/scale-advice.js'
 import { alertsRoutes } from './routes/alerts.js'
+import { deployRoutes } from './routes/deploy.js'
 import { startStatusMonitor } from './lib/status-monitor.js'
 import { startDigestScheduler } from './lib/digest-scheduler.js'
 
@@ -68,6 +69,7 @@ await app.register(containerLogsRoutes)
 await app.register(nginxEndpointsRoutes)
 await app.register(scaleAdviceRoutes)
 await app.register(alertsRoutes)
+await app.register(deployRoutes)
 
 const port = Number(process.env['PORT'] ?? 7001)
 await app.listen({ port, host: '0.0.0.0' })
