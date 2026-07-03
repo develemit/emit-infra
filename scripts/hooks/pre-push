@@ -145,13 +145,16 @@ STEPS=$((STEPS + PRE_DEPLOY_COUNT))
 
 deploy_init "$STEPS"
 
-# ── GHCR auth ──────────────────────────────────────────────────────────────────
+# ── GHCR auth (isolated config to avoid docker-credential-desktop hangs) ──────
 deploy_step "GHCR auth"
 TOKEN="${GHCR_TOKEN:-$(gh auth token 2>/dev/null || true)}"
 if [[ -z "$TOKEN" ]]; then
   echo "error: set GHCR_TOKEN or run 'gh auth login'" >&2; exit 1
 fi
-echo "$TOKEN" | docker login ghcr.io -u "${GHCR_USER:-$GHCR_ORG}" --password-stdin
+DOCKER_CI_CONFIG="${TMPDIR:-/tmp}/emit-docker-ci"
+mkdir -p "$DOCKER_CI_CONFIG"
+echo "$TOKEN" | docker --config "$DOCKER_CI_CONFIG" login ghcr.io -u "${GHCR_USER:-$GHCR_ORG}" --password-stdin
+export DOCKER_CONFIG="$DOCKER_CI_CONFIG"
 
 # ── image name helper ──────────────────────────────────────────────────────────
 image_name() {
