@@ -130,7 +130,7 @@ else
   echo "→ all services unchanged since last deploy, re-tagging only"
 fi
 
-# steps: auth + (build if needed) + push + (retag if needed) + deploy
+# steps: auth + (build+push if needed) + (retag if needed) + deploy
 STEPS=2
 [[ ${#TO_BUILD[@]} -gt 0 ]] && STEPS=$((STEPS + 1))
 [[ ${#TO_RETAG[@]} -gt 0 ]] && STEPS=$((STEPS + 1))
@@ -186,7 +186,7 @@ build_image() {
 
   echo "==> Building $svc..."
   # shellcheck disable=SC2086
-  docker build \
+  docker buildx build \
     --platform linux/amd64 \
     -f "apps/$svc/Dockerfile" \
     --build-arg BUILD_NUMBER="$BUILD_NUMBER" \
@@ -194,30 +194,19 @@ build_image() {
     -t "$img:$SHA" \
     -t "$img:$BUILD_NUMBER" \
     -t "$img:latest" \
+    --push \
     --quiet \
     .
 }
 
 if [[ ${#TO_BUILD[@]} -gt 0 ]]; then
-  deploy_step "Building images"
+  deploy_step "Building + pushing images"
   pids=()
   for svc in "${TO_BUILD[@]}"; do
     build_image "$svc" &
     pids+=($!)
   done
   for pid in "${pids[@]}"; do wait "$pid" || exit 1; done
-fi
-
-# ── push + retag ───────────────────────────────────────────────────────────────
-deploy_step "Pushing images"
-if [[ ${#TO_BUILD[@]} -gt 0 ]]; then
-  push_pids=()
-  for svc in "${TO_BUILD[@]}"; do
-    img=$(image_name "$svc")
-    (docker push --quiet "$img:$SHA" && docker push --quiet "$img:$BUILD_NUMBER" && docker push --quiet "$img:latest") &
-    push_pids+=($!)
-  done
-  for pid in "${push_pids[@]}"; do wait "$pid" || exit 1; done
 fi
 
 if [[ ${#TO_RETAG[@]} -gt 0 ]]; then
