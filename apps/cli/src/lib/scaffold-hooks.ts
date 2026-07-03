@@ -1,64 +1,80 @@
-import { writeFileSync, existsSync, mkdirSync, chmodSync } from 'node:fs'
-import { join } from 'node:path'
-import type { ProjectConfig } from '@emit-infra/core'
+import { existsSync, mkdirSync, symlinkSync, unlinkSync, readlinkSync, chmodSync } from 'node:fs'
+import { join, resolve, relative, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-export type HookWriteResult =
-  | { written: true; path: string; husky: boolean }
-  | { written: false; path: string }
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+const EMIT_INFRA_HOOKS_DIR = resolve(__dirname, '../../../../scripts/hooks')
+const HOOK_NAMES = ['pre-commit', 'pre-push'] as const
 
-export function writePreCommitHook(cwd: string, config: ProjectConfig, force = false): HookWriteResult {
-  const huskyDir = join(cwd, '.husky')
-
-  if (existsSync(huskyDir)) {
-    const hookPath = join(huskyDir, 'pre-commit')
-    writeFileSync(hookPath, buildPreCommitHook(config))
-    chmodSync(hookPath, 0o755)
-    return { written: true, path: '.husky/pre-commit', husky: true }
-  }
-
-  const hooksDir = join(cwd, '.githooks')
-  if (!existsSync(hooksDir)) mkdirSync(hooksDir, { recursive: true })
-  const hookPath = join(hooksDir, 'pre-commit')
-
-  if (existsSync(hookPath) && !force) {
-    return { written: false, path: '.githooks/pre-commit' }
-  }
-
-  writeFileSync(hookPath, buildPreCommitHook(config))
-  chmodSync(hookPath, 0o755)
-  return { written: true, path: '.githooks/pre-commit', husky: false }
+export interface HookInstallResult {
+  hook: string
+  action: 'linked' | 'skipped' | 'replaced'
+  path: string
 }
 
-export function buildPreCommitHook(config: ProjectConfig): string {
-  return `#!/usr/bin/env bash
-set -euo pipefail
+function resolveHooksDir(cwd: string): { dir: string; husky: boolean } {
+  const huskyDir = join(cwd, '.husky')
+  if (existsSync(huskyDir)) return { dir: huskyDir, husky: true }
+  return { dir: join(cwd, '.githooks'), husky: false }
+}
 
-echo "pre-commit: running checks on affected projects..."
-pnpm nx affected -t check:all:e2e --base=HEAD
+function isOurLink(hookPath: string, sharedPath: string): boolean {
+  try {
+    return readlinkSync(hookPath) === sharedPath
+  } catch {
+    return false
+  }
+}
 
-if [ "\${EMIT_INFRA_DOCKER_CHECK:-0}" = "1" ]; then
-  echo "pre-commit: verifying Docker builds..."
-  FAILED=0
-  for df in $(find . -name 'Dockerfile' -not -path '*/node_modules/*' -not -path '*/.next/*'); do
-    APP=$(dirname "$df")
-    TAG="$(basename $(pwd))-$(basename $APP):pre-commit-check"
-    TMPLOG=$(mktemp)
-    echo "  building $df..."
-    if ! docker build -f "$df" --build-arg BUILD_NUMBER=0 -t "$TAG" . > "$TMPLOG" 2>&1; then
-      cat "$TMPLOG"
-      rm -f "$TMPLOG"
-      echo "pre-commit: Docker build failed for $df"
-      FAILED=1
-    else
-      rm -f "$TMPLOG"
-      docker rmi "$TAG" > /dev/null 2>&1 || true
-    fi
-  done
-  if [ "$FAILED" -eq 1 ]; then
-    echo "pre-commit: fix Docker errors above before committing."
-    exit 1
-  fi
-fi
-echo "pre-commit: all checks passed."
-`
+export function installHooks(cwd: string, force = false): {
+  results: HookInstallResult[]
+  husky: boolean
+} {
+  const { dir, husky } = resolveHooksDir(cwd)
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+
+  const results: HookInstallResult[] = []
+
+  for (const hook of HOOK_NAMES) {
+    const hookPath = join(dir, hook)
+    const sharedScript = join(EMIT_INFRA_HOOKS_DIR, hook)
+    const relPath = relative(dir, sharedScript)
+
+    if (existsSync(hookPath)) {
+      if (isOurLink(hookPath, relPath) || isOurLink(hookPath, sharedScript)) {
+        results.push({ hook, action: 'skipped', path: join(relative(cwd, dir), hook) })
+        continue
+      }
+      if (!force) {
+        results.push({ hook, action: 'skipped', path: join(relative(cwd, dir), hook) })
+        continue
+      }
+      unlinkSync(hookPath)
+    }
+
+    symlinkSync(relPath, hookPath)
+    chmodSync(hookPath, 0o755)
+    results.push({ hook, action: force ? 'replaced' : 'linked', path: join(relative(cwd, dir), hook) })
+  }
+
+  return { results, husky }
+}
+
+export function uninstallHooks(cwd: string): string[] {
+  const { dir } = resolveHooksDir(cwd)
+  const removed: string[] = []
+
+  for (const hook of HOOK_NAMES) {
+    const hookPath = join(dir, hook)
+    if (!existsSync(hookPath)) continue
+    const sharedScript = join(EMIT_INFRA_HOOKS_DIR, hook)
+    const relPath = relative(dir, sharedScript)
+    if (isOurLink(hookPath, relPath) || isOurLink(hookPath, sharedScript)) {
+      unlinkSync(hookPath)
+      removed.push(hook)
+    }
+  }
+
+  return removed
 }

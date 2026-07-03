@@ -80,6 +80,21 @@ export const ProjectConfigSchema = z.object({
       composeStructure: z.enum(['profiles', 'separate']).default('separate'),
     })
     .optional(),
+  ci: z
+    .object({
+      preCommit: z.array(z.string()).default(['lint', 'typecheck']),
+      prePush: z.array(z.string()).default(['lint', 'typecheck', 'test', 'build']),
+      envFile: z.string().optional(),
+      ghcrOrg: z.string(),
+      ghcrRepo: z.string().optional(),
+      imagePrefix: z.string().optional(),
+      sshKey: z.string().default('~/.ssh/emit-deploy'),
+      buildArgs: z
+        .record(z.string(), z.array(z.object({ name: z.string(), env: z.string() })))
+        .optional(),
+      preDeploy: z.array(z.string()).optional(),
+    })
+    .optional(),
   requiredEnvKeys: z.string().array().optional(),
   warnThresholds: z
     .object({

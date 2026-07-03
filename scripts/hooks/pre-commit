@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Shared pre-commit hook for emit projects.
+# Reads ci.preCommit targets from .emit-infra.json and runs them via nx affected.
+# Install: emit-infra init-hooks (or symlink from .husky/pre-commit)
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+EMIT_INFRA_DIR="${EMIT_INFRA_DIR:-$HOME/projects/emit-infra}"
+CONFIG_FILE="$ROOT/.emit-infra.json"
+
+if [[ ! -f "$CONFIG_FILE" ]]; then
+  echo "pre-commit: no .emit-infra.json found, skipping"
+  exit 0
+fi
+
+TARGETS=$(python3 -c "
+import json, sys
+try:
+    c = json.load(open('$CONFIG_FILE'))
+    targets = c.get('ci', {}).get('preCommit', ['lint', 'typecheck'])
+    print(' '.join(targets))
+except Exception as e:
+    print('lint typecheck', file=sys.stderr)
+    print('lint typecheck')
+")
+
+echo "pre-commit: running $TARGETS on affected projects..."
+pnpm nx affected -t $TARGETS --base=HEAD
+
+echo "pre-commit: all checks passed."

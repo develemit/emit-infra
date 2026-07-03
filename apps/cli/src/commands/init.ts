@@ -3,7 +3,7 @@ import { writeFileSync, existsSync, mkdirSync, readFileSync, appendFileSync } fr
 import { join } from 'node:path'
 import chalk from 'chalk'
 import type { ProjectConfig } from '@emit-infra/core'
-import { writePreCommitHook } from '../lib/scaffold-hooks.js'
+import { installHooks } from '../lib/scaffold-hooks.js'
 
 export function registerInit(program: Command): void {
   program
@@ -50,17 +50,17 @@ export function registerInit(program: Command): void {
 
       ensureGitignoreEntry(process.cwd(), '.env.prod')
 
-      const hookResult = writePreCommitHook(process.cwd(), config as ProjectConfig)
-      if (hookResult.written) {
-        console.log(chalk.green(`Created ${hookResult.path}`))
+      const { results, husky } = installHooks(process.cwd())
+      for (const r of results) {
+        if (r.action === 'linked') console.log(chalk.green(`Linked ${r.path}`))
       }
 
       console.log(chalk.cyan(`\nNext steps:`))
       console.log(`  emit-infra provision ${name}`)
       console.log(`  emit-infra configure ${name}`)
       console.log(`  emit-infra deploy ${name}`)
-      if (hookResult.written && !hookResult.husky) {
-        console.log(`  git config core.hooksPath .githooks  # activate pre-commit hook`)
+      if (!husky) {
+        console.log(`  git config core.hooksPath .githooks  # activate hooks`)
       }
       console.log(`  Push to GitHub to trigger the deploy workflow`)
       console.log(`  curl https://${config.domain}/healthz  # verify build number after first deploy`)

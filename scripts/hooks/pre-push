@@ -1,0 +1,254 @@
+#!/usr/bin/env bash
+# Shared pre-push hook for emit projects.
+# 1. Runs CI (ci.prePush targets via nx affected)
+# 2. On push to main: builds Docker images, pushes to GHCR, deploys via emit-infra
+# Reads all config from .emit-infra.json.
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+EMIT_INFRA_DIR="${EMIT_INFRA_DIR:-$HOME/projects/emit-infra}"
+CONFIG_FILE="$ROOT/.emit-infra.json"
+
+if [[ ! -f "$CONFIG_FILE" ]]; then
+  echo "pre-push: no .emit-infra.json found, skipping"
+  exit 0
+fi
+
+source "$EMIT_INFRA_DIR/scripts/lib/ci-utils.sh"
+
+# ── read config ────────────────────────────────────────────────────────────────
+read_config() {
+  python3 -c "
+import json, sys
+c = json.load(open('$CONFIG_FILE'))
+ci = c.get('ci', {})
+bg = c.get('blueGreen', {})
+gh = c.get('github', {})
+
+print(c.get('name', ''))
+print(' '.join(ci.get('prePush', ['lint', 'typecheck', 'test', 'build'])))
+print(ci.get('envFile', ''))
+print(ci.get('ghcrOrg', ''))
+print(ci.get('ghcrRepo', gh.get('repo', '').split('/')[-1]))
+print(ci.get('imagePrefix', ''))
+print(ci.get('sshKey', '~/.ssh/emit-deploy'))
+print(' '.join(s['name'] for s in bg.get('services', [])))
+print(json.dumps(ci.get('buildArgs', {})))
+print(json.dumps(ci.get('preDeploy', [])))
+"
+}
+
+IFS=$'\n' read -r -d '' \
+  PROJECT_NAME CI_TARGETS ENV_FILE GHCR_ORG GHCR_REPO IMAGE_PREFIX \
+  SSH_KEY BG_SERVICES BUILD_ARGS_JSON PRE_DEPLOY_JSON \
+  < <(read_config; printf '\0') || true
+
+SSH_KEY="${SSH_KEY/#\~/$HOME}"
+SHA=$(git rev-parse HEAD)
+BUILD_NUMBER=$(git rev-list --count HEAD)
+
+# ── source env file if configured ──────────────────────────────────────────────
+if [[ -n "$ENV_FILE" && -f "$ROOT/$ENV_FILE" ]]; then
+  set -a; source "$ROOT/$ENV_FILE"; set +a
+fi
+
+# ── phase 1: CI ────────────────────────────────────────────────────────────────
+run_ci() {
+  trap 'ci_done failure; echo "✗ CI failed"; exit 1' ERR
+
+  local target_count
+  target_count=$(echo "$CI_TARGETS" | wc -w | tr -d ' ')
+  ci_init "$target_count"
+
+  for target in $CI_TARGETS; do
+    ci_step "$target"
+    echo "→ $target"
+    pnpm nx affected -t "$target" --base=origin/main
+  done
+
+  ci_done success
+  echo "✓ CI passed ($SHA)"
+  trap - ERR
+}
+
+run_ci
+
+# ── phase 2: deploy (only on push to main) ────────────────────────────────────
+PUSHING_TO_MAIN=false
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+  if [[ "$remote_ref" == "refs/heads/main" ]]; then
+    PUSHING_TO_MAIN=true
+    break
+  fi
+done
+
+if [[ "$PUSHING_TO_MAIN" != "true" ]]; then
+  exit 0
+fi
+
+if [[ -z "$GHCR_ORG" ]]; then
+  echo "pre-push: ci.ghcrOrg not set in .emit-infra.json, skipping deploy"
+  exit 0
+fi
+
+echo "→ pushing to main — running deploy"
+
+trap 'deploy_done failed; echo "✗ deploy failed"; exit 1' ERR
+
+# ── smart build: only rebuild services changed since last deploy ───────────────
+LAST_SHA=$(python3 -c "
+import json
+try:
+    d = json.load(open('$ROOT/.deploy-status.json'))
+    if d.get('status') == 'deployed': print(d.get('sha', ''))
+except: pass
+" 2>/dev/null || true)
+
+needs_build() {
+  local svc="$1"
+  if [[ -z "$LAST_SHA" ]] || ! git rev-parse "$LAST_SHA" &>/dev/null; then
+    return 0
+  fi
+  git diff --name-only "$LAST_SHA"..HEAD -- "apps/$svc/" packages/ pnpm-lock.yaml | grep -q .
+}
+
+IFS=' ' read -r -a ALL_SVCS <<< "$BG_SERVICES"
+TO_BUILD=()
+TO_RETAG=()
+for svc in "${ALL_SVCS[@]}"; do
+  if needs_build "$svc"; then
+    TO_BUILD+=("$svc")
+  else
+    TO_RETAG+=("$svc")
+  fi
+done
+
+deploy_set_services ${TO_BUILD[@]+"${TO_BUILD[@]}"}
+
+if [[ ${#TO_BUILD[@]} -gt 0 ]]; then
+  echo "→ services to build: ${TO_BUILD[*]}"
+  [[ ${#TO_RETAG[@]} -gt 0 ]] && echo "→ services unchanged (re-tag only): ${TO_RETAG[*]}"
+else
+  echo "→ all services unchanged since last deploy, re-tagging only"
+fi
+
+# steps: auth + (build if needed) + push + (retag if needed) + deploy
+STEPS=2
+[[ ${#TO_BUILD[@]} -gt 0 ]] && STEPS=$((STEPS + 1))
+[[ ${#TO_RETAG[@]} -gt 0 ]] && STEPS=$((STEPS + 1))
+
+# count pre-deploy commands
+PRE_DEPLOY_COUNT=$(python3 -c "import json; print(len(json.loads('$PRE_DEPLOY_JSON')))" 2>/dev/null || echo 0)
+STEPS=$((STEPS + PRE_DEPLOY_COUNT))
+
+deploy_init "$STEPS"
+
+# ── GHCR auth ──────────────────────────────────────────────────────────────────
+deploy_step "GHCR auth"
+TOKEN="${GHCR_TOKEN:-$(gh auth token 2>/dev/null || true)}"
+if [[ -z "$TOKEN" ]]; then
+  echo "error: set GHCR_TOKEN or run 'gh auth login'" >&2; exit 1
+fi
+echo "$TOKEN" | docker login ghcr.io -u "${GHCR_USER:-$GHCR_ORG}" --password-stdin
+
+# ── image name helper ──────────────────────────────────────────────────────────
+image_name() {
+  local svc="$1"
+  if [[ -n "$IMAGE_PREFIX" ]]; then
+    echo "ghcr.io/$GHCR_ORG/${IMAGE_PREFIX}${svc}"
+  elif [[ -n "$GHCR_REPO" ]]; then
+    echo "ghcr.io/$GHCR_ORG/$GHCR_REPO/$svc"
+  else
+    echo "ghcr.io/$GHCR_ORG/$svc"
+  fi
+}
+
+# ── resolve build args for a service ───────────────────────────────────────────
+get_build_args() {
+  local svc="$1"
+  python3 -c "
+import json, os
+args = json.loads('$BUILD_ARGS_JSON')
+for a in args.get('$svc', []):
+    val = os.environ.get(a['env'], '')
+    print(f'--build-arg {a[\"name\"]}={val}')
+" 2>/dev/null || true
+}
+
+# ── build changed services ────────────────────────────────────────────────────
+build_image() {
+  local svc="$1"
+  local img
+  img=$(image_name "$svc")
+  local extra_args
+  extra_args=$(get_build_args "$svc")
+
+  echo "==> Building $svc..."
+  # shellcheck disable=SC2086
+  docker build \
+    --platform linux/amd64 \
+    -f "apps/$svc/Dockerfile" \
+    --build-arg BUILD_NUMBER="$BUILD_NUMBER" \
+    $extra_args \
+    -t "$img:$SHA" \
+    -t "$img:latest" \
+    --quiet \
+    .
+}
+
+if [[ ${#TO_BUILD[@]} -gt 0 ]]; then
+  deploy_step "Building images"
+  pids=()
+  for svc in "${TO_BUILD[@]}"; do
+    build_image "$svc" &
+    pids+=($!)
+  done
+  for pid in "${pids[@]}"; do wait "$pid" || exit 1; done
+fi
+
+# ── push + retag ───────────────────────────────────────────────────────────────
+deploy_step "Pushing images"
+if [[ ${#TO_BUILD[@]} -gt 0 ]]; then
+  push_pids=()
+  for svc in "${TO_BUILD[@]}"; do
+    img=$(image_name "$svc")
+    (docker push --quiet "$img:$SHA" && docker push --quiet "$img:latest") &
+    push_pids+=($!)
+  done
+  for pid in "${push_pids[@]}"; do wait "$pid" || exit 1; done
+fi
+
+if [[ ${#TO_RETAG[@]} -gt 0 ]]; then
+  deploy_step "Re-tagging unchanged images"
+  for svc in "${TO_RETAG[@]}"; do
+    img=$(image_name "$svc")
+    echo "==> Re-tagging $svc:latest as :$SHA..."
+    docker buildx imagetools create -t "$img:$SHA" "$img:latest"
+  done
+fi
+
+# ── pre-deploy commands (migrations etc.) ──────────────────────────────────────
+if [[ "$PRE_DEPLOY_COUNT" -gt 0 ]]; then
+  python3 -c "
+import json
+cmds = json.loads('$PRE_DEPLOY_JSON')
+for cmd in cmds:
+    print(cmd)
+" | while IFS= read -r cmd; do
+    deploy_step "Pre-deploy: $cmd"
+    echo "→ $cmd"
+    eval "$cmd"
+  done
+fi
+
+# ── deploy via emit-infra ─────────────────────────────────────────────────────
+deploy_step "Deploying via emit-infra"
+echo "→ running emit-infra deploy"
+export GHCR_TOKEN="$TOKEN"
+export GHCR_ACTOR="${GHCR_USER:-$GHCR_ORG}"
+npx --prefix "$EMIT_INFRA_DIR" emit-infra deploy
+
+deploy_done deployed
+echo "✓ deployed $SHA (build $BUILD_NUMBER)"
