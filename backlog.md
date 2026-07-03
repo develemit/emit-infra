@@ -114,3 +114,5 @@ file to promote items into proper sprints when the list grows worth addressing.
 - (sprint 191, 2026-07-03) `.alerts.jsonl` and `.alert-state.json` are never pruned — add cleanup (trim to 90 days) in a future maintenance sprint
 - (sprint 192, 2026-07-03) AlertRulesSection initializes from config at mount — won't reflect server-side changes until page reload
 - (sprint 192, 2026-07-03) Multiple metrics firing simultaneously send separate push notifications (no bundling)
+- (sprint 193, 2026-07-03) `nx run dashboard:build` still fails due to pre-existing Next.js 15 `Html` outside `pages/_document` bug on `/500` and `/_error` static routes (tracked since sprint 04)
+- (sprint 195, 2026-07-03) `pairIncidents` is duplicated between `fleet.ts` and `digest-scheduler.ts` — extract to a shared lib helper if a third callsite appears
