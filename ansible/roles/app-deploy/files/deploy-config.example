@@ -1,0 +1,51 @@
+# .deploy-config — Project-specific blue-green deploy configuration
+# Place at /opt/<PROJECT>/.deploy-config
+# This file is sourced by blue-green-deploy.sh
+
+# Space-separated list of app services (order must match port arrays)
+SERVICES="web api"
+
+# Blue slot port for each service (must match SERVICES order)
+PORTS_BLUE="3000 3001"
+
+# Green slot port for each service (must match SERVICES order)
+PORTS_GREEN="3010 3011"
+
+# Health check path per service (must match SERVICES order)
+# Use "skip" to skip health check for a service (e.g. workers with no HTTP port)
+HEALTH_CHECKS="/ /health"
+
+# Health check tuning
+HEALTH_RETRIES=20       # Number of attempts before failing
+HEALTH_INTERVAL=5       # Seconds between attempts
+
+# Compose file structure:
+#   "separate" — uses COMPOSE_APP (base) + docker-compose.{blue,green}.yml per slot
+#   "profiles" — uses a single COMPOSE_FILE with --profile blue/green
+COMPOSE_STRUCTURE="separate"
+
+# For "separate" structure: path to the base app compose file
+COMPOSE_APP="/opt/myproject/docker-compose.app.yml"
+
+# For "profiles" structure: path to the single compose file
+# COMPOSE_FILE="/opt/myproject/docker-compose.prod.yml"
+
+# Path where the nginx upstream config is written on each deploy
+NGINX_CONF_PATH="/etc/nginx/blue-green/myproject.conf"
+
+# Optional pre-deploy migration command (runs before images are pulled)
+# MIGRATE_PRE="docker compose -f /opt/myproject/docker-compose.prod.yml --profile migrate run --rm db-migrate"
+
+# Optional post-deploy migration command (runs after nginx switch)
+# MIGRATE_POST="docker compose exec api node packages/db/src/migrate.cjs"
+
+# Prune strategy:
+#   "standard"   — docker image prune -f
+#   "aggressive"  — prune containers and images older than 24h
+PRUNE_STRATEGY="standard"
+
+# Seconds to wait before stopping old slot (grace period for in-flight requests)
+SLOT_GRACE_SECONDS=0
+
+# Optional: path to a file whose contents should be copied to .deployed-version
+# VERSION_FILE=""

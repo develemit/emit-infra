@@ -1,17 +1,13 @@
 #!/usr/bin/env bash
-# blue-green-deploy.sh — Zero-downtime deploy for emit-infra blue-green projects.
+# blue-green-deploy.sh — Config-driven zero-downtime deploy for any emit-infra project.
 #
 # Usage:
-#   ./blue-green-deploy.sh [PROJECT]
+#   ./blue-green-deploy.sh [PROJECT] [--dry-run]
 #   PROJECT defaults to "emit-vision"
 #
-# Expected layout at /opt/<PROJECT>/:
-#   docker-compose.app.yml    — base app services (no port bindings)
-#   docker-compose.blue.yml   — blue slot port overrides (web:4300 api:4301 worker:4302 marketing:4303)
-#   docker-compose.green.yml  — green slot port overrides (web:4400 api:4401 worker:4402 marketing:4403)
-#   .env                      — shared env file (loaded by compose)
-#   .active-slot              — "blue" or "green"; created on first deploy
-#   health-check.sh           — per-port HTTP health check (copied by Ansible)
+# Config:
+#   Sources /opt/<PROJECT>/.deploy-config for project-specific values.
+#   Falls back to emit-vision defaults if no config exists.
 #
 # How rollback works:
 #   Pre-switch failure  : script exits non-zero; old slot keeps serving; inactive stack is
@@ -20,62 +16,122 @@
 #                         To roll back, redeploy with the previous image tag.
 set -euo pipefail
 
-PROJECT="${1:-emit-vision}"
-APP_DIR="/opt/${PROJECT}"
-SLOT_FILE="${APP_DIR}/.active-slot"
-COMPOSE_APP="${APP_DIR}/docker-compose.app.yml"
-NGINX_SLOT_CONF="/etc/nginx/blue-green/${PROJECT}.conf"
-
-# ── Guard: required files must exist ─────────────────────────────────────────
-for f in "$COMPOSE_APP" "${APP_DIR}/docker-compose.blue.yml" "${APP_DIR}/docker-compose.green.yml"; do
-  if [ ! -f "$f" ]; then
-    echo "ERROR: Required file missing: $f"
-    echo "Run the sprint-29 dual-stack compose layout to create it."
-    exit 1
-  fi
+DRY_RUN=0
+PROJECT=""
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run) DRY_RUN=1 ;;
+    *) [ -z "$PROJECT" ] && PROJECT="$arg" ;;
+  esac
 done
+PROJECT="${PROJECT:-emit-vision}"
 
-if [ ! -f "$NGINX_SLOT_CONF" ]; then
-  echo "ERROR: nginx slot config not found: $NGINX_SLOT_CONF"
-  echo "Run the nginx Ansible role with blue_green=true to initialise it."
+APP_DIR="/opt/${PROJECT}"
+CONFIG_FILE="${APP_DIR}/.deploy-config"
+SLOT_FILE="${APP_DIR}/.active-slot"
+
+# ── Load config (defaults = emit-vision layout) ──────────────────────────────
+SERVICES="web api worker marketing"
+PORTS_BLUE="4300 4301 4302 4303"
+PORTS_GREEN="4400 4401 4402 4403"
+HEALTH_CHECKS="/ /readyz skip skip"
+HEALTH_RETRIES=20
+HEALTH_INTERVAL=5
+COMPOSE_STRUCTURE="separate"
+COMPOSE_APP="${APP_DIR}/docker-compose.app.yml"
+COMPOSE_FILE=""
+NGINX_CONF_PATH="/etc/nginx/blue-green/${PROJECT}.conf"
+MIGRATE_PRE=""
+MIGRATE_POST=""
+PRUNE_STRATEGY="standard"
+SLOT_GRACE_SECONDS=0
+VERSION_FILE=""
+
+if [ -f "$CONFIG_FILE" ]; then
+  # shellcheck source=/dev/null
+  source "$CONFIG_FILE"
+  echo "==> Loaded config from ${CONFIG_FILE}"
+else
+  echo "==> No config at ${CONFIG_FILE}, using defaults (emit-vision)"
+fi
+
+# Convert space-separated strings to arrays
+read -ra SVC_ARR <<< "$SERVICES"
+read -ra BLUE_ARR <<< "$PORTS_BLUE"
+read -ra GREEN_ARR <<< "$PORTS_GREEN"
+read -ra HC_ARR <<< "$HEALTH_CHECKS"
+
+SVC_COUNT=${#SVC_ARR[@]}
+
+if [ "${#BLUE_ARR[@]}" -ne "$SVC_COUNT" ] || [ "${#GREEN_ARR[@]}" -ne "$SVC_COUNT" ]; then
+  echo "ERROR: SERVICES (${SVC_COUNT}), PORTS_BLUE (${#BLUE_ARR[@]}), PORTS_GREEN (${#GREEN_ARR[@]}) count mismatch"
   exit 1
 fi
 
-# ── Determine active and inactive slots ──────────────────────────────────────
+# ── Determine active and inactive slots ───────────────────────────────────────
 ACTIVE=$(cat "$SLOT_FILE" 2>/dev/null || echo "blue")
 if [ "$ACTIVE" = "blue" ]; then
   INACTIVE="green"
-  INACTIVE_WEB=4400
-  INACTIVE_API=4401
-  INACTIVE_WORKER=4402
-  INACTIVE_MARKETING=4403
+  PORTS_ARR=("${GREEN_ARR[@]}")
 else
   INACTIVE="blue"
-  INACTIVE_WEB=4300
-  INACTIVE_API=4301
-  INACTIVE_WORKER=4302
-  INACTIVE_MARKETING=4303
+  PORTS_ARR=("${BLUE_ARR[@]}")
 fi
 
-INACTIVE_COMPOSE="${APP_DIR}/docker-compose.${INACTIVE}.yml"
-INACTIVE_PROJECT="${PROJECT}-${INACTIVE}"
-ACTIVE_PROJECT="${PROJECT}-${ACTIVE}"
+echo "==> Deploy: active=${ACTIVE} -> new=${INACTIVE} (${SVC_COUNT} services)"
 
-echo "==> Deploy: active=${ACTIVE} → new=${INACTIVE}"
+# ── Dry run: print plan and exit ──────────────────────────────────────────────
+if [ "$DRY_RUN" -eq 1 ]; then
+  echo ""
+  echo "DRY RUN — planned actions for ${PROJECT}:"
+  echo "  Compose structure: ${COMPOSE_STRUCTURE}"
+  if [ "$COMPOSE_STRUCTURE" = "profiles" ]; then
+    echo "  Compose file: ${COMPOSE_FILE}"
+    echo "  Compose up: docker compose -f ${COMPOSE_FILE} --profile ${INACTIVE} up -d"
+  else
+    echo "  Compose app: ${COMPOSE_APP}"
+    echo "  Compose slot: ${APP_DIR}/docker-compose.${INACTIVE}.yml"
+    echo "  Compose up: docker compose -f ${COMPOSE_APP} -f docker-compose.${INACTIVE}.yml up -d"
+  fi
+  echo "  Services:"
+  for i in $(seq 0 $((SVC_COUNT - 1))); do
+    hc="${HC_ARR[$i]:-skip}"
+    echo "    ${SVC_ARR[$i]}: port ${PORTS_ARR[$i]} health=${hc}"
+  done
+  [ -n "$MIGRATE_PRE" ] && echo "  Pre-migration: ${MIGRATE_PRE}"
+  [ -n "$MIGRATE_POST" ] && echo "  Post-migration: ${MIGRATE_POST}"
+  echo "  Nginx config: ${NGINX_CONF_PATH}"
+  echo "  Prune strategy: ${PRUNE_STRATEGY}"
+  echo ""
+  echo "DRY RUN complete — no changes made."
+  exit 0
+fi
 
-# ── Trap: clean up inactive slot on pre-switch failure ───────────────────────
-# SWITCHED=0 means the nginx reload has not happened yet; safe to tear down.
+# ── Build compose command helpers ─────────────────────────────────────────────
+compose_cmd_inactive() {
+  if [ "$COMPOSE_STRUCTURE" = "profiles" ]; then
+    echo "docker compose -f ${COMPOSE_FILE} --env-file ${APP_DIR}/.env --profile ${INACTIVE}"
+  else
+    echo "docker compose -f ${COMPOSE_APP} -f ${APP_DIR}/docker-compose.${INACTIVE}.yml --env-file ${APP_DIR}/.env --project-name ${PROJECT}-${INACTIVE}"
+  fi
+}
+
+compose_cmd_active() {
+  if [ "$COMPOSE_STRUCTURE" = "profiles" ]; then
+    echo "docker compose -f ${COMPOSE_FILE} --env-file ${APP_DIR}/.env --profile ${ACTIVE}"
+  else
+    echo "docker compose -f ${COMPOSE_APP} -f ${APP_DIR}/docker-compose.${ACTIVE}.yml --env-file ${APP_DIR}/.env --project-name ${PROJECT}-${ACTIVE}"
+  fi
+}
+
+# ── Trap: clean up inactive slot on pre-switch failure ────────────────────────
 SWITCHED=0
 cleanup() {
   local exit_code=$?
-  if [ "$exit_code" -eq 0 ]; then
-    return
-  fi
+  if [ "$exit_code" -eq 0 ]; then return; fi
   if [ "$SWITCHED" -eq 0 ]; then
     echo "==> Deploy failed before nginx switch. Stopping ${INACTIVE} slot..."
-    docker compose -f "$COMPOSE_APP" -f "$INACTIVE_COMPOSE" \
-      --env-file "${APP_DIR}/.env" \
-      --project-name "$INACTIVE_PROJECT" down 2>/dev/null || true
+    $(compose_cmd_inactive) down 2>/dev/null || true
     echo "==> Old slot (${ACTIVE}) is still serving traffic."
   else
     echo "==> Deploy failed after nginx switch. nginx now points to ${INACTIVE}."
@@ -84,47 +140,92 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# ── 1. Pull new images ────────────────────────────────────────────────────────
+# ── 1. Pre-deploy migration ──────────────────────────────────────────────────
+if [ -n "$MIGRATE_PRE" ]; then
+  echo "==> Running pre-deploy migration..."
+  eval "$MIGRATE_PRE"
+fi
+
+# ── 2. Pull new images ───────────────────────────────────────────────────────
 echo "==> Pulling images for ${INACTIVE} slot..."
-docker compose -f "$COMPOSE_APP" -f "$INACTIVE_COMPOSE" \
-  --env-file "${APP_DIR}/.env" pull
+$(compose_cmd_inactive) pull
 
-# ── 2. Start inactive slot ────────────────────────────────────────────────────
+# ── 3. Start inactive slot ───────────────────────────────────────────────────
 echo "==> Starting ${INACTIVE} slot..."
-docker compose -f "$COMPOSE_APP" -f "$INACTIVE_COMPOSE" \
-  --env-file "${APP_DIR}/.env" \
-  --project-name "$INACTIVE_PROJECT" up -d --remove-orphans
+$(compose_cmd_inactive) up -d --remove-orphans
 
-# ── 3. Health check inactive slot ────────────────────────────────────────────
-echo "==> Health checking ${INACTIVE} slot (web:${INACTIVE_WEB} api:${INACTIVE_API})..."
-"${APP_DIR}/health-check.sh" "$INACTIVE_WEB" 20 "/" 5
-"${APP_DIR}/health-check.sh" "$INACTIVE_API" 20 "/readyz" 5
+# ── 4. Health check inactive slot ─────────────────────────────────────────────
+for i in $(seq 0 $((SVC_COUNT - 1))); do
+  hc="${HC_ARR[$i]:-skip}"
+  if [ "$hc" = "skip" ]; then
+    echo "==> Health check: ${SVC_ARR[$i]} — skipped"
+    continue
+  fi
 
-# ── 4. Switch nginx to inactive slot ─────────────────────────────────────────
+  port="${PORTS_ARR[$i]}"
+  echo "==> Health checking ${SVC_ARR[$i]} at port ${port}${hc} (${HEALTH_RETRIES} attempts, ${HEALTH_INTERVAL}s interval)..."
+
+  ok=0
+  for attempt in $(seq 1 "$HEALTH_RETRIES"); do
+    status=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${port}${hc}" 2>/dev/null || echo "000")
+    if [[ "$status" =~ ^[23] ]]; then
+      echo "    ${SVC_ARR[$i]} healthy (HTTP ${status}) on attempt ${attempt}"
+      ok=1
+      break
+    fi
+    sleep "$HEALTH_INTERVAL"
+  done
+
+  if [ "$ok" -eq 0 ]; then
+    echo "ERROR: ${SVC_ARR[$i]} failed health check after ${HEALTH_RETRIES} attempts"
+    exit 1
+  fi
+done
+
+# ── 5. Switch nginx to inactive slot ──────────────────────────────────────────
 echo "==> Switching nginx to ${INACTIVE} slot..."
-cat > "$NGINX_SLOT_CONF" <<NGINX_UPSTREAM
-# Active slot: ${INACTIVE} — written by blue-green-deploy.sh $(date -u +%Y-%m-%dT%H:%M:%SZ)
-upstream ${PROJECT}_web      { server 127.0.0.1:${INACTIVE_WEB}; }
-upstream ${PROJECT}_api      { server 127.0.0.1:${INACTIVE_API}; }
-upstream ${PROJECT}_worker   { server 127.0.0.1:${INACTIVE_WORKER}; }
-upstream ${PROJECT}_marketing { server 127.0.0.1:${INACTIVE_MARKETING}; }
-NGINX_UPSTREAM
+
+upstream_block="# Active slot: ${INACTIVE} — written by blue-green-deploy.sh $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+for i in $(seq 0 $((SVC_COUNT - 1))); do
+  svc="${SVC_ARR[$i]}"
+  port="${PORTS_ARR[$i]}"
+  upstream_block="${upstream_block}
+upstream ${PROJECT}_${svc} { server 127.0.0.1:${port}; }"
+done
+
+mkdir -p "$(dirname "$NGINX_CONF_PATH")"
+echo "$upstream_block" > "$NGINX_CONF_PATH"
 
 nginx -t && nginx -s reload
 SWITCHED=1
 
-# ── 5. Record new active slot ─────────────────────────────────────────────────
+# ── 6. Record new active slot ────────────────────────────────────────────────
 echo "$INACTIVE" > "$SLOT_FILE"
-date +%s > "$APP_DIR/.deployed-at"
+date +%s > "${APP_DIR}/.deployed-at"
+[ -n "$VERSION_FILE" ] && cp "$VERSION_FILE" "${APP_DIR}/.deployed-version" 2>/dev/null || true
 
-# ── 6. Stop old slot ──────────────────────────────────────────────────────────
+# ── 7. Post-deploy migration ─────────────────────────────────────────────────
+if [ -n "$MIGRATE_POST" ]; then
+  echo "==> Running post-deploy migration..."
+  eval "$MIGRATE_POST"
+fi
+
+# ── 8. Grace period before stopping old slot ──────────────────────────────────
+if [ "$SLOT_GRACE_SECONDS" -gt 0 ]; then
+  echo "==> Waiting ${SLOT_GRACE_SECONDS}s before stopping old slot..."
+  sleep "$SLOT_GRACE_SECONDS"
+fi
+
+# ── 9. Stop old slot ─────────────────────────────────────────────────────────
 echo "==> Stopping old ${ACTIVE} slot..."
-docker compose -f "$COMPOSE_APP" \
-  -f "${APP_DIR}/docker-compose.${ACTIVE}.yml" \
-  --env-file "${APP_DIR}/.env" \
-  --project-name "$ACTIVE_PROJECT" stop
+$(compose_cmd_active) stop
 
-# ── 7. Prune old images ───────────────────────────────────────────────────────
-docker image prune -f
+# ── 10. Prune ─────────────────────────────────────────────────────────────────
+if [ "$PRUNE_STRATEGY" = "aggressive" ]; then
+  docker container prune -f --filter "until=24h" 2>/dev/null || true
+  docker image prune -a -f --filter "until=24h" 2>/dev/null || true
+else
+  docker image prune -f 2>/dev/null || true
+fi
 
 echo "==> Deploy complete. Active slot: ${INACTIVE}"
