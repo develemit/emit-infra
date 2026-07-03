@@ -1,5 +1,12 @@
 import { z } from 'zod'
 
+const AlertRuleItemSchema = z.object({
+  metric: z.enum(['diskPct', 'memPct', 'certDays', 'backupAgeHours']),
+  op: z.enum(['gt', 'lt']),
+  threshold: z.number(),
+  enabled: z.boolean(),
+})
+
 export const ProjectConfigSchema = z.object({
   name: z.string().min(1),
   domain: z.string().min(1),
@@ -65,6 +72,7 @@ export const ProjectConfigSchema = z.object({
       backupAgeHours: z.number().int().min(1).optional(),
     })
     .optional(),
+  alertRules: z.array(AlertRuleItemSchema).optional(),
 })
 
 export type ProjectConfig = z.infer<typeof ProjectConfigSchema>

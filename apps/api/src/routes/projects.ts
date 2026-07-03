@@ -134,6 +134,12 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
       memPct: z.number().int().min(1).max(100).optional(),
       backupAgeHours: z.number().int().min(1).optional(),
     }).optional(),
+    alertRules: z.array(z.object({
+      metric: z.enum(['diskPct', 'memPct', 'certDays', 'backupAgeHours']),
+      op: z.enum(['gt', 'lt']),
+      threshold: z.number(),
+      enabled: z.boolean(),
+    })).optional(),
   }).partial()
 
   app.patch<{ Params: { name: string }; Body: unknown }>(
