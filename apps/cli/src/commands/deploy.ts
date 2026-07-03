@@ -101,6 +101,11 @@ export function registerDeploy(program: Command): void {
         console.warn(chalk.yellow('Warning: GHCR_TOKEN not set — docker pull may fail for private images'))
       }
 
+      const buildNumber = process.env.BUILD_NUMBER
+      if (buildNumber) {
+        extraVars.build_number = buildNumber
+      }
+
       if (config.blueGreen) {
         extraVars.blue_green = true
         extraVars.bg_services = config.blueGreen.services.map((s) => s.name).join(' ')

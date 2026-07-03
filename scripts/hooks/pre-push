@@ -196,6 +196,7 @@ build_image() {
     --build-arg BUILD_NUMBER="$BUILD_NUMBER" \
     $extra_args \
     -t "$img:$SHA" \
+    -t "$img:$BUILD_NUMBER" \
     -t "$img:latest" \
     --quiet \
     .
@@ -217,7 +218,7 @@ if [[ ${#TO_BUILD[@]} -gt 0 ]]; then
   push_pids=()
   for svc in "${TO_BUILD[@]}"; do
     img=$(image_name "$svc")
-    (docker push --quiet "$img:$SHA" && docker push --quiet "$img:latest") &
+    (docker push --quiet "$img:$SHA" && docker push --quiet "$img:$BUILD_NUMBER" && docker push --quiet "$img:latest") &
     push_pids+=($!)
   done
   for pid in "${push_pids[@]}"; do wait "$pid" || exit 1; done
@@ -227,8 +228,8 @@ if [[ ${#TO_RETAG[@]} -gt 0 ]]; then
   deploy_step "Re-tagging unchanged images"
   for svc in "${TO_RETAG[@]}"; do
     img=$(image_name "$svc")
-    echo "==> Re-tagging $svc:latest as :$SHA..."
-    docker buildx imagetools create -t "$img:$SHA" "$img:latest"
+    echo "==> Re-tagging $svc:latest as :$SHA / :$BUILD_NUMBER..."
+    docker buildx imagetools create -t "$img:$SHA" -t "$img:$BUILD_NUMBER" "$img:latest"
   done
 fi
 
@@ -251,6 +252,7 @@ deploy_step "Deploying via emit-infra"
 echo "→ running emit-infra deploy"
 export GHCR_TOKEN="$TOKEN"
 export GHCR_ACTOR="${GHCR_USER:-$GHCR_ORG}"
+export BUILD_NUMBER
 npx --prefix "$EMIT_INFRA_DIR" emit-infra deploy
 
 deploy_done deployed

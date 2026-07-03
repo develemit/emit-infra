@@ -34,6 +34,14 @@
     mode: "0600"
   when: copy_env | default(false)
 
+- name: Set BUILD_NUMBER in server .env
+  lineinfile:
+    path: "{{ app_dir }}/.env"
+    regexp: "^BUILD_NUMBER="
+    line: "BUILD_NUMBER={{ build_number }}"
+    create: false
+  when: build_number is defined
+
 - name: Copy health-check script
   copy:
     src: health-check.sh
