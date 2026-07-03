@@ -1,4 +1,0 @@
-> nx run types:build
-
-Compiling TypeScript files for project "types"...
-Done compiling TypeScript files for project "types".

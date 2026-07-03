@@ -1,7 +1,0 @@
-> tsc --noEmit -p apps/dashboard/tsconfig.json
-
-apps/dashboard/src/components/detail/project-settings-panel.tsx(106,33): error TS2353: Object literal may only specify known properties, and 'warnThresholds' does not exist in type 'ProjectConfigPatch'.
-> tsc --noEmit -p apps/dashboard/tsconfig.json
-
-apps/dashboard/src/components/detail/project-settings-panel.tsx(106,33): error TS2353: Object literal may only specify known properties, and 'warnThresholds' does not exist in type 'ProjectConfigPatch'.
-Warning: command "tsc --noEmit -p apps/dashboard/tsconfig.json" exited with non-zero status code

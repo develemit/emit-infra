@@ -9,6 +9,8 @@ build/
 tmp/
 .nx/cache
 .nx/workspace-data
+# Accidental literal "~" dir (tool expanded ~ without a shell)
+/~/
 typecheck-output.txt
 
 # Terraform
