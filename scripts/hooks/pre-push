@@ -19,31 +19,27 @@ fi
 source "$EMIT_INFRA_DIR/scripts/lib/ci-utils.sh"
 
 # ── read config ────────────────────────────────────────────────────────────────
-read_config() {
-  python3 -c "
-import json, sys
+eval "$(python3 -c "
+import json, shlex
 c = json.load(open('$CONFIG_FILE'))
 ci = c.get('ci', {})
 bg = c.get('blueGreen', {})
 gh = c.get('github', {})
 
-print(c.get('name', ''))
-print(' '.join(ci.get('prePush', ['lint', 'typecheck', 'test', 'build'])))
-print(ci.get('envFile', ''))
-print(ci.get('ghcrOrg', ''))
-print(ci.get('ghcrRepo', gh.get('repo', '').split('/')[-1]))
-print(ci.get('imagePrefix', ''))
-print(ci.get('sshKey', '~/.ssh/emit-deploy'))
-print(' '.join(s['name'] for s in bg.get('services', [])))
-print(json.dumps(ci.get('buildArgs', {})))
-print(json.dumps(ci.get('preDeploy', [])))
-"
-}
+def out(name, val):
+    print(f'{name}={shlex.quote(str(val))}')
 
-IFS=$'\n' read -r -d '' \
-  PROJECT_NAME CI_TARGETS ENV_FILE GHCR_ORG GHCR_REPO IMAGE_PREFIX \
-  SSH_KEY BG_SERVICES BUILD_ARGS_JSON PRE_DEPLOY_JSON \
-  < <(read_config; printf '\0') || true
+out('PROJECT_NAME', c.get('name', ''))
+out('CI_TARGETS', ' '.join(ci.get('prePush', ['lint', 'typecheck', 'test', 'build'])))
+out('ENV_FILE', ci.get('envFile', ''))
+out('GHCR_ORG', ci.get('ghcrOrg', ''))
+out('GHCR_REPO', ci.get('ghcrRepo', gh.get('repo', '').split('/')[-1]))
+out('IMAGE_PREFIX', ci.get('imagePrefix', ''))
+out('SSH_KEY', ci.get('sshKey', '~/.ssh/emit-deploy'))
+out('BG_SERVICES', ' '.join(s['name'] for s in bg.get('services', [])))
+out('BUILD_ARGS_JSON', json.dumps(ci.get('buildArgs', {})))
+out('PRE_DEPLOY_JSON', json.dumps(ci.get('preDeploy', [])))
+")"
 
 SSH_KEY="${SSH_KEY/#\~/$HOME}"
 SHA=$(git rev-parse HEAD)
