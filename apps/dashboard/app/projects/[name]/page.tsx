@@ -17,6 +17,7 @@ import { RollbackPanel } from '@/components/rollback-panel'
 import { SecretsSyncPanel } from '@/components/secrets-sync-panel'
 import { DestroyModal } from '@/components/destroy-modal'
 import { useProjectDetail } from '@/lib/use-project-detail'
+import { PipelineProgressCard } from '@/components/detail/pipeline-progress-card'
 
 function fmtAgo(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime()
@@ -160,6 +161,8 @@ export default function ProjectDetailPage() {
               {project && status && (
                 <HealthCard project={project} status={status} polledAgo={polledAgo} onRefresh={fetchData} uptimePct={uptimePct} latestMetric={latestMetric} scaleAdvice={scaleAdvice} />
               )}
+
+              <PipelineProgressCard name={name} />
 
               {/* Alert banners */}
               {diskTrend !== null && diskTrend.projectedDaysUntilFull !== null && diskTrend.disk > 75 && (
