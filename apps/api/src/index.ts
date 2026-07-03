@@ -8,6 +8,7 @@ import { opsRoutes } from './routes/ops.js'
 import { billingRoutes } from './routes/billing.js'
 import { pushRoutes } from './routes/push.js'
 import { historyRoutes } from './routes/history.js'
+import { incidentsExportRoutes } from './routes/incidents-export.js'
 import { diskRoutes } from './routes/disk.js'
 import { postgresRoutes } from './routes/postgres.js'
 import { cronRoutes } from './routes/cron.js'
@@ -48,6 +49,7 @@ await app.register(opsRoutes)
 await app.register(billingRoutes)
 await app.register(pushRoutes)
 await app.register(historyRoutes)
+await app.register(incidentsExportRoutes)
 await app.register(diskRoutes)
 await app.register(postgresRoutes)
 await app.register(cronRoutes)

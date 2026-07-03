@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { Icon } from '@/components/icon'
 import { Badge } from '@/components/ui/badge'
-import { getIncidents } from '@/lib/api'
+import { getIncidents, exportIncidents } from '@/lib/api'
 import type { Incident } from '@/lib/api'
 
 interface Props {
@@ -35,6 +35,7 @@ export function IncidentPanel({ name }: Props) {
   const [incidents, setIncidents] = useState<Incident[]>([])
   const [mttrSec, setMttrSec] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showExportMenu, setShowExportMenu] = useState(false)
 
   useEffect(() => {
     const fetchIncidents = async () => {
@@ -63,6 +64,37 @@ export function IncidentPanel({ name }: Props) {
         <div className="flex items-center gap-2">
           <span className="text-[11px] text-subtle">MTTR:</span>
           <span className="text-[12px] font-mono font-semibold text-fg">{formatMttr(mttrSec)}</span>
+        </div>
+        <div className="relative">
+          <button
+            onClick={() => setShowExportMenu(!showExportMenu)}
+            className="inline-flex items-center gap-1 px-2 h-[28px] rounded-lg text-[12px] text-subtle hover:text-fg hover:bg-fg/5 transition-colors"
+            title="Export incidents"
+          >
+            <Icon name="download" size={13} />
+          </button>
+          {showExportMenu && (
+            <div className="absolute right-0 top-full mt-1 bg-card border border-border rounded-lg shadow-lg z-10">
+              <button
+                onClick={() => {
+                  void exportIncidents(name, 'json', 90)
+                  setShowExportMenu(false)
+                }}
+                className="block w-full text-left px-3 py-2 text-[12px] text-fg hover:bg-fg/5 transition-colors whitespace-nowrap"
+              >
+                JSON (90d)
+              </button>
+              <button
+                onClick={() => {
+                  void exportIncidents(name, 'csv', 90)
+                  setShowExportMenu(false)
+                }}
+                className="block w-full text-left px-3 py-2 text-[12px] text-fg hover:bg-fg/5 transition-colors whitespace-nowrap border-t border-border"
+              >
+                CSV (90d)
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

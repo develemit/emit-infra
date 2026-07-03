@@ -72,3 +72,9 @@ export async function getIncidents(name: string): Promise<IncidentsResponse> {
   if (!res.ok) return { incidents: [], mttrSec: null }
   return res.json() as Promise<IncidentsResponse>
 }
+
+export async function exportIncidents(name: string, format: 'json' | 'csv', days: number = 90): Promise<void> {
+  const qs = `?format=${encodeURIComponent(format)}&days=${encodeURIComponent(String(days))}`
+  const url = `${API_BASE}/projects/${encodeURIComponent(name)}/incidents/export${qs}`
+  window.open(url, '_blank')
+}
