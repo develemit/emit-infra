@@ -125,6 +125,19 @@ compose_cmd_active() {
   fi
 }
 
+# In the profiles structure, un-profiled shared services (postgres, backups)
+# are always enabled, so an unscoped stop/down would take them down with the
+# slot. Returns the slot's service names to scope those commands; empty for
+# the separate structure, whose per-slot project names already isolate it.
+slot_scope() {
+  local slot="$1"
+  if [ "$COMPOSE_STRUCTURE" = "profiles" ]; then
+    local s out=""
+    for s in "${SVC_ARR[@]}"; do out="$out ${s}-${slot}"; done
+    echo "$out"
+  fi
+}
+
 # ── Trap: clean up inactive slot on pre-switch failure ────────────────────────
 SWITCHED=0
 cleanup() {
@@ -132,7 +145,11 @@ cleanup() {
   if [ "$exit_code" -eq 0 ]; then return; fi
   if [ "$SWITCHED" -eq 0 ]; then
     echo "==> Deploy failed before nginx switch. Stopping ${INACTIVE} slot..."
-    $(compose_cmd_inactive) down 2>/dev/null || true
+    if [ "$COMPOSE_STRUCTURE" = "profiles" ]; then
+      $(compose_cmd_inactive) stop $(slot_scope "$INACTIVE") 2>/dev/null || true
+    else
+      $(compose_cmd_inactive) down 2>/dev/null || true
+    fi
     echo "==> Old slot (${ACTIVE}) is still serving traffic."
   else
     echo "==> Deploy failed after nginx switch. nginx now points to ${INACTIVE}."
@@ -230,7 +247,7 @@ fi
 
 # ── 9. Stop old slot ─────────────────────────────────────────────────────────
 echo "==> Stopping old ${ACTIVE} slot..."
-$(compose_cmd_active) stop
+$(compose_cmd_active) stop $(slot_scope "$ACTIVE")
 
 # ── 10. Prune ─────────────────────────────────────────────────────────────────
 if [ "$PRUNE_STRATEGY" = "aggressive" ]; then
