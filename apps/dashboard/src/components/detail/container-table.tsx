@@ -6,7 +6,7 @@ import type { Container, MetricPoint } from '@/lib/api'
 import { restartContainer } from '@/lib/api'
 import { useContainerRestarts } from '@/lib/use-container-restarts'
 import { useToast } from '@/components/ui/toast'
-import { MobileContainerRow, DesktopContainerRow, RestartSparkline, type ContainerMetrics } from './container-row'
+import { MobileContainerRow, DesktopContainerRow, type ContainerMetrics } from './container-row'
 import { ContainerLogViewer } from './container-log-viewer'
 
 function stateOrder(state: string): number {

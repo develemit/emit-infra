@@ -3,6 +3,7 @@ import type { NextConfig } from 'next'
 const API_ORIGIN = process.env['API_ORIGIN'] ?? 'http://localhost:7001'
 
 const nextConfig: NextConfig = {
+  output: 'standalone',
   allowedDevOrigins: ['hq.narluga-climb.ts.net'],
   async rewrites() {
     return [

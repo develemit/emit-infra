@@ -15,17 +15,17 @@ vi.mock('@/components/ui/toast', () => ({
 }))
 
 vi.mock('next/link', () => ({
-  default: ({ children, href }: any) =>
+  default: ({ children, href }: { children: React.ReactNode; href: string }) =>
     React.createElement('a', { href }, children),
 }))
 
 vi.mock('@/components/icon', () => ({
-  Icon: ({ name, size }: any) =>
+  Icon: ({ name, size }: { name: string; size: number }) =>
     React.createElement('span', { 'data-testid': `icon-${name}`, 'data-size': size }),
 }))
 
 vi.mock('@/components/ui/badge', () => ({
-  Badge: ({ variant, dot, children }: any) =>
+  Badge: ({ variant, dot, children }: { variant: string; dot?: boolean; children: React.ReactNode }) =>
     React.createElement('span', { 'data-testid': 'badge', 'data-variant': variant, 'data-dot': dot }, children),
 }))
 

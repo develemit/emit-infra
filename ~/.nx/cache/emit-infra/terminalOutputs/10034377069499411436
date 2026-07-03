@@ -1,0 +1,87 @@
+> next dev --port 7013
+
+   [1m[38;2;173;127;168m▲ Next.js 15.5.19[39m[22m
+   - Local:        http://localhost:7013
+   - Network:      http://192.168.1.238:7013
+
+ [32m[1m✓[22m[39m Starting...
+ [32m[1m✓[22m[39m Ready in 1280ms
+ [31m[1m⨯[22m[39m ./src/lib/api.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-projects.js'[39m
+ [90m 3 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-containers.js'[39m
+ [90m 4 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-metrics.js'[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./app/page.tsx
+ [37m[1m○[22m[39m Compiling /projects ...
+ [31m[1m⨯[22m[39m ./src/lib/api.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-projects.js'[39m
+ [90m 3 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-containers.js'[39m
+ [90m 4 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-metrics.js'[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./app/page.tsx
+ [31m[1m⨯[22m[39m ./src/lib/api.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-projects.js'[39m
+ [90m 3 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-containers.js'[39m
+ [90m 4 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-metrics.js'[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./app/page.tsx
+ GET /projects [31m500[39m in 1196ms
+ [31m[1m⨯[22m[39m ./src/lib/api-containers.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m { apiFetch[33m,[39m authHeaders[33m,[39m getApiBase } [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m
+ [90m 3 |[39m [36mconst[39m [33mAPI_BASE[39m [33m=[39m getApiBase()
+ [90m 4 |[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./src/lib/api.ts
+./app/page.tsx
+ [31m[1m⨯[22m[39m ./src/lib/api-containers.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m { apiFetch[33m,[39m authHeaders[33m,[39m getApiBase } [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m
+ [90m 3 |[39m [36mconst[39m [33mAPI_BASE[39m [33m=[39m getApiBase()
+ [90m 4 |[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./src/lib/api.ts
+./app/page.tsx
+ [31m[1m⨯[22m[39m ./src/lib/api-containers.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m { apiFetch[33m,[39m authHeaders[33m,[39m getApiBase } [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m
+ [90m 3 |[39m [36mconst[39m [33mAPI_BASE[39m [33m=[39m getApiBase()
+ [90m 4 |[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./src/lib/api.ts
+./app/page.tsx
+ GET /projects [31m500[39m in 242ms
+[?25h

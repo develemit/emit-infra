@@ -20,7 +20,7 @@ function toPolyline(
   const span = (points[points.length - 1]!.t - t0) || 1
 
   return points
-    .map((p, i) => {
+    .map((p) => {
       const x = ((p.t - t0) / span) * W
       const val = p[key] ?? 0
       const y = (1 - val / maxVal) * H

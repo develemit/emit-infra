@@ -143,7 +143,7 @@ export function MobileContainerRow({
 export function DesktopContainerRow({
   c,
   logsHref,
-  projectName,
+  projectName: _projectName,
   isRestarting,
   onRestart,
   isConfirming,

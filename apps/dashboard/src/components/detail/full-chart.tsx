@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import type { DeployMarker } from './resource-chart'
-import { toPolyline, deployX, formatTimeLabel, formatTooltipTime, timeLabels, filterVisibleDeploys, getChartDimensions, type HoverState } from './full-chart-helpers'
+import { toPolyline, deployX, formatTooltipTime, timeLabels, filterVisibleDeploys, getChartDimensions, type HoverState } from './full-chart-helpers'
 
 export interface FullChartPoint {
   t: number

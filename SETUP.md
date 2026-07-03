@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- **Node.js**: v20.x or later
+- **Node.js**: v24 or later
 - **pnpm**: v9.x or later (install with `npm i -g pnpm`)
 - **Terraform**: v1.5+ (for infrastructure provisioning)
 - **Ansible**: 2.13+ (for deployments)

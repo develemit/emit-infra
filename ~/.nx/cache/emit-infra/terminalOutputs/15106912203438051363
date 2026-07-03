@@ -1,0 +1,238 @@
+> next dev --port 7013
+
+   [1m[38;2;173;127;168m▲ Next.js 15.5.19[39m[22m
+   - Local:        http://localhost:7013
+   - Network:      http://192.168.1.238:7013
+
+ [32m[1m✓[22m[39m Starting...
+ [32m[1m✓[22m[39m Ready in 1112ms
+ [33m[1m⚠[22m[39m Fast Refresh had to perform a full reload due to a runtime error.
+ [37m[1m○[22m[39m Compiling /projects ...
+ [31m[1m⨯[22m[39m ./src/lib/api-containers.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m { apiFetch[33m,[39m authHeaders[33m,[39m getApiBase } [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m
+ [90m 3 |[39m [36mconst[39m [33mAPI_BASE[39m [33m=[39m getApiBase()
+ [90m 4 |[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./src/lib/api.ts
+./app/page.tsx
+ [31m[1m⨯[22m[39m ./src/lib/api-containers.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m { apiFetch[33m,[39m authHeaders[33m,[39m getApiBase } [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m
+ [90m 3 |[39m [36mconst[39m [33mAPI_BASE[39m [33m=[39m getApiBase()
+ [90m 4 |[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./src/lib/api.ts
+./app/page.tsx
+ [31m[1m⨯[22m[39m ./src/lib/api-containers.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m { apiFetch[33m,[39m authHeaders[33m,[39m getApiBase } [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m
+ [90m 3 |[39m [36mconst[39m [33mAPI_BASE[39m [33m=[39m getApiBase()
+ [90m 4 |[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./src/lib/api.ts
+./app/page.tsx
+ GET /projects [31m500[39m in 305ms
+ GET /projects [31m500[39m in 6ms
+ GET /projects [31m500[39m in 5ms
+ GET /projects [31m500[39m in 4ms
+ [31m[1m⨯[22m[39m ./src/lib/api-containers.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m { apiFetch[33m,[39m authHeaders[33m,[39m getApiBase } [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m
+ [90m 3 |[39m [36mconst[39m [33mAPI_BASE[39m [33m=[39m getApiBase()
+ [90m 4 |[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./src/lib/api.ts
+./app/page.tsx
+ GET / [31m500[39m in 162ms
+ [33m[1m⚠[22m[39m Fast Refresh had to perform a full reload due to a runtime error.
+ [32m[1m✓[22m[39m Compiled / in 703ms (1055 modules)
+ GET / [32m200[39m in 384ms
+ GET / [32m200[39m in 43ms
+ [32m[1m✓[22m[39m Compiled /projects/[name] in 473ms (1129 modules)
+ GET /projects/tastease [32m200[39m in 1826ms
+ [32m[1m✓[22m[39m Compiled /projects/[name]/deploy-log/[sha] in 229ms (1156 modules)
+ GET /projects/tastease/deploy-log/1bf3639caa6e8534c2f18622563b28ff346a73ef [32m200[39m in 1220ms
+ GET /projects/tastease/deploy-log/17242c2376224df8cd6d25787d0ee30cd74a6feb [32m200[39m in 184ms
+ [32m[1m✓[22m[39m Compiled in 308ms (1170 modules)
+ GET /projects/tastease [32m200[39m in 75ms
+ [32m[1m✓[22m[39m Compiled in 170ms (1170 modules)
+ GET /projects/tastease [32m200[39m in 58ms
+ [32m[1m✓[22m[39m Compiled in 153ms (1170 modules)
+ GET /projects/tastease [32m200[39m in 39ms
+ GET /projects/tastease [32m200[39m in 146ms
+ [32m[1m✓[22m[39m Compiled in 268ms (1170 modules)
+ GET /projects/tastease [32m200[39m in 64ms
+ [32m[1m✓[22m[39m Compiled in 360ms (1170 modules)
+ GET /projects/tastease [32m200[39m in 79ms
+ [32m[1m✓[22m[39m Compiled in 261ms (1170 modules)
+ GET /projects/tastease [32m200[39m in 50ms
+ [32m[1m✓[22m[39m Compiled in 204ms (1170 modules)
+ GET /projects/tastease [32m200[39m in 71ms
+ GET /projects/tastease [32m200[39m in 127ms
+ GET /projects/tastease [32m200[39m in 58ms
+ GET / [32m200[39m in 77ms
+ GET /projects/tastease [32m200[39m in 31ms
+ GET / [32m200[39m in 28ms
+ [32m[1m✓[22m[39m Compiled in 344ms (499 modules)
+ GET /projects/tastease [32m200[39m in 128ms
+ [32m[1m✓[22m[39m Compiled in 58ms (499 modules)
+ GET /projects/tastease [32m200[39m in 13ms
+ [32m[1m✓[22m[39m Compiled in 57ms (499 modules)
+ GET /projects/tastease [32m200[39m in 13ms
+ GET /projects/tastease [32m200[39m in 9ms
+ [32m[1m✓[22m[39m Compiled in 66ms (499 modules)
+ GET /projects/tastease [32m200[39m in 29ms
+ GET /projects/tastease [32m200[39m in 11ms
+ [32m[1m✓[22m[39m Compiled in 54ms (499 modules)
+ GET /projects/tastease [32m200[39m in 16ms
+ GET /projects/tastease [32m200[39m in 10ms
+ [32m[1m✓[22m[39m Compiled in 55ms (499 modules)
+ GET /projects/tastease [32m200[39m in 15ms
+ GET /projects/tastease [32m200[39m in 9ms
+ [32m[1m✓[22m[39m Compiled in 54ms (499 modules)
+ GET /projects/tastease [32m200[39m in 17ms
+ GET /projects/tastease [32m200[39m in 10ms
+ [32m[1m✓[22m[39m Compiled in 64ms (499 modules)
+ GET /projects/tastease [32m200[39m in 17ms
+ GET /projects/tastease [32m200[39m in 11ms
+ [32m[1m✓[22m[39m Compiled in 323ms (1130 modules)
+ GET /projects/tastease [32m200[39m in 106ms
+ [32m[1m✓[22m[39m Compiled in 151ms (1128 modules)
+ GET /projects/tastease [32m200[39m in 87ms
+ [32m[1m✓[22m[39m Compiled in 172ms (1128 modules)
+ GET /projects/tastease [32m200[39m in 48ms
+ [32m[1m✓[22m[39m Compiled in 127ms (1128 modules)
+ GET /projects/tastease [32m200[39m in 34ms
+ [32m[1m✓[22m[39m Compiled in 127ms (1126 modules)
+ GET /projects/tastease [32m200[39m in 61ms
+ [32m[1m✓[22m[39m Compiled in 125ms (1126 modules)
+ GET /projects/tastease [32m200[39m in 46ms
+ [32m[1m✓[22m[39m Compiled in 161ms (1126 modules)
+ GET /projects/tastease [32m200[39m in 66ms
+ [32m[1m✓[22m[39m Compiled in 133ms (1126 modules)
+ GET /projects/tastease [32m200[39m in 54ms
+ [32m[1m✓[22m[39m Compiled in 131ms (1126 modules)
+ GET /projects/tastease [32m200[39m in 41ms
+ [32m[1m✓[22m[39m Compiled in 185ms (1126 modules)
+ GET /projects/tastease [32m200[39m in 53ms
+ GET / [32m200[39m in 128ms
+ [32m[1m✓[22m[39m Compiled /health in 304ms (1121 modules)
+ GET /health [32m200[39m in 351ms
+ [32m[1m✓[22m[39m Compiled /ops in 246ms (1140 modules)
+ GET /ops [32m200[39m in 280ms
+ [32m[1m✓[22m[39m Compiled /ci in 231ms (1149 modules)
+ GET /ci [32m200[39m in 283ms
+ [32m[1m✓[22m[39m Compiled /logs in 222ms (1156 modules)
+ GET /logs [32m200[39m in 272ms
+ [32m[1m✓[22m[39m Compiled /projects in 157ms (681 modules)
+ GET /projects [32m200[39m in 198ms
+ GET /projects/develemail [32m200[39m in 20ms
+ [32m[1m✓[22m[39m Compiled /projects/[name]/pipelines in 366ms (1159 modules)
+ GET /projects/develemail/pipelines [32m200[39m in 882ms
+ [32m[1m✓[22m[39m Compiled /projects/[name]/deploy-log/[sha] in 102ms (682 modules)
+ GET /projects/develemail/deploy-log/b1176f4cbeffb42a418e158772f2c12d4751e0a9 [32m200[39m in 141ms
+ [37m[1m○[22m[39m Compiling /_not-found ...
+ [32m[1m✓[22m[39m Compiled /_not-found in 525ms (1160 modules)
+ GET /apple-touch-icon-precomposed.png [33m404[39m in 676ms
+ GET / [32m200[39m in 715ms
+ GET /projects/develemail [32m200[39m in 85ms
+ GET /projects/develemail [32m200[39m in 86ms
+Failed to proxy http://localhost:7001/projects/tastease/containers [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+ [32m[1m✓[22m[39m Compiled in 285ms (500 modules)
+ GET /projects/tastease [32m200[39m in 19ms
+ [32m[1m✓[22m[39m Compiled in 65ms (500 modules)
+ GET /projects/tastease [32m200[39m in 13ms
+ [32m[1m✓[22m[39m Compiled in 76ms (500 modules)
+ GET /projects/tastease [32m200[39m in 15ms
+ [32m[1m✓[22m[39m Compiled in 65ms (500 modules)
+ GET /projects/tastease [32m200[39m in 16ms
+ [32m[1m✓[22m[39m Compiled in 330ms (1166 modules)
+ GET /projects/tastease [32m200[39m in 52ms
+ [32m[1m✓[22m[39m Compiled in 75ms (500 modules)
+ GET /projects/tastease [32m200[39m in 15ms
+ [32m[1m✓[22m[39m Compiled in 67ms (500 modules)
+ GET /projects/tastease [32m200[39m in 15ms
+Failed to proxy http://localhost:7001/projects/tastease/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/containers [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/metrics?hours=24 [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-history?limit=20 [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/metrics?hours=24 [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-history?limit=20 [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+ [32m[1m✓[22m[39m Compiled in 392ms (1166 modules)
+ GET /projects/tastease [32m200[39m in 61ms
+ [32m[1m✓[22m[39m Compiled in 149ms (1166 modules)
+ GET /projects/tastease [32m200[39m in 58ms
+Failed to proxy http://localhost:7001/projects/tastease/backup-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/containers [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+ [32m[1m✓[22m[39m Compiled in 6.8s (1166 modules)
+ GET /projects/tastease [32m200[39m in 56ms
+ [32m[1m✓[22m[39m Compiled in 140ms (500 modules)
+ GET /projects/tastease [32m200[39m in 29ms
+ [32m[1m✓[22m[39m Compiled in 60ms (500 modules)
+ GET /projects/tastease [32m200[39m in 16ms
+ [32m[1m✓[22m[39m Compiled in 55ms (500 modules)
+ GET /projects/tastease [32m200[39m in 13ms
+ [32m[1m✓[22m[39m Compiled in 55ms (500 modules)
+ GET /projects/tastease [32m200[39m in 15ms
+ [32m[1m✓[22m[39m Compiled in 415ms (1166 modules)
+ GET /projects/tastease [32m200[39m in 54ms
+ [32m[1m✓[22m[39m Compiled in 199ms (1166 modules)
+ GET /projects/tastease [32m200[39m in 55ms
+ [32m[1m✓[22m[39m Compiled in 243ms (500 modules)
+ GET /projects/tastease [32m200[39m in 53ms
+ [32m[1m✓[22m[39m Compiled in 63ms (500 modules)
+ GET /projects/tastease [32m200[39m in 14ms
+ [32m[1m✓[22m[39m Compiled in 75ms (500 modules)
+ GET /projects/tastease [32m200[39m in 24ms
+ [32m[1m✓[22m[39m Compiled in 66ms (500 modules)
+ GET /projects/tastease [32m200[39m in 15ms
+ [32m[1m✓[22m[39m Compiled in 267ms (1166 modules)
+ GET /projects/tastease [32m200[39m in 46ms
+ [32m[1m✓[22m[39m Compiled in 257ms (1171 modules)
+ GET /projects/tastease [32m200[39m in 66ms
+ [32m[1m✓[22m[39m Compiled in 423ms (1171 modules)
+ GET /projects/tastease [32m200[39m in 57ms
+ [32m[1m✓[22m[39m Compiled in 61ms (502 modules)
+ GET /projects/tastease [32m200[39m in 14ms
+ [32m[1m✓[22m[39m Compiled in 57ms (502 modules)
+ GET /projects/tastease [32m200[39m in 14ms
+ [32m[1m✓[22m[39m Compiled in 63ms (502 modules)
+ GET /projects/tastease [32m200[39m in 18ms
+ [32m[1m✓[22m[39m Compiled / in 242ms (672 modules)
+ GET / [32m200[39m in 410ms
+ GET /projects/tastease [32m200[39m in 153ms
+[?25h

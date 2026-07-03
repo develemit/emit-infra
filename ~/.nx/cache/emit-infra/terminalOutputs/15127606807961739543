@@ -1,0 +1,4 @@
+> nx run core:build
+
+Compiling TypeScript files for project "core"...
+Done compiling TypeScript files for project "core".

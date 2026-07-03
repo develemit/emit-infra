@@ -1,0 +1,7 @@
+> tsc --noEmit -p apps/api/tsconfig.json
+
+apps/api/src/routes/projects.ts(104,24): error TS2783: 'name' is specified more than once, so this usage will be overwritten.
+> tsc --noEmit -p apps/api/tsconfig.json
+
+apps/api/src/routes/projects.ts(104,24): error TS2783: 'name' is specified more than once, so this usage will be overwritten.
+Warning: command "tsc --noEmit -p apps/api/tsconfig.json" exited with non-zero status code

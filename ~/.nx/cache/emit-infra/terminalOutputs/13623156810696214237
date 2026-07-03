@@ -1,0 +1,9 @@
+> tsc --noEmit -p apps/dashboard/tsconfig.json
+
+apps/dashboard/src/components/detail/container-table.tsx(117,23): error TS2322: Type '() => void' is not assignable to type '() => Promise<void>'.
+  Type 'void' is not assignable to type 'Promise<void>'.
+> tsc --noEmit -p apps/dashboard/tsconfig.json
+
+apps/dashboard/src/components/detail/container-table.tsx(117,23): error TS2322: Type '() => void' is not assignable to type '() => Promise<void>'.
+  Type 'void' is not assignable to type 'Promise<void>'.
+Warning: command "tsc --noEmit -p apps/dashboard/tsconfig.json" exited with non-zero status code

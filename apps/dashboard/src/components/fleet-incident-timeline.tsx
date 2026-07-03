@@ -1,7 +1,7 @@
 'use client'
 import type { FleetProjectData } from '@/lib/api-history'
 import {
-  timeToX, incidentBar, deployX, fleetTimeLabels, fmtDuration,
+  incidentBar, deployX, fleetTimeLabels, fmtDuration,
   CHART_W, LABEL_W, LANE_H, AXIS_H,
 } from '@/lib/fleet-timeline-helpers'
 

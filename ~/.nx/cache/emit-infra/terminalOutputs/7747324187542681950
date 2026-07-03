@@ -1,0 +1,920 @@
+> next dev --port 7013
+
+   [1m[38;2;173;127;168m▲ Next.js 15.5.19[39m[22m
+   - Local:        http://localhost:7013
+   - Network:      http://192.168.1.238:7013
+
+ [32m[1m✓[22m[39m Starting...
+ [32m[1m✓[22m[39m Ready in 1064ms
+ [37m[1m○[22m[39m Compiling /projects/[name] ...
+ [32m[1m✓[22m[39m Compiled /projects/[name] in 851ms (703 modules)
+ GET /projects/tastease [32m200[39m in 1884ms
+Failed to proxy http://localhost:7001/projects/tastease/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/containers [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+ [32m[1m✓[22m[39m Compiled /_error in 348ms (640 modules)
+ [32m[1m✓[22m[39m Compiled in 689ms (450 modules)
+ [32m[1m✓[22m[39m Compiled in 161ms (450 modules)
+ [32m[1m✓[22m[39m Compiled in 67ms (450 modules)
+ [32m[1m✓[22m[39m Compiled in 73ms (450 modules)
+ [32m[1m✓[22m[39m Compiled in 73ms (451 modules)
+ [32m[1m✓[22m[39m Compiled in 67ms (451 modules)
+ [32m[1m✓[22m[39m Compiled in 79ms (451 modules)
+ [32m[1m✓[22m[39m Compiled in 76ms (451 modules)
+ [32m[1m✓[22m[39m Compiled in 71ms (452 modules)
+ [32m[1m✓[22m[39m Compiled in 102ms (452 modules)
+ [32m[1m✓[22m[39m Compiled in 147ms (452 modules)
+ [32m[1m✓[22m[39m Compiled in 84ms (452 modules)
+Failed to proxy http://localhost:7001/projects/tastease/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+ [32m[1m✓[22m[39m Compiled /_error in 108ms (642 modules)
+ [32m[1m✓[22m[39m Compiled /projects/[name] in 207ms (525 modules)
+ GET /projects/tastease [32m200[39m in 432ms
+ [32m[1m✓[22m[39m Compiled /projects in 286ms (985 modules)
+ GET /projects [32m200[39m in 362ms
+ [32m[1m✓[22m[39m Compiled in 317ms (999 modules)
+ GET /projects [32m200[39m in 67ms
+ [32m[1m✓[22m[39m Compiled in 191ms (999 modules)
+ GET /projects [32m200[39m in 34ms
+ [32m[1m✓[22m[39m Compiled in 74ms (461 modules)
+ GET /projects [32m200[39m in 17ms
+ [32m[1m✓[22m[39m Compiled in 175ms (999 modules)
+ GET /projects [32m200[39m in 33ms
+ [32m[1m✓[22m[39m Compiled in 244ms (1001 modules)
+ GET /projects [32m200[39m in 31ms
+ [32m[1m✓[22m[39m Compiled in 239ms (1001 modules)
+ GET /projects [32m200[39m in 66ms
+ [32m[1m✓[22m[39m Compiled in 65ms (462 modules)
+ GET /projects [32m200[39m in 13ms
+ [32m[1m✓[22m[39m Compiled in 177ms (1001 modules)
+ GET /projects [32m200[39m in 32ms
+ [32m[1m✓[22m[39m Compiled in 193ms (1003 modules)
+ GET /projects [32m200[39m in 31ms
+Failed to proxy http://localhost:7001/projects/test-smoke/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+ [32m[1m✓[22m[39m Compiled /_error in 210ms (1085 modules)
+ [32m[1m✓[22m[39m Compiled in 260ms (1003 modules)
+ GET /projects [32m200[39m in 99ms
+ [32m[1m✓[22m[39m Compiled in 66ms (463 modules)
+ GET /projects [32m200[39m in 12ms
+ [32m[1m✓[22m[39m Compiled in 157ms (1003 modules)
+ GET /projects [32m200[39m in 27ms
+ [32m[1m✓[22m[39m Compiled in 197ms (1005 modules)
+ GET /projects [32m200[39m in 35ms
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+ [32m[1m✓[22m[39m Compiled /_error in 224ms (1087 modules)
+ [32m[1m✓[22m[39m Compiled in 205ms (1101 modules)
+ GET /projects [32m200[39m in 52ms
+ [32m[1m✓[22m[39m Compiled in 67ms (465 modules)
+ GET /projects [32m200[39m in 14ms
+ [32m[1m✓[22m[39m Compiled in 205ms (1101 modules)
+ GET /projects [32m200[39m in 30ms
+ [32m[1m✓[22m[39m Compiled in 222ms (1103 modules)
+ GET /projects [32m200[39m in 28ms
+Failed to proxy http://localhost:7001/projects/test-smoke/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+ [32m[1m✓[22m[39m Compiled in 354ms (1007 modules)
+ GET /projects [32m200[39m in 119ms
+ [32m[1m✓[22m[39m Compiled in 59ms (465 modules)
+ GET /projects [32m200[39m in 15ms
+ [32m[1m✓[22m[39m Compiled in 181ms (1007 modules)
+ GET /projects [32m200[39m in 35ms
+ [32m[1m✓[22m[39m Compiled in 206ms (1009 modules)
+ GET /projects [32m200[39m in 50ms
+ [32m[1m✓[22m[39m Compiled in 142ms (1009 modules)
+ GET /projects [32m200[39m in 56ms
+ [32m[1m✓[22m[39m Compiled in 131ms (1009 modules)
+ GET /projects [32m200[39m in 71ms
+ [32m[1m✓[22m[39m Compiled in 119ms (1009 modules)
+ GET /projects [32m200[39m in 33ms
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+ [32m[1m✓[22m[39m Compiled /_error in 261ms (1091 modules)
+ [32m[1m✓[22m[39m Compiled in 295ms (1009 modules)
+ GET /projects [32m200[39m in 102ms
+ [32m[1m✓[22m[39m Compiled in 65ms (466 modules)
+ GET /projects [32m200[39m in 15ms
+ [32m[1m✓[22m[39m Compiled in 278ms (1009 modules)
+ GET /projects [32m200[39m in 32ms
+ [32m[1m✓[22m[39m Compiled in 179ms (1011 modules)
+ GET /projects [32m200[39m in 45ms
+ [32m[1m✓[22m[39m Compiled in 286ms (1011 modules)
+ GET /projects [32m200[39m in 64ms
+ [32m[1m✓[22m[39m Compiled in 69ms (467 modules)
+ GET /projects [32m200[39m in 16ms
+ [32m[1m✓[22m[39m Compiled in 331ms (1011 modules)
+ GET /projects [32m200[39m in 43ms
+ [32m[1m✓[22m[39m Compiled in 186ms (1011 modules)
+ GET /projects [32m200[39m in 41ms
+ [32m[1m✓[22m[39m Compiled in 140ms (1011 modules)
+ GET /projects [32m200[39m in 25ms
+ [32m[1m✓[22m[39m Compiled in 298ms (1013 modules)
+ GET /projects [32m200[39m in 40ms
+Failed to proxy http://localhost:7001/projects/test-smoke/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+ [32m[1m✓[22m[39m Compiled /_error in 205ms (1095 modules)
+ [32m[1m✓[22m[39m Compiled in 393ms (1013 modules)
+ GET /projects [32m200[39m in 108ms
+ [32m[1m✓[22m[39m Compiled in 73ms (468 modules)
+ GET /projects [32m200[39m in 19ms
+ [32m[1m✓[22m[39m Compiled in 212ms (1013 modules)
+ GET /projects [32m200[39m in 39ms
+ [32m[1m✓[22m[39m Compiled in 256ms (1015 modules)
+ GET /projects [32m200[39m in 30ms
+ [32m[1m✓[22m[39m Compiled in 277ms (1015 modules)
+ GET /projects [32m200[39m in 33ms
+ [32m[1m✓[22m[39m Compiled in 68ms (469 modules)
+ GET /projects [32m200[39m in 19ms
+ [32m[1m✓[22m[39m Compiled in 172ms (1015 modules)
+ GET /projects [32m200[39m in 48ms
+ [32m[1m✓[22m[39m Compiled in 170ms (1017 modules)
+ GET /projects [32m200[39m in 29ms
+ [32m[1m✓[22m[39m Compiled in 439ms (1017 modules)
+ GET /projects [32m200[39m in 69ms
+ [32m[1m✓[22m[39m Compiled in 68ms (470 modules)
+ GET /projects [32m200[39m in 17ms
+ [32m[1m✓[22m[39m Compiled in 204ms (1017 modules)
+ GET /projects [32m200[39m in 29ms
+ [32m[1m✓[22m[39m Compiled in 207ms (1019 modules)
+ GET /projects [32m200[39m in 34ms
+ [32m[1m✓[22m[39m Compiled in 328ms (1019 modules)
+ GET /projects [32m200[39m in 85ms
+ [32m[1m✓[22m[39m Compiled in 112ms (1019 modules)
+ GET /projects [32m200[39m in 30ms
+ [32m[1m✓[22m[39m Compiled in 138ms (1019 modules)
+ GET /projects [32m200[39m in 38ms
+ [32m[1m✓[22m[39m Compiled in 120ms (1019 modules)
+ GET /projects [32m200[39m in 29ms
+ [32m[1m✓[22m[39m Compiled in 241ms (1019 modules)
+ GET /projects [32m200[39m in 56ms
+ [32m[1m✓[22m[39m Compiled in 128ms (1019 modules)
+ GET /projects [32m200[39m in 37ms
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+ [32m[1m✓[22m[39m Compiled /_error in 267ms (1101 modules)
+Failed to proxy http://localhost:7001/projects/test-smoke/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+ [32m[1m✓[22m[39m Compiled in 263ms (1115 modules)
+ GET /projects [32m200[39m in 107ms
+ [32m[1m✓[22m[39m Compiled in 144ms (1115 modules)
+ GET /projects [32m200[39m in 25ms
+ [32m[1m✓[22m[39m Compiled in 130ms (1115 modules)
+ GET /projects [32m200[39m in 31ms
+ [32m[1m✓[22m[39m Compiled in 138ms (1115 modules)
+ GET /projects [32m200[39m in 49ms
+ [32m[1m✓[22m[39m Compiled in 379ms (1019 modules)
+ GET /projects [32m200[39m in 132ms
+ [32m[1m✓[22m[39m Compiled in 123ms (1019 modules)
+ GET /projects [32m200[39m in 30ms
+ [32m[1m✓[22m[39m Compiled in 135ms (1019 modules)
+ GET /projects [32m200[39m in 32ms
+ [32m[1m✓[22m[39m Compiled in 118ms (1019 modules)
+ GET /projects [32m200[39m in 33ms
+Failed to proxy http://localhost:7001/projects/develemail/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+ [37m[1m○[22m[39m Compiling /_error ...
+Failed to proxy http://localhost:7001/projects/tastease/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+ [32m[1m✓[22m[39m Compiled /_error in 31.1s (1101 modules)
+Failed to proxy http://localhost:7001/projects/martialops/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+ [32m[1m✓[22m[39m Compiled in 360ms (1019 modules)
+ [32m[1m✓[22m[39m Compiled in 282ms (1019 modules)
+ [32m[1m✓[22m[39m Compiled in 143ms (1019 modules)
+ [32m[1m✓[22m[39m Compiled in 144ms (1019 modules)
+ [32m[1m✓[22m[39m Compiled in 1428ms (1019 modules)
+ [32m[1m✓[22m[39m Compiled in 286ms (1019 modules)
+ [32m[1m✓[22m[39m Compiled in 60ms (471 modules)
+ [32m[1m✓[22m[39m Compiled in 144ms (1019 modules)
+ [32m[1m✓[22m[39m Compiled in 188ms (1019 modules)
+ [32m[1m✓[22m[39m Compiled in 181ms (1021 modules)
+Failed to proxy http://localhost:7001/projects/test-smoke/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+ [32m[1m✓[22m[39m Compiled /_error in 198ms (1103 modules)
+ [32m[1m✓[22m[39m Compiled in 234ms (1117 modules)
+ [32m[1m✓[22m[39m Compiled in 57ms (473 modules)
+ [32m[1m✓[22m[39m Compiled in 197ms (1117 modules)
+ [32m[1m✓[22m[39m Compiled in 212ms (1117 modules)
+ [32m[1m✓[22m[39m Compiled in 164ms (1119 modules)
+Failed to proxy http://localhost:7001/projects/test-smoke/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+ [32m[1m✓[22m[39m Compiled in 215ms (1119 modules)
+ [32m[1m✓[22m[39m Compiled in 141ms (1119 modules)
+ [32m[1m✓[22m[39m Compiled in 57ms (474 modules)
+ [32m[1m✓[22m[39m Compiled in 153ms (1119 modules)
+ [32m[1m✓[22m[39m Compiled in 150ms (1119 modules)
+ [32m[1m✓[22m[39m Compiled in 138ms (1119 modules)
+ [32m[1m✓[22m[39m Compiled in 167ms (1119 modules)
+ [32m[1m✓[22m[39m Compiled in 154ms (1121 modules)
+ [32m[1m✓[22m[39m Compiled in 261ms (1025 modules)
+ [32m[1m✓[22m[39m Compiled in 56ms (474 modules)
+ [32m[1m✓[22m[39m Compiled in 188ms (1025 modules)
+ [32m[1m✓[22m[39m Compiled in 117ms (1025 modules)
+ [32m[1m✓[22m[39m Compiled in 106ms (1025 modules)
+ [32m[1m✓[22m[39m Compiled in 109ms (1025 modules)
+ [32m[1m✓[22m[39m Compiled in 140ms (1025 modules)
+ [32m[1m✓[22m[39m Compiled in 181ms (1027 modules)
+ [32m[1m✓[22m[39m Compiled in 150ms (1027 modules)
+Failed to proxy http://localhost:7001/projects/test-smoke/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+ [32m[1m✓[22m[39m Compiled /_error in 176ms (1109 modules)
+ [32m[1m✓[22m[39m Compiled in 352ms (1123 modules)
+ [32m[1m✓[22m[39m Compiled in 68ms (476 modules)
+ [32m[1m✓[22m[39m Compiled in 268ms (1123 modules)
+ [32m[1m✓[22m[39m Compiled in 156ms (1123 modules)
+ [32m[1m✓[22m[39m Compiled in 175ms (1027 modules)
+ [32m[1m✓[22m[39m Compiled in 140ms (1027 modules)
+ [32m[1m✓[22m[39m Compiled in 153ms (1029 modules)
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+ [32m[1m✓[22m[39m Compiled /_error in 165ms (1111 modules)
+ [32m[1m✓[22m[39m Compiled in 223ms (1125 modules)
+ [32m[1m✓[22m[39m Compiled in 164ms (1125 modules)
+ [32m[1m✓[22m[39m Compiled in 117ms (1125 modules)
+ [32m[1m✓[22m[39m Compiled in 107ms (1125 modules)
+ [32m[1m✓[22m[39m Compiled in 148ms (1125 modules)
+ [32m[1m✓[22m[39m Compiled in 429ms (1125 modules)
+ [32m[1m✓[22m[39m Compiled in 170ms (1029 modules)
+ [32m[1m✓[22m[39m Compiled in 410ms (1029 modules)
+ [32m[1m✓[22m[39m Compiled in 166ms (1029 modules)
+ [31m[1m⨯[22m[39m ./src/lib/api.ts
+Module parse failed: Identifier 'getSshKeys' has already been declared (433:22)
+|     }
+| }
+> export async function getSshKeys() {
+|     const res = await fetch("".concat(API_BASE, "/projects/ssh-keys"), {
+|         cache: 'no-store',
+
+Import trace for requested module:
+./src/lib/api.ts
+./app/projects/[name]/page.tsx
+ [31m[1m⨯[22m[39m ./src/lib/api.ts
+Module parse failed: Identifier 'getSshKeys' has already been declared (433:22)
+|     }
+| }
+> export async function getSshKeys() {
+|     const res = await fetch("".concat(API_BASE, "/projects/ssh-keys"), {
+|         cache: 'no-store',
+
+Import trace for requested module:
+./src/lib/api.ts
+./app/projects/[name]/page.tsx
+ [31m[1m⨯[22m[39m ./src/lib/api.ts
+Module parse failed: Identifier 'getSshKeys' has already been declared (433:22)
+|     }
+| }
+> export async function getSshKeys() {
+|     const res = await fetch("".concat(API_BASE, "/projects/ssh-keys"), {
+|         cache: 'no-store',
+
+Import trace for requested module:
+./src/lib/api.ts
+./app/page.tsx
+ [31m[1m⨯[22m[39m ./src/lib/api.ts
+Module parse failed: Identifier 'getSshKeys' has already been declared (433:22)
+|     }
+| }
+> export async function getSshKeys() {
+|     const res = await fetch("".concat(API_BASE, "/projects/ssh-keys"), {
+|         cache: 'no-store',
+
+Import trace for requested module:
+./src/lib/api.ts
+./app/page.tsx
+ [32m[1m✓[22m[39m Compiled in 173ms (1031 modules)
+ [32m[1m✓[22m[39m Compiled in 148ms (1031 modules)
+Failed to proxy http://localhost:7001/projects/test-smoke/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+ [37m[1m○[22m[39m Compiling /_error ...
+ [32m[1m✓[22m[39m Compiled /_error in 2.5s (1113 modules)
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+ [32m[1m✓[22m[39m Compiled in 271ms (1031 modules)
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+ [32m[1m✓[22m[39m Compiled /_error in 357ms (1113 modules)
+ [32m[1m✓[22m[39m Compiled in 157ms (1031 modules)
+ [32m[1m✓[22m[39m Compiled in 162ms (1031 modules)
+ [32m[1m✓[22m[39m Compiled in 209ms (1031 modules)
+ [32m[1m✓[22m[39m Compiled in 96ms (1031 modules)
+ [32m[1m✓[22m[39m Compiled in 104ms (1031 modules)
+ [32m[1m✓[22m[39m Compiled in 110ms (1031 modules)
+ [32m[1m✓[22m[39m Compiled in 101ms (1031 modules)
+ [32m[1m✓[22m[39m Compiled in 97ms (1031 modules)
+ [32m[1m✓[22m[39m Compiled in 107ms (1031 modules)
+ [32m[1m✓[22m[39m Compiled in 109ms (477 modules)
+ [32m[1m✓[22m[39m Compiled in 48ms (477 modules)
+ [32m[1m✓[22m[39m Compiled in 69ms (477 modules)
+ [32m[1m✓[22m[39m Compiled in 139ms (1031 modules)
+ [32m[1m✓[22m[39m Compiled in 114ms (1031 modules)
+ [32m[1m✓[22m[39m Compiled in 123ms (1031 modules)
+ [32m[1m✓[22m[39m Compiled in 110ms (1031 modules)
+ [32m[1m✓[22m[39m Compiled in 101ms (1031 modules)
+ [32m[1m✓[22m[39m Compiled in 106ms (1031 modules)
+Failed to proxy http://localhost:7001/projects [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+ [32m[1m✓[22m[39m Compiled /_error in 212ms (1113 modules)
+Failed to proxy http://localhost:7001/projects [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/test-smoke/deploy-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects/tastease/ci-status [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+Failed to proxy http://localhost:7001/projects [AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+[AggregateError: ] { code: [32m'ECONNREFUSED'[39m }
+ [32m[1m✓[22m[39m Compiled in 346ms (1127 modules)
+ [32m[1m✓[22m[39m Compiled in 116ms (1127 modules)
+Failed to proxy http://localhost:7001/projects/tastease/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/martialops/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/emit-vision/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/diner-decider/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+Failed to proxy http://localhost:7001/projects/develemail/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+ [32m[1m✓[22m[39m Compiled in 131ms (477 modules)
+ [32m[1m✓[22m[39m Compiled in 62ms (477 modules)
+ [32m[1m✓[22m[39m Compiled in 48ms (477 modules)
+ [32m[1m✓[22m[39m Compiled in 52ms (477 modules)
+ [32m[1m✓[22m[39m Compiled in 52ms (477 modules)
+ [32m[1m✓[22m[39m Compiled in 51ms (477 modules)
+ [32m[1m✓[22m[39m Compiled in 48ms (477 modules)
+ [32m[1m✓[22m[39m Compiled in 44ms (477 modules)
+ [32m[1m✓[22m[39m Compiled in 61ms (477 modules)
+ [31m[1m⨯[22m[39m ./src/lib/api.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-projects.js'[39m
+ [90m 3 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-containers.js'[39m
+ [90m 4 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-metrics.js'[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./app/projects/[name]/page.tsx
+Failed to proxy http://localhost:7001/projects/test-smoke/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+ [31m[1m⨯[22m[39m ./src/lib/api.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-projects.js'[39m
+ [90m 3 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-containers.js'[39m
+ [90m 4 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-metrics.js'[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./app/projects/[name]/page.tsx
+ [37m[1m○[22m[39m Compiling /_error ...
+Failed to proxy http://localhost:7001/projects/test-smoke/status [Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+[Error: socket hang up] { code: [32m'ECONNRESET'[39m }
+ [31m[1m⨯[22m[39m ./src/lib/api.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-projects.js'[39m
+ [90m 3 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-containers.js'[39m
+ [90m 4 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-metrics.js'[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./app/projects/[name]/page.tsx
+ [31m[1m⨯[22m[39m ./src/lib/api.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-projects.js'[39m
+ [90m 3 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-containers.js'[39m
+ [90m 4 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-metrics.js'[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./app/projects/[name]/page.tsx
+ [31m[1m⨯[22m[39m ./src/lib/api.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-projects.js'[39m
+ [90m 3 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-containers.js'[39m
+ [90m 4 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-metrics.js'[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./app/projects/[name]/page.tsx
+ [31m[1m⨯[22m[39m ./src/lib/api.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-projects.js'[39m
+ [90m 3 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-containers.js'[39m
+ [90m 4 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-metrics.js'[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./app/projects/[name]/page.tsx
+ [31m[1m⨯[22m[39m ./src/lib/api.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-projects.js'[39m
+ [90m 3 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-containers.js'[39m
+ [90m 4 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-metrics.js'[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./app/projects/[name]/page.tsx
+ [31m[1m⨯[22m[39m ./src/lib/api.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-projects.js'[39m
+ [90m 3 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-containers.js'[39m
+ [90m 4 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-metrics.js'[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./app/projects/[name]/page.tsx
+ [31m[1m⨯[22m[39m ./src/lib/api.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-projects.js'[39m
+ [90m 3 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-containers.js'[39m
+ [90m 4 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-metrics.js'[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./app/projects/[name]/page.tsx
+ [31m[1m⨯[22m[39m ./src/lib/api.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-projects.js'[39m
+ [90m 3 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-containers.js'[39m
+ [90m 4 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-metrics.js'[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./app/projects/[name]/page.tsx
+ [31m[1m⨯[22m[39m ./src/lib/api.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-projects.js'[39m
+ [90m 3 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-containers.js'[39m
+ [90m 4 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-metrics.js'[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./app/projects/[name]/page.tsx
+ [31m[1m⨯[22m[39m ./src/lib/api.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-projects.js'[39m
+ [90m 3 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-containers.js'[39m
+ [90m 4 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-metrics.js'[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./app/projects/[name]/page.tsx
+ [31m[1m⨯[22m[39m ./src/lib/api.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-projects.js'[39m
+ [90m 3 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-containers.js'[39m
+ [90m 4 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-metrics.js'[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./app/projects/[name]/page.tsx
+ [31m[1m⨯[22m[39m ./src/lib/api.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-projects.js'[39m
+ [90m 3 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-containers.js'[39m
+ [90m 4 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-metrics.js'[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./app/projects/[name]/page.tsx
+ [31m[1m⨯[22m[39m ./src/lib/api.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-projects.js'[39m
+ [90m 3 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-containers.js'[39m
+ [90m 4 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-metrics.js'[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./app/projects/[name]/page.tsx
+ [31m[1m⨯[22m[39m ./src/lib/api.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-projects.js'[39m
+ [90m 3 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-containers.js'[39m
+ [90m 4 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-metrics.js'[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./app/projects/[name]/page.tsx
+ [31m[1m⨯[22m[39m ./src/lib/api.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-projects.js'[39m
+ [90m 3 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-containers.js'[39m
+ [90m 4 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-metrics.js'[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./app/projects/[name]/page.tsx
+ [31m[1m⨯[22m[39m ./src/lib/api.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-projects.js'[39m
+ [90m 3 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-containers.js'[39m
+ [90m 4 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-metrics.js'[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./app/projects/[name]/page.tsx
+ [31m[1m⨯[22m[39m ./src/lib/api.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-projects.js'[39m
+ [90m 3 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-containers.js'[39m
+ [90m 4 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-metrics.js'[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./app/projects/[name]/page.tsx
+ [31m[1m⨯[22m[39m ./src/lib/api.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-projects.js'[39m
+ [90m 3 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-containers.js'[39m
+ [90m 4 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-metrics.js'[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./app/projects/[name]/page.tsx
+ [31m[1m⨯[22m[39m ./src/lib/api.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-projects.js'[39m
+ [90m 3 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-containers.js'[39m
+ [90m 4 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-metrics.js'[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./app/projects/[name]/page.tsx
+ [31m[1m⨯[22m[39m ./src/lib/api.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-projects.js'[39m
+ [90m 3 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-containers.js'[39m
+ [90m 4 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-metrics.js'[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./app/projects/[name]/page.tsx
+ [31m[1m⨯[22m[39m ./src/lib/api.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-projects.js'[39m
+ [90m 3 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-containers.js'[39m
+ [90m 4 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-metrics.js'[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./app/projects/[name]/page.tsx
+ [31m[1m⨯[22m[39m ./src/lib/api.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-projects.js'[39m
+ [90m 3 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-containers.js'[39m
+ [90m 4 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-metrics.js'[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./app/projects/[name]/page.tsx
+ [31m[1m⨯[22m[39m ./src/lib/api.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-projects.js'[39m
+ [90m 3 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-containers.js'[39m
+ [90m 4 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-metrics.js'[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./app/projects/[name]/page.tsx
+ [31m[1m⨯[22m[39m ./src/lib/api.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-projects.js'[39m
+ [90m 3 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-containers.js'[39m
+ [90m 4 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-metrics.js'[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./app/projects/[name]/page.tsx
+ [31m[1m⨯[22m[39m ./src/lib/api.ts:1:1
+[31m[1mModule not found[22m[39m: Can't resolve '[32m./api-auth.js[39m'
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-auth.js'[39m
+ [90m   |[39m [31m[1m^[22m[39m
+ [90m 2 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-projects.js'[39m
+ [90m 3 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-containers.js'[39m
+ [90m 4 |[39m [36mexport[39m [33m*[39m [36mfrom[39m [32m'./api-metrics.js'[39m[0m
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./app/projects/[name]/page.tsx
+ GET /projects [31m500[39m in 457ms
+[?25h

@@ -109,3 +109,8 @@ file to promote items into proper sprints when the list grows worth addressing.
 - (sprint 177, 2026-07-02) `httpCircuit` resets on API server restart; a failed first probe post-boot could leave a circuit open that delays recovery visibility — acceptable for now
 - (sprint 178, 2026-07-02) backup completion polling has no elapsed-time indicator — "Running…" is the only feedback during a potentially long backup
 - (sprint 178, 2026-07-02) 10-minute polling timeout silently stops with no user message — could show "Backup status unknown — check logs" on timeout
+- (sprint 190, 2026-07-03) Fix pre-existing `MobileContainerRow > calls restartContainer and onRefetch on restart button click` test failure in `apps/dashboard/src/components/detail/container-row.test.tsx`
+- (sprint 191, 2026-07-03) `backupAgeHours` metric in status-monitor uses `grep -o '"lastRun":"[^"]*"'` — silently unavailable if backup-status.json format changes
+- (sprint 191, 2026-07-03) `.alerts.jsonl` and `.alert-state.json` are never pruned — add cleanup (trim to 90 days) in a future maintenance sprint
+- (sprint 192, 2026-07-03) AlertRulesSection initializes from config at mount — won't reflect server-side changes until page reload
+- (sprint 192, 2026-07-03) Multiple metrics firing simultaneously send separate push notifications (no bundling)
