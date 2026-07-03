@@ -24,66 +24,6 @@ function operationTimeout(): Promise<never> {
 
 
 export async function operationRoutes(app: FastifyInstance) {
-  app.post('/projects/:name/deploy', async (req, reply) => {
-    const params = NameParam.safeParse(req.params)
-    if (!params.success) return reply.status(400).send({ error: params.error.message })
-
-    const project = await findProject(params.data.name)
-    if (!project) return reply.status(404).send({ error: 'not found' })
-
-    const name = params.data.name
-    const inventory = join(homedir(), 'projects', name, 'inventory.ini')
-    const key = sshKeyPath(project.config.sshKeyName)
-    const host = project.config.serverIp ?? project.config.domain
-
-    openSse(reply)
-
-    try { await access(inventory) } catch {
-      return sseError(reply.raw, `inventory.ini not found at ~/projects/${name}/inventory.ini`)
-    }
-
-    if (project.config.postgres?.backupBucket) {
-      writeEvent(reply.raw, { type: 'backup', status: 'started', message: 'Taking pre-deploy snapshot…' })
-      try {
-        await Promise.race([
-          sshExec(host, `/usr/local/bin/emit-db-backup-${name} 2>&1`, key),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('backup timeout')), 30_000)),
-        ])
-        writeEvent(reply.raw, { type: 'backup', status: 'ok', message: 'Pre-deploy snapshot complete' })
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err)
-        writeEvent(reply.raw, { type: 'backup', status: 'warn', message: `Pre-deploy snapshot failed (continuing): ${msg}` })
-      }
-    }
-
-    const deployVars: Record<string, unknown> = { project_name: name }
-    if (project.config.postgres) {
-      deployVars['postgres_version'] = project.config.postgres.version ?? '16'
-      if (project.config.postgres.backupBucket) {
-        deployVars['postgres_backup_bucket'] = project.config.postgres.backupBucket
-      }
-      deployVars['postgres_backup_retain_days'] = project.config.postgres.backupRetainDays ?? 7
-    }
-
-    let exitCode = 0
-    try {
-      await Promise.race([
-        runAnsible('deploy', inventory, deployVars, (stream, text) => {
-          writeEvent(reply.raw, { type: 'line', stream, text })
-        }),
-        operationTimeout(),
-      ])
-    } catch (err) {
-      exitCode = 1
-      if (err instanceof Error && err.message === 'timeout') {
-        writeEvent(reply.raw, { type: 'error', message: 'Operation timed out after 15 minutes' })
-      }
-    }
-
-    writeEvent(reply.raw, { type: 'done', exitCode })
-    reply.raw.end()
-  })
-
   app.post(
     '/projects/:name/provision',
     async (req, reply) => {

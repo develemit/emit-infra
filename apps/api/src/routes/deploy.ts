@@ -53,14 +53,6 @@ export async function deployRoutes(app: FastifyInstance): Promise<void> {
     return reply.status(202).send({ status: 'accepted', startedAt: state.startedAt })
   })
 
-  app.get<{ Params: { name: string } }>('/projects/:name/deploy-status', async (req, reply) => {
-    const { name } = req.params
-    if (!SAFE_NAME_RE.test(name)) return reply.status(400).send({ error: 'invalid project name' })
-
-    const state = deployStates.get(name)
-    if (!state) return reply.send({ status: 'idle' })
-    return reply.send(state)
-  })
 }
 
 async function runDeploy(name: string, projectDir: string, state: DeployState): Promise<void> {

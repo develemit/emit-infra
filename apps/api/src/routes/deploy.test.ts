@@ -79,24 +79,6 @@ describe('deploy webhook routes', () => {
     expect(res.json().error).toBe('deploy already running')
   })
 
-  it('GET /projects/:name/deploy-status returns idle when no deploy', async () => {
-    const res = await app.inject({ method: 'GET', url: '/projects/otherapp/deploy-status' })
-    expect(res.statusCode).toBe(200)
-    expect(res.json()).toEqual({ status: 'idle' })
-  })
-
-  it('GET /projects/:name/deploy-status returns running state after POST', async () => {
-    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
-
-    await app.inject({ method: 'POST', url: '/projects/myapp/deploy' })
-
-    const res = await app.inject({ method: 'GET', url: '/projects/myapp/deploy-status' })
-    expect(res.statusCode).toBe(200)
-    const body = res.json()
-    expect(body.status).toBe('running')
-    expect(body.startedAt).toBeDefined()
-  })
-
   it('POST /projects/:name/deploy returns 400 for invalid name', async () => {
     const res = await app.inject({ method: 'POST', url: '/projects/$bad-name/deploy' })
     expect(res.statusCode).toBe(400)
