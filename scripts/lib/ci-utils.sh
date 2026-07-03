@@ -30,6 +30,29 @@ _EMIT_DEPLOY_TOTAL=0
 _EMIT_SERVICES_BUILT=""
 _EMIT_LOG_FILE=""
 _EMIT_DEPLOY_LOG_FILE=""
+_EMIT_TEE_PID=""
+
+# Mirror stdout/stderr to a log file via a background tee we can wait on.
+# A plain `exec > >(tee ...)` loses buffered output when the script exits
+# right after a failure (bash doesn't wait for process substitutions, and
+# $! isn't set for them on bash 3.2), truncating the log at the failing step.
+_emit_start_log() {
+  local file="$1" fifo
+  fifo=$(mktemp -u "${TMPDIR:-/tmp}/emit-log.XXXXXX") || return 0
+  mkfifo "$fifo" 2>/dev/null || return 0
+  tee -a "$file" < "$fifo" &
+  _EMIT_TEE_PID=$!
+  exec 3>&1 4>&2 > "$fifo" 2>&1
+  rm -f "$fifo"
+}
+
+# Restore stdout/stderr and wait for tee to drain so the log is complete.
+_emit_flush_log() {
+  [[ -n "$_EMIT_TEE_PID" ]] || return 0
+  exec 1>&3 2>&4 3>&- 4>&-
+  wait "$_EMIT_TEE_PID" 2>/dev/null || true
+  _EMIT_TEE_PID=""
+}
 
 _emit_rotate_logs() {
   local dir="$1" max="${2:-100}"
@@ -73,7 +96,7 @@ ci_init() {
   _EMIT_STARTED_EPOCH=$(date +%s)
   if mkdir -p ".ci-logs" 2>/dev/null; then
     _EMIT_LOG_FILE=".ci-logs/${_EMIT_SHA}.log"
-    exec > >(tee -a "$_EMIT_LOG_FILE") 2>&1
+    _emit_start_log "$_EMIT_LOG_FILE"
   fi
   _emit_write_atomic \
     "$(printf '{"status":"running","sha":"%s","branch":"%s","startedAt":"%s","progress":{"step":0,"total":%d,"pct":0,"label":"starting"}}' \
@@ -106,6 +129,7 @@ ci_done() {
 
   _emit_truncate_history .ci-history.jsonl
   [[ -d ".ci-logs" ]] && _emit_rotate_logs .ci-logs
+  _emit_flush_log
 }
 
 deploy_init() {
@@ -119,7 +143,7 @@ deploy_init() {
   _EMIT_STARTED_EPOCH=$(date +%s)
   if mkdir -p ".deploy-logs" 2>/dev/null; then
     _EMIT_DEPLOY_LOG_FILE=".deploy-logs/${_EMIT_SHA}.log"
-    exec > >(tee -a "$_EMIT_DEPLOY_LOG_FILE") 2>&1
+    _emit_start_log "$_EMIT_DEPLOY_LOG_FILE"
   fi
   _emit_write_atomic \
     "$(printf '{"status":"deploying","sha":"%s","branch":"%s","startedAt":"%s","progress":{"step":0,"total":%d,"pct":0,"label":"starting"}}' \
@@ -152,4 +176,5 @@ deploy_done() {
 
   _emit_truncate_history .deploy-history.jsonl
   [[ -d ".deploy-logs" ]] && _emit_rotate_logs .deploy-logs
+  _emit_flush_log
 }

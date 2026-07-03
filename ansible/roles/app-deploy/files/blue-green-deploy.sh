@@ -115,6 +115,7 @@ SWITCHED=1
 
 # ── 5. Record new active slot ─────────────────────────────────────────────────
 echo "$INACTIVE" > "$SLOT_FILE"
+date +%s > "$APP_DIR/.deployed-at"
 
 # ── 6. Stop old slot ──────────────────────────────────────────────────────────
 echo "==> Stopping old ${ACTIVE} slot..."

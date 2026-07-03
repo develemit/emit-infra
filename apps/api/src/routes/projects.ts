@@ -67,6 +67,19 @@ async function readProjectConfig(name: string): Promise<Record<string, unknown> 
   }
 }
 
+async function lastDeployEpoch(name: string): Promise<string | null> {
+  try {
+    const content = await readFile(join(homedir(), 'projects', name, '.deploy-history.jsonl'), 'utf8')
+    const last = content.trim().split('\n').filter(Boolean).at(-1)
+    if (!last) return null
+    const entry = JSON.parse(last) as { completedAt?: string }
+    if (!entry.completedAt) return null
+    return String(Math.floor(new Date(entry.completedAt).getTime() / 1000))
+  } catch {
+    return null
+  }
+}
+
 export async function projectRoutes(app: FastifyInstance): Promise<void> {
   app.get('/projects', async () => {
     return (await discoverProjects()).map(({ config, configPath, projectDir }) => ({
@@ -214,13 +227,14 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
       : 'echo ""'
 
     try {
-      const [raw, httpStatus] = await Promise.all([
+      const [raw, httpStatus, historyEpoch] = await Promise.all([
         sshExec(
           host,
           `uptime -p; df -h / | tail -1 | awk '{print $5, $3, $2}'; free -m | awk 'NR==2{printf "%.0f %dM %dM\\n", $3/$2*100, $3, $2}'; docker ps -q --filter status=running | wc -l; docker ps -aq | wc -l; docker ps -q --filter status=restarting --filter status=dead | wc -l; cat /opt/${name}/.deployed-version 2>/dev/null || echo ""; systemctl is-active nginx 2>/dev/null || echo "unknown"; test -f /etc/nginx/sites-enabled/${name} && echo "configured" || echo "missing"; ${sslProbe}; cd /opt/${name} && docker compose ps --format '{{.Service}}' 2>/dev/null | grep -qi redis && docker compose exec -T redis timeout 5 redis-cli ping 2>/dev/null || echo ""; cd /opt/${name} && docker compose ps --format '{{.Service}}' 2>/dev/null | grep -qi redis && docker compose exec -T redis timeout 5 redis-cli eval 'local f=0;local w=0;for _,k in ipairs(redis.call("KEYS","bull:*:failed")) do f=f+redis.call("LLEN",k) end;for _,k in ipairs(redis.call("KEYS","bull:*:wait")) do w=w+redis.call("LLEN",k) end;return tostring(f)..":"..tostring(w)' 0 2>/dev/null || echo ""; cat /opt/${name}/.deployed-at 2>/dev/null || echo ""; cat /opt/${name}/.active-slot 2>/dev/null || echo ""`,
           key,
         ),
         checkHttp(domain),
+        lastDeployEpoch(name),
       ])
       const [uptimeLine, diskLine, memLine, containerLine, totalLine, unhealthyLine, buildNumberLine, nginxStatusLine, nginxConfigLine, sslExpiryLine, redisLine, queueLine, deployedAtLine, activeSlotLine] = raw.split('\n').map(l => l.trim())
       const diskParts = (diskLine ?? '').split(' ')
@@ -247,7 +261,12 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
         redisStatus: redisLine === 'PONG' ? 'healthy' : redisLine ? 'unhealthy' : null,
         queueFailed: queueLine ? parseInt(queueLine.split(':')[0] ?? '', 10) || 0 : null,
         queueWait: queueLine ? parseInt(queueLine.split(':')[1] ?? '', 10) || 0 : null,
-        deployedAt: deployedAtLine || null,
+        deployedAt: (() => {
+          const server = deployedAtLine ? parseInt(deployedAtLine, 10) : 0
+          const history = historyEpoch ? parseInt(historyEpoch, 10) : 0
+          const best = Math.max(server || 0, history || 0)
+          return best > 0 ? String(best) : null
+        })(),
         activeSlot: activeSlotLine || null,
       }
       statusCache.set(name, data)

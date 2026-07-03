@@ -137,11 +137,6 @@ export function ProjectCard({ project, status, onRetry }: Props) {
             deploying · {deployProgress.pct}%
           </span>
         )}
-        {deployedAgoStr && (
-          <span className="text-[11px] font-mono px-1.5 py-0.5 rounded text-subtle" style={{ background: 'var(--card-2)', border: '1px solid var(--border)' }}>
-            {deployedAgoStr}
-          </span>
-        )}
       </div>
 
       {/* Meters / skeleton / unreachable */}
@@ -187,6 +182,12 @@ export function ProjectCard({ project, status, onRetry }: Props) {
           <Icon name="clock" size={13} className="shrink-0" />
           <span className="truncate">{status?.uptime ?? '—'}</span>
         </span>
+        {deployedAgoStr && (
+          <span className="text-[12px] font-mono text-subtle flex items-center gap-1 whitespace-nowrap shrink-0">
+            <Icon name="deploy" size={13} />
+            {deployedAgoStr}
+          </span>
+        )}
         <span className="text-[12px] font-mono text-subtle flex items-center gap-1.5 whitespace-nowrap shrink-0">
           <Icon name="box" size={13} />
           {status?.containerTotal != null ? `${status.containerCount ?? 0}/${status.containerTotal} running` : '— running'}
