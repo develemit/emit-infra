@@ -36,6 +36,22 @@ export interface ProjectStatus {
   error?: string
 }
 
+export interface AlertRule {
+  metric: 'diskPct' | 'memPct' | 'certDays' | 'backupAgeHours'
+  op: 'gt' | 'lt'
+  threshold: number
+  enabled: boolean
+}
+
+export interface FiredAlert {
+  projectName: string
+  metric: string
+  op: string
+  threshold: number
+  value: number
+  firedAt: number
+}
+
 export interface ProjectConfigPatch {
   serverType?: string
   sshKeyName?: string
@@ -53,6 +69,7 @@ export interface ProjectConfigPatch {
     memPct?: number
     backupAgeHours?: number
   }
+  alertRules?: AlertRule[]
 }
 
 export function getProjects(): Promise<ProjectSummary[]> {
@@ -107,6 +124,13 @@ export function rollbackProject(
     url: `${API_BASE}/projects/${encodeURIComponent(name)}/rollback`,
     body: JSON.stringify(timestamp ? { timestamp } : {}),
   }
+}
+
+export async function getAlerts(name: string, days = 7): Promise<FiredAlert[]> {
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/alerts?days=${days}`, { cache: 'no-store', headers: authHeaders() })
+  if (!res.ok) return []
+  const data = await res.json() as { alerts: FiredAlert[] }
+  return data.alerts
 }
 
 export async function updateProjectConfig(name: string, patch: ProjectConfigPatch): Promise<void> {

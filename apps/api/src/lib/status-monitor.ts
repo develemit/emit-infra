@@ -190,6 +190,19 @@ async function poll(): Promise<void> {
         const prevState = await readAlertState(config.name)
         const { fired, newState } = evaluateRules(config.name, rules, metrics, prevState)
         await persistAlerts(config.name, fired, newState)
+        const metricLabels: Record<string, string> = {
+          diskPct: 'disk', memPct: 'memory', certDays: 'cert days', backupAgeHours: 'backup age (h)',
+        }
+        for (const alert of fired) {
+          const opLabel = alert.op === 'gt' ? '>' : '<'
+          const label = metricLabels[alert.metric] ?? alert.metric
+          await sendToAll({
+            title: config.name,
+            body: `${label} ${Math.round(alert.value)} ${opLabel} ${alert.threshold}`,
+            url: `/projects/${encodeURIComponent(config.name)}/reliability`,
+            tag: `alert:${config.name}:${alert.metric}`,
+          }).catch(() => {/* best-effort */})
+        }
       }
     }),
   )

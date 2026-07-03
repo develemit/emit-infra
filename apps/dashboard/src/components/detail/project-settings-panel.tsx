@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { Icon } from '@/components/icon'
 import { updateProjectConfig, getSshKeys, type ProjectSummary } from '@/lib/api'
+import { AlertRulesSection } from './alert-rules-section'
 
 interface Props {
   project: ProjectSummary
@@ -209,6 +210,9 @@ export function ProjectSettingsPanel({ project }: Props) {
             </Field>
             <SaveButton state={accessState} onClick={saveAccess} />
           </div>
+
+          {/* Alert Rules */}
+          <AlertRulesSection project={project} />
         </div>
       )}
     </div>

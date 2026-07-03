@@ -5,6 +5,7 @@ import { getSla, type SlaData } from '@/lib/api'
 import { SubPageShell } from '@/components/detail/sub-page-shell'
 import { SlaPanel } from '@/components/detail/sla-panel'
 import { IncidentPanel } from '@/components/detail/incident-panel'
+import { AlertHistoryPanel } from '@/components/detail/alert-history-panel'
 
 export default function ReliabilityPage() {
   const params = useParams()
@@ -20,6 +21,7 @@ export default function ReliabilityPage() {
     <SubPageShell name={name} title="Reliability">
       {sla && <SlaPanel sla={sla} />}
       <IncidentPanel name={name} />
+      <AlertHistoryPanel name={name} />
     </SubPageShell>
   )
 }
