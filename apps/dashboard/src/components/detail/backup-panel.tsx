@@ -4,6 +4,7 @@ import { Icon } from '@/components/icon'
 import type { ProjectSummary } from '@/lib/api'
 import { updateBackupRetainDays, getBackupStatus } from '@/lib/api'
 import type { useBackups } from '@/lib/use-backups'
+import { fmtElapsed } from './backup-panel-helpers'
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`
@@ -89,11 +90,6 @@ export function BackupPanel({ project, backups }: BackupPanelProps) {
     const id = setInterval(() => setElapsedSecs(s => s + 1), 1_000)
     return () => clearInterval(id)
   }, [runningBackup])
-
-  function fmtElapsed(secs: number): string {
-    if (secs < 60) return `${secs}s`
-    return `${Math.floor(secs / 60)}m ${secs % 60}s`
-  }
 
   async function handleTriggerBackup() {
     setBackupResult(null)

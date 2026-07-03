@@ -5,6 +5,10 @@ import { dirname, resolve } from 'path'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
+  esbuild: {
+    jsx: 'automatic',
+    jsxImportSource: 'react',
+  },
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),

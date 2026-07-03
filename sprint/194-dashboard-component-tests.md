@@ -29,11 +29,37 @@ API routes now have solid coverage (13 test files), but the dashboard has exactl
 - possibly small helper extractions colocated with their components
 
 ## Acceptance criteria
-- [ ] All five components have tests covering the behaviors listed in Context
-- [ ] Backup-panel state machine (running/elapsed/timeout) tested with fake timers
-- [ ] No test makes a real network call
-- [ ] `npx nx run dashboard:test` and typecheck clean
+- [x] All five components have tests covering the behaviors listed in Context
+- [x] Backup-panel state machine (running/elapsed/timeout) tested with fake timers
+- [x] No test makes a real network call
+- [x] `npx nx run dashboard:test` and typecheck clean
 
 ## Out of scope
 - Remaining ~55 components (future batches)
 - E2E/browser tests
+
+## Completed
+
+**Date:** 2026-07-03
+
+### Summary
+Added unit tests for the five most logic-dense dashboard components: health-card, incident-panel, backup-panel, sla-panel, and summary-card. Extracted two trivially-pure helpers to colocated modules (`sla-panel-helpers.ts` for `slaColor`, `backup-panel-helpers.ts` for `fmtElapsed`) to enable direct logic testing without rendering overhead. Added `esbuild.jsx: 'automatic'` to vitest.config.ts so components using Next.js's automatic JSX transform (no explicit `import React`) work in the test environment. Backup-panel state machine tests use `vi.useFakeTimers()` + `act(async () => { await vi.advanceTimersByTimeAsync(...) })` — `waitFor` is avoided in fake-timer tests because it uses real `setTimeout` internally, which never fires under fake timers.
+
+### Files changed
+- (new) `apps/dashboard/src/components/detail/sla-panel-helpers.ts` — exports `slaColor(value)`
+- (new) `apps/dashboard/src/components/detail/backup-panel-helpers.ts` — exports `fmtElapsed(secs)`
+- `apps/dashboard/src/components/detail/sla-panel.tsx` — import `slaColor` from helper
+- `apps/dashboard/src/components/detail/backup-panel.tsx` — import `fmtElapsed` from helper
+- (new) `apps/dashboard/src/components/detail/sla-panel.test.tsx` — 8 tests
+- (new) `apps/dashboard/src/components/detail/summary-card.test.tsx` — 9 tests
+- (new) `apps/dashboard/src/components/detail/health-card.test.tsx` — 14 tests
+- (new) `apps/dashboard/src/components/detail/incident-panel.test.tsx` — 13 tests
+- (new) `apps/dashboard/src/components/detail/backup-panel.test.tsx` — 16 tests
+- `apps/dashboard/vitest.config.ts` — added `esbuild.jsx: 'automatic'` for JSX transform compatibility
+
+### Verification
+- `npx nx run dashboard:typecheck`: clean
+- `npx nx run dashboard:test`: 126/127 pass (1 pre-existing failure in container-row.test.tsx)
+
+### Follow-ups
+- `[defer]` Pre-existing container-row `MobileContainerRow > calls restartContainer and onRefetch on restart button click` failure — tracked since sprint 193

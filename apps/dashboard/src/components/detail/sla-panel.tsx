@@ -1,6 +1,7 @@
 'use client'
 
 import type { SlaData } from '@/lib/api'
+import { slaColor } from './sla-panel-helpers'
 
 interface SlaStatProps {
   label: string
@@ -8,9 +9,7 @@ interface SlaStatProps {
 }
 
 function SlaStat({ label, value }: SlaStatProps) {
-  let color = 'var(--err)'
-  if (value >= 99.9) color = 'var(--ok)'
-  else if (value >= 99) color = 'var(--warn)'
+  const color = slaColor(value)
 
   return (
     <div className="flex flex-col gap-1">
