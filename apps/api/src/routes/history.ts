@@ -6,6 +6,7 @@ import { z } from 'zod/v4'
 import { readJsonl, downsample } from '../lib/jsonl.js'
 import { findProject } from '../lib/project-helpers.js'
 import { createTtlCache } from '../lib/ttl-cache.js'
+import { readAnnotations } from '../lib/annotations.js'
 
 const NameParam = z.object({ name: z.string().min(1).max(100) })
 const ShaParam = z.object({
@@ -67,6 +68,8 @@ interface Incident {
   resolvedAt: number | null
   durationSec: number | null
   resolved: boolean
+  note?: string
+  falsePositive?: boolean
 }
 
 const MAX_METRIC_POINTS = 500
@@ -320,14 +323,24 @@ export async function historyRoutes(app: FastifyInstance) {
       { tail: 50_000 },
     )
 
-    const incidents = pairIncidents(records)
+    const paired = pairIncidents(records)
+    const annotationsPath = join(homedir(), 'projects', params.data.name, '.incident-annotations.json')
+    const annotations = await readAnnotations(annotationsPath)
 
-    // Compute MTTR (mean time to recovery)
-    const resolvedIncidents = incidents.filter((i) => i.resolved)
+    const incidents: Incident[] = paired.map(i => {
+      const ann = annotations[String(i.startedAt)]
+      const out: Incident = { ...i }
+      if (ann?.note !== undefined) out.note = ann.note
+      if (ann?.falsePositive !== undefined) out.falsePositive = ann.falsePositive
+      return out
+    })
+
+    // Compute MTTR excluding false positives
+    const resolvedReal = incidents.filter((i) => i.resolved && !i.falsePositive)
     let mttrSec: number | null = null
-    if (resolvedIncidents.length > 0) {
-      const totalDuration = resolvedIncidents.reduce((sum, i) => sum + (i.durationSec ?? 0), 0)
-      mttrSec = totalDuration / resolvedIncidents.length
+    if (resolvedReal.length > 0) {
+      const totalDuration = resolvedReal.reduce((sum, i) => sum + (i.durationSec ?? 0), 0)
+      mttrSec = totalDuration / resolvedReal.length
     }
 
     // Sort most recent first
@@ -394,7 +407,10 @@ export async function historyRoutes(app: FastifyInstance) {
       { tail: 50_000 },
     )
 
-    const incidents = pairIncidents(records)
+    const paired = pairIncidents(records)
+    const annotationsPath = join(homedir(), 'projects', params.data.name, '.incident-annotations.json')
+    const annotations = await readAnnotations(annotationsPath)
+    const incidents = paired.filter(i => !annotations[String(i.startedAt)]?.falsePositive)
 
     const now = Math.floor(Date.now() / 1000)
     const window7d = 7 * 86400

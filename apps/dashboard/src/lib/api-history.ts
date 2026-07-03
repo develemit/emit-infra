@@ -32,10 +32,12 @@ export interface CiHistoryResponse {
 }
 
 export interface Incident {
-  startedAt: string
-  resolvedAt: string | null
-  durationSec: number
+  startedAt: number
+  resolvedAt: number | null
+  durationSec: number | null
   resolved: boolean
+  note?: string
+  falsePositive?: boolean
 }
 
 export interface IncidentsResponse {
@@ -71,6 +73,22 @@ export async function getIncidents(name: string): Promise<IncidentsResponse> {
   const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/incidents`, { cache: 'no-store', headers: authHeaders() })
   if (!res.ok) return { incidents: [], mttrSec: null }
   return res.json() as Promise<IncidentsResponse>
+}
+
+export async function annotateIncident(
+  name: string,
+  startedAt: number,
+  patch: { note?: string; falsePositive?: boolean },
+): Promise<void> {
+  const res = await fetch(
+    `${API_BASE}/projects/${encodeURIComponent(name)}/incidents/${encodeURIComponent(String(startedAt))}/annotation`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify(patch),
+    },
+  )
+  if (!res.ok) throw new Error(`annotateIncident failed: ${res.status}`)
 }
 
 export async function exportIncidents(name: string, format: 'json' | 'csv', days: number = 90): Promise<void> {
