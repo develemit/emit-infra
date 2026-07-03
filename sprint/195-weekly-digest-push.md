@@ -29,10 +29,36 @@ A solo operator checks the dashboard ad-hoc; trends (disk creeping up, deploy ve
 - new state file convention for `lastDigestSentAt` (follow data-dir helpers)
 
 ## Acceptance criteria
-- [ ] `GET /fleet/digest` returns correct aggregates for a seeded week of data (tested)
-- [ ] Summary line formats correctly for 0/1/many incidents and missing disk data
-- [ ] Digest fires at most once per 7 days, surviving API restarts
-- [ ] Typecheck clean; API tests pass
+- [x] `GET /fleet/digest` returns correct aggregates for a seeded week of data (tested)
+- [x] Summary line formats correctly for 0/1/many incidents and missing disk data
+- [x] Digest fires at most once per 7 days, surviving API restarts
+- [x] Typecheck clean; API tests pass
+
+## Completed
+
+**Date:** 2026-07-03
+
+### Summary
+Implemented the full weekly digest pipeline: a pure `buildDigest()` aggregation module, a `GET /fleet/digest` route, and a `startDigestScheduler()` lifecycle function wired into the API entry point. The digest aggregates incident counts (excluding false positives), deploy counts, and disk delta from `.jsonl` history files across all registered projects. The summary line handles singular/plural forms and omits disk info when unavailable or unchanged.
+
+The scheduler persists `lastSentAt` to `~/.emit-infra/digest-state.json` (mode 600), checks hourly with a 15-second startup delay (mirroring the status monitor pattern), and fires `sendToAll` when 7+ days have elapsed. State file survives API restarts; the next check on startup will either skip (not due) or send immediately (overdue).
+
+`exactOptionalPropertyTypes` required changing the interface fields from optional `?:` to explicit `number | undefined`, which also required updating the test helper spread pattern (`const nd = { diskPctNow: undefined, diskPctWeekAgo: undefined }`).
+
+### Files changed
+- (new) `apps/api/src/lib/weekly-digest.ts` — pure aggregation + formatting (`buildDigest`)
+- (new) `apps/api/src/lib/weekly-digest.test.ts` — 13 unit tests for counts, summary line, disk delta sorting/formatting
+- (new) `apps/api/src/lib/digest-scheduler.ts` — hourly due-check, state file persistence, `startDigestScheduler()`
+- `apps/api/src/routes/fleet.ts` — added `GET /fleet/digest` route + `MetricPoint` interface
+- `apps/api/src/routes/fleet.test.ts` — 3 new tests for the digest route (400 validation, response shape, `buildDigest` call args)
+- `apps/api/src/index.ts` — wired `startDigestScheduler()` after `startStatusMonitor()`
+
+### Verification
+- typecheck: clean
+- api:test: 189/189 pass
+
+### Follow-ups
+- `[defer]` `pairIncidents` is duplicated between `fleet.ts` and `digest-scheduler.ts` — extract to a shared lib helper if a third callsite appears
 
 ## Out of scope
 - Email delivery, HTML reports

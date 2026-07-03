@@ -24,6 +24,7 @@ import { nginxEndpointsRoutes } from './routes/nginx-endpoints.js'
 import { scaleAdviceRoutes } from './routes/scale-advice.js'
 import { alertsRoutes } from './routes/alerts.js'
 import { startStatusMonitor } from './lib/status-monitor.js'
+import { startDigestScheduler } from './lib/digest-scheduler.js'
 
 const app = Fastify({ logger: process.env['NODE_ENV'] === 'development' ? { level: 'warn' } : true })
 
@@ -71,3 +72,4 @@ await app.register(alertsRoutes)
 const port = Number(process.env['PORT'] ?? 7001)
 await app.listen({ port, host: '0.0.0.0' })
 startStatusMonitor()
+startDigestScheduler()

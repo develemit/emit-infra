@@ -5,6 +5,7 @@ import { z } from 'zod/v4'
 import { discoverProjects } from '../lib/discover-projects.js'
 import { readJsonl } from '../lib/jsonl.js'
 import { readAnnotations } from '../lib/annotations.js'
+import { buildDigest } from '../lib/weekly-digest.js'
 
 const DaysQuery = z.object({ days: z.coerce.number().int().min(1).max(90).default(7) })
 
@@ -27,6 +28,11 @@ interface DeployEntry {
   status: string
   sha: string
   completedAt: string
+}
+
+interface MetricPoint {
+  t: number
+  disk: number
 }
 
 function pairIncidents(records: IncidentRecord[]): Incident[] {
@@ -83,5 +89,46 @@ export async function fleetRoutes(app: FastifyInstance) {
     )
 
     return results.filter(r => r.incidents.length > 0 || r.deploys.length > 0)
+  })
+
+  app.get('/fleet/digest', async (req, reply) => {
+    const query = DaysQuery.safeParse(req.query)
+    if (!query.success) return reply.status(400).send({ error: 'Invalid query' })
+
+    const since = Math.floor(Date.now() / 1000) - query.data.days * 86400
+    const projects = await discoverProjects()
+
+    const projectData = await Promise.all(
+      projects.map(async (p) => {
+        const name = p.config.name
+        const dir = join(homedir(), 'projects', name)
+
+        const records = await readJsonl<IncidentRecord>(
+          join(dir, '.incidents.jsonl'),
+          (r) => typeof r.t === 'number' && r.type === 'ssh' && r.t >= since,
+          { tail: 10_000 },
+        ).catch(() => [] as IncidentRecord[])
+        const incidents = pairIncidents(records)
+
+        const deploys = await readJsonl<DeployEntry>(
+          join(dir, '.deploy-history.jsonl'),
+          (d) => typeof d.completedAt === 'string' && new Date(d.completedAt).getTime() / 1000 >= since,
+          { tail: 200 },
+        ).catch(() => [] as DeployEntry[])
+
+        const metrics = await readJsonl<MetricPoint>(
+          join(dir, '.metrics.jsonl'),
+          (m) => typeof m.t === 'number' && typeof m.disk === 'number' && m.t >= since,
+          { tail: 50_000 },
+        ).catch(() => [] as MetricPoint[])
+
+        const diskPctNow = metrics.length > 0 ? metrics[metrics.length - 1]!.disk : undefined
+        const diskPctWeekAgo = metrics.length > 0 ? metrics[0]!.disk : undefined
+
+        return { project: name, incidents, deploys, diskPctNow, diskPctWeekAgo }
+      }),
+    )
+
+    return buildDigest(projectData)
   })
 }
