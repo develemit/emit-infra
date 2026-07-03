@@ -1,0 +1,30 @@
+---
+- name: Generate .deploy-config from Ansible vars
+  copy:
+    content: |
+      SERVICES="{{ bg_services | default('web api worker marketing') }}"
+      PORTS_BLUE="{{ bg_ports_blue | default('4300 4301 4302 4303') }}"
+      PORTS_GREEN="{{ bg_ports_green | default('4400 4401 4402 4403') }}"
+      HEALTH_CHECKS="{{ bg_health_checks | default('/ /readyz skip skip') }}"
+      HEALTH_RETRIES=20
+      HEALTH_INTERVAL=5
+      COMPOSE_STRUCTURE="{{ bg_compose_structure | default('separate') }}"
+      COMPOSE_APP="{{ app_dir }}/docker-compose.app.yml"
+      COMPOSE_FILE="{{ app_dir }}/{{ compose_dest | default('docker-compose.prod.yml') }}"
+      NGINX_CONF_PATH="{{ bg_nginx_conf_path | default('/etc/nginx/blue-green/' + project_name + '.conf') }}"
+      MIGRATE_PRE="{{ bg_migrate_pre | default('') }}"
+      MIGRATE_POST="{{ bg_migrate_post | default('') }}"
+      PRUNE_STRATEGY="standard"
+      SLOT_GRACE_SECONDS=0
+    dest: "{{ app_dir }}/.deploy-config"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0644"
+
+- name: Run blue-green deploy script
+  command: bash {{ app_dir }}/blue-green-deploy.sh {{ project_name }}
+  register: bg_deploy_result
+
+- name: Show deploy output
+  debug:
+    msg: "{{ bg_deploy_result.stdout_lines }}"

@@ -87,13 +87,17 @@
   when: blue_green | default(false)
 
 # ── Deploy strategy ──────────────────────────────────────────────
+- name: Deploy (blue-green)
+  include_tasks: deploy-blue-green.yml
+  when: blue_green | default(false)
+
 - name: Deploy (zero-downtime)
   include_tasks: deploy-zero-downtime.yml
-  when: zero_downtime | default(false)
+  when: not (blue_green | default(false)) and (zero_downtime | default(false))
 
 - name: Deploy (standard)
   include_tasks: deploy-standard.yml
-  when: not (zero_downtime | default(false))
+  when: not (blue_green | default(false)) and not (zero_downtime | default(false))
 
 # ── Post-deploy ──────────────────────────────────────────────────
 - name: Read deployed build number from container label

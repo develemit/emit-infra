@@ -101,6 +101,26 @@ export function registerDeploy(program: Command): void {
         console.warn(chalk.yellow('Warning: GHCR_TOKEN not set — docker pull may fail for private images'))
       }
 
+      if (config.blueGreen) {
+        extraVars.blue_green = true
+        extraVars.bg_services = config.blueGreen.services.map((s) => s.name).join(' ')
+        extraVars.bg_ports_blue = config.blueGreen.services.map((s) => s.bluePort).join(' ')
+        extraVars.bg_ports_green = config.blueGreen.services.map((s) => s.greenPort).join(' ')
+        extraVars.bg_health_checks = config.blueGreen.services
+          .map((s) => s.healthPath ?? 'skip')
+          .join(' ')
+        extraVars.bg_compose_structure = config.blueGreen.composeStructure
+        if (config.blueGreen.nginxConfPath) {
+          extraVars.bg_nginx_conf_path = config.blueGreen.nginxConfPath
+        }
+        if (config.blueGreen.migratePre) {
+          extraVars.bg_migrate_pre = config.blueGreen.migratePre
+        }
+        if (config.blueGreen.migratePost) {
+          extraVars.bg_migrate_post = config.blueGreen.migratePost
+        }
+      }
+
       await runAnsible('deploy', inventory, extraVars)
 
       console.log(chalk.green(`\nDeployed successfully.`))

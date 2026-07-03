@@ -64,6 +64,22 @@ export const ProjectConfigSchema = z.object({
         .default([]),
     })
     .optional(),
+  blueGreen: z
+    .object({
+      services: z.array(
+        z.object({
+          name: z.string(),
+          bluePort: z.number().int(),
+          greenPort: z.number().int(),
+          healthPath: z.string().optional(),
+        }),
+      ),
+      nginxConfPath: z.string().optional(),
+      migratePre: z.string().optional(),
+      migratePost: z.string().optional(),
+      composeStructure: z.enum(['profiles', 'separate']).default('separate'),
+    })
+    .optional(),
   requiredEnvKeys: z.string().array().optional(),
   warnThresholds: z
     .object({
