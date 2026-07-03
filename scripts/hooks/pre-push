@@ -149,6 +149,9 @@ if [[ -z "$TOKEN" ]]; then
 fi
 DOCKER_CI_CONFIG="${TMPDIR:-/tmp}/emit-docker-ci"
 mkdir -p "$DOCKER_CI_CONFIG"
+if [[ -d "$HOME/.docker/cli-plugins" && ! -e "$DOCKER_CI_CONFIG/cli-plugins" ]]; then
+  ln -s "$HOME/.docker/cli-plugins" "$DOCKER_CI_CONFIG/cli-plugins"
+fi
 echo "$TOKEN" | docker --config "$DOCKER_CI_CONFIG" login ghcr.io -u "${GHCR_USER:-$GHCR_ORG}" --password-stdin
 export DOCKER_CONFIG="$DOCKER_CI_CONFIG"
 
