@@ -15,6 +15,7 @@ import { registerVersions } from './commands/versions.js'
 import { registerHooks } from './commands/hooks.js'
 import { registerTerraformInit } from './commands/terraform-init.js'
 import { registerR2RotateToken } from './commands/r2-rotate-token.js'
+import { registerInitDeploy } from './commands/init-deploy.js'
 
 const program = new Command()
 
@@ -38,6 +39,7 @@ registerVersions(program)
 registerHooks(program)
 registerTerraformInit(program)
 registerR2RotateToken(program)
+registerInitDeploy(program)
 
 program.parseAsync(process.argv).catch((err: unknown) => {
   console.error(err instanceof Error ? err.message : String(err))
