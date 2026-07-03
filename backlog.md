@@ -116,3 +116,9 @@ file to promote items into proper sprints when the list grows worth addressing.
 - (sprint 192, 2026-07-03) Multiple metrics firing simultaneously send separate push notifications (no bundling)
 - (sprint 193, 2026-07-03) `nx run dashboard:build` still fails due to pre-existing Next.js 15 `Html` outside `pages/_document` bug on `/500` and `/_error` static routes (tracked since sprint 04)
 - (sprint 195, 2026-07-03) `pairIncidents` is duplicated between `fleet.ts` and `digest-scheduler.ts` — extract to a shared lib helper if a third callsite appears
+- (sprint 199, 2026-07-03) Rollback via webhook not yet implemented — manual `emit-infra deploy` for now
+- (sprint 202, 2026-07-03) develemail worker has no HTTP health check — may want Docker HEALTHCHECK inspection in future
+- (sprint 202, 2026-07-03) All project CI changes are local; need to be pushed to their respective repos
+- (sprint 203, 2026-07-03) Deploy command lacks a `--dry-run` flag for validating generated configs without SSH
+- (sprint 203, 2026-07-03) init-deploy currently only scaffolds "separate" compose structure; "profiles" mode generates config but doesn't modify the existing compose file
+- (sprint 203, 2026-07-03) Nginx upstream config template generation not implemented (checklist mentions it as a manual step instead)
