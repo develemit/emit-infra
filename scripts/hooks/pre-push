@@ -241,7 +241,7 @@ echo "→ running emit-infra deploy"
 export GHCR_TOKEN="$TOKEN"
 export GHCR_ACTOR="${GHCR_USER:-$GHCR_ORG}"
 export BUILD_NUMBER
-npx --prefix "$EMIT_INFRA_DIR" emit-infra deploy
+node "$EMIT_INFRA_DIR/apps/cli/dist/index.js" deploy
 
 deploy_done deployed
 echo "✓ deployed $SHA (build $BUILD_NUMBER)"
