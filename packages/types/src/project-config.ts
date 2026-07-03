@@ -92,6 +92,13 @@ export const ProjectConfigSchema = z.object({
       buildArgs: z
         .record(z.string(), z.array(z.object({ name: z.string(), env: z.string() })))
         .optional(),
+      buildTargets: z.record(z.string(), z.string()).optional(),
+      buildVariants: z
+        .record(
+          z.string(),
+          z.array(z.object({ target: z.string(), tagSuffix: z.string() })),
+        )
+        .optional(),
       preDeploy: z.array(z.string()).optional(),
     })
     .optional(),

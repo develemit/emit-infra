@@ -38,6 +38,8 @@ out('IMAGE_PREFIX', ci.get('imagePrefix', ''))
 out('SSH_KEY', ci.get('sshKey', '~/.ssh/emit-deploy'))
 out('BG_SERVICES', ' '.join(s['name'] for s in bg.get('services', [])))
 out('BUILD_ARGS_JSON', json.dumps(ci.get('buildArgs', {})))
+out('BUILD_TARGETS_JSON', json.dumps(ci.get('buildTargets', {})))
+out('BUILD_VARIANTS_JSON', json.dumps(ci.get('buildVariants', {})))
 out('PRE_DEPLOY_JSON', json.dumps(ci.get('preDeploy', [])))
 ")"
 
@@ -179,19 +181,43 @@ for a in args.get('$svc', []):
 " 2>/dev/null || true
 }
 
+# ── resolve build variants for a service (extra Dockerfile targets) ───────────
+get_build_variants() {
+  local svc="$1"
+  python3 -c "
+import json
+variants = json.loads('$BUILD_VARIANTS_JSON')
+for v in variants.get('$svc', []):
+    print(f'{v[\"target\"]} {v[\"tagSuffix\"]}')
+" 2>/dev/null || true
+}
+
 # ── build changed services ────────────────────────────────────────────────────
+get_build_target() {
+  local svc="$1"
+  python3 -c "
+import json
+targets = json.loads('$BUILD_TARGETS_JSON')
+print(targets.get('$svc', ''))
+" 2>/dev/null || true
+}
+
 build_image() {
   local svc="$1"
   local img
   img=$(image_name "$svc")
   local extra_args
   extra_args=$(get_build_args "$svc")
+  local target target_flag=""
+  target=$(get_build_target "$svc")
+  [[ -n "$target" ]] && target_flag="--target $target"
 
   echo "==> Building $svc..."
   # shellcheck disable=SC2086
   docker buildx build \
     --platform linux/amd64 \
     -f "apps/$svc/Dockerfile" \
+    $target_flag \
     --build-arg BUILD_NUMBER="$BUILD_NUMBER" \
     $extra_args \
     -t "$img:$SHA" \
@@ -200,6 +226,23 @@ build_image() {
     --push \
     --quiet \
     .
+
+  while read -r target suffix; do
+    [[ -z "$target" ]] && continue
+    echo "==> Building $svc variant '$target' (tag suffix $suffix)..."
+    # shellcheck disable=SC2086
+    docker buildx build \
+      --platform linux/amd64 \
+      -f "apps/$svc/Dockerfile" \
+      --target "$target" \
+      --build-arg BUILD_NUMBER="$BUILD_NUMBER" \
+      $extra_args \
+      -t "$img:${BUILD_NUMBER}${suffix}" \
+      -t "$img:latest${suffix}" \
+      --push \
+      --quiet \
+      .
+  done < <(get_build_variants "$svc")
 }
 
 if [[ ${#TO_BUILD[@]} -gt 0 ]]; then
@@ -223,6 +266,11 @@ if [[ ${#TO_RETAG[@]} -gt 0 ]]; then
     img=$(image_name "$svc")
     echo "==> Re-tagging $svc:latest as :$SHA / :$BUILD_NUMBER..."
     docker buildx imagetools create -t "$img:$SHA" -t "$img:$BUILD_NUMBER" "$img:latest"
+    while read -r target suffix; do
+      [[ -z "$target" ]] && continue
+      echo "==> Re-tagging $svc variant latest${suffix} as :${BUILD_NUMBER}${suffix}..."
+      docker buildx imagetools create -t "$img:${BUILD_NUMBER}${suffix}" "$img:latest${suffix}"
+    done < <(get_build_variants "$svc")
   done
 fi
 
