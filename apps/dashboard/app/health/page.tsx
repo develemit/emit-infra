@@ -73,6 +73,11 @@ export default function FleetHealthPage() {
         <Icon name="layers" size={18} style={{ color: 'var(--fg-muted)' }} />
         <span className="text-[15px] font-semibold text-fg">Fleet Health</span>
         {rows && <Badge variant="muted" mono className="ml-1">{rows.length} projects</Badge>}
+        <div className="flex-1" />
+        <Link href="/health/incidents" className="flex items-center gap-1.5 text-[12px] text-subtle hover:text-fg transition-colors font-mono">
+          <Icon name="activity" size={13} />
+          Incidents
+        </Link>
       </div>
 
       {/* Mobile header */}

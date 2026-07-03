@@ -91,6 +91,18 @@ export async function annotateIncident(
   if (!res.ok) throw new Error(`annotateIncident failed: ${res.status}`)
 }
 
+export interface FleetProjectData {
+  project: string
+  incidents: Incident[]
+  deploys: Array<{ status: string; sha: string; completedAt: string }>
+}
+
+export async function getFleetIncidents(days: number = 7): Promise<FleetProjectData[]> {
+  const res = await fetch(`${API_BASE}/fleet/incidents?days=${days}`, { cache: 'no-store', headers: authHeaders() })
+  if (!res.ok) return []
+  return res.json() as Promise<FleetProjectData[]>
+}
+
 export async function exportIncidents(name: string, format: 'json' | 'csv', days: number = 90): Promise<void> {
   const qs = `?format=${encodeURIComponent(format)}&days=${encodeURIComponent(String(days))}`
   const url = `${API_BASE}/projects/${encodeURIComponent(name)}/incidents/export${qs}`
