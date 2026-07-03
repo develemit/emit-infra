@@ -45,11 +45,6 @@ SSH_KEY="${SSH_KEY/#\~/$HOME}"
 SHA=$(git rev-parse HEAD)
 BUILD_NUMBER=$(git rev-list --count HEAD)
 
-# ── source env file if configured ──────────────────────────────────────────────
-if [[ -n "$ENV_FILE" && -f "$ROOT/$ENV_FILE" ]]; then
-  set -a; source "$ROOT/$ENV_FILE"; set +a
-fi
-
 # ── phase 1: CI ────────────────────────────────────────────────────────────────
 run_ci() {
   trap 'ci_done failure; echo "✗ CI failed"; exit 1' ERR
@@ -90,6 +85,11 @@ if [[ -z "$GHCR_ORG" ]]; then
 fi
 
 echo "→ pushing to main — running deploy"
+
+# source env file for deploy phase (after CI so tests use local env)
+if [[ -n "$ENV_FILE" && -f "$ROOT/$ENV_FILE" ]]; then
+  set -a; source "$ROOT/$ENV_FILE"; set +a
+fi
 
 trap 'deploy_done failed; echo "✗ deploy failed"; exit 1' ERR
 
