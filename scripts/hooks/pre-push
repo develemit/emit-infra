@@ -204,12 +204,17 @@ build_image() {
 
 if [[ ${#TO_BUILD[@]} -gt 0 ]]; then
   deploy_step "Building + pushing images"
+  MAX_PARALLEL=${EMIT_BUILD_PARALLEL:-2}
   pids=()
   for svc in "${TO_BUILD[@]}"; do
     build_image "$svc" &
     pids+=($!)
+    if [[ ${#pids[@]} -ge $MAX_PARALLEL ]]; then
+      for pid in "${pids[@]}"; do wait "$pid" || exit 1; done
+      pids=()
+    fi
   done
-  for pid in "${pids[@]}"; do wait "$pid" || exit 1; done
+  for pid in ${pids[@]+"${pids[@]}"}; do wait "$pid" || exit 1; done
 fi
 
 if [[ ${#TO_RETAG[@]} -gt 0 ]]; then
