@@ -43,6 +43,7 @@ COMPOSE_FILE=""
 NGINX_CONF_PATH="/etc/nginx/blue-green/${PROJECT}.conf"
 MIGRATE_PRE=""
 MIGRATE_POST=""
+POST_EXEC=""
 PRUNE_STRATEGY="standard"
 SLOT_GRACE_SECONDS=0
 VERSION_FILE=""
@@ -208,6 +209,17 @@ date +%s > "${APP_DIR}/.deployed-at"
 if [ -n "$MIGRATE_POST" ]; then
   echo "==> Running post-deploy migration..."
   eval "$MIGRATE_POST"
+fi
+
+# ── 7b. Post-deploy exec commands (service:command pairs) ─────────────────────
+if [ -n "$POST_EXEC" ]; then
+  IFS='|' read -ra EXEC_ENTRIES <<< "$POST_EXEC"
+  for entry in "${EXEC_ENTRIES[@]}"; do
+    svc="${entry%%:*}"
+    cmd="${entry#*:}"
+    echo "==> Post-deploy exec: ${svc} → ${cmd}"
+    $(compose_cmd_inactive) exec -T "$svc" $cmd
+  done
 fi
 
 # ── 8. Grace period before stopping old slot ──────────────────────────────────

@@ -14,6 +14,7 @@
       NGINX_CONF_PATH="{{ bg_nginx_conf_path | default('/etc/nginx/blue-green/' + project_name + '.conf') }}"
       MIGRATE_PRE="{{ bg_migrate_pre | default('') }}"
       MIGRATE_POST="{{ bg_migrate_post | default('') }}"
+      POST_EXEC="{{ bg_post_exec | default('') }}"
       PRUNE_STRATEGY="standard"
       SLOT_GRACE_SECONDS=0
     dest: "{{ app_dir }}/.deploy-config"

@@ -85,7 +85,11 @@ export function registerDeploy(program: Command): void {
         }
       }
 
-      const envCandidates = ['.env.prod', '.env'].map(f => join(process.cwd(), f))
+      const envCandidates = [
+        config.ci?.envFile,
+        '.env.prod',
+        '.env',
+      ].filter(Boolean).map(f => join(process.cwd(), f!))
       const envPath = envCandidates.find(p => existsSync(p))
       if (envPath) {
         extraVars.copy_env = true
@@ -124,6 +128,15 @@ export function registerDeploy(program: Command): void {
         if (config.blueGreen.migratePost) {
           extraVars.bg_migrate_post = config.blueGreen.migratePost
         }
+
+        // Pass postDeployExec as structured data for the blue-green script
+        // (generic post_deploy_exec can't target the correct slot compose)
+        const postExec = config.deploy?.postDeployExec ?? []
+        if (postExec.length > 0) {
+          extraVars.bg_post_exec = postExec.map(e => `${e.service}:${e.command}`).join('|')
+        }
+        // Clear generic post_deploy_exec so Ansible doesn't also try it
+        delete extraVars.post_deploy_exec
       }
 
       await runAnsible('deploy', inventory, extraVars)
