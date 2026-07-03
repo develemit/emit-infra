@@ -1,5 +1,5 @@
 import { Command } from 'commander'
-import { join } from 'node:path'
+import { join, dirname } from 'node:path'
 import { readFileSync, existsSync } from 'node:fs'
 import chalk from 'chalk'
 import { loadConfig, runAnsible, type ProjectConfig } from '@emit-infra/core'
@@ -119,6 +119,16 @@ export function registerDeploy(program: Command): void {
           .map((s) => s.healthPath ?? 'skip')
           .join(' ')
         extraVars.bg_compose_structure = config.blueGreen.composeStructure
+
+        if (config.blueGreen.composeStructure === 'separate') {
+          const composeDir = dirname(join(process.cwd(), config.deploy?.composeSrc ?? 'docker-compose.prod.yml'))
+          extraVars.blue_green_compose_files = [
+            join(composeDir, 'docker-compose.app.yml'),
+            join(composeDir, 'docker-compose.blue.yml'),
+            join(composeDir, 'docker-compose.green.yml'),
+          ].filter(f => existsSync(f))
+        }
+
         if (config.blueGreen.nginxConfPath) {
           extraVars.bg_nginx_conf_path = config.blueGreen.nginxConfPath
         }

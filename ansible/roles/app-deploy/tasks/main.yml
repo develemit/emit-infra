@@ -79,7 +79,7 @@
   when: blue_green | default(false)
 
 - name: Start infra stack
-  command: docker compose -f docker-compose.infra.yml up -d
+  command: docker compose -f {{ compose_dest | default('docker-compose.prod.yml') }} up -d
   args:
     chdir: "{{ app_dir }}"
   when: blue_green | default(false)
