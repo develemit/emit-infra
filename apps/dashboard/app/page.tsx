@@ -43,34 +43,22 @@ export default function HomePage() {
     setProjects(ps)
     window.dispatchEvent(new Event('emit:ready'))
 
-    const settled = await Promise.allSettled(
+    await Promise.allSettled(
       ps.map((p) =>
-        getStatus(p.config.name).then(
-          (s) => ({ name: p.config.name, status: s }),
-          () => ({ name: p.config.name, status: { error: 'unreachable' } as ProjectStatus }),
-        ),
+        getStatus(p.config.name)
+          .then(
+            (s) => s,
+            () => ({ error: 'unreachable' } as ProjectStatus),
+          )
+          .then((s) => {
+            const prev = prevStatuses.current[p.config.name]
+            if (prev && !prev.error && s.error) notifyDown(p.config.name)
+            if (prev?.error && !s.error) notifyUp(p.config.name)
+            prevStatuses.current[p.config.name] = s
+            setStatuses((cur) => ({ ...cur, [p.config.name]: s }))
+          }),
       ),
     )
-
-    const newStatuses: Record<string, ProjectStatus> = {}
-    for (const r of settled) {
-      if (r.status === 'fulfilled') {
-        newStatuses[r.value.name] = r.value.status
-      }
-    }
-
-    for (const [name, newStatus] of Object.entries(newStatuses)) {
-      const prev = prevStatuses.current[name]
-      if (prev && !prev.error && newStatus.error) {
-        notifyDown(name)
-      }
-      if (prev?.error && !newStatus.error) {
-        notifyUp(name)
-      }
-    }
-
-    prevStatuses.current = newStatuses
-    setStatuses(newStatuses)
   }, [])
 
   useEffect(() => {
