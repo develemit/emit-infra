@@ -94,6 +94,8 @@
     docker container prune -f --filter "until=24h"
     docker image prune -a -f --filter "until=24h"
   ignore_errors: true
+  changed_when: false
 
 - name: Record deploy timestamp
   shell: "date +%s > /opt/{{ project_name }}/.deployed-at"
+  changed_when: false

@@ -80,8 +80,9 @@ export async function operationRoutes(app: FastifyInstance) {
       try {
         const ip = await getTerraformOutput('server_ip', terraformDir)
         await writeInventory(name, ip, (config?.['sshKeyName'] as string | undefined) ?? 'emit-deploy')
-      } catch {
-        // inventory.ini can be written manually if terraform output fails
+      } catch (err) {
+        app.log.error({ err, project: name }, 'failed to write inventory after terraform apply')
+        writeEvent(reply.raw, { type: 'error', message: `inventory write failed: ${err instanceof Error ? err.message : String(err)}` })
       }
     }
 

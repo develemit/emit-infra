@@ -62,6 +62,12 @@ await app.register(alertsRoutes)
 await app.register(deployRoutes)
 
 const port = Number(process.env['PORT'] ?? 7001)
-await app.listen({ port, host: '0.0.0.0' })
+const isDev = process.env['NODE_ENV'] === 'development'
+const hasSecret = Boolean(process.env['API_SECRET'])
+const host = !hasSecret && !isDev ? '127.0.0.1' : '0.0.0.0'
+if (!hasSecret && !isDev) {
+  app.log.warn('API_SECRET not set — binding to localhost only; destructive endpoints would otherwise be open to the network')
+}
+await app.listen({ port, host })
 startStatusMonitor()
 startDigestScheduler()

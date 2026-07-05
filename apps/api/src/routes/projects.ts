@@ -59,23 +59,27 @@ function toInt(s: string | undefined): number | undefined {
 }
 
 async function readProjectConfig(name: string): Promise<Record<string, unknown> | null> {
+  const path = join(homedir(), 'projects', name, '.emit-infra.json')
   try {
-    const raw = await readFile(join(homedir(), 'projects', name, '.emit-infra.json'), 'utf8')
+    const raw = await readFile(path, 'utf8')
     return JSON.parse(raw) as Record<string, unknown>
-  } catch {
+  } catch (err) {
+    console.warn(`[readProjectConfig] failed to read/parse ${path}: ${err}`)
     return null
   }
 }
 
 async function lastDeployEpoch(name: string): Promise<string | null> {
+  const path = join(homedir(), 'projects', name, '.deploy-history.jsonl')
   try {
-    const content = await readFile(join(homedir(), 'projects', name, '.deploy-history.jsonl'), 'utf8')
+    const content = await readFile(path, 'utf8')
     const last = content.trim().split('\n').filter(Boolean).at(-1)
     if (!last) return null
     const entry = JSON.parse(last) as { completedAt?: string }
     if (!entry.completedAt) return null
     return String(Math.floor(new Date(entry.completedAt).getTime() / 1000))
-  } catch {
+  } catch (err) {
+    console.warn(`[lastDeployEpoch] failed to read/parse ${path}: ${err}`)
     return null
   }
 }

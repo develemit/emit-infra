@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, FastifyBaseLogger } from 'fastify'
 import { join } from 'node:path'
 import { appendFile } from 'node:fs/promises'
 import { z } from 'zod'
@@ -48,14 +48,16 @@ export async function deployRoutes(app: FastifyInstance): Promise<void> {
     }
     deployStates.set(name, state)
 
-    runDeploy(name, project.projectDir, state).catch(() => {})
+    runDeploy(name, project.projectDir, state, app.log).catch((err) =>
+      app.log.error({ err, project: name }, 'runDeploy crashed'),
+    )
 
     return reply.status(202).send({ status: 'accepted', startedAt: state.startedAt })
   })
 
 }
 
-async function runDeploy(name: string, projectDir: string, state: DeployState): Promise<void> {
+async function runDeploy(name: string, projectDir: string, state: DeployState, log: FastifyBaseLogger): Promise<void> {
   try {
     const { execa } = await import('execa')
     await execa('npx', ['emit-infra', 'deploy', name], {
@@ -83,14 +85,18 @@ async function runDeploy(name: string, projectDir: string, state: DeployState): 
     }
 
     const historyPath = join(projectDir, '.deploy-history.jsonl')
-    await appendFile(historyPath, JSON.stringify(historyEntry) + '\n').catch(() => {})
+    await appendFile(historyPath, JSON.stringify(historyEntry) + '\n').catch((err) =>
+      log.warn({ err, project: name }, 'failed to write deploy history'),
+    )
 
     await sendToAll({
       title: `${name}: deploy complete`,
       body: state.buildNumber ? `Build #${state.buildNumber} is live` : 'Deploy succeeded',
       tag: `deploy:${name}`,
       url: `/?p=${name}`,
-    }).catch(() => {})
+    }).catch((err) =>
+      log.warn({ err, project: name }, 'failed to send deploy push notification'),
+    )
   } catch (err) {
     state.status = 'failed'
     state.completedAt = new Date().toISOString()
@@ -113,13 +119,17 @@ async function runDeploy(name: string, projectDir: string, state: DeployState): 
     }
 
     const historyPath = join(projectDir, '.deploy-history.jsonl')
-    await appendFile(historyPath, JSON.stringify(historyEntry) + '\n').catch(() => {})
+    await appendFile(historyPath, JSON.stringify(historyEntry) + '\n').catch((histErr) =>
+      log.warn({ err: histErr, project: name }, 'failed to write deploy history'),
+    )
 
     await sendToAll({
       title: `${name}: deploy failed`,
       body: state.error,
       tag: `deploy:${name}`,
       url: `/?p=${name}`,
-    }).catch(() => {})
+    }).catch((pushErr) =>
+      log.warn({ err: pushErr, project: name }, 'failed to send deploy push notification'),
+    )
   }
 }

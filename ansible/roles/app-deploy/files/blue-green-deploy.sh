@@ -212,10 +212,26 @@ upstream ${PROJECT}_${svc} { server 127.0.0.1:${port}; }"
 done
 
 mkdir -p "$(dirname "$NGINX_CONF_PATH")"
+
+if [ -f "$NGINX_CONF_PATH" ]; then
+  cp "$NGINX_CONF_PATH" "${NGINX_CONF_PATH}.bak"
+fi
+
 echo "$upstream_block" > "$NGINX_CONF_PATH"
 
-nginx -t && nginx -s reload
+if ! nginx -t; then
+  echo "ERROR: nginx config validation failed after writing new upstream block"
+  if [ -f "${NGINX_CONF_PATH}.bak" ]; then
+    echo "==> Restoring previous nginx config from backup..."
+    cp "${NGINX_CONF_PATH}.bak" "$NGINX_CONF_PATH"
+    nginx -t || echo "WARNING: restored config also fails validation"
+  fi
+  exit 1
+fi
+
+nginx -s reload
 SWITCHED=1
+rm -f "${NGINX_CONF_PATH}.bak"
 
 # ── 6. Record new active slot ────────────────────────────────────────────────
 echo "$INACTIVE" > "$SLOT_FILE"
