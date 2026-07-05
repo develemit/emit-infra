@@ -117,13 +117,14 @@
   register: deployed_build_number
   changed_when: false
   ignore_errors: true
+  when: build_number is not defined
 
 - name: Write deployed version file
   copy:
-    content: "{{ deployed_build_number.stdout | trim }}"
+    content: "{{ build_number | default(deployed_build_number.stdout | default('') | trim, true) }}"
     dest: "{{ app_dir }}/.deployed-version"
     mode: "0644"
-  when: deployed_build_number.stdout | default('') | trim | length > 0
+  when: build_number is defined or (deployed_build_number.stdout | default('') | trim | length > 0)
 
 - name: Run post-deploy commands
   command: docker compose -f {{ compose_dest | default('docker-compose.yml') }} exec -T {{ item.service }} {{ item.command }}
