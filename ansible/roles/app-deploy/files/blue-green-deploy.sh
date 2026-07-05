@@ -81,6 +81,12 @@ fi
 
 echo "==> Deploy: active=${ACTIVE} -> new=${INACTIVE} (${SVC_COUNT} services)"
 
+# For "separate" structure: if COMPOSE_APP doesn't exist on disk, the slot
+# files are self-contained (e.g. develemail has no app.yml overlay).
+if [ "$COMPOSE_STRUCTURE" != "profiles" ] && [ -n "$COMPOSE_APP" ] && [ ! -f "$COMPOSE_APP" ]; then
+  COMPOSE_APP=""
+fi
+
 # ── Dry run: print plan and exit ──────────────────────────────────────────────
 if [ "$DRY_RUN" -eq 1 ]; then
   echo ""
@@ -89,10 +95,13 @@ if [ "$DRY_RUN" -eq 1 ]; then
   if [ "$COMPOSE_STRUCTURE" = "profiles" ]; then
     echo "  Compose file: ${COMPOSE_FILE}"
     echo "  Compose up: docker compose -f ${COMPOSE_FILE} --profile ${INACTIVE} up -d"
-  else
+  elif [ -n "$COMPOSE_APP" ]; then
     echo "  Compose app: ${COMPOSE_APP}"
     echo "  Compose slot: ${APP_DIR}/docker-compose.${INACTIVE}.yml"
     echo "  Compose up: docker compose -f ${COMPOSE_APP} -f docker-compose.${INACTIVE}.yml up -d"
+  else
+    echo "  Compose slot: ${APP_DIR}/docker-compose.${INACTIVE}.yml (self-contained)"
+    echo "  Compose up: docker compose -f docker-compose.${INACTIVE}.yml up -d"
   fi
   echo "  Services:"
   for i in $(seq 0 $((SVC_COUNT - 1))); do
@@ -112,16 +121,20 @@ fi
 compose_cmd_inactive() {
   if [ "$COMPOSE_STRUCTURE" = "profiles" ]; then
     echo "docker compose -f ${COMPOSE_FILE} --env-file ${APP_DIR}/.env --profile ${INACTIVE}"
-  else
+  elif [ -n "$COMPOSE_APP" ]; then
     echo "docker compose -f ${COMPOSE_APP} -f ${APP_DIR}/docker-compose.${INACTIVE}.yml --env-file ${APP_DIR}/.env --project-name ${PROJECT}-${INACTIVE}"
+  else
+    echo "docker compose -f ${APP_DIR}/docker-compose.${INACTIVE}.yml --env-file ${APP_DIR}/.env --project-name ${PROJECT}-${INACTIVE}"
   fi
 }
 
 compose_cmd_active() {
   if [ "$COMPOSE_STRUCTURE" = "profiles" ]; then
     echo "docker compose -f ${COMPOSE_FILE} --env-file ${APP_DIR}/.env --profile ${ACTIVE}"
-  else
+  elif [ -n "$COMPOSE_APP" ]; then
     echo "docker compose -f ${COMPOSE_APP} -f ${APP_DIR}/docker-compose.${ACTIVE}.yml --env-file ${APP_DIR}/.env --project-name ${PROJECT}-${ACTIVE}"
+  else
+    echo "docker compose -f ${APP_DIR}/docker-compose.${ACTIVE}.yml --env-file ${APP_DIR}/.env --project-name ${PROJECT}-${ACTIVE}"
   fi
 }
 
