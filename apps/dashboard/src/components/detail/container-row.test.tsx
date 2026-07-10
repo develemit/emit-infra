@@ -203,6 +203,9 @@ describe('MobileContainerRow', () => {
     const restartButton = screen.getByRole('button', { name: /restart/i })
     await user.click(restartButton)
 
+    const confirmButton = screen.getByRole('button', { name: /confirm/i })
+    await user.click(confirmButton)
+
     await waitFor(() => {
       expect(vi.mocked(restartContainer)).toHaveBeenCalledWith('myapp', 'web')
       expect(onRefetch).toHaveBeenCalled()
