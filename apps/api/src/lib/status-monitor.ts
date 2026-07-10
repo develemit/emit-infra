@@ -14,6 +14,7 @@ import { discoverProjects } from './discover-projects.js'
 import { sshKeyPath, SAFE_DOMAIN_RE } from './project-helpers.js'
 import { sendToAll } from './push.js'
 import { evaluateRules, type AlertMetrics, type AlertCooldownState, type FiredAlert } from './alert-rules.js'
+import { pruneAlertJsonl } from './prune-alerts.js'
 
 interface IncidentRecord {
   type: 'ssh' | 'http'
@@ -126,6 +127,11 @@ async function persistAlerts(name: string, fired: FiredAlert[], newState: AlertC
   for (const alert of fired) {
     await appendFile(join(dir, '.alerts.jsonl'), JSON.stringify(alert) + '\n').catch(
       err => console.error('[status-monitor] appendAlert failed:', err),
+    )
+  }
+  if (fired.length > 0) {
+    await pruneAlertJsonl(join(dir, '.alerts.jsonl')).catch(
+      err => console.error('[status-monitor] pruneAlerts failed:', err),
     )
   }
 }
