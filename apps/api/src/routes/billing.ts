@@ -75,7 +75,7 @@ async function fetchBilling(token: string): Promise<BillingResponse> {
 
   const ipv4Prices = pricing.primary_ips.find((p) => p.type === 'ipv4')?.prices ?? []
 
-  const { hours, hoursInMonth } = hoursElapsedThisMonth()
+  const { hours } = hoursElapsedThisMonth()
 
   const breakdown = servers.map((server) => {
     const loc = server.datacenter.location.name

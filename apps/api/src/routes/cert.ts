@@ -21,11 +21,6 @@ const certCache = createTtlCache<CertDetails | null>(CERT_TTL)
 
 const nameSchema = z.object({ name: z.string().min(1).max(100).regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/) })
 
-function field(raw: string, prefix: string): string {
-  const line = raw.split('\n').find(l => l.trimStart().startsWith(prefix))
-  return line ? line.slice(line.indexOf(prefix) + prefix.length).trim() : ''
-}
-
 function parseOpenSslOutput(raw: string): CertDetails | null {
   const lines = raw.split('\n')
 

@@ -4,7 +4,6 @@ import { join } from 'node:path'
 import { z } from 'zod/v4'
 import { readJsonl } from '../lib/jsonl.js'
 import { findProject, SAFE_NAME_RE } from '../lib/project-helpers.js'
-import { createTtlCache } from '../lib/ttl-cache.js'
 
 const NameParam = z.object({ name: z.string().regex(SAFE_NAME_RE) })
 const ExportQuery = z.object({

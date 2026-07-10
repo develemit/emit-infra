@@ -73,8 +73,6 @@ interface Incident {
 }
 
 const MAX_METRIC_POINTS = 500
-const MAX_HOURS = 720
-const MAX_HISTORY_LIMIT = 200
 
 interface SlaData {
   uptime7d: number
