@@ -20,6 +20,63 @@ function parseEnvFile(path: string): Record<string, string> {
   )
 }
 
+function printDryRunPlan(
+  config: ProjectConfig,
+  inventory: string,
+  extraVars: Record<string, unknown>,
+): void {
+  console.log(chalk.yellow('\n╔════════════════════════════════════════╗'))
+  console.log(chalk.yellow('║      DRY RUN — no changes made         ║'))
+  console.log(chalk.yellow('╚════════════════════════════════════════╝\n'))
+
+  console.log(chalk.bold('Project:  '), config.name)
+  const strategy = config.blueGreen ? 'blue-green' : 'standard'
+  console.log(chalk.bold('Strategy: '), strategy)
+  console.log(chalk.bold('Inventory:'), inventory)
+
+  if (config.blueGreen) {
+    console.log(chalk.bold('\nBlue-Green config:'))
+    console.log(`  Compose structure: ${config.blueGreen.composeStructure}`)
+    console.log('  Services:')
+    for (const s of config.blueGreen.services) {
+      console.log(`    ${s.name.padEnd(12)} blue: ${s.bluePort}  green: ${s.greenPort}  health: ${s.healthPath ?? 'skip'}`)
+    }
+    if (config.blueGreen.migratePre) console.log(`  Migrate pre:  ${config.blueGreen.migratePre}`)
+    if (config.blueGreen.migratePost) console.log(`  Migrate post: ${config.blueGreen.migratePost}`)
+  }
+
+  console.log(chalk.bold('\nDeploy artifacts:'))
+  if (extraVars.compose_src) {
+    const exists = existsSync(extraVars.compose_src as string)
+    console.log(`  Compose src: ${extraVars.compose_src} ${exists ? chalk.green('✓') : chalk.red('✗ missing')}`)
+  }
+  if (extraVars.blue_green_compose_files) {
+    for (const f of extraVars.blue_green_compose_files as string[]) {
+      const exists = existsSync(f)
+      console.log(`  Compose file: ${f} ${exists ? chalk.green('✓') : chalk.red('✗ missing')}`)
+    }
+  }
+  if (extraVars.env_src) {
+    const exists = existsSync(extraVars.env_src as string)
+    console.log(`  Env file:    ${extraVars.env_src} ${exists ? chalk.green('✓') : chalk.red('✗ missing')}`)
+  }
+  if (extraVars.extra_files) {
+    for (const ef of extraVars.extra_files as Array<{ src: string; dest: string }>) {
+      const exists = existsSync(ef.src)
+      console.log(`  Extra file:  ${ef.src} → ${ef.dest} ${exists ? chalk.green('✓') : chalk.red('✗ missing')}`)
+    }
+  }
+
+  console.log(chalk.bold('\nAnsible extra-vars:'))
+  console.log(JSON.stringify(extraVars, null, 2))
+
+  if (config.blueGreen) {
+    console.log(chalk.dim('\nℹ Active/inactive slot is detected at deploy time by Ansible.'))
+  }
+
+  console.log(chalk.yellow('\nDRY RUN complete — no changes were made.\n'))
+}
+
 function checkBackupEnv(config: ProjectConfig): void {
   if (!config.postgres?.backupBucket) return
 
@@ -45,12 +102,19 @@ export function registerDeploy(program: Command): void {
     .description('Pull latest images and restart the app (Ansible deploy playbook)')
     .option('--config <path>', 'Path to .emit-infra.json')
     .option('--inventory <path>', 'Path to Ansible inventory file')
-    .action(async (_name: string | undefined, opts: { config?: string; inventory?: string }) => {
+    .option('-n, --dry-run', 'Validate config and show deploy plan without making SSH connections')
+    .action(async (_name: string | undefined, opts: { config?: string; inventory?: string; dryRun?: boolean }) => {
       const config = loadConfig(opts.config)
 
-      checkBackupEnv(config)
+      if (!opts.dryRun) {
+        checkBackupEnv(config)
+      }
 
-      console.log(chalk.cyan(`Deploying ${chalk.bold(config.name)}...`))
+      if (opts.dryRun) {
+        console.log(chalk.cyan(`Validating deploy plan for ${chalk.bold(config.name)}...`))
+      } else {
+        console.log(chalk.cyan(`Deploying ${chalk.bold(config.name)}...`))
+      }
 
       const inventory = opts.inventory ?? (await resolveInventoryPath(config.name, config))
 
@@ -147,6 +211,11 @@ export function registerDeploy(program: Command): void {
         }
         // Clear generic post_deploy_exec so Ansible doesn't also try it
         delete extraVars.post_deploy_exec
+      }
+
+      if (opts.dryRun) {
+        printDryRunPlan(config, inventory, extraVars)
+        return
       }
 
       await runAnsible('deploy', inventory, extraVars)
