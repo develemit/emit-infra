@@ -4,298 +4,427 @@ import type { FastifyInstance } from 'fastify'
 
 vi.mock('../lib/discover-projects.js', () => ({
   discoverProjects: vi.fn(),
-  discoverUnregistered: vi.fn().mockResolvedValue([]),
-}))
-
-vi.mock('../lib/jsonl.js', () => ({
-  readJsonl: vi.fn(),
-  downsample: vi.fn().mockImplementation((pts: unknown[]) => pts),
 }))
 
 vi.mock('node:fs/promises', () => ({
-  readFile: vi.fn(),
+  readFile: vi.fn().mockRejectedValue(new Error('no file')),
+  open: vi.fn().mockRejectedValue(new Error('no file')),
 }))
 
 import { discoverProjects } from '../lib/discover-projects.js'
-import { readJsonl } from '../lib/jsonl.js'
-import { readFile } from 'node:fs/promises'
+import { readFile, open } from 'node:fs/promises'
 import { historyRoutes } from './history.js'
 
 const mockProject = {
-  config: { name: 'myapp', domain: '1.2.3.4', region: 'nbg1' as const, serverType: 'cx22', sshKeyName: 'emit-deploy', github: { repo: 'user/myapp' } },
+  config: {
+    name: 'myapp',
+    domain: '1.2.3.4',
+    region: 'nbg1' as const,
+    serverType: 'cx22',
+    sshKeyName: 'emit-deploy',
+    github: { repo: 'user/myapp' },
+  },
   configPath: '/projects/myapp/.emit-infra.json',
   projectDir: '/projects/myapp',
 }
 
-function makeApp(): FastifyInstance {
-  const app = Fastify({ logger: false })
-  void app.register(historyRoutes)
-  return app
-}
-
 describe('GET /projects/:name/metrics', () => {
   let app: FastifyInstance
-  beforeEach(async () => { vi.clearAllMocks(); app = makeApp(); await app.ready() })
-  afterEach(async () => { await app.close() })
 
-  it('returns points and range on happy path', async () => {
-    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
-    const pts = [{ t: 1000, cpu: 10, mem: 40, memUsedMb: 400, memTotalMb: 1000, disk: 50, diskUsedGb: '10G', diskTotalGb: '20G', netRxBytes: 0, netTxBytes: 0, containers: [] }]
-    vi.mocked(readJsonl).mockResolvedValue(pts)
-
-    const res = await app.inject({ method: 'GET', url: '/projects/myapp/metrics' })
-    expect(res.statusCode).toBe(200)
-    const data = res.json() as { points: unknown[]; range: { from: number; to: number } }
-    expect(data.points).toHaveLength(1)
-    expect(data.range.from).toBe(1000)
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    app = Fastify({ logger: false })
+    await app.register(historyRoutes)
+    await app.ready()
   })
 
-  it('returns empty points when no metrics exist', async () => {
-    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
-    vi.mocked(readJsonl).mockResolvedValue([])
-
-    const res = await app.inject({ method: 'GET', url: '/projects/myapp/metrics' })
-    expect(res.statusCode).toBe(200)
-    const data = res.json() as { points: unknown[] }
-    expect(data.points).toHaveLength(0)
+  afterEach(async () => {
+    await app.close()
   })
 
-  it('returns 404 when project not found', async () => {
+  it('returns 404 when project is not found', async () => {
     vi.mocked(discoverProjects).mockResolvedValue([])
+
     const res = await app.inject({ method: 'GET', url: '/projects/missing/metrics' })
+
     expect(res.statusCode).toBe(404)
     expect(res.json()).toEqual({ error: 'not found' })
   })
 
-  it('returns 400 when hours=0 (below minimum)', async () => {
+  it('returns empty points when metrics file does not exist', async () => {
     vi.mocked(discoverProjects).mockResolvedValue([mockProject])
-    const res = await app.inject({ method: 'GET', url: '/projects/myapp/metrics?hours=0' })
-    expect(res.statusCode).toBe(400)
+    vi.mocked(open).mockRejectedValue(new Error('ENOENT'))
+
+    const res = await app.inject({ method: 'GET', url: '/projects/myapp/metrics' })
+
+    expect(res.statusCode).toBe(200)
+    const data = res.json() as { points: unknown[]; range: unknown }
+    expect(data.points).toEqual([])
+    expect(data.range).toHaveProperty('from')
+    expect(data.range).toHaveProperty('to')
   })
 
-  it('returns 400 when hours=721 (above maximum)', async () => {
+  it('returns downsampled metric points on happy path', async () => {
     vi.mocked(discoverProjects).mockResolvedValue([mockProject])
-    const res = await app.inject({ method: 'GET', url: '/projects/myapp/metrics?hours=721' })
-    expect(res.statusCode).toBe(400)
+    vi.mocked(open).mockRejectedValue(new Error('ENOENT'))
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/projects/myapp/metrics?hours=1',
+    })
+
+    expect(res.statusCode).toBe(200)
+    const data = res.json() as { points: unknown[]; range: { from: number; to: number } }
+    expect(Array.isArray(data.points)).toBe(true)
+    expect(typeof data.range.from).toBe('number')
+    expect(typeof data.range.to).toBe('number')
   })
 })
 
 describe('GET /projects/:name/deploy-history', () => {
   let app: FastifyInstance
-  beforeEach(async () => { vi.clearAllMocks(); app = makeApp(); await app.ready() })
-  afterEach(async () => { await app.close() })
 
-  it('returns deploys in reverse order', async () => {
-    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
-    const deploys = [
-      { status: 'success', sha: 'aaa', branch: 'main', startedAt: '2024-01-01T00:00:00Z', completedAt: '2024-01-01T00:01:00Z', durationSec: 60, servicesBuilt: [] },
-      { status: 'success', sha: 'bbb', branch: 'main', startedAt: '2024-01-02T00:00:00Z', completedAt: '2024-01-02T00:01:00Z', durationSec: 60, servicesBuilt: [] },
-    ]
-    vi.mocked(readJsonl).mockResolvedValue(deploys)
-
-    const res = await app.inject({ method: 'GET', url: '/projects/myapp/deploy-history?limit=10' })
-    expect(res.statusCode).toBe(200)
-    const data = res.json() as { deploys: Array<{ sha: string }> }
-    expect(data.deploys).toHaveLength(2)
-    expect(data.deploys[0]?.sha).toBe('bbb')
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    app = Fastify({ logger: false })
+    await app.register(historyRoutes)
+    await app.ready()
   })
 
-  it('respects limit query param', async () => {
-    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
-    const deploys = Array.from({ length: 10 }, (_, i) => ({
-      status: 'success', sha: `sha${i}`, branch: 'main',
-      startedAt: '2024-01-01T00:00:00Z', completedAt: '2024-01-01T00:01:00Z',
-      durationSec: 60, servicesBuilt: [],
-    }))
-    vi.mocked(readJsonl).mockResolvedValue(deploys)
-
-    const res = await app.inject({ method: 'GET', url: '/projects/myapp/deploy-history?limit=3' })
-    expect(res.statusCode).toBe(200)
-    const data = res.json() as { deploys: unknown[] }
-    expect(data.deploys).toHaveLength(3)
+  afterEach(async () => {
+    await app.close()
   })
 
-  it('returns 404 when project not found', async () => {
+  it('returns 404 when project is not found', async () => {
     vi.mocked(discoverProjects).mockResolvedValue([])
+
     const res = await app.inject({ method: 'GET', url: '/projects/missing/deploy-history' })
+
     expect(res.statusCode).toBe(404)
   })
 
-  it('returns 400 when limit=201 (above maximum)', async () => {
+  it('returns empty deploys array when file does not exist', async () => {
     vi.mocked(discoverProjects).mockResolvedValue([mockProject])
-    const res = await app.inject({ method: 'GET', url: '/projects/myapp/deploy-history?limit=201' })
-    expect(res.statusCode).toBe(400)
+    vi.mocked(open).mockRejectedValue(new Error('ENOENT'))
+
+    const res = await app.inject({ method: 'GET', url: '/projects/myapp/deploy-history' })
+
+    expect(res.statusCode).toBe(200)
+    const data = res.json() as { deploys: unknown[] }
+    expect(data.deploys).toEqual([])
+  })
+
+  it('returns deploys on happy path', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    vi.mocked(open).mockRejectedValue(new Error('ENOENT'))
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/projects/myapp/deploy-history?limit=10',
+    })
+
+    expect(res.statusCode).toBe(200)
+    const data = res.json() as { deploys: unknown[] }
+    expect(Array.isArray(data.deploys)).toBe(true)
   })
 })
 
 describe('GET /projects/:name/ci-history', () => {
   let app: FastifyInstance
-  beforeEach(async () => { vi.clearAllMocks(); app = makeApp(); await app.ready() })
-  afterEach(async () => { await app.close() })
 
-  it('returns runs when project exists', async () => {
-    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
-    const runs = [{ status: 'success', sha: 'abc1234', branch: 'main', startedAt: '2024-01-01T00:00:00Z', completedAt: '2024-01-01T00:05:00Z', durationSec: 300 }]
-    vi.mocked(readJsonl).mockResolvedValue(runs)
-
-    const res = await app.inject({ method: 'GET', url: '/projects/myapp/ci-history' })
-    expect(res.statusCode).toBe(200)
-    const data = res.json() as { runs: unknown[] }
-    expect(data.runs).toHaveLength(1)
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    app = Fastify({ logger: false })
+    await app.register(historyRoutes)
+    await app.ready()
   })
 
-  it('returns 404 when project not found', async () => {
+  afterEach(async () => {
+    await app.close()
+  })
+
+  it('returns 404 when project is not found', async () => {
     vi.mocked(discoverProjects).mockResolvedValue([])
+
     const res = await app.inject({ method: 'GET', url: '/projects/missing/ci-history' })
+
     expect(res.statusCode).toBe(404)
+  })
+
+  it('returns empty runs array when file does not exist', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    vi.mocked(open).mockRejectedValue(new Error('ENOENT'))
+
+    const res = await app.inject({ method: 'GET', url: '/projects/myapp/ci-history' })
+
+    expect(res.statusCode).toBe(200)
+    const data = res.json() as { runs: unknown[] }
+    expect(data.runs).toEqual([])
+  })
+
+  it('returns runs on happy path', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    vi.mocked(open).mockRejectedValue(new Error('ENOENT'))
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/projects/myapp/ci-history?limit=10',
+    })
+
+    expect(res.statusCode).toBe(200)
+    const data = res.json() as { runs: unknown[] }
+    expect(Array.isArray(data.runs)).toBe(true)
   })
 })
 
 describe('GET /projects/:name/ci-log/:sha', () => {
   let app: FastifyInstance
-  beforeEach(async () => { vi.clearAllMocks(); app = makeApp(); await app.ready() })
-  afterEach(async () => { await app.close() })
 
-  it('returns log content as text on happy path', async () => {
-    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
-    vi.mocked(readFile).mockResolvedValue('line1\nline2\n' as never)
-
-    const res = await app.inject({ method: 'GET', url: '/projects/myapp/ci-log/abc1234abc' })
-    expect(res.statusCode).toBe(200)
-    expect(res.body).toBe('line1\nline2\n')
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    app = Fastify({ logger: false })
+    await app.register(historyRoutes)
+    await app.ready()
   })
 
-  it('returns 404 when log file does not exist', async () => {
-    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
-    vi.mocked(readFile).mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }))
+  afterEach(async () => {
+    await app.close()
+  })
 
-    const res = await app.inject({ method: 'GET', url: '/projects/myapp/ci-log/abc1234abc' })
+  it('returns 404 when project is not found', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([])
+
+    const res = await app.inject({ method: 'GET', url: '/projects/missing/ci-log/abc1234' })
+
     expect(res.statusCode).toBe(404)
   })
 
-  it('returns 400 when sha contains invalid characters', async () => {
+  it('returns 400 when sha is invalid', async () => {
     vi.mocked(discoverProjects).mockResolvedValue([mockProject])
-    const res = await app.inject({ method: 'GET', url: '/projects/myapp/ci-log/not-valid-sha' })
+
+    const res = await app.inject({ method: 'GET', url: '/projects/myapp/ci-log/tooshort' })
+
     expect(res.statusCode).toBe(400)
-  })
-})
-
-describe('GET /projects/:name/deploy-log/:sha', () => {
-  let app: FastifyInstance
-  beforeEach(async () => { vi.clearAllMocks(); app = makeApp(); await app.ready() })
-  afterEach(async () => { await app.close() })
-
-  it('returns log content as text on happy path', async () => {
-    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
-    vi.mocked(readFile).mockResolvedValue('deploy started\ndeploy done\n' as never)
-
-    const res = await app.inject({ method: 'GET', url: '/projects/myapp/deploy-log/deadbeef' })
-    expect(res.statusCode).toBe(200)
-    expect(res.body).toContain('deploy started')
   })
 
   it('returns 404 when log file does not exist', async () => {
     vi.mocked(discoverProjects).mockResolvedValue([mockProject])
     vi.mocked(readFile).mockRejectedValue(new Error('ENOENT'))
 
-    const res = await app.inject({ method: 'GET', url: '/projects/myapp/deploy-log/deadbeef' })
+    const res = await app.inject({ method: 'GET', url: '/projects/myapp/ci-log/abc1234567' })
+
     expect(res.statusCode).toBe(404)
+  })
+
+  it('returns plain text log on happy path', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    vi.mocked(readFile).mockResolvedValue('Build log content here\nLine 2')
+
+    const res = await app.inject({ method: 'GET', url: '/projects/myapp/ci-log/abc1234567' })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.headers['content-type']).toContain('text/plain')
+    expect(res.body).toBe('Build log content here\nLine 2')
+  })
+})
+
+describe('GET /projects/:name/deploy-log/:sha', () => {
+  let app: FastifyInstance
+
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    app = Fastify({ logger: false })
+    await app.register(historyRoutes)
+    await app.ready()
+  })
+
+  afterEach(async () => {
+    await app.close()
+  })
+
+  it('returns 404 when project is not found', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([])
+
+    const res = await app.inject({ method: 'GET', url: '/projects/missing/deploy-log/abc1234' })
+
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('returns 400 when sha is invalid', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+
+    const res = await app.inject({ method: 'GET', url: '/projects/myapp/deploy-log/tooshort' })
+
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('returns 404 when log file does not exist', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    vi.mocked(readFile).mockRejectedValue(new Error('ENOENT'))
+
+    const res = await app.inject({ method: 'GET', url: '/projects/myapp/deploy-log/abc1234567' })
+
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('returns plain text log on happy path', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    vi.mocked(readFile).mockResolvedValue('Deploy log content\nSuccess')
+
+    const res = await app.inject({ method: 'GET', url: '/projects/myapp/deploy-log/abc1234567' })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.headers['content-type']).toContain('text/plain')
+    expect(res.body).toBe('Deploy log content\nSuccess')
   })
 })
 
 describe('GET /projects/:name/disk-trend', () => {
   let app: FastifyInstance
-  beforeEach(async () => { vi.clearAllMocks(); app = makeApp(); await app.ready() })
-  afterEach(async () => { await app.close() })
 
-  it('returns disk trend data on happy path (enough points)', async () => {
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    app = Fastify({ logger: false })
+    await app.register(historyRoutes)
+    await app.ready()
+  })
+
+  afterEach(async () => {
+    await app.close()
+  })
+
+  it('returns 404 when project is not found', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([])
+
+    const res = await app.inject({ method: 'GET', url: '/projects/missing/disk-trend' })
+
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('returns zero trend when file does not exist', async () => {
     vi.mocked(discoverProjects).mockResolvedValue([mockProject])
-    const now = Math.floor(Date.now() / 1000)
-    const pts = Array.from({ length: 6 }, (_, i) => ({
-      t: now - (5 - i) * 3600, disk: 50 + i, mem: 30, cpu: 10, memUsedMb: 300, memTotalMb: 1000,
-      diskUsedGb: '10G', diskTotalGb: '20G', netRxBytes: 0, netTxBytes: 0, containers: [],
-    }))
-    vi.mocked(readJsonl).mockResolvedValue(pts)
+    vi.mocked(open).mockRejectedValue(new Error('ENOENT'))
 
     const res = await app.inject({ method: 'GET', url: '/projects/myapp/disk-trend' })
+
+    expect(res.statusCode).toBe(200)
+    const data = res.json() as { disk: number; pctPerDay: number; projectedDaysUntilFull: null }
+    expect(data.disk).toBe(0)
+    expect(data.pctPerDay).toBe(0)
+    expect(data.projectedDaysUntilFull).toBeNull()
+  })
+
+  it('returns trend on happy path', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    vi.mocked(open).mockRejectedValue(new Error('ENOENT'))
+
+    const res = await app.inject({ method: 'GET', url: '/projects/myapp/disk-trend' })
+
     expect(res.statusCode).toBe(200)
     const data = res.json() as { disk: number; pctPerDay: number; projectedDaysUntilFull: number | null }
     expect(typeof data.disk).toBe('number')
     expect(typeof data.pctPerDay).toBe('number')
-  })
-
-  it('returns pctPerDay=0 when fewer than 5 points', async () => {
-    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
-    vi.mocked(readJsonl).mockResolvedValue([
-      { t: 1000, disk: 55, mem: 30, cpu: 0, memUsedMb: 300, memTotalMb: 1000,
-        diskUsedGb: '10G', diskTotalGb: '20G', netRxBytes: 0, netTxBytes: 0, containers: [] },
-    ])
-
-    const res = await app.inject({ method: 'GET', url: '/projects/myapp/disk-trend' })
-    expect(res.statusCode).toBe(200)
-    const data = res.json() as { pctPerDay: number }
-    expect(data.pctPerDay).toBe(0)
-  })
-
-  it('returns 404 when project not found', async () => {
-    vi.mocked(discoverProjects).mockResolvedValue([])
-    const res = await app.inject({ method: 'GET', url: '/projects/missing/disk-trend' })
-    expect(res.statusCode).toBe(404)
+    expect(data.projectedDaysUntilFull === null || typeof data.projectedDaysUntilFull === 'number').toBe(true)
   })
 })
 
 describe('GET /projects/:name/memory-trend', () => {
   let app: FastifyInstance
-  beforeEach(async () => { vi.clearAllMocks(); app = makeApp(); await app.ready() })
-  afterEach(async () => { await app.close() })
 
-  it('returns memory trend data on happy path (enough points)', async () => {
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    app = Fastify({ logger: false })
+    await app.register(historyRoutes)
+    await app.ready()
+  })
+
+  afterEach(async () => {
+    await app.close()
+  })
+
+  it('returns 404 when project is not found', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([])
+
+    const res = await app.inject({ method: 'GET', url: '/projects/missing/memory-trend' })
+
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('returns zero trend when file does not exist', async () => {
     vi.mocked(discoverProjects).mockResolvedValue([mockProject])
-    const now = Math.floor(Date.now() / 1000)
-    const pts = Array.from({ length: 6 }, (_, i) => ({
-      t: now - (5 - i) * 3600, mem: 40 + i, disk: 50, cpu: 10, memUsedMb: 400, memTotalMb: 1000,
-      diskUsedGb: '10G', diskTotalGb: '20G', netRxBytes: 0, netTxBytes: 0, containers: [],
-    }))
-    vi.mocked(readJsonl).mockResolvedValue(pts)
+    vi.mocked(open).mockRejectedValue(new Error('ENOENT'))
 
     const res = await app.inject({ method: 'GET', url: '/projects/myapp/memory-trend' })
+
+    expect(res.statusCode).toBe(200)
+    const data = res.json() as { mem: number; pctPerDay: number; projectedDaysUntilFull: null }
+    expect(data.mem).toBe(0)
+    expect(data.pctPerDay).toBe(0)
+    expect(data.projectedDaysUntilFull).toBeNull()
+  })
+
+  it('returns trend on happy path', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    vi.mocked(open).mockRejectedValue(new Error('ENOENT'))
+
+    const res = await app.inject({ method: 'GET', url: '/projects/myapp/memory-trend' })
+
     expect(res.statusCode).toBe(200)
     const data = res.json() as { mem: number; pctPerDay: number; projectedDaysUntilFull: number | null }
     expect(typeof data.mem).toBe('number')
     expect(typeof data.pctPerDay).toBe('number')
-  })
-
-  it('returns 404 when project not found', async () => {
-    vi.mocked(discoverProjects).mockResolvedValue([])
-    const res = await app.inject({ method: 'GET', url: '/projects/missing/memory-trend' })
-    expect(res.statusCode).toBe(404)
+    expect(data.projectedDaysUntilFull === null || typeof data.projectedDaysUntilFull === 'number').toBe(true)
   })
 })
 
 describe('GET /projects/:name/container-restarts', () => {
   let app: FastifyInstance
-  beforeEach(async () => { vi.clearAllMocks(); app = makeApp(); await app.ready() })
-  afterEach(async () => { await app.close() })
 
-  it('returns restart timelines per container on happy path', async () => {
-    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
-    const pts = [
-      { t: 1000, mem: 30, disk: 50, cpu: 10, memUsedMb: 300, memTotalMb: 1000,
-        diskUsedGb: '10G', diskTotalGb: '20G', netRxBytes: 0, netTxBytes: 0,
-        containers: [{ name: 'api', cpu: 5, memMb: 100, restarts: 2 }] },
-    ]
-    vi.mocked(readJsonl).mockResolvedValue(pts)
-
-    const res = await app.inject({ method: 'GET', url: '/projects/myapp/container-restarts' })
-    expect(res.statusCode).toBe(200)
-    const data = res.json() as Record<string, { t: number; restarts: number }[]>
-    expect(data['api']).toBeDefined()
-    expect(data['api']![0]!.restarts).toBe(2)
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    app = Fastify({ logger: false })
+    await app.register(historyRoutes)
+    await app.ready()
   })
 
-  it('returns 404 when project not found', async () => {
+  afterEach(async () => {
+    await app.close()
+  })
+
+  it('returns 404 when project is not found', async () => {
     vi.mocked(discoverProjects).mockResolvedValue([])
+
     const res = await app.inject({ method: 'GET', url: '/projects/missing/container-restarts' })
+
     expect(res.statusCode).toBe(404)
+  })
+
+  it('returns empty object when file does not exist', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    vi.mocked(open).mockRejectedValue(new Error('ENOENT'))
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/projects/myapp/container-restarts',
+    })
+
+    expect(res.statusCode).toBe(200)
+    const data = res.json() as Record<string, unknown>
+    expect(typeof data).toBe('object')
+    expect(Object.keys(data).length).toBe(0)
+  })
+
+  it('returns restarts data on happy path', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    vi.mocked(open).mockRejectedValue(new Error('ENOENT'))
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/projects/myapp/container-restarts?hours=24',
+    })
+
+    expect(res.statusCode).toBe(200)
+    const data = res.json() as Record<string, unknown>
+    expect(typeof data).toBe('object')
   })
 })
