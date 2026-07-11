@@ -1,0 +1,227 @@
+import { readFileSync, existsSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
+import { sshExec } from '@emit-infra/core'
+
+export type Severity = 'critical' | 'warn' | 'info'
+
+export interface Issue {
+  severity: Severity
+  file: string
+  message: string
+  fix: string
+}
+
+export interface RemoteImage {
+  name: string
+  sizeStr: string
+  sizeMb: number
+}
+
+export function findDockerfiles(projectDir: string): string[] {
+  const candidates: string[] = []
+  const searchDirs = [
+    projectDir,
+    join(projectDir, 'docker'),
+  ]
+
+  const appsDir = join(projectDir, 'apps')
+  if (existsSync(appsDir)) {
+    const appDirs = readdirSync(appsDir, { withFileTypes: true })
+      .filter(d => d.isDirectory())
+      .map(d => join(appsDir, d.name))
+    searchDirs.push(...appDirs)
+  }
+
+  for (const dir of searchDirs) {
+    if (!existsSync(dir)) continue
+    for (const f of readdirSync(dir)) {
+      if (f.startsWith('Dockerfile')) candidates.push(join(dir, f))
+    }
+  }
+  return candidates
+}
+
+export function auditDockerfile(filepath: string, content: string): Issue[] {
+  const issues: Issue[] = []
+  const rel = filepath.replace(process.cwd() + '/', '')
+  const lines = content.split('\n')
+
+  const stages = lines.filter(l => /^FROM\s+/i.test(l))
+  const isMultiStage = stages.length > 1
+
+  // Running dev server in production
+  const cmdLine = lines.find(l => /^(CMD|ENTRYPOINT)\s+/i.test(l)) ?? ''
+  if (/\bdev\b/i.test(cmdLine)) {
+    issues.push({
+      severity: 'critical',
+      file: rel,
+      message: `CMD runs dev server: ${cmdLine.trim()}`,
+      fix: 'Build the app (e.g. "next build") in a builder stage and run "next start" or serve the standalone output.',
+    })
+  }
+
+  // No multi-stage build
+  if (!isMultiStage) {
+    issues.push({
+      severity: 'critical',
+      file: rel,
+      message: 'Single-stage build — all source files and devDependencies land in the final image.',
+      fix: 'Use a multi-stage build: builder stage installs + compiles, final stage copies only the built output.',
+    })
+  }
+
+  // pnpm install without --frozen-lockfile
+  const installLines = lines.filter(l => /pnpm install/i.test(l))
+  for (const il of installLines) {
+    if (!il.includes('--frozen-lockfile')) {
+      issues.push({
+        severity: 'warn',
+        file: rel,
+        message: `pnpm install without --frozen-lockfile: ${il.trim()}`,
+        fix: 'Replace with "pnpm install --frozen-lockfile" to enforce lockfile integrity in CI/CD.',
+      })
+    }
+  }
+
+  // npm install without --production / npm ci
+  const npmLines = lines.filter(l => /\bnpm install(?!.*--production)(?!.*--omit=dev)/i.test(l))
+  if (npmLines.length && !lines.some(l => /npm ci/i.test(l))) {
+    issues.push({
+      severity: 'warn',
+      file: rel,
+      message: 'npm install without --production/--omit=dev in apparent final stage.',
+      fix: 'Use "npm ci --omit=dev" or multi-stage to avoid shipping devDependencies.',
+    })
+  }
+
+  // COPY . . without a .dockerignore nearby check is done separately
+  if (lines.some(l => /^COPY\s+\.\s+\./i.test(l))) {
+    issues.push({
+      severity: 'info',
+      file: rel,
+      message: '"COPY . ." detected — verify .dockerignore excludes build artifacts and dev files.',
+      fix: 'Ensure .dockerignore lists: node_modules, .git, **/*.ts (if not needed at runtime), test files, *.md.',
+    })
+  }
+
+  // BUILD_NUMBER build-arg capture
+  const hasBuildNumberArg = lines.some(l => /^ARG\s+BUILD_NUMBER/i.test(l))
+  const hasBuildNumberEnv = lines.some(l => /^ENV\s+.*BUILD_NUMBER/i.test(l))
+  if (isMultiStage && !hasBuildNumberArg) {
+    issues.push({
+      severity: 'warn',
+      file: rel,
+      message: 'BUILD_NUMBER build-arg not declared — the value passed by CI is silently dropped.',
+      fix: 'Add "ARG BUILD_NUMBER" before the final stage CMD, then "ENV BUILD_NUMBER=$BUILD_NUMBER" to expose it at runtime.',
+    })
+  } else if (isMultiStage && hasBuildNumberArg && !hasBuildNumberEnv) {
+    issues.push({
+      severity: 'info',
+      file: rel,
+      message: 'ARG BUILD_NUMBER declared but not promoted to ENV — not available as a runtime env var.',
+      fix: 'Add "ENV BUILD_NUMBER=$BUILD_NUMBER" (or "ENV NEXT_PUBLIC_BUILD_NUMBER=$BUILD_NUMBER" for Next.js) after the ARG line.',
+    })
+  }
+
+  return issues
+}
+
+const REQUIRED_IGNORES = ['.git', '**/*.test.*', '**/*.spec.*', '*.md', '.env*']
+
+export function auditDockerignore(projectDir: string): Issue[] {
+  const path = join(projectDir, '.dockerignore')
+  const file = '.dockerignore'
+  if (!existsSync(path)) {
+    return [{
+      severity: 'critical',
+      file,
+      message: 'No .dockerignore file found.',
+      fix: 'Create .dockerignore with at minimum: node_modules, .git, dist, .next, *.md, **/*.test.*, .env*',
+    }]
+  }
+  const content = readFileSync(path, 'utf8')
+  const missing = REQUIRED_IGNORES.filter(pat => !content.includes(pat.replace('**/', '')))
+  if (!missing.length) return []
+  return [{
+    severity: 'warn',
+    file,
+    message: `Missing recommended exclusions: ${missing.join(', ')}`,
+    fix: `Add these to .dockerignore to avoid shipping unnecessary files into the image.`,
+  }]
+}
+
+export function parseSizeMb(sizeStr: string): number {
+  const n = parseFloat(sizeStr)
+  if (/GB/i.test(sizeStr)) return n * 1024
+  if (/MB/i.test(sizeStr)) return n
+  if (/kB/i.test(sizeStr)) return n / 1024
+  return 0
+}
+
+export async function auditRemote(host: string, key: string, _projectName: string): Promise<Issue[]> {
+  const issues: Issue[] = []
+
+  let raw: string
+  try {
+    raw = await sshExec(
+      host,
+      `docker ps --format '{{.Names}}\t{{.Image}}' | while read line; do
+        name=$(echo "$line" | cut -f1)
+        img=$(echo "$line" | cut -f2)
+        size=$(docker image inspect "$img" --format '{{.Size}}' 2>/dev/null)
+        echo "$name\t$img\t$size"
+      done`,
+      key,
+    )
+  } catch {
+    issues.push({
+      severity: 'warn',
+      file: 'remote',
+      message: 'Could not SSH to check remote image sizes.',
+      fix: 'Pass --key and --host, or run from a machine with SSH access.',
+    })
+    return issues
+  }
+
+  const images: RemoteImage[] = raw.split('\n')
+    .filter(l => l.trim())
+    .map(l => {
+      const parts = l.split('\t')
+      const bytes = parseInt(parts[2] ?? '0', 10)
+      const sizeMb = bytes / (1024 * 1024)
+      const sizeStr = sizeMb >= 1024
+        ? `${(sizeMb / 1024).toFixed(2)} GB`
+        : `${sizeMb.toFixed(0)} MB`
+      return { name: parts[0] ?? '', sizeStr, sizeMb }
+    })
+    .filter(img => img.sizeMb > 0)
+
+  for (const img of images) {
+    if (img.sizeMb >= 1024) {
+      issues.push({
+        severity: 'critical',
+        file: `container: ${img.name}`,
+        message: `Image is ${img.sizeStr} — well above the ~400 MB target for a Next.js app.`,
+        fix: 'Switch to a multi-stage build with Next.js standalone output. Expected size: 200–400 MB.',
+      })
+    } else if (img.sizeMb >= 500) {
+      issues.push({
+        severity: 'warn',
+        file: `container: ${img.name}`,
+        message: `Image is ${img.sizeStr} — larger than expected (target < 500 MB).`,
+        fix: 'Review devDependencies in the final stage; consider multi-stage or standalone builds.',
+      })
+    }
+  }
+
+  if (!images.length) {
+    issues.push({
+      severity: 'info',
+      file: 'remote',
+      message: `No running containers found on ${host}.`,
+      fix: 'Run "emit-infra deploy" first, or pass --host to target the correct server.',
+    })
+  }
+
+  return issues
+}

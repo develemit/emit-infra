@@ -69,6 +69,10 @@ await app.register(scaleAdviceRoutes)
 await app.register(alertsRoutes)
 await app.register(deployRoutes)
 
+process.on('unhandledRejection', (reason, promise) => {
+  app.log.error({ err: reason, promise }, 'Unhandled rejection')
+})
+
 const port = Number(process.env['PORT'] ?? 7001)
 const isDev = process.env['NODE_ENV'] === 'development'
 const hasSecret = Boolean(process.env['API_SECRET'])
