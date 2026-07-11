@@ -1,6 +1,9 @@
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import { projectRoutes } from './routes/projects.js'
+import { projectStatusRoutes } from './routes/project-status.js'
+import { projectDockerRoutes } from './routes/project-docker.js'
+import { projectBackupsRoutes } from './routes/project-backups.js'
 import { operationRoutes } from './routes/operations.js'
 import { rollbackRoutes } from './routes/rollback.js'
 import { secretsSyncRoutes } from './routes/secrets-sync.js'
@@ -37,6 +40,9 @@ registerAuth(app, process.env['API_SECRET'])
 app.get('/health', async () => ({ ok: true }))
 
 await app.register(projectRoutes)
+await app.register(projectStatusRoutes)
+await app.register(projectDockerRoutes)
+await app.register(projectBackupsRoutes)
 await app.register(operationRoutes)
 await app.register(rollbackRoutes)
 await app.register(secretsSyncRoutes)

@@ -28,7 +28,7 @@ vi.mock('@emit-infra/core', () => ({
 
 import { sshExec } from '@emit-infra/core'
 import { findProject } from '../lib/project-helpers.js'
-import { projectRoutes } from './projects.js'
+import { projectBackupsRoutes } from './project-backups.js'
 
 const mockProjectWithoutBucket = {
   config: {
@@ -63,7 +63,7 @@ describe('GET /projects/:name/backups', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
     app = Fastify({ logger: false })
-    await app.register(projectRoutes)
+    await app.register(projectBackupsRoutes)
     await app.ready()
   })
 
@@ -112,7 +112,7 @@ describe('DELETE /projects/:name/backups/:key', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
     app = Fastify({ logger: false })
-    await app.register(projectRoutes)
+    await app.register(projectBackupsRoutes)
     await app.ready()
   })
 
@@ -176,7 +176,7 @@ describe('POST /projects/:name/backups/trigger', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
     app = Fastify({ logger: false })
-    await app.register(projectRoutes)
+    await app.register(projectBackupsRoutes)
     await app.ready()
   })
 
@@ -230,7 +230,7 @@ describe('GET /projects/:name/backups/:key/download', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
     app = Fastify({ logger: false })
-    await app.register(projectRoutes)
+    await app.register(projectBackupsRoutes)
     await app.ready()
   })
 
