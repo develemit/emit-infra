@@ -26,8 +26,8 @@ file to promote items into proper sprints when the list grows worth addressing.
 - (sprint 114, 2026-06-28) SSE reconnection on token expiry not handled — tokens are static per deployment so acceptable for now; revisit if token rotation is added
 - (sprint 115, 2026-06-29) **[manual ops]** Activate healthchecks.io DMS for emit-vision: create a check (15-min period, 5-min grace) at healthchecks.io, add `HEALTHCHECKS_URL=<ping-url>` to Hetzner `.env`, run `docker compose -f infra/docker/docker-compose.infra.yml up -d dms-ping`
 
-<!-- follow-up-scan: date=2026-07-01 through=154 clean=true -->
-> _Sprint scan: incremental scan 2026-07-01 through sprint-154. Sprints 151–154: all follow-ups marked `none` — clean. Prior scan: 2026-07-01 through sprint-150._
+<!-- follow-up-scan: date=2026-07-10 through=207 clean=false -->
+> _Sprint scan: incremental scan 2026-07-10 through sprint-207. 9 orphans found from sprints 183–204. Prior scan: 2026-07-01 through sprint-154._
 
 - (sprint 04, 2026-06-03) `pnpm build` fails on `/_error` and `/500` static pre-render — `<Html>` outside pages/_document error in Next.js 15.5.19 (upstream bug; dev server and typecheck/lint are clean) `[hold]`
 ~~- (sprint 04, 2026-06-03) Provision wizard uses local Zod schema mirroring `ProjectConfigSchema` — consider extracting shared browser-safe types into `@emit-infra/types`; run `/plan-sprint "shared types package"` to plan~~
@@ -41,6 +41,11 @@ file to promote items into proper sprints when the list grows worth addressing.
 
 ## ✅ Converted to Sprints
 
+- ~~(sprint 206/207) Pre-existing lint errors across billing.ts, cert.ts, history.ts, incidents-export.ts, operations.ts~~ → sprint-208 (2026-07-10)
+- ~~(sprint 191) `.alerts.jsonl` and `.alert-state.json` never pruned — 90-day retention~~ → sprint-209 (2026-07-10)
+- ~~(sprint 190) Fix MobileContainerRow restart test failure~~ → sprint-210 (2026-07-10)
+- ~~(sprint 178) Backup polling UX: elapsed timer + timeout message~~ → sprint-211 (2026-07-10)
+- ~~(sprint 203) Deploy --dry-run flag~~ → sprint-212 (2026-07-10)
 - ~~(sprint 125, 2026-07-01) Route-level tests for backup routes (key validation, 404 on missing bucket, parse edge cases)~~ → sprint-151 (2026-07-01)
 - ~~(sprint 126, 2026-07-01) BackupPanel delete failure silently re-fetches — add inline error state~~ → sprint-152 (2026-07-01)
 - ~~(sprint 128, 2026-07-01) Dashboard UI for editing `backupRetainDays` per project~~ → sprint-153 (2026-07-01)
@@ -107,11 +112,7 @@ file to promote items into proper sprints when the list grows worth addressing.
 - (sprint 176, 2026-07-02) "Sync to server" button only appears for missing keys; extra server-side keys (in `extra[]`) are not cleaned up by the apply route — would need a separate "prune extra" SSH step
 - (sprint 177, 2026-07-02) other polling hooks (`use-server-metrics`, `use-ci-history`, etc.) still use plain `setInterval` — could apply jitter pattern there if lockstep polling at scale is a concern
 - (sprint 177, 2026-07-02) `httpCircuit` resets on API server restart; a failed first probe post-boot could leave a circuit open that delays recovery visibility — acceptable for now
-- (sprint 178, 2026-07-02) backup completion polling has no elapsed-time indicator — "Running…" is the only feedback during a potentially long backup
-- (sprint 178, 2026-07-02) 10-minute polling timeout silently stops with no user message — could show "Backup status unknown — check logs" on timeout
-- (sprint 190, 2026-07-03) Fix pre-existing `MobileContainerRow > calls restartContainer and onRefetch on restart button click` test failure in `apps/dashboard/src/components/detail/container-row.test.tsx`
 - (sprint 191, 2026-07-03) `backupAgeHours` metric in status-monitor uses `grep -o '"lastRun":"[^"]*"'` — silently unavailable if backup-status.json format changes
-- (sprint 191, 2026-07-03) `.alerts.jsonl` and `.alert-state.json` are never pruned — add cleanup (trim to 90 days) in a future maintenance sprint
 - (sprint 192, 2026-07-03) AlertRulesSection initializes from config at mount — won't reflect server-side changes until page reload
 - (sprint 192, 2026-07-03) Multiple metrics firing simultaneously send separate push notifications (no bundling)
 - (sprint 193, 2026-07-03) `nx run dashboard:build` still fails due to pre-existing Next.js 15 `Html` outside `pages/_document` bug on `/500` and `/_error` static routes (tracked since sprint 04)
@@ -119,6 +120,23 @@ file to promote items into proper sprints when the list grows worth addressing.
 - (sprint 199, 2026-07-03) Rollback via webhook not yet implemented — manual `emit-infra deploy` for now
 - (sprint 202, 2026-07-03) develemail worker has no HTTP health check — may want Docker HEALTHCHECK inspection in future
 - (sprint 202, 2026-07-03) All project CI changes are local; need to be pushed to their respective repos
-- (sprint 203, 2026-07-03) Deploy command lacks a `--dry-run` flag for validating generated configs without SSH
 - (sprint 203, 2026-07-03) init-deploy currently only scaffolds "separate" compose structure; "profiles" mode generates config but doesn't modify the existing compose file
 - (sprint 203, 2026-07-03) Nginx upstream config template generation not implemented (checklist mentions it as a manual step instead)
+- (sprint 205, 2026-07-05) The streaming mock pattern (thenable process with Readable.from streams) could be extracted to a shared test helper if future test sprints repeat it
+- (sprint 205, 2026-07-05) `sshExec` doesn't throw on non-zero exit (execa's default reject behavior handles it) — worth a test if reject semantics are ever customized
+- (sprint 206, 2026-07-05) postgres.test.ts uses a separate project name for the SSH-failure test to avoid TTL cache interference — the cache is module-scoped and survives between tests within the same file
+- (sprint 206, 2026-07-05) The logs route in operations.ts uses `streamProcess` which is harder to test via inject — only validation/404 paths are covered; a streaming integration test would need a fake async iterable
+- (sprint 183, 2026-07-10) claude-session TTL/cap constants (24h/100) are hardcoded — could move to env config if ops chat usage grows beyond a solo operator
+- (sprint 183, 2026-07-10) metric-history quota prune only trims the current project's key; a full-storage sweep across all `emit-infra:metrics:*` keys would recover more space
+- (sprint 184, 2026-07-10) sshExec in packages/core could grow an optional stdin `input` param (execa supports it) — would let secrets-apply drop the interpolated base64 entirely
+- (sprint 184, 2026-07-10) prune route catch collapses all failures to `{ error: 'unreachable' }` — could pass through the real error message like restart now does
+- (sprint 184, 2026-07-10) readJsonlTail with `tail: 0` returns first window instead of all items — no caller passes 0, noting for completeness
+- (sprint 187, 2026-07-10) palette-items `filterItems` is pure and would be a cheap first target for dashboard component tests
+- (sprint 188, 2026-07-10) CSV escaping test covers structure but doesn't exercise the comma-in-field branch (ISO timestamps contain colons not commas)
+- (sprint 189, 2026-07-10) SLA cache is not invalidated when an annotation is written — false-positive flag change won't affect cached SLA until 120s TTL expires
+- (sprint 204, 2026-07-10) label-read's `ps -q | head -1` picks arbitrary container — could target first app service explicitly, but harmless as a fallback
+- (sprint 212, 2026-07-10) Could suppress the `GHCR_TOKEN not set` warning in dry-run mode since no docker pull occurs
+- (sprint 213, 2026-07-10) ops.ts route integration tests (sprint 215 covers full route testing)
+- (sprint 214, 2026-07-10) Pre-existing lint errors in audit.ts, init-deploy.ts, init-deploy.test.ts, vitest.config.ts — 7 errors unrelated to this sprint, should be swept in a future lint-cleanup sprint
+- (sprint 215, 2026-07-11) Full SSE stream integration test for the `confirmationFor` path (deploy/provision/destroy confirmation flow) — the SSE agent loop and hijacked-response streaming are out of scope per sprint spec
+- (sprint 218, 2026-07-11) The filter-tab pattern may be reusable in other list views (e.g., if a future page adds similar all/warn/fail filtering) — no action needed now

@@ -227,7 +227,7 @@ build_image() {
     --quiet \
     .
 
-  while read -r target suffix; do
+  get_build_variants "$svc" | while read -r target suffix; do
     [[ -z "$target" ]] && continue
     echo "==> Building $svc variant '$target' (tag suffix $suffix)..."
     # shellcheck disable=SC2086
@@ -242,7 +242,7 @@ build_image() {
       --push \
       --quiet \
       .
-  done < <(get_build_variants "$svc")
+  done
 }
 
 if [[ ${#TO_BUILD[@]} -gt 0 ]]; then
@@ -266,11 +266,11 @@ if [[ ${#TO_RETAG[@]} -gt 0 ]]; then
     img=$(image_name "$svc")
     echo "==> Re-tagging $svc:latest as :$SHA / :$BUILD_NUMBER..."
     docker buildx imagetools create -t "$img:$SHA" -t "$img:$BUILD_NUMBER" "$img:latest"
-    while read -r target suffix; do
+    get_build_variants "$svc" | while read -r target suffix; do
       [[ -z "$target" ]] && continue
       echo "==> Re-tagging $svc variant latest${suffix} as :${BUILD_NUMBER}${suffix}..."
       docker buildx imagetools create -t "$img:${BUILD_NUMBER}${suffix}" "$img:latest${suffix}"
-    done < <(get_build_variants "$svc")
+    done
   done
 fi
 
