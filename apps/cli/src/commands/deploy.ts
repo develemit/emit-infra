@@ -96,6 +96,105 @@ function checkBackupEnv(config: ProjectConfig): void {
   process.exit(1)
 }
 
+export function buildDeployExtraVars(
+  config: ProjectConfig,
+  cwd: string,
+  env: NodeJS.ProcessEnv,
+  existsFn: (p: string) => boolean = existsSync,
+): Record<string, unknown> {
+  const extraVars: Record<string, unknown> = { project_name: config.name }
+
+  if (config.deploy) {
+    extraVars.compose_src = join(cwd, config.deploy.composeSrc)
+    extraVars.compose_dest = config.deploy.composeDest
+    if (config.deploy.extraFiles.length > 0) {
+      extraVars.extra_files = config.deploy.extraFiles.map((f) => ({
+        src: join(cwd, f.src),
+        dest: f.dest,
+      }))
+    }
+    if (config.deploy.postDeployExec && config.deploy.postDeployExec.length > 0) {
+      extraVars.post_deploy_exec = config.deploy.postDeployExec
+    }
+    if (config.deploy.appPort) {
+      extraVars.app_port = config.deploy.appPort
+    }
+  }
+
+  if (config.healthCheck?.url) {
+    extraVars.health_check_url = config.healthCheck.url
+  }
+
+  if (config.postgres) {
+    extraVars.postgres_version = config.postgres.version ?? '16'
+    if (config.postgres.backupBucket) {
+      extraVars.postgres_backup_bucket = config.postgres.backupBucket
+    }
+  }
+
+  const envCandidates = [config.ci?.envFile, '.env.prod', '.env']
+    .filter(Boolean)
+    .map(f => join(cwd, f!))
+  const envPath = envCandidates.find(p => existsFn(p))
+  if (envPath) {
+    extraVars.copy_env = true
+    extraVars.env_src = envPath
+  }
+
+  const ghcrToken = env.GHCR_TOKEN ?? env.CR_PAT
+  const ghcrActor = env.GHCR_ACTOR ?? env.GITHUB_ACTOR
+  if (ghcrToken) {
+    extraVars.ghcr_token = ghcrToken
+    extraVars.ghcr_actor = ghcrActor ?? 'x-access-token'
+  }
+
+  const buildNumber = env.BUILD_NUMBER
+  if (buildNumber) {
+    extraVars.build_number = buildNumber
+  }
+
+  if (config.blueGreen) {
+    extraVars.blue_green = true
+    extraVars.bg_services = config.blueGreen.services.map((s) => s.name).join(' ')
+    extraVars.bg_ports_blue = config.blueGreen.services.map((s) => s.bluePort).join(' ')
+    extraVars.bg_ports_green = config.blueGreen.services.map((s) => s.greenPort).join(' ')
+    extraVars.bg_health_checks = config.blueGreen.services
+      .map((s) => s.healthPath ?? 'skip')
+      .join(' ')
+    extraVars.bg_compose_structure = config.blueGreen.composeStructure
+
+    if (config.blueGreen.composeStructure === 'separate') {
+      const composeDir = dirname(join(cwd, config.deploy?.composeSrc ?? 'docker-compose.prod.yml'))
+      extraVars.blue_green_compose_files = [
+        join(composeDir, 'docker-compose.app.yml'),
+        join(composeDir, 'docker-compose.blue.yml'),
+        join(composeDir, 'docker-compose.green.yml'),
+      ].filter(f => existsFn(f))
+    }
+
+    if (config.blueGreen.nginxConfPath) {
+      extraVars.bg_nginx_conf_path = config.blueGreen.nginxConfPath
+    }
+    if (config.blueGreen.migratePre) {
+      extraVars.bg_migrate_pre = config.blueGreen.migratePre
+    }
+    if (config.blueGreen.migratePost) {
+      extraVars.bg_migrate_post = config.blueGreen.migratePost
+    }
+
+    // Pass postDeployExec as structured data for the blue-green script
+    // (generic post_deploy_exec can't target the correct slot compose)
+    const postExec = config.deploy?.postDeployExec ?? []
+    if (postExec.length > 0) {
+      extraVars.bg_post_exec = postExec.map(e => `${e.service}:${e.command}`).join('|')
+    }
+    // Clear generic post_deploy_exec so Ansible doesn't also try it
+    delete extraVars.post_deploy_exec
+  }
+
+  return extraVars
+}
+
 export function registerDeploy(program: Command): void {
   program
     .command('deploy [name]')
@@ -117,100 +216,10 @@ export function registerDeploy(program: Command): void {
       }
 
       const inventory = opts.inventory ?? (await resolveInventoryPath(config.name, config))
+      const extraVars = buildDeployExtraVars(config, process.cwd(), process.env)
 
-      const extraVars: Record<string, unknown> = { project_name: config.name }
-
-      if (config.deploy) {
-        const cwd = process.cwd()
-        extraVars.compose_src = join(cwd, config.deploy.composeSrc)
-        extraVars.compose_dest = config.deploy.composeDest
-        if (config.deploy.extraFiles.length > 0) {
-          extraVars.extra_files = config.deploy.extraFiles.map((f) => ({
-            src: join(cwd, f.src),
-            dest: f.dest,
-          }))
-        }
-        if (config.deploy.postDeployExec && config.deploy.postDeployExec.length > 0) {
-          extraVars.post_deploy_exec = config.deploy.postDeployExec
-        }
-        if (config.deploy.appPort) {
-          extraVars.app_port = config.deploy.appPort
-        }
-      }
-
-      if (config.healthCheck?.url) {
-        extraVars.health_check_url = config.healthCheck.url
-      }
-
-      if (config.postgres) {
-        extraVars.postgres_version = config.postgres.version ?? '16'
-        if (config.postgres.backupBucket) {
-          extraVars.postgres_backup_bucket = config.postgres.backupBucket
-        }
-      }
-
-      const envCandidates = [
-        config.ci?.envFile,
-        '.env.prod',
-        '.env',
-      ].filter(Boolean).map(f => join(process.cwd(), f!))
-      const envPath = envCandidates.find(p => existsSync(p))
-      if (envPath) {
-        extraVars.copy_env = true
-        extraVars.env_src = envPath
-      }
-
-      const ghcrToken = process.env.GHCR_TOKEN ?? process.env.CR_PAT
-      const ghcrActor = process.env.GHCR_ACTOR ?? process.env.GITHUB_ACTOR
-      if (ghcrToken) {
-        extraVars.ghcr_token = ghcrToken
-        extraVars.ghcr_actor = ghcrActor ?? 'x-access-token'
-      } else {
+      if (!extraVars.ghcr_token) {
         console.warn(chalk.yellow('Warning: GHCR_TOKEN not set — docker pull may fail for private images'))
-      }
-
-      const buildNumber = process.env.BUILD_NUMBER
-      if (buildNumber) {
-        extraVars.build_number = buildNumber
-      }
-
-      if (config.blueGreen) {
-        extraVars.blue_green = true
-        extraVars.bg_services = config.blueGreen.services.map((s) => s.name).join(' ')
-        extraVars.bg_ports_blue = config.blueGreen.services.map((s) => s.bluePort).join(' ')
-        extraVars.bg_ports_green = config.blueGreen.services.map((s) => s.greenPort).join(' ')
-        extraVars.bg_health_checks = config.blueGreen.services
-          .map((s) => s.healthPath ?? 'skip')
-          .join(' ')
-        extraVars.bg_compose_structure = config.blueGreen.composeStructure
-
-        if (config.blueGreen.composeStructure === 'separate') {
-          const composeDir = dirname(join(process.cwd(), config.deploy?.composeSrc ?? 'docker-compose.prod.yml'))
-          extraVars.blue_green_compose_files = [
-            join(composeDir, 'docker-compose.app.yml'),
-            join(composeDir, 'docker-compose.blue.yml'),
-            join(composeDir, 'docker-compose.green.yml'),
-          ].filter(f => existsSync(f))
-        }
-
-        if (config.blueGreen.nginxConfPath) {
-          extraVars.bg_nginx_conf_path = config.blueGreen.nginxConfPath
-        }
-        if (config.blueGreen.migratePre) {
-          extraVars.bg_migrate_pre = config.blueGreen.migratePre
-        }
-        if (config.blueGreen.migratePost) {
-          extraVars.bg_migrate_post = config.blueGreen.migratePost
-        }
-
-        // Pass postDeployExec as structured data for the blue-green script
-        // (generic post_deploy_exec can't target the correct slot compose)
-        const postExec = config.deploy?.postDeployExec ?? []
-        if (postExec.length > 0) {
-          extraVars.bg_post_exec = postExec.map(e => `${e.service}:${e.command}`).join('|')
-        }
-        // Clear generic post_deploy_exec so Ansible doesn't also try it
-        delete extraVars.post_deploy_exec
       }
 
       if (opts.dryRun) {
