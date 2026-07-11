@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import chalk from 'chalk'
 import { loadConfig, sshExec } from '@emit-infra/core'
 
-function buildLogsScript(
+export function buildLogsScript(
   container: string | undefined,
   lines: string,
   since: string | undefined,

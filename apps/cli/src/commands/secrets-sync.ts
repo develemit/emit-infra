@@ -6,8 +6,9 @@ import { execa } from 'execa'
 import { loadConfig } from '@emit-infra/core'
 
 export function registerSecretsSync(program: Command): void {
-  program
-    .command('secrets sync [name]')
+  const secretsCmd = program.command('secrets')
+  secretsCmd
+    .command('sync [name]')
     .description('Push .env secrets to GitHub repo secrets via gh CLI')
     .option('--config <path>', 'Path to .emit-infra.json')
     .option('--env-file <path>', 'Path to .env file (default: .env.prod, falls back to .env)')
