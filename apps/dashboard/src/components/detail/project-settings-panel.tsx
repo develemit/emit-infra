@@ -3,29 +3,10 @@ import { useState, useEffect } from 'react'
 import { Icon } from '@/components/icon'
 import { updateProjectConfig, getSshKeys, type ProjectSummary } from '@/lib/api'
 import { AlertRulesSection } from './alert-rules-section'
+import { useSettingsSection, type SectionState } from '@/lib/use-settings-section'
 
 interface Props {
   project: ProjectSummary
-}
-
-interface SectionState {
-  saving: boolean
-  saved: boolean
-  error: string | null
-}
-
-function useSave(fn: () => Promise<void>): [SectionState, () => void] {
-  const [state, setState] = useState<SectionState>({ saving: false, saved: false, error: null })
-  const save = () => {
-    setState({ saving: true, saved: false, error: null })
-    fn().then(() => {
-      setState({ saving: false, saved: true, error: null })
-      setTimeout(() => setState(s => ({ ...s, saved: false })), 2000)
-    }).catch((err: unknown) => {
-      setState({ saving: false, saved: false, error: err instanceof Error ? err.message : 'Save failed' })
-    })
-  }
-  return [state, save]
 }
 
 function SaveButton({ state, onClick }: { state: SectionState; onClick: () => void }) {
@@ -85,7 +66,7 @@ export function ProjectSettingsPanel({ project }: Props) {
     if (open) getSshKeys().then(setSshKeys).catch(() => {})
   }, [open])
 
-  const [serverState, saveServer] = useSave(() => {
+  const [serverState, saveServer] = useSettingsSection(() => {
     // Validate domain
     if (domain) {
       const domainRe = /^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$/
@@ -97,17 +78,17 @@ export function ProjectSettingsPanel({ project }: Props) {
     setDomainError(null)
     return updateProjectConfig(name, { serverType, region, domain, serverIp: serverIp || undefined })
   })
-  const [sshState, saveSsh] = useSave(() =>
+  const [sshState, saveSsh] = useSettingsSection(() =>
     updateProjectConfig(name, { sshKeyName }),
   )
-  const [dbState, saveDb] = useSave(() =>
+  const [dbState, saveDb] = useSettingsSection(() =>
     updateProjectConfig(name, { postgres: { version: pgVersion || undefined, backupBucket: pgBucket || undefined } }),
   )
-  const [thresholdsState, saveThresholds] = useSave(() =>
+  const [thresholdsState, saveThresholds] = useSettingsSection(() =>
     updateProjectConfig(name, { warnThresholds: { diskPct, memPct, backupAgeHours } }),
   )
 
-  const [accessState, saveAccess] = useSave(() => {
+  const [accessState, saveAccess] = useSettingsSection(() => {
     // Validate env keys
     const keys = envKeys.split(',').map(k => k.trim()).filter(Boolean)
     const keyRe = /^[A-Z_][A-Z0-9_]*$/

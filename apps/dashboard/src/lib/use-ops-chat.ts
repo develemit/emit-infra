@@ -2,91 +2,20 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   getApiBase, getStatus, getProjects, getDeployHistory, getCiHistory,
-  type ProjectStatus, type DeployHistoryEntry, type CiHistoryEntry,
 } from '@/lib/api'
 import type { ChatMessage, ChatResponse, ConfirmType } from '@/components/ops/types'
-import { formatAgo } from '@/lib/date-helpers'
-
-function genId() {
-  return Math.random().toString(36).slice(2)
-}
-
-function getConfirmText(toolName: string, projectName: string) {
-  if (toolName === 'destroy') return {
-    subtitle: `Destroy ${projectName}`,
-    description: 'This will permanently destroy all Hetzner infrastructure. This action cannot be undone.',
-  }
-  if (toolName === 'provision') return {
-    subtitle: `Provision ${projectName}`,
-    description: 'Creates new infrastructure on Hetzner via Terraform and configures it with Ansible.',
-  }
-  return {
-    subtitle: `Deploy ${projectName}`,
-    description: 'Runs Ansible to pull the latest code and restart application containers.',
-  }
-}
-
-function buildContextString(
-  name: string,
-  domain: string,
-  status: ProjectStatus,
-  deploys: DeployHistoryEntry[] = [],
-  ciRuns: CiHistoryEntry[] = [],
-): string {
-  const lines: (string | null)[] = [
-    `Project: ${name}  Domain: ${domain}`,
-  ]
-
-  const statusParts = [
-    status.httpStatus ? `HTTP ${status.httpStatus}` : null,
-    status.disk != null ? `Disk: ${status.disk}%` : null,
-    status.memory != null ? `Mem: ${status.memory}%` : null,
-    status.sslExpiry ? `SSL: ${status.sslExpiry}` : null,
-    status.nginxStatus ? `Nginx: ${status.nginxStatus}` : null,
-    status.redisStatus ? `Redis: ${status.redisStatus}` : null,
-  ]
-  if (statusParts.some(p => p)) {
-    lines.push(`Status: ${statusParts.filter(Boolean).join('  ')}`)
-  }
-
-  if (deploys.length > 0) {
-    const last = deploys[0]!
-    const shaShort = last.sha.slice(0, 7)
-    const time = formatAgo(last.completedAt)
-    lines.push(`Last deploy: ${shaShort} (${last.branch}) ${last.durationSec}s ${last.status} — "${last.message || 'no message'}"  ${time}`)
-  }
-
-  if (deploys.length > 0) {
-    const succeeded = deploys.filter(d => d.status === 'success').length
-    lines.push(`Deploy health: ${succeeded}/${Math.min(3, deploys.length)} recent succeeded`)
-  }
-
-  if (ciRuns.length > 0) {
-    const passed = ciRuns.filter(r => r.status === 'success').length
-    const avgDuration = Math.round(ciRuns.reduce((sum, r) => sum + r.durationSec, 0) / ciRuns.length)
-    lines.push(`CI health: ${passed}/${Math.min(10, ciRuns.length)} recent passed  Avg: ${avgDuration}s`)
-  }
-
-  return lines.filter(Boolean).join('\n')
-}
+import { genId, getConfirmText, buildContextString } from '@/lib/ops-chat-context'
+import { useOpsSession } from '@/lib/use-ops-session'
 
 export function useOpsChat(initialContextProject: string | null) {
   const apiBase = getApiBase()
+  const { sessionId, resetting, resetSession } = useOpsSession()
 
-  const [sessionId, setSessionId] = useState<string | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [loading, setLoading] = useState(false)
-  const [resetting, setResetting] = useState(false)
   const [contextProject, setContextProject] = useState<string | null>(initialContextProject)
   const [statusContext, setStatusContext] = useState<string | null>(null)
   const [contextBuildLabel, setContextBuildLabel] = useState<string>('')
-
-  useEffect(() => {
-    fetch(`${apiBase}/ops/session`)
-      .then(r => r.json() as Promise<{ sessionId: string }>)
-      .then(d => setSessionId(d.sessionId))
-      .catch(console.error)
-  }, [apiBase])
 
   useEffect(() => {
     if (!contextProject) return
@@ -177,22 +106,7 @@ export function useOpsChat(initialContextProject: string | null) {
   }
 
   async function handleNewConversation() {
-    setResetting(true)
-    try {
-      if (sessionId) {
-        await fetch(`${apiBase}/ops/session/${sessionId}`, { method: 'DELETE' }).catch(() => {})
-      }
-      setMessages([])
-      try {
-        const res = await fetch(`${apiBase}/ops/session`)
-        const data = await res.json() as { sessionId: string }
-        setSessionId(data.sessionId)
-      } catch {
-        // keep existing session id
-      }
-    } finally {
-      setResetting(false)
-    }
+    await resetSession(() => setMessages([]))
   }
 
   function clearContext() {
