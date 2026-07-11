@@ -23,7 +23,9 @@ const mockProject = {
     sshKeyName: 'emit-deploy',
     github: { repo: 'user/myapp' },
     postgres: {
+      version: '16',
       backupBucket: 'my-bucket',
+      backupRetainDays: 7,
     },
   },
   configPath: '/projects/myapp/.emit-infra.json',
