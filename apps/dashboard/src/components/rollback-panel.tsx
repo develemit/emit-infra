@@ -4,6 +4,7 @@ import { Terminal } from '@/components/ui/terminal'
 import { Icon } from '@/components/icon'
 import { getRollbackSnapshots, rollbackProject } from '@/lib/api'
 import { useToast } from '@/components/ui/toast'
+import { useSseStream } from '@/lib/use-sse-stream'
 
 interface RollbackPanelProps {
   name: string
@@ -23,45 +24,16 @@ function useRollbackSse(url: string, body: string, active: boolean) {
   const [lines, setLines] = useState<string[]>([])
   const [exit, setExit] = useState<number | undefined>()
 
-  useEffect(() => {
-    if (!active || !url) return
-    const ctrl = new AbortController()
-    async function run() {
-      try {
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body,
-          signal: ctrl.signal,
-        })
-        const reader = res.body!.getReader()
-        const dec = new TextDecoder()
-        let buf = ''
-        for (;;) {
-          const { done, value } = await reader.read()
-          if (done) break
-          buf += dec.decode(value, { stream: true })
-          const parts = buf.split('\n\n')
-          buf = parts.pop() ?? ''
-          for (const part of parts) {
-            const data = part.split('\n').find(l => l.startsWith('data:'))
-            if (!data) continue
-            const ev = JSON.parse(data.slice(5).trim()) as SseEvent
-            if (ev.type === 'line') setLines(p => [...p, ev.text])
-            else if (ev.type === 'done') setExit(ev.exitCode)
-            else if (ev.type === 'error') {
-              setLines(p => [...p, `error: ${ev.message}`])
-              setExit(1)
-            }
-          }
-        }
-      } catch {
-        // aborted or network error
-      }
-    }
-    void run()
-    return () => ctrl.abort()
-  }, [url, body, active])
+  useSseStream<SseEvent>(url, {
+    headers: { 'Content-Type': 'application/json' },
+    body,
+    enabled: active && !!url,
+    onEvent(ev) {
+      if (ev.type === 'line') setLines(p => [...p, ev.text])
+      else if (ev.type === 'done') setExit(ev.exitCode)
+      else if (ev.type === 'error') { setLines(p => [...p, `error: ${ev.message}`]); setExit(1) }
+    },
+  })
 
   return { lines, exit }
 }

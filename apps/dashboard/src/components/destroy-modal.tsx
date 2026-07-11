@@ -1,7 +1,8 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Terminal } from '@/components/ui/terminal'
 import { Icon } from '@/components/icon'
+import { useSseStream } from '@/lib/use-sse-stream'
 
 interface Props {
   projectName: string
@@ -20,37 +21,14 @@ function useDestroySse(url: string, active: boolean) {
   const [lines, setLines] = useState<string[]>([])
   const [exit, setExit] = useState<number | undefined>()
 
-  useEffect(() => {
-    if (!active) return
-    const ctrl = new AbortController()
-    async function run() {
-      try {
-        const res = await fetch(url, { method: 'POST', signal: ctrl.signal })
-        const reader = res.body!.getReader()
-        const dec = new TextDecoder()
-        let buf = ''
-        for (;;) {
-          const { done, value } = await reader.read()
-          if (done) break
-          buf += dec.decode(value, { stream: true })
-          const parts = buf.split('\n\n')
-          buf = parts.pop() ?? ''
-          for (const part of parts) {
-            const data = part.split('\n').find(l => l.startsWith('data:'))
-            if (!data) continue
-            const ev = JSON.parse(data.slice(5).trim()) as SseEvent
-            if (ev.type === 'line') setLines(p => [...p, ev.text])
-            else if (ev.type === 'done') setExit(ev.exitCode)
-            else if (ev.type === 'error') { setLines(p => [...p, `error: ${ev.message}`]); setExit(1) }
-          }
-        }
-      } catch {
-        // aborted
-      }
-    }
-    void run()
-    return () => ctrl.abort()
-  }, [url, active])
+  useSseStream<SseEvent>(url, {
+    enabled: active,
+    onEvent(ev) {
+      if (ev.type === 'line') setLines(p => [...p, ev.text])
+      else if (ev.type === 'done') setExit(ev.exitCode)
+      else if (ev.type === 'error') { setLines(p => [...p, `error: ${ev.message}`]); setExit(1) }
+    },
+  })
 
   return { lines, exit }
 }

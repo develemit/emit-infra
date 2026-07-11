@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { Terminal } from '@/components/ui/terminal'
 import { Icon } from '@/components/icon'
 import { useToast } from '@/components/ui/toast'
+import { useSseStream } from '@/lib/use-sse-stream'
 
 interface DeployPanelProps {
   url: string
@@ -20,41 +21,18 @@ function useDeploySse(url: string) {
   const [lines, setLines] = useState<{ text: string; color?: string }[]>([])
   const [exit, setExit] = useState<number | undefined>()
 
-  useEffect(() => {
-    const ctrl = new AbortController()
-    async function run() {
-      try {
-        const res = await fetch(url, { method: 'POST', signal: ctrl.signal })
-        const reader = res.body!.getReader()
-        const dec = new TextDecoder()
-        let buf = ''
-        for (;;) {
-          const { done, value } = await reader.read()
-          if (done) break
-          buf += dec.decode(value, { stream: true })
-          const parts = buf.split('\n\n')
-          buf = parts.pop() ?? ''
-          for (const part of parts) {
-            const data = part.split('\n').find(l => l.startsWith('data:'))
-            if (!data) continue
-            const ev = JSON.parse(data.slice(5).trim()) as SseEvent
-            if (ev.type === 'line') setLines(p => [...p, { text: ev.text }])
-            else if (ev.type === 'done') setExit(ev.exitCode)
-            else if (ev.type === 'error') { setLines(p => [...p, { text: `error: ${ev.message}` }]); setExit(1) }
-            else if (ev.type === 'backup') {
-              const color = ev.status === 'ok' ? 'var(--ok)' : ev.status === 'warn' ? 'var(--warn)' : 'var(--fg-muted)'
-              const prefix = ev.status === 'ok' ? '✓' : ev.status === 'warn' ? '⚠' : '●'
-              setLines(p => [...p, { text: `${prefix} Backup: ${ev.message}`, color }])
-            }
-          }
-        }
-      } catch {
-        // aborted or network error
+  useSseStream<SseEvent>(url, {
+    onEvent(ev) {
+      if (ev.type === 'line') setLines(p => [...p, { text: ev.text }])
+      else if (ev.type === 'done') setExit(ev.exitCode)
+      else if (ev.type === 'error') { setLines(p => [...p, { text: `error: ${ev.message}` }]); setExit(1) }
+      else if (ev.type === 'backup') {
+        const color = ev.status === 'ok' ? 'var(--ok)' : ev.status === 'warn' ? 'var(--warn)' : 'var(--fg-muted)'
+        const prefix = ev.status === 'ok' ? '✓' : ev.status === 'warn' ? '⚠' : '●'
+        setLines(p => [...p, { text: `${prefix} Backup: ${ev.message}`, color }])
       }
-    }
-    void run()
-    return () => ctrl.abort()
-  }, [url])
+    },
+  })
 
   return { lines, exit }
 }

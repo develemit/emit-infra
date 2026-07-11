@@ -1,8 +1,9 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { Icon } from '@/components/icon'
 import { Terminal } from '@/components/ui/terminal'
+import { useSseStream } from '@/lib/use-sse-stream'
 
 type PhaseState = 'pending' | 'running' | 'done'
 
@@ -47,55 +48,29 @@ export function StepRunning({ url, body, name }: Props) {
   const [terraformDetail, setTerraformDetail] = useState<string>()
   const running = exit === undefined
 
-  useEffect(() => {
-    const ctrl = new AbortController()
-    async function run() {
-      try {
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body,
-          signal: ctrl.signal,
-        })
-        const reader = res.body!.getReader()
-        const dec = new TextDecoder()
-        let buf = ''
-        for (;;) {
-          const { done, value } = await reader.read()
-          if (done) break
-          buf += dec.decode(value, { stream: true })
-          const parts = buf.split('\n\n')
-          buf = parts.pop() ?? ''
-          for (const part of parts) {
-            const data = part.split('\n').find(l => l.startsWith('data:'))
-            if (!data) continue
-            const ev = JSON.parse(data.slice(5).trim()) as SseEvent
-            if (ev.type === 'line') {
-              const text = ev.text
-              setLines(p => [...p, text])
-              if (text.includes('Apply complete')) {
-                setTerraform('done')
-                setAnsible('running')
-                const m = text.match(/(\d+) added/)
-                if (m) setTerraformDetail(`${m[1]} added`)
-              }
-            } else if (ev.type === 'done') {
-              setExit(ev.exitCode)
-              setTerraform('done')
-              setAnsible('done')
-            } else if (ev.type === 'error') {
-              setLines(p => [...p, `error: ${ev.message}`])
-              setExit(1)
-            }
-          }
+  useSseStream<SseEvent>(url, {
+    headers: { 'Content-Type': 'application/json' },
+    body,
+    onEvent(ev) {
+      if (ev.type === 'line') {
+        const text = ev.text
+        setLines(p => [...p, text])
+        if (text.includes('Apply complete')) {
+          setTerraform('done')
+          setAnsible('running')
+          const m = text.match(/(\d+) added/)
+          if (m) setTerraformDetail(`${m[1]} added`)
         }
-      } catch {
-        // aborted
+      } else if (ev.type === 'done') {
+        setExit(ev.exitCode)
+        setTerraform('done')
+        setAnsible('done')
+      } else if (ev.type === 'error') {
+        setLines(p => [...p, `error: ${ev.message}`])
+        setExit(1)
       }
-    }
-    void run()
-    return () => ctrl.abort()
-  }, [url, body])
+    },
+  })
 
   return (
     <div className="flex flex-col gap-4">
