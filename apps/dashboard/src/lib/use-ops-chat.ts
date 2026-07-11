@@ -5,6 +5,7 @@ import {
   type ProjectStatus, type DeployHistoryEntry, type CiHistoryEntry,
 } from '@/lib/api'
 import type { ChatMessage, ChatResponse, ConfirmType } from '@/components/ops/types'
+import { formatAgo } from '@/lib/date-helpers'
 
 function genId() {
   return Math.random().toString(36).slice(2)
@@ -23,17 +24,6 @@ function getConfirmText(toolName: string, projectName: string) {
     subtitle: `Deploy ${projectName}`,
     description: 'Runs Ansible to pull the latest code and restart application containers.',
   }
-}
-
-function formatTime(isoString: string): string {
-  const date = new Date(isoString)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffH = Math.floor(diffMs / (1000 * 60 * 60))
-  if (diffH < 1) return 'just now'
-  if (diffH < 24) return `${diffH}h ago`
-  const diffD = Math.floor(diffH / 24)
-  return `${diffD}d ago`
 }
 
 function buildContextString(
@@ -62,7 +52,7 @@ function buildContextString(
   if (deploys.length > 0) {
     const last = deploys[0]!
     const shaShort = last.sha.slice(0, 7)
-    const time = formatTime(last.completedAt)
+    const time = formatAgo(last.completedAt)
     lines.push(`Last deploy: ${shaShort} (${last.branch}) ${last.durationSec}s ${last.status} — "${last.message || 'no message'}"  ${time}`)
   }
 

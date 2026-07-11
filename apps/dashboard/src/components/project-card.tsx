@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { deriveHealth } from '@/lib/health'
 import { useUptimePct } from '@/lib/use-uptime-pct'
 import { useDiskTrend } from '@/lib/use-disk-trend'
+import { sslDaysLeft, deployedAgo } from '@/lib/date-helpers'
 
 function usePipelineStatus(name: string): { ciStatus: CiStatus | null; deployStatus: DeployStatus | null } {
   const [ciStatus, setCiStatus] = useState<CiStatus | null>(null)
@@ -33,27 +34,6 @@ interface Props {
   project: ProjectSummary
   status: ProjectStatus | null
   onRetry?: () => Promise<void>
-}
-
-function sslDaysLeft(expiry: string | null | undefined): { value: string; color?: string; days: number } {
-  if (!expiry) return { value: '—', days: Infinity }
-  const expiryDate = new Date(expiry)
-  if (isNaN(expiryDate.getTime())) return { value: '—', days: Infinity }
-  const days = Math.floor((expiryDate.getTime() - Date.now()) / 86_400_000)
-  if (days < 0) return { value: 'Expired', color: 'var(--err)', days }
-  if (days < 7) return { value: `${days}d`, color: 'var(--err)', days }
-  if (days < 30) return { value: `${days}d`, color: 'var(--warn, #e5a00d)', days }
-  return { value: `${days}d`, color: 'var(--ok, #22c55e)', days }
-}
-
-function deployedAgo(epoch: string | null | undefined): string {
-  if (!epoch) return ''
-  const secs = Math.floor(Date.now() / 1000) - parseInt(epoch, 10)
-  if (isNaN(secs) || secs < 0) return ''
-  if (secs < 60) return 'just now'
-  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`
-  if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`
-  return `${Math.floor(secs / 86400)}d ago`
 }
 
 export function ProjectCard({ project, status, onRetry }: Props) {
@@ -155,7 +135,7 @@ export function ProjectCard({ project, status, onRetry }: Props) {
           className="flex items-center gap-2 rounded-lg px-3 py-2 text-[12px] text-err border border-err-line bg-err-soft"
         >
           <Icon name="alert" size={15} style={{ color: 'var(--err)', flexShrink: 0 }} />
-          <span>SSH unreachable — last seen {deployedAgoStr ? `${deployedAgoStr.replace(' ago', '')} ago` : '—'}</span>
+          <span>SSH unreachable — last seen {deployedAgoStr && deployedAgoStr !== '—' ? `${deployedAgoStr.replace(' ago', '')} ago` : '—'}</span>
           {onRetry && (
             <button
               type="button"
@@ -182,7 +162,7 @@ export function ProjectCard({ project, status, onRetry }: Props) {
           <Icon name="clock" size={13} className="shrink-0" />
           <span className="truncate">{status?.uptime ?? '—'}</span>
         </span>
-        {deployedAgoStr && (
+        {deployedAgoStr && deployedAgoStr !== '—' && (
           <span className="text-[12px] font-mono text-subtle flex items-center gap-1 whitespace-nowrap shrink-0">
             <Icon name="deploy" size={13} />
             {deployedAgoStr}

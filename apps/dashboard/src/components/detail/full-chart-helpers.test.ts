@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import {
-  toPolyline, deployX, formatTimeLabel, formatTooltipTime,
+  toPolyline, deployX,
   timeLabels, filterVisibleDeploys,
 } from './full-chart-helpers'
+import { formatTimeLabel, formatTooltipTime } from '@/lib/date-helpers'
 
 const t0 = 1_000_000_000 * 1000 // fixed epoch for determinism
 const tEnd = t0 + 24 * 3600 * 1000

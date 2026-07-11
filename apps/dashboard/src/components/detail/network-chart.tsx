@@ -1,5 +1,6 @@
 'use client'
 import type { DeployMarker } from './resource-chart'
+import { formatTimeLabel } from '@/lib/date-helpers'
 
 interface NetworkPoint {
   t: number
@@ -71,14 +72,6 @@ function toLine(bw: BandwidthPoint[], key: 'rxRate' | 'txRate', maxVal: number):
 function deployXPos(completedAt: string, t0: number, span: number): number {
   const ts = new Date(completedAt).getTime()
   return ((ts - t0) / span) * W
-}
-
-function formatTimeLabel(ts: number, hours: number): string {
-  const d = new Date(ts)
-  if (hours <= 24) {
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
-  }
-  return d.toLocaleDateString([], { month: 'short', day: 'numeric' })
 }
 
 function LegendLine({ color, label }: { color: string; label: string }) {

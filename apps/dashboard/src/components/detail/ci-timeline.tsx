@@ -4,16 +4,12 @@ import { Icon } from '@/components/icon'
 import { Badge } from '@/components/ui/badge'
 import type { CiHistoryEntry } from '@/lib/api'
 import { formatDuration } from '@/lib/format-duration'
+import { formatTimestamp } from '@/lib/date-helpers'
 
 interface Props {
   runs: CiHistoryEntry[]
   name: string
   repoUrl?: string
-}
-
-function formatTimestamp(iso: string): string {
-  const d = new Date(iso)
-  return d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
 export function CiTimeline({ runs, name, repoUrl }: Props) {

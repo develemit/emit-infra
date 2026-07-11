@@ -1,6 +1,7 @@
 import { Icon } from '@/components/icon'
 import { Meter } from '@/components/ui/meter'
 import type { ProjectSummary, ProjectStatus, MetricPoint, ScaleAdvice } from '@/lib/api'
+import { sslDaysLeft, deployedAgo } from '@/lib/date-helpers'
 
 interface StatTileProps {
   icon: string
@@ -27,17 +28,6 @@ function StatTile({ icon, label, value, mono = true, color }: StatTileProps) {
   )
 }
 
-function sslDaysLeft(expiry: string | null | undefined): { value: string; color?: string } {
-  if (!expiry) return { value: '—' }
-  const expiryDate = new Date(expiry)
-  if (isNaN(expiryDate.getTime())) return { value: '—' }
-  const days = Math.floor((expiryDate.getTime() - Date.now()) / 86_400_000)
-  if (days < 0) return { value: 'Expired', color: 'var(--err)' }
-  if (days < 7) return { value: `${days}d`, color: 'var(--err)' }
-  if (days < 30) return { value: `${days}d`, color: 'var(--warn, #e5a00d)' }
-  return { value: `${days}d`, color: 'var(--ok, #22c55e)' }
-}
-
 function nginxLabel(status: string | null | undefined): { value: string; color?: string } {
   if (!status) return { value: '—' }
   if (status === 'active') return { value: 'Active', color: 'var(--ok, #22c55e)' }
@@ -48,16 +38,6 @@ function redisLabel(status: string | null | undefined): { value: string; color?:
   if (!status) return { value: '—' }
   if (status === 'healthy') return { value: 'Healthy', color: 'var(--ok, #22c55e)' }
   return { value: 'Down', color: 'var(--err)' }
-}
-
-function deployedAgo(epoch: string | null | undefined): string {
-  if (!epoch) return '—'
-  const secs = Math.floor(Date.now() / 1000) - parseInt(epoch, 10)
-  if (isNaN(secs) || secs < 0) return '—'
-  if (secs < 60) return 'just now'
-  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`
-  if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`
-  return `${Math.floor(secs / 86400)}d ago`
 }
 
 function queueLabel(failed: number | null | undefined, wait: number | null | undefined): { value: string; color?: string } | null {

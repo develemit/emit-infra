@@ -1,5 +1,6 @@
 import type { FullChartPoint } from './full-chart'
 import type { DeployMarker } from './resource-chart'
+import { formatTimeLabel } from '@/lib/date-helpers'
 
 export interface HoverState {
   pct: number
@@ -25,16 +26,6 @@ export function toPolyline(points: FullChartPoint[], key: 'cpu' | 'mem' | 'disk'
 
 export function deployX(completedAt: string, t0: number, span: number): number {
   return ((new Date(completedAt).getTime() - t0) / span) * W
-}
-
-export function formatTimeLabel(ts: number, hours: number): string {
-  const d = new Date(ts)
-  if (hours <= 24) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
-  return d.toLocaleDateString([], { month: 'short', day: 'numeric' })
-}
-
-export function formatTooltipTime(ts: number): string {
-  return new Date(ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
 export function timeLabels(points: FullChartPoint[], hours: number): { x: number; label: string }[] {
