@@ -1,6 +1,7 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { sshExec, sshMuxArgs } from '@emit-infra/core'
+import { SAFE_CONTAINER_RE } from './project-helpers.js'
 import { discoverProjects } from './discover-projects.js'
 import { streamProcess } from './stream-process.js'
 
@@ -104,8 +105,12 @@ export async function executeTool(
     case 'get_logs': {
       const project = await findProject(input['name'] as string)
       if (!project) return { error: 'project not found' }
+      const service = (input['service'] as string) ?? ''
+      if (service && !SAFE_CONTAINER_RE.test(service)) {
+        return { error: 'invalid service name' }
+      }
       const host = project.config.serverIp ?? project.config.domain
-      const logs = await collectLogs(host, (input['service'] as string) ?? '', project.config.sshKeyName)
+      const logs = await collectLogs(host, service, project.config.sshKeyName)
       return { logs: logs.slice(-4000) }
     }
 
