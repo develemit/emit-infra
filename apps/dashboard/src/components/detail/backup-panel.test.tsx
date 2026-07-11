@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { BackupPanel } from './backup-panel'
 import { fmtElapsed } from './backup-panel-helpers'
-import { getBackupStatus, updateBackupRetainDays } from '@/lib/api'
+import { getBackupStatus } from '@/lib/api'
 import type { ProjectSummary } from '@/lib/api'
 
 vi.mock('@/lib/api', () => ({

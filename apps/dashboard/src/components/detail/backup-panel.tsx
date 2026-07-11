@@ -1,10 +1,11 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState } from 'react'
 import { Icon } from '@/components/icon'
 import type { ProjectSummary } from '@/lib/api'
-import { updateBackupRetainDays, getBackupStatus } from '@/lib/api'
+import { updateBackupRetainDays } from '@/lib/api'
 import type { useBackups } from '@/lib/use-backups'
 import { fmtElapsed } from './backup-panel-helpers'
+import { useBackupPolling } from '@/lib/use-backup-polling'
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`
@@ -55,51 +56,14 @@ export function BackupPanel({ project, backups }: BackupPanelProps) {
   const [retainDays, setRetainDays] = useState<number>(project.config.postgres?.backupRetainDays ?? 7)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [runningBackup, setRunningBackup] = useState(false)
-  const [triggerTime, setTriggerTime] = useState<number | null>(null)
-  const [backupResult, setBackupResult] = useState<'complete' | 'failed' | 'timeout' | null>(null)
-  const [elapsedSecs, setElapsedSecs] = useState(0)
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  useEffect(() => {
-    if (!runningBackup || !triggerTime) return
-    pollRef.current = setInterval(async () => {
-      const status = await getBackupStatus(project.config.name).catch(() => null)
-      if (status && new Date(status.lastRun).getTime() > triggerTime) {
-        if (pollRef.current) clearInterval(pollRef.current)
-        if (timeoutRef.current) clearTimeout(timeoutRef.current)
-        setRunningBackup(false)
-        setBackupResult(status.status === 'ok' ? 'complete' : 'failed')
-        void fetchBackups()
-      }
-    }, 5_000)
-    timeoutRef.current = setTimeout(() => {
-      if (pollRef.current) clearInterval(pollRef.current)
-      setRunningBackup(false)
-      setBackupResult('timeout')
-    }, 600_000)
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current)
-      if (timeoutRef.current) clearTimeout(timeoutRef.current)
-    }
-  }, [runningBackup, triggerTime, project.config.name, fetchBackups])
-
-  useEffect(() => {
-    if (!runningBackup) { setElapsedSecs(0); return }
-    const id = setInterval(() => setElapsedSecs(s => s + 1), 1_000)
-    return () => clearInterval(id)
-  }, [runningBackup])
+  const polling = useBackupPolling(project.config.name, fetchBackups)
 
   async function handleTriggerBackup() {
-    setBackupResult(null)
-    setElapsedSecs(0)
-    setTriggerTime(Date.now())
-    setRunningBackup(true)
+    polling.start()
     try {
       await triggerBackup()
     } catch {
-      setRunningBackup(false)
+      polling.abort()
     }
   }
 
@@ -160,16 +124,16 @@ export function BackupPanel({ project, backups }: BackupPanelProps) {
         )}
         <button
           onClick={() => void handleTriggerBackup()}
-          disabled={triggering || runningBackup}
+          disabled={triggering || polling.runningBackup}
           className="inline-flex items-center gap-1.5 px-3 h-[30px] rounded-lg text-[12px] font-medium text-accent-fg bg-accent hover:opacity-90 disabled:opacity-50 transition-opacity"
         >
-          {triggering || runningBackup
-            ? <><Icon name="refresh" size={12} />Running… {fmtElapsed(elapsedSecs)}</>
-            : backupResult === 'timeout'
+          {triggering || polling.runningBackup
+            ? <><Icon name="refresh" size={12} />Running… {fmtElapsed(polling.elapsedSecs)}</>
+            : polling.backupResult === 'timeout'
             ? <><Icon name="alert" size={12} />Status unknown — check logs</>
-            : backupResult === 'complete'
+            : polling.backupResult === 'complete'
             ? <><Icon name="check" size={12} />Backup complete</>
-            : backupResult === 'failed'
+            : polling.backupResult === 'failed'
             ? <><Icon name="alert" size={12} />Backup failed</>
             : <><Icon name="deploy" size={12} />Back up now</>
           }

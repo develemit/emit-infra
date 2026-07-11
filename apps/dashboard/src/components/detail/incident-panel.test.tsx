@@ -18,7 +18,7 @@ vi.mock('@/components/icon', () => ({
 }))
 
 vi.mock('@/components/ui/badge', () => ({
-  Badge: ({ variant, dot, children }: { variant: string; dot?: boolean; children: React.ReactNode }) =>
+  Badge: ({ variant, children }: { variant: string; dot?: boolean; children: React.ReactNode }) =>
     React.createElement('span', { 'data-testid': 'badge', 'data-variant': variant }, children),
 }))
 
