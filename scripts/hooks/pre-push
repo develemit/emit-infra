@@ -41,6 +41,7 @@ out('BUILD_ARGS_JSON', json.dumps(ci.get('buildArgs', {})))
 out('BUILD_TARGETS_JSON', json.dumps(ci.get('buildTargets', {})))
 out('BUILD_VARIANTS_JSON', json.dumps(ci.get('buildVariants', {})))
 out('PRE_DEPLOY_JSON', json.dumps(ci.get('preDeploy', [])))
+out('DEPLOY_IGNORE_PATHS', ' '.join(ci.get('deployIgnorePaths', [])))
 ")"
 
 SSH_KEY="${SSH_KEY/#\~/$HOME}"
@@ -86,6 +87,31 @@ if [[ -z "$GHCR_ORG" ]]; then
   exit 0
 fi
 
+# ── last deployed sha (used by path filter + smart build) ─────────────────────
+LAST_SHA=$(python3 -c "
+import json
+try:
+    d = json.load(open('$ROOT/.deploy-status.json'))
+    if d.get('status') == 'deployed': print(d.get('sha', ''))
+except: pass
+" 2>/dev/null || true)
+
+# ── path filter: skip deploy when only ci.deployIgnorePaths changed ───────────
+# Ignore-list semantics: deploy is skipped only if EVERY file changed since the
+# last deploy matches an ignore pattern. Unknown paths always deploy (safe
+# default). Override with EMIT_FORCE_DEPLOY=1 (e.g. after env-only changes,
+# which are gitignored and invisible to this diff).
+if [[ "${EMIT_FORCE_DEPLOY:-0}" != "1" && -n "$DEPLOY_IGNORE_PATHS" && -n "$LAST_SHA" ]] && git rev-parse --quiet --verify "$LAST_SHA" >/dev/null; then
+  EXCLUDE_SPECS=()
+  for p in $DEPLOY_IGNORE_PATHS; do
+    EXCLUDE_SPECS+=(":(exclude)$p")
+  done
+  if ! git diff --name-only "$LAST_SHA"..HEAD -- . "${EXCLUDE_SPECS[@]}" | grep -q .; then
+    echo "→ only non-deploy paths changed since last deploy (${LAST_SHA:0:7}); skipping deploy (EMIT_FORCE_DEPLOY=1 to override)"
+    exit 0
+  fi
+fi
+
 echo "→ pushing to main — running deploy"
 
 # source env file for deploy phase (after CI so tests use local env)
@@ -96,14 +122,6 @@ fi
 trap 'deploy_done failed; echo "✗ deploy failed"; exit 1' ERR
 
 # ── smart build: only rebuild services changed since last deploy ───────────────
-LAST_SHA=$(python3 -c "
-import json
-try:
-    d = json.load(open('$ROOT/.deploy-status.json'))
-    if d.get('status') == 'deployed': print(d.get('sha', ''))
-except: pass
-" 2>/dev/null || true)
-
 needs_build() {
   local svc="$1"
   if [[ -z "$LAST_SHA" ]] || ! git rev-parse "$LAST_SHA" &>/dev/null; then
