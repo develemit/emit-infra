@@ -24,7 +24,7 @@ type BillingResponse = {
 type HetznerServer = {
   id: number
   name: string
-  datacenter: { location: { name: string } }
+  location: { name: string }
   public_net: { ipv4: { id: number } | null }
   server_type: {
     prices: Array<{
@@ -78,7 +78,7 @@ async function fetchBilling(token: string): Promise<BillingResponse> {
   const { hours } = hoursElapsedThisMonth()
 
   const breakdown = servers.map((server) => {
-    const loc = server.datacenter.location.name
+    const loc = server.location.name
     const serverPrice = server.server_type.prices.find((p) => p.location === loc)
     const serverMonthly = parseFloat(serverPrice?.price_monthly.gross ?? '0')
     const serverHourly = parseFloat(serverPrice?.price_hourly.gross ?? '0')

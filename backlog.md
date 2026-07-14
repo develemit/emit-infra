@@ -140,3 +140,8 @@ file to promote items into proper sprints when the list grows worth addressing.
 - (sprint 214, 2026-07-10) Pre-existing lint errors in audit.ts, init-deploy.ts, init-deploy.test.ts, vitest.config.ts — 7 errors unrelated to this sprint, should be swept in a future lint-cleanup sprint
 - (sprint 215, 2026-07-11) Full SSE stream integration test for the `confirmationFor` path (deploy/provision/destroy confirmation flow) — the SSE agent loop and hijacked-response streaming are out of scope per sprint spec
 - (sprint 218, 2026-07-11) The filter-tab pattern may be reusable in other list views (e.g., if a future page adds similar all/warn/fail filtering) — no action needed now
+- (sprint 220, 2026-07-11) container-log-viewer state reset and stream re-run happen in separate effects (one useEffect for reset, one inside useSseStream); ordering is correct in React 18 but could be collapsed into a key-based remount if component-level isolation ever becomes a concern
+- (sprint 222, 2026-07-11) The 7 pre-existing lint errors in audit.ts and init-deploy.ts (unused vars) plus vitest.config.ts tsconfig exclusion are tech debt — not introduced here, but worth a cleanup pass
+- (sprint 222, 2026-07-11) secrets-sync.ts lacked a --yes / non-interactive mode like destroy has; currently always requires a real env file to exist
+- (sprint 224, 2026-07-11) DesktopContainerRow (139 lines) could be split further if it grows — currently fine
+- (sprint 225, 2026-07-11) Pre-existing lint errors in init-deploy.ts/init-deploy.test.ts and vitest.config.ts remain; not in sprint scope

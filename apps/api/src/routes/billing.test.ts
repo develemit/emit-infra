@@ -58,7 +58,7 @@ describe('GET /billing/hetzner', () => {
         {
           id: 1,
           name: 'myapp-server',
-          datacenter: { location: { name: 'nbg1' } },
+          location: { name: 'nbg1' },
           public_net: { ipv4: { id: 100 } },
           server_type: {
             prices: [
