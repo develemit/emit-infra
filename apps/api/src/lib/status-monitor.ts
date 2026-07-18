@@ -12,9 +12,42 @@ import { join } from 'node:path'
 import { sshExec } from '@emit-infra/core'
 import { discoverProjects } from './discover-projects.js'
 import { sshKeyPath, SAFE_DOMAIN_RE } from './project-helpers.js'
-import { sendToAll } from './push.js'
+import { sendToAll, type PushPayload } from './push.js'
 import { evaluateRules, type AlertMetrics, type AlertCooldownState, type FiredAlert } from './alert-rules.js'
 import { pruneAlertJsonl } from './prune-alerts.js'
+
+const metricLabels: Record<string, string> = {
+  diskPct: 'disk', memPct: 'memory', certDays: 'cert days', backupAgeHours: 'backup age (h)',
+}
+
+export function formatAlertNotification(fired: FiredAlert[]): PushPayload {
+  const name = fired[0]!.projectName
+  const url = `/projects/${encodeURIComponent(name)}/reliability`
+
+  if (fired.length === 1) {
+    const alert = fired[0]!
+    const label = metricLabels[alert.metric] ?? alert.metric
+    const opLabel = alert.op === 'gt' ? '>' : '<'
+    return {
+      title: name,
+      body: `${label} ${Math.round(alert.value)} ${opLabel} ${alert.threshold}`,
+      url,
+      tag: `alert:${name}:${alert.metric}`,
+    }
+  }
+
+  const parts = fired.map(alert => {
+    const label = metricLabels[alert.metric] ?? alert.metric
+    const opLabel = alert.op === 'gt' ? '>' : '<'
+    return `${label} ${Math.round(alert.value)} ${opLabel} ${alert.threshold}`
+  })
+  return {
+    title: name,
+    body: `${fired.length} alerts: ${parts.join(', ')}`,
+    url,
+    tag: `alert:${name}:bundle`,
+  }
+}
 
 interface IncidentRecord {
   type: 'ssh' | 'http'
@@ -196,18 +229,8 @@ async function poll(): Promise<void> {
         const prevState = await readAlertState(config.name)
         const { fired, newState } = evaluateRules(config.name, rules, metrics, prevState)
         await persistAlerts(config.name, fired, newState)
-        const metricLabels: Record<string, string> = {
-          diskPct: 'disk', memPct: 'memory', certDays: 'cert days', backupAgeHours: 'backup age (h)',
-        }
-        for (const alert of fired) {
-          const opLabel = alert.op === 'gt' ? '>' : '<'
-          const label = metricLabels[alert.metric] ?? alert.metric
-          await sendToAll({
-            title: config.name,
-            body: `${label} ${Math.round(alert.value)} ${opLabel} ${alert.threshold}`,
-            url: `/projects/${encodeURIComponent(config.name)}/reliability`,
-            tag: `alert:${config.name}:${alert.metric}`,
-          }).catch(() => {/* best-effort */})
+        if (fired.length > 0) {
+          await sendToAll(formatAlertNotification(fired)).catch(() => {/* best-effort */})
         }
       }
     }),
