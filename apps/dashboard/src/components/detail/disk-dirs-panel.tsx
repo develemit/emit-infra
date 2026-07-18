@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { Icon } from '@/components/icon'
-import { getDiskDirs, type DiskDir } from '@/lib/api'
+import { getDiskDirs, type DiskDir } from '@/lib/api-infra'
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`

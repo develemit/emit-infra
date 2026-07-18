@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
-import { getUnregistered, registerProject } from '@/lib/api'
+import { getUnregistered, registerProject } from '@/lib/api-projects'
 import { Icon } from '@/components/icon'
 
 interface Props {

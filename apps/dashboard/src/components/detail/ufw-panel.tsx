@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { Icon } from '@/components/icon'
-import { getUfwRules, type UfwStatus } from '@/lib/api'
+import { getUfwRules, type UfwStatus } from '@/lib/api-ops'
 
 interface UfwPanelProps {
   name: string

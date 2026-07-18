@@ -1,8 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { Icon } from '@/components/icon'
-import { getProjectCost } from '@/lib/api'
-import type { ProjectCost } from '@/lib/api'
+import { getProjectCost, type ProjectCost } from '@/lib/api-infra'
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`

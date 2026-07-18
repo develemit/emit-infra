@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { getApiBase } from '@/lib/api'
+import { getApiBase } from '@/lib/api-auth'
 
 export function useOpsSession() {
   const apiBase = getApiBase()

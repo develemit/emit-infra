@@ -1,5 +1,5 @@
 import type { BadgeVariant } from '@/components/ui/badge'
-import type { Container } from '@/lib/api'
+import type { Container } from '@/lib/api-containers'
 
 export interface ContainerMetrics {
   cpu: number

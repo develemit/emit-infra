@@ -1,8 +1,8 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import {
-  getApiBase, getStatus, getProjects, getDeployHistory, getCiHistory,
-} from '@/lib/api'
+import { getApiBase } from '@/lib/api-auth'
+import { getStatus, getProjects } from '@/lib/api-projects'
+import { getDeployHistory, getCiHistory } from '@/lib/api-history'
 import type { ChatMessage, ChatResponse, ConfirmType } from '@/components/ops/types'
 import { genId, getConfirmText, buildContextString } from '@/lib/ops-chat-context'
 import { useOpsSession } from '@/lib/use-ops-session'

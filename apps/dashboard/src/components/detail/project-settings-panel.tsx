@@ -1,7 +1,8 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { Icon } from '@/components/icon'
-import { updateProjectConfig, getSshKeys, type ProjectSummary } from '@/lib/api'
+import { updateProjectConfig, type ProjectSummary } from '@/lib/api-projects'
+import { getSshKeys } from '@/lib/api-containers'
 import { AlertRulesSection } from './alert-rules-section'
 import { useSettingsSection, type SectionState } from '@/lib/use-settings-section'
 

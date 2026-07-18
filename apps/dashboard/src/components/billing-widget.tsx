@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
-import { getApiBase } from '@/lib/api'
+import { getApiBase } from '@/lib/api-auth'
 
 interface BillingBreakdownItem {
   type: 'server'

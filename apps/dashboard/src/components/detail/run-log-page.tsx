@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import AnsiToHtml from 'ansi-to-html'
-import { getCiLog, getDeployLog } from '@/lib/api'
+import { getCiLog, getDeployLog } from '@/lib/api-history'
 import { getCiStatus, getDeployStatus } from '@/lib/api-containers'
 import { Terminal } from '@/components/ui/terminal'
 import { Icon } from '@/components/icon'

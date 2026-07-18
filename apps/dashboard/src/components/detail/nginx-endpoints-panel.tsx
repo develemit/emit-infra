@@ -1,5 +1,5 @@
 'use client'
-import type { NginxEndpoint } from '@/lib/api'
+import type { NginxEndpoint } from '@/lib/api-infra'
 
 interface Props {
   available: boolean

@@ -4,10 +4,10 @@ import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { BackupPanel } from './backup-panel'
 import { fmtElapsed } from './backup-panel-helpers'
-import { getBackupStatus } from '@/lib/api'
-import type { ProjectSummary } from '@/lib/api'
+import { getBackupStatus } from '@/lib/api-ops'
+import type { ProjectSummary } from '@/lib/api-projects'
 
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api-ops', () => ({
   getBackupStatus: vi.fn(),
   updateBackupRetainDays: vi.fn().mockResolvedValue(undefined),
 }))

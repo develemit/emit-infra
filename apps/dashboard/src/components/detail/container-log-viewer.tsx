@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { Terminal } from '@/components/ui/terminal'
-import { getApiBase, authHeaders } from '@/lib/api'
+import { getApiBase, authHeaders } from '@/lib/api-auth'
 import { useSseStream } from '@/lib/use-sse-stream'
 
 interface ContainerLogViewerProps {

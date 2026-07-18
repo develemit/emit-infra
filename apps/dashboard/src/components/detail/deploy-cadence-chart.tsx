@@ -1,5 +1,5 @@
 'use client'
-import type { DeployCadenceDay } from '@/lib/api'
+import type { DeployCadenceDay } from '@/lib/api-metrics'
 
 function fmtDate(iso: string): string {
   const d = new Date(iso + 'T00:00:00')

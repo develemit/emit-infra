@@ -3,10 +3,9 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { IncidentPanel } from './incident-panel'
-import { getIncidents, annotateIncident } from '@/lib/api'
-import type { Incident } from '@/lib/api'
+import { getIncidents, annotateIncident, type Incident } from '@/lib/api-history'
 
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api-history', () => ({
   getIncidents: vi.fn(),
   annotateIncident: vi.fn().mockResolvedValue(undefined),
   exportIncidents: vi.fn(),

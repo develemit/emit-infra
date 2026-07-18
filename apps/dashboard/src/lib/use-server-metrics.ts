@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { getMetrics, type MetricPoint } from '@/lib/api'
+import { getMetrics, type MetricPoint } from '@/lib/api-metrics'
 
 export function useServerMetrics(name: string, hours = 24) {
   const [points, setPoints] = useState<MetricPoint[]>([])

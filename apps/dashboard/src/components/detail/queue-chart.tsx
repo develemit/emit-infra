@@ -1,5 +1,5 @@
 'use client'
-import type { MetricPoint } from '@/lib/api'
+import type { MetricPoint } from '@/lib/api-metrics'
 
 interface Props {
   points: MetricPoint[]

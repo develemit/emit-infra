@@ -1,4 +1,7 @@
-import type { BackupStatus, DiskTrend, ProjectStatus, DeployHistoryEntry } from '@/lib/api'
+import type { BackupStatus } from '@/lib/api-ops'
+import type { DiskTrend } from '@/lib/api-metrics'
+import type { ProjectStatus } from '@/lib/api-projects'
+import type { DeployHistoryEntry } from '@/lib/api-history'
 import { SummaryCard } from '@/components/detail/summary-card'
 import { fmtAgo } from '@/lib/project-detail-helpers'
 

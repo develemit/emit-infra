@@ -3,7 +3,8 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { HealthCard } from './health-card'
-import type { ProjectSummary, ProjectStatus, ScaleAdvice } from '@/lib/api'
+import type { ProjectSummary, ProjectStatus } from '@/lib/api-projects'
+import type { ScaleAdvice } from '@/lib/api-infra'
 
 vi.mock('@/components/icon', () => ({
   Icon: ({ name }: { name: string; size?: number; style?: React.CSSProperties }) =>

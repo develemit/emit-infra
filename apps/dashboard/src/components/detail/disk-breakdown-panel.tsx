@@ -1,5 +1,5 @@
 'use client'
-import type { DiskCategory } from '@/lib/api'
+import type { DiskCategory } from '@/lib/api-infra'
 import { Icon } from '@/components/icon'
 
 interface DiskBreakdownPanelProps {

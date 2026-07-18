@@ -1,6 +1,8 @@
 import { Icon } from '@/components/icon'
 import { Meter } from '@/components/ui/meter'
-import type { ProjectSummary, ProjectStatus, MetricPoint, ScaleAdvice } from '@/lib/api'
+import type { ProjectSummary, ProjectStatus } from '@/lib/api-projects'
+import type { MetricPoint } from '@/lib/api-metrics'
+import type { ScaleAdvice } from '@/lib/api-infra'
 import { sslDaysLeft, deployedAgo } from '@/lib/date-helpers'
 
 interface StatTileProps {

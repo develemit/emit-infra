@@ -1,4 +1,5 @@
-import type { ProjectStatus, DeployHistoryEntry, CiHistoryEntry } from '@/lib/api'
+import type { ProjectStatus } from '@/lib/api-projects'
+import type { DeployHistoryEntry, CiHistoryEntry } from '@/lib/api-history'
 import { formatAgo } from '@/lib/date-helpers'
 
 export function genId() {

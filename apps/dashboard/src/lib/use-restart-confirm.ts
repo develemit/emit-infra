@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { restartContainer } from '@/lib/api'
+import { restartContainer } from '@/lib/api-containers'
 
 interface Params {
   projectName: string

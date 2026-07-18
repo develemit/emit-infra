@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { Icon } from '@/components/icon'
-import { getDockerUsage, pruneDocker, type DockerUsageRow } from '@/lib/api'
+import { getDockerUsage, pruneDocker, type DockerUsageRow } from '@/lib/api-containers'
 
 function isReclaimable(s: string): boolean {
   const trimmed = s.trim()

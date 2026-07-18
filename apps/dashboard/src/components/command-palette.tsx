@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Icon } from '@/components/icon'
-import { getProjects } from '@/lib/api'
+import { getProjects } from '@/lib/api-projects'
 import { STATIC_ITEMS, buildProjectItems, filterItems, type PaletteItem } from '@/lib/palette-items'
 
 export function CommandPalette() {

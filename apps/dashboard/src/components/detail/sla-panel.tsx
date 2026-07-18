@@ -1,6 +1,6 @@
 'use client'
 
-import type { SlaData } from '@/lib/api'
+import type { SlaData } from '@/lib/api-metrics'
 import { slaColor } from './sla-panel-helpers'
 
 interface SlaStatProps {

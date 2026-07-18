@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { Icon } from '@/components/icon'
 import { Badge } from '@/components/ui/badge'
-import { getSecretsDrift, applySecrets, type SecretsDrift } from '@/lib/api'
+import { getSecretsDrift, applySecrets, type SecretsDrift } from '@/lib/api-secrets'
 
 interface SecretsPanelProps {
   name: string

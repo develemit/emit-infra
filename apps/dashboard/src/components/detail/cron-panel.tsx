@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { Icon } from '@/components/icon'
-import { getCronJobs, type CronJob } from '@/lib/api'
+import { getCronJobs, type CronJob } from '@/lib/api-ops'
 
 interface CronPanelProps {
   name: string

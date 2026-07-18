@@ -3,9 +3,9 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { RestartSparkline, MobileContainerRow, DesktopContainerRow, type ContainerMetrics } from './container-row'
-import type { Container } from '@/lib/api'
+import type { Container } from '@/lib/api-containers'
 
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api-containers', () => ({
   restartContainer: vi.fn().mockResolvedValue(undefined),
 }))
 
@@ -187,7 +187,7 @@ describe('MobileContainerRow', () => {
   })
 
   it('calls restartContainer and onRefetch on restart button click', async () => {
-    const { restartContainer } = await import('@/lib/api')
+    const { restartContainer } = await import('@/lib/api-containers')
     const onRefetch = vi.fn()
     const user = userEvent.setup()
 

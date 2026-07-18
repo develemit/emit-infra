@@ -2,7 +2,7 @@
 import { useRouter } from 'next/navigation'
 import { Icon } from '@/components/icon'
 import { Badge } from '@/components/ui/badge'
-import type { CiHistoryEntry } from '@/lib/api'
+import type { CiHistoryEntry } from '@/lib/api-history'
 import { formatDuration } from '@/lib/format-duration'
 import { formatTimestamp } from '@/lib/date-helpers'
 

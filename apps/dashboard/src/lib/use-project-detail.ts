@@ -1,9 +1,8 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
-import {
-  getStatus, getContainers, getProjects, getApiBase,
-  type ProjectSummary, type ProjectStatus, type Container,
-} from '@/lib/api'
+import { getStatus, getProjects, type ProjectSummary, type ProjectStatus } from '@/lib/api-projects'
+import { getContainers, type Container } from '@/lib/api-containers'
+import { getApiBase } from '@/lib/api-auth'
 import { deriveHealth } from '@/lib/health'
 import { useMetricHistory, computeUptimePct } from '@/lib/metric-history'
 import { useServerMetrics } from '@/lib/use-server-metrics'

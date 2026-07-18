@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { getDeployHistory, type DeployHistoryEntry } from '@/lib/api'
+import { getDeployHistory, type DeployHistoryEntry } from '@/lib/api-history'
 
 export function useDeployMarkers(name: string) {
   const [deploys, setDeploys] = useState<DeployHistoryEntry[]>([])

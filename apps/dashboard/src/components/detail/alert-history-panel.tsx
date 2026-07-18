@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { Icon } from '@/components/icon'
-import { getAlerts, type FiredAlert } from '@/lib/api'
+import { getAlerts, type FiredAlert } from '@/lib/api-projects'
 
 const METRIC_LABELS: Record<string, string> = {
   diskPct: 'disk %', memPct: 'memory %', certDays: 'cert days', backupAgeHours: 'backup age (h)',

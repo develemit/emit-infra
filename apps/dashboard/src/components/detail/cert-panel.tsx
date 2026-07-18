@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { Icon } from '@/components/icon'
-import { getCertDetails, type CertDetails } from '@/lib/api'
+import { getCertDetails, type CertDetails } from '@/lib/api-infra'
 
 interface StatTileProps {
   icon: string

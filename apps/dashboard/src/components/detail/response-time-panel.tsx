@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { Icon } from '@/components/icon'
-import { getResponseTimes, type ResponseTimes } from '@/lib/api'
+import { getResponseTimes, type ResponseTimes } from '@/lib/api-infra'
 
 interface StatTileProps {
   icon: string

@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { Icon } from '@/components/icon'
-import { getPgTableSizes, type PgTable } from '@/lib/api'
+import { getPgTableSizes, type PgTable } from '@/lib/api-infra'
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`

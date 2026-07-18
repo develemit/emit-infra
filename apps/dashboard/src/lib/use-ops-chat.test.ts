@@ -2,10 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
 import { useOpsChat } from './use-ops-chat'
 
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api-auth', () => ({
   getApiBase: vi.fn().mockReturnValue('http://localhost:7001'),
+}))
+vi.mock('@/lib/api-projects', () => ({
   getStatus: vi.fn().mockRejectedValue(new Error('not needed')),
   getProjects: vi.fn().mockRejectedValue(new Error('not needed')),
+}))
+vi.mock('@/lib/api-history', () => ({
   getDeployHistory: vi.fn().mockRejectedValue(new Error('not needed')),
   getCiHistory: vi.fn().mockRejectedValue(new Error('not needed')),
 }))

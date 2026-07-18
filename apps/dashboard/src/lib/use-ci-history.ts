@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { getCiHistory, type CiHistoryEntry } from '@/lib/api'
+import { getCiHistory, type CiHistoryEntry } from '@/lib/api-history'
 
 export function useCiHistory(name: string) {
   const [runs, setRuns] = useState<CiHistoryEntry[]>([])

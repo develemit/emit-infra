@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { Terminal } from '@/components/ui/terminal'
 import { Icon } from '@/components/icon'
-import { getRollbackSnapshots, rollbackProject } from '@/lib/api'
+import { getRollbackSnapshots, rollbackProject } from '@/lib/api-projects'
 import { useToast } from '@/components/ui/toast'
 import { useSseStream } from '@/lib/use-sse-stream'
 

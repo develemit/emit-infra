@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { Icon } from '@/components/icon'
 import { ChipInput } from '@/components/ui/chip-input'
 import { Switch } from '@/components/ui/switch'
-import { getSshKeys } from '@/lib/api'
+import { getSshKeys } from '@/lib/api-containers'
 import type { FormValues } from './types'
 
 const REGIONS = ['nbg1', 'fsn1', 'hel1', 'ash', 'hil']

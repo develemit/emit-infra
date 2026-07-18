@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { Icon } from '@/components/icon'
-import { updateProjectConfig, type ProjectSummary, type AlertRule } from '@/lib/api'
+import { updateProjectConfig, type ProjectSummary, type AlertRule } from '@/lib/api-projects'
 
 const DOMAIN_RE = /^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$/i
 const METRICS = ['diskPct', 'memPct', 'certDays', 'backupAgeHours'] as const

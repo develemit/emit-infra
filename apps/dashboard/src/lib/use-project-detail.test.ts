@@ -2,10 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
 import { useProjectDetail } from './use-project-detail'
 
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api-projects', () => ({
   getStatus: vi.fn(),
-  getContainers: vi.fn(),
   getProjects: vi.fn(),
+}))
+vi.mock('@/lib/api-containers', () => ({
+  getContainers: vi.fn(),
+}))
+vi.mock('@/lib/api-auth', () => ({
   getApiBase: vi.fn().mockReturnValue('http://localhost:7001'),
 }))
 vi.mock('@/lib/health', () => ({
@@ -34,7 +38,8 @@ vi.mock('@/lib/use-backup-status', () => ({
   useBackupStatus: vi.fn().mockReturnValue(null),
 }))
 
-import * as api from '@/lib/api'
+import * as apiProjects from '@/lib/api-projects'
+import * as apiContainers from '@/lib/api-containers'
 
 const mockStatus = { disk: 55, memory: 40, httpStatus: 200 as const, error: '' }
 
@@ -44,9 +49,9 @@ describe('useProjectDetail', () => {
   })
 
   it('starts with loading=true before fetch resolves', () => {
-    vi.mocked(api.getStatus).mockImplementation(() => new Promise(() => {}))
-    vi.mocked(api.getContainers).mockImplementation(() => new Promise(() => {}))
-    vi.mocked(api.getProjects).mockImplementation(() => new Promise(() => {}))
+    vi.mocked(apiProjects.getStatus).mockImplementation(() => new Promise(() => {}))
+    vi.mocked(apiContainers.getContainers).mockImplementation(() => new Promise(() => {}))
+    vi.mocked(apiProjects.getProjects).mockImplementation(() => new Promise(() => {}))
 
     const { result } = renderHook(() => useProjectDetail('myapp'))
 
@@ -55,9 +60,9 @@ describe('useProjectDetail', () => {
   })
 
   it('sets loading=false and populates status after fetch resolves', async () => {
-    vi.mocked(api.getStatus).mockResolvedValue(mockStatus)
-    vi.mocked(api.getContainers).mockResolvedValue([])
-    vi.mocked(api.getProjects).mockResolvedValue([])
+    vi.mocked(apiProjects.getStatus).mockResolvedValue(mockStatus)
+    vi.mocked(apiContainers.getContainers).mockResolvedValue([])
+    vi.mocked(apiProjects.getProjects).mockResolvedValue([])
 
     const { result } = renderHook(() => useProjectDetail('myapp'))
 
@@ -68,9 +73,9 @@ describe('useProjectDetail', () => {
   })
 
   it('exposes fetchData that triggers re-fetch', async () => {
-    vi.mocked(api.getStatus).mockResolvedValue(mockStatus)
-    vi.mocked(api.getContainers).mockResolvedValue([])
-    vi.mocked(api.getProjects).mockResolvedValue([])
+    vi.mocked(apiProjects.getStatus).mockResolvedValue(mockStatus)
+    vi.mocked(apiContainers.getContainers).mockResolvedValue([])
+    vi.mocked(apiProjects.getProjects).mockResolvedValue([])
 
     const { result } = renderHook(() => useProjectDetail('myapp'))
     await waitFor(() => expect(result.current.loading).toBe(false))
@@ -79,13 +84,13 @@ describe('useProjectDetail', () => {
       await result.current.fetchData()
     })
 
-    expect(api.getStatus).toHaveBeenCalledTimes(2)
+    expect(apiProjects.getStatus).toHaveBeenCalledTimes(2)
   })
 
   it('derives deployUrl from apiBase and project name', async () => {
-    vi.mocked(api.getStatus).mockResolvedValue(mockStatus)
-    vi.mocked(api.getContainers).mockResolvedValue([])
-    vi.mocked(api.getProjects).mockResolvedValue([])
+    vi.mocked(apiProjects.getStatus).mockResolvedValue(mockStatus)
+    vi.mocked(apiContainers.getContainers).mockResolvedValue([])
+    vi.mocked(apiProjects.getProjects).mockResolvedValue([])
 
     const { result } = renderHook(() => useProjectDetail('my-app'))
 

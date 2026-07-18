@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { Terminal } from '@/components/ui/terminal'
 import { Icon } from '@/components/icon'
-import { syncSecrets } from '@/lib/api'
+import { syncSecrets } from '@/lib/api-secrets'
 import { useToast } from '@/components/ui/toast'
 import { useSseStream } from '@/lib/use-sse-stream'
 

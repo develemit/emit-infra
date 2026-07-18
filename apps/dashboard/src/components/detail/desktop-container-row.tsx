@@ -3,7 +3,7 @@ import React from 'react'
 import Link from 'next/link'
 import { Icon } from '@/components/icon'
 import { Badge } from '@/components/ui/badge'
-import type { Container } from '@/lib/api'
+import type { Container } from '@/lib/api-containers'
 import { stateBadge, buildLabel, type ContainerMetrics } from './container-row-utils'
 
 export function RestartSparkline({ points }: { points: { t: number; restarts: number }[] }) {

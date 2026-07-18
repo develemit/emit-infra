@@ -2,8 +2,7 @@
 import { useEffect, useState } from 'react'
 import { Icon } from '@/components/icon'
 import { Badge } from '@/components/ui/badge'
-import { getIncidents, annotateIncident, exportIncidents } from '@/lib/api'
-import type { Incident } from '@/lib/api'
+import { getIncidents, annotateIncident, exportIncidents, type Incident } from '@/lib/api-history'
 import { IncidentAnnotationForm } from './incident-annotation-form'
 
 interface Props {

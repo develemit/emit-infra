@@ -1,4 +1,5 @@
-import type { BackupStatus, DiskTrend, MemoryTrend } from '@/lib/api'
+import type { BackupStatus } from '@/lib/api-ops'
+import type { DiskTrend, MemoryTrend } from '@/lib/api-metrics'
 
 interface AlertBannersProps {
   diskTrend: DiskTrend | null
