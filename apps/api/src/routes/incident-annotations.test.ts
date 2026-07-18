@@ -7,6 +7,10 @@ vi.mock('../lib/discover-projects.js', () => ({
   discoverUnregistered: vi.fn().mockResolvedValue([]),
 }))
 
+vi.mock('./reliability.js', () => ({
+  invalidateSlaCache: vi.fn(),
+}))
+
 const mockAnnotations: Record<string, unknown> = {}
 
 vi.mock('../lib/annotations.js', () => ({
@@ -19,6 +23,7 @@ vi.mock('../lib/annotations.js', () => ({
 
 import { discoverProjects } from '../lib/discover-projects.js'
 import { readAnnotations, writeAnnotation } from '../lib/annotations.js'
+import { invalidateSlaCache } from './reliability.js'
 import { incidentAnnotationRoutes } from './incident-annotations.js'
 
 const mockProject = {
@@ -120,6 +125,16 @@ describe('PUT /projects/:name/incidents/:startedAt/annotation', () => {
     })
     expect(res.statusCode).toBe(404)
     expect(res.json()).toEqual({ error: 'Project not found' })
+  })
+
+  it('invalidates the SLA cache after successful PUT', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    await app.inject({
+      method: 'PUT',
+      url: '/projects/myapp/incidents/1750000000/annotation',
+      payload: { falsePositive: true },
+    })
+    expect(vi.mocked(invalidateSlaCache)).toHaveBeenCalledWith('myapp')
   })
 })
 

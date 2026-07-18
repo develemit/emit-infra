@@ -5,6 +5,7 @@ import { z } from 'zod/v4'
 import { SAFE_NAME_RE } from '../lib/project-helpers.js'
 import { findProject } from '../lib/project-helpers.js'
 import { readAnnotations, writeAnnotation } from '../lib/annotations.js'
+import { invalidateSlaCache } from './reliability.js'
 
 const NameParam = z.object({ name: z.string().regex(SAFE_NAME_RE) })
 const StartedAtParam = z.object({
@@ -39,6 +40,7 @@ export async function incidentAnnotationRoutes(app: FastifyInstance) {
 
       const filePath = annotationsPath(params.data.name)
       await writeAnnotation(filePath, String(params.data.startedAt), body.data)
+      invalidateSlaCache(params.data.name)
 
       return reply.status(200).send({ ok: true })
     },

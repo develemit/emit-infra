@@ -44,6 +44,10 @@ interface SlaData {
 
 const slaCache = createTtlCache<SlaData>(120_000)
 
+export function invalidateSlaCache(name: string): void {
+  slaCache.invalidate(name)
+}
+
 function pairIncidents(records: IncidentRecord[]): Incident[] {
   const incidents: Incident[] = []
   let openDownAt: number | null = null
