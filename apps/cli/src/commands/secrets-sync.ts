@@ -1,6 +1,7 @@
 import { Command } from 'commander'
 import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { createInterface } from 'node:readline'
 import chalk from 'chalk'
 import { execa } from 'execa'
 import { loadConfig } from '@emit-infra/core'
@@ -13,7 +14,8 @@ export function registerSecretsSync(program: Command): void {
     .option('--config <path>', 'Path to .emit-infra.json')
     .option('--env-file <path>', 'Path to .env file (default: .env.prod, falls back to .env)')
     .option('--dry-run', 'Print secrets that would be synced without setting them')
-    .action(async (_name: string | undefined, opts: { config?: string; envFile?: string; dryRun?: boolean }) => {
+    .option('-y, --yes', 'Skip confirmation prompt')
+    .action(async (_name: string | undefined, opts: { config?: string; envFile?: string; dryRun?: boolean; yes?: boolean }) => {
       const config = loadConfig(opts.config)
 
       const resolvedFile = opts.envFile ?? resolveEnvFile(process.cwd())
@@ -33,6 +35,14 @@ export function registerSecretsSync(program: Command): void {
         console.log(chalk.cyan(`Would sync ${entries.length} secrets to ${config.github.repo}:`))
         entries.forEach(([k]) => console.log(`  ${k}`))
         return
+      }
+
+      if (!opts.yes) {
+        const confirmed = await confirmSync(entries.length, config.github.repo)
+        if (!confirmed) {
+          console.log('Aborted.')
+          return
+        }
       }
 
       console.log(chalk.cyan(`Syncing ${entries.length} secrets to ${config.github.repo}...`))
@@ -63,4 +73,17 @@ function parseEnvFile(content: string): [string, string][] {
       return [key, value] as [string, string]
     })
     .filter((entry): entry is [string, string] => entry !== null)
+}
+
+function confirmSync(count: number, repo: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const rl = createInterface({ input: process.stdin, output: process.stdout })
+    rl.question(
+      `Sync ${count} secrets to ${repo}? (y/N) `,
+      (answer) => {
+        rl.close()
+        resolve(answer.trim().toLowerCase() === 'y')
+      },
+    )
+  })
 }

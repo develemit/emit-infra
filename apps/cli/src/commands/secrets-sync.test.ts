@@ -15,9 +15,19 @@ vi.mock('execa', () => ({
   execa: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
 }))
 
+const mockRl = {
+  question: vi.fn(),
+  close: vi.fn(),
+}
+
+vi.mock('node:readline', () => ({
+  createInterface: vi.fn(() => mockRl),
+}))
+
 import { loadConfig } from '@emit-infra/core'
 import { existsSync, readFileSync } from 'node:fs'
 import { execa } from 'execa'
+import { createInterface } from 'node:readline'
 
 const baseConfig = {
   name: 'test-project',
@@ -54,7 +64,7 @@ describe('secrets-sync command', () => {
     const program = new Command()
     program.exitOverride()
     registerSecretsSync(program)
-    await program.parseAsync(['node', 'cli', 'secrets', 'sync'])
+    await program.parseAsync(['node', 'cli', 'secrets', 'sync', '--yes'])
 
     expect(execa).toHaveBeenCalledTimes(3)
     expect(execa).toHaveBeenNthCalledWith(1, 'gh', ['secret', 'set', 'KEY1', '--repo', 'user/test'], { input: 'val1' })
@@ -81,7 +91,7 @@ describe('secrets-sync command', () => {
     const program = new Command()
     program.exitOverride()
     registerSecretsSync(program)
-    await program.parseAsync(['node', 'cli', 'secrets', 'sync', '--env-file', '.env.staging'])
+    await program.parseAsync(['node', 'cli', 'secrets', 'sync', '--env-file', '.env.staging', '--yes'])
 
     expect(execa).toHaveBeenCalledWith('gh', ['secret', 'set', 'MYKEY', '--repo', 'user/test'], { input: 'myval' })
   })
@@ -93,9 +103,58 @@ describe('secrets-sync command', () => {
     const program = new Command()
     program.exitOverride()
     registerSecretsSync(program)
-    await program.parseAsync(['node', 'cli', 'secrets', 'sync'])
+    await program.parseAsync(['node', 'cli', 'secrets', 'sync', '--yes'])
 
     expect(execa).toHaveBeenNthCalledWith(1, 'gh', ['secret', 'set', 'TOKEN', '--repo', 'user/test'], { input: 'abc123' })
     expect(execa).toHaveBeenNthCalledWith(2, 'gh', ['secret', 'set', 'PASS', '--repo', 'user/test'], { input: 'xyz' })
+  })
+
+  it('--yes flag bypasses confirmation', async () => {
+    vi.mocked(existsSync).mockReturnValue(true)
+    vi.mocked(readFileSync).mockReturnValue('KEY1=val1')
+
+    const program = new Command()
+    program.exitOverride()
+    registerSecretsSync(program)
+    await program.parseAsync(['node', 'cli', 'secrets', 'sync', '--yes'])
+
+    expect(createInterface).not.toHaveBeenCalled()
+    expect(execa).toHaveBeenCalledTimes(1)
+  })
+
+  it('without --yes, user confirms and sync proceeds', async () => {
+    vi.mocked(existsSync).mockReturnValue(true)
+    vi.mocked(readFileSync).mockReturnValue('KEY1=val1')
+
+    mockRl.question.mockImplementation((_prompt, callback) => {
+      callback('y')
+    })
+
+    const program = new Command()
+    program.exitOverride()
+    registerSecretsSync(program)
+    await program.parseAsync(['node', 'cli', 'secrets', 'sync'])
+
+    expect(mockRl.question).toHaveBeenCalled()
+    expect(mockRl.close).toHaveBeenCalled()
+    expect(execa).toHaveBeenCalledTimes(1)
+  })
+
+  it('without --yes, user denies and sync is aborted', async () => {
+    vi.mocked(existsSync).mockReturnValue(true)
+    vi.mocked(readFileSync).mockReturnValue('KEY1=val1')
+
+    mockRl.question.mockImplementation((_prompt, callback) => {
+      callback('n')
+    })
+
+    const program = new Command()
+    program.exitOverride()
+    registerSecretsSync(program)
+    await program.parseAsync(['node', 'cli', 'secrets', 'sync'])
+
+    expect(mockRl.question).toHaveBeenCalled()
+    expect(mockRl.close).toHaveBeenCalled()
+    expect(execa).not.toHaveBeenCalled()
   })
 })
