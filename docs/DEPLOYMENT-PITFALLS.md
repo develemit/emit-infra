@@ -506,3 +506,13 @@ Drizzle's `migrate()` creates a `__drizzle_migrations` tracking table and only a
 - Is `NODE_ENV=production` set in the Docker runner stage? If yes, any env-based guard will be active.
 - Does the production Docker image include the migrations folder? Check the Dockerfile runner stage `COPY` lines.
 - Does the deploy workflow include a migration step, or are migrations run only at startup?
+
+---
+
+## 20. `MIGRATE_PRE` must run after the image pull — or migrations come from the old image
+
+**Symptom:** Blue-green deploy fails at the new slot's API health check. Container logs show the API crashing at boot on a query referencing a column its own release's migration should have added (`column does not exist`). The DB shows the migration was never applied, even though the deploy log printed "Running pre-deploy migration..." with no error.
+
+**Cause:** `blue-green-deploy.sh` ran `MIGRATE_PRE` (typically `docker compose run --rm api node migrate.mjs`) **before** `compose pull`. The `run` used the locally-cached `:latest` image — the previous release — whose migrations folder doesn't contain the new migration files. The migration step succeeds (nothing pending from the old image's perspective) and silently applies nothing.
+
+**Fix:** The script now pulls images for the inactive slot first, then runs `MIGRATE_PRE`, so the migration container is the new release. If you hit this on a server with an old copy of the script, run the migrate command manually after a pull, or just redeploy — Ansible re-copies the fixed script on every deploy.

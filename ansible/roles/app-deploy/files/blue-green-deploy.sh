@@ -171,15 +171,19 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# ── 1. Pre-deploy migration ──────────────────────────────────────────────────
+# ── 1. Pull new images ───────────────────────────────────────────────────────
+echo "==> Pulling images for ${INACTIVE} slot..."
+$(compose_cmd_inactive) pull
+
+# ── 2. Pre-deploy migration ──────────────────────────────────────────────────
+# Must run AFTER the pull: MIGRATE_PRE commands typically `docker compose run`
+# the app image, and running before the pull executes the OLD image's
+# migrations — new migrations silently never apply (observed 2026-07-21:
+# API crashed on boot querying columns its own migration should have added).
 if [ -n "$MIGRATE_PRE" ]; then
   echo "==> Running pre-deploy migration..."
   eval "$MIGRATE_PRE"
 fi
-
-# ── 2. Pull new images ───────────────────────────────────────────────────────
-echo "==> Pulling images for ${INACTIVE} slot..."
-$(compose_cmd_inactive) pull
 
 # ── 3. Start inactive slot ───────────────────────────────────────────────────
 echo "==> Starting ${INACTIVE} slot..."
