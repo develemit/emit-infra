@@ -20,6 +20,7 @@ import { postgresRoutes } from './routes/postgres.js'
 import { cronRoutes } from './routes/cron.js'
 import { ufwRoutes } from './routes/ufw.js'
 import { secretsRoutes } from './routes/secrets.js'
+import { nginxConfigRoutes } from './routes/nginx-config.js'
 import { responseTimeRoutes } from './routes/response-times.js'
 import { certRoutes } from './routes/cert.js'
 import { costRoutes } from './routes/cost.js'
@@ -60,6 +61,7 @@ await app.register(postgresRoutes)
 await app.register(cronRoutes)
 await app.register(ufwRoutes)
 await app.register(secretsRoutes)
+await app.register(nginxConfigRoutes)
 await app.register(responseTimeRoutes)
 await app.register(certRoutes)
 await app.register(costRoutes)
