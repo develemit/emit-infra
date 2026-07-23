@@ -315,18 +315,29 @@ Re-add when a paid Cloud plan is in place.
 
 The issue is invisible while blue is active (the hardcoded ports happen to be correct) and only surfaces after the first slot swap.
 
-**Fix:** The deploy script must remove the Ansible-provisioned config before or during each nginx config update:
+**Fix:** There must be exactly **one** vhost per project, and its canonical name is the extensionless `/etc/nginx/sites-available/<project>`, symlinked to `/etc/nginx/sites-enabled/<project>`. Fix the *content* (make it blue-green aware) rather than the filename.
 
-```bash
-# Remove legacy Ansible-provisioned config (hardcoded ports, not blue-green aware)
-rm -f /etc/nginx/sites-enabled/<project> /etc/nginx/sites-available/<project>
-ln -sf /etc/nginx/sites-available/<project>.conf /etc/nginx/sites-enabled/<project>.conf
-nginx -t && nginx -s reload
-```
+That extensionless path is what every code path in this repo assumes:
 
-Add this to the "Deploy nginx config" step in `deploy.yml`. The `rm -f` is idempotent — safe to run even after the file is already gone.
+| Consumer | Path |
+|---|---|
+| `ansible/roles/nginx/tasks/main.yml` (provision copy + enable symlink) | `sites-available/<project>` |
+| `ansible/roles/app-deploy/tasks/deploy-zero-downtime.yml` (backup / port swap / restore) | `sites-available/<project>` |
+| `apps/api/src/routes/nginx-config.ts` (drift detection) | `sites-available/<project>` |
+| `apps/api/src/routes/project-status.ts` (nginx "configured" check) | `sites-enabled/<project>` |
 
-**Also:** the deploy-managed config (`<project>.conf`) must handle HTTPS (port 443) itself. If it only has `listen 80` blocks, the Ansible config's 443 blocks were the only thing handling HTTPS — removing it without adding 443 blocks will break SSL. Use named upstreams (from the blue-green slot include file) rather than hardcoded ports.
+The vhost the project owns in its repo (`nginx.customConfigSrc`) must handle HTTPS (port 443) itself and use **named upstreams** from the blue-green slot include (`include /etc/nginx/blue-green/<project>.conf;`) rather than hardcoded slot ports. That is what makes it survive a slot swap; a `.conf`-suffixed second file never was.
+
+> ⚠️ **Superseded advice.** An earlier version of this entry told you to `rm` the extensionless config and enable a `<project>.conf` alongside it. Don't. That produces exactly the conflicting-server-name state described above, just with the winner reversed, and it hides the project from drift detection and the dashboard's nginx check. If you find a server still on the `.conf` layout, migrate it back — content unchanged, filename only:
+>
+> ```bash
+> mv /etc/nginx/sites-available/<project>.conf /etc/nginx/sites-available/<project>
+> rm -f /etc/nginx/sites-enabled/<project>.conf
+> ln -sfn /etc/nginx/sites-available/<project> /etc/nginx/sites-enabled/<project>
+> nginx -t && nginx -s reload
+> ```
+>
+> nginx does not re-read vhost files until reload, so the `mv`/`ln` window carries no traffic risk, and `nginx -t` gates the reload.
 
 ---
 

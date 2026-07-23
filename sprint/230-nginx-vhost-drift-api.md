@@ -51,7 +51,7 @@ Note the API app registers routes explicitly in `apps/api/src/index.ts` (see the
 - `apps/api/src/routes/secrets.ts` — read-only reference for structure; do not modify
 
 ## Acceptance criteria
-- [ ] `GET /projects/emit-vision/nginx-drift` returns a `drift` or `ok` status with a readable diff (emit-vision declares `infra/nginx/emit-vision.conf`). **Not met as literally worded — see Completed summary: live emit-vision actually returns `missing-server`, a real finding, not a code defect. The `drift`/`ok` code paths were proven live against other fleet projects instead.**
+- [x] `GET /projects/emit-vision/nginx-drift` returns a `drift` or `ok` status with a readable diff (emit-vision declares `infra/nginx/emit-vision.conf`). **Initially reported `missing-server` — a real finding, not a code defect. Met after the server-side naming migration described under "Blocker resolution": now returns `drift`, 125 local vs 110 server lines, diff containing the `/v1` block.**
 - [x] A project with no `nginx.customConfigSrc` returns `{ status: 'unconfigured' }`, not an error.
 - [x] An unreachable server returns 503 rather than hanging or throwing.
 - [x] Diff output is capped and cannot return an unbounded payload.
@@ -92,8 +92,46 @@ The 503-unreachable path is covered by mocked unit tests (matching the existing 
 - Live SSH verification against all 7 managed fleet projects (see Summary) — every status branch (`unconfigured`, `ok`, `drift`, `missing-server`, `missing-local` not hit live but covered by unit test, `503` covered by unit test) exercised with real project configs and real SSH keys.
 
 ### Follow-ups
-- `[blocker]` Before sprint 232 (sync-vhost-on-deploy) starts writing vhost files: emit-vision's live nginx file lives at `/etc/nginx/sites-available/emit-vision.conf` (symlinked into `sites-enabled/` under the same name), not the ansible-canonical `/etc/nginx/sites-available/emit-vision` that `nginx.customConfigSrc` deploys expect. A naive sync would create a second, differently-named file alongside the real one rather than replacing it — sprint 232 needs to reconcile or migrate this naming mismatch first, or it will silently fail to fix emit-vision's actual routing problem.
-- `[defer]` martialops also returns `missing-server` — same class of gap as emit-vision, lower urgency since no incident has been reported for it yet.
+- ~~`[blocker]` Before sprint 232 (sync-vhost-on-deploy) starts writing vhost files: emit-vision's live nginx file lives at `/etc/nginx/sites-available/emit-vision.conf` (symlinked into `sites-enabled/` under the same name), not the ansible-canonical `/etc/nginx/sites-available/emit-vision` that `nginx.customConfigSrc` deploys expect. A naive sync would create a second, differently-named file alongside the real one rather than replacing it — sprint 232 needs to reconcile or migrate this naming mismatch first, or it will silently fail to fix emit-vision's actual routing problem.~~ **Resolved 2026-07-23 — see "Blocker resolution" below.**
+- ~~`[defer]` martialops also returns `missing-server`~~ — **not a gap: martialops is shelved and has no server.** Its config still declares `nginx.customConfigSrc`, so the route correctly reports `missing-server`; nothing to fix.
+
+## Blocker resolution (2026-07-23)
+
+**The mismatch was real, but the blocker was mis-scoped and its premise was half-wrong.**
+
+*Mis-scoped:* sprint 232 ships inert by design — `syncOnDeploy` defaults to `false` and no project opts in, so 232 writes nothing to any server. The naming mismatch cannot bite until sprint 235 opts emit-vision in. 232 is safe to run today.
+
+*Premise:* emit-vision's `.conf` file was **not** hand-placed out-of-band. It is the residue of a deliberate, since-superseded convention: `docs/DEPLOYMENT-PITFALLS.md` #16 explicitly instructed removing the extensionless vhost and enabling `<project>.conf` instead. That advice is now wrong — every code path in the current repo assumes the extensionless name (provision role, zero-downtime backup/port-swap/restore, this drift route, and the dashboard's `sites-enabled/<project>` check). The doc has been corrected in this change, with a migration snippet and a note marking the old advice superseded.
+
+Fleet survey confirms emit-vision is the sole outlier:
+
+| project | `sites-enabled` entry | verdict |
+|---|---|---|
+| develemail | `develemail` → symlink | canonical |
+| emit-social | canonical (`ok` in this sprint's live run) | canonical |
+| tastease | `tastease` (regular file, not a symlink) | canonical name |
+| martialops | none — shelved, no server | n/a |
+| emit-vision | `emit-vision.conf` → `sites-available/emit-vision.conf` | **outlier** |
+
+The live-vs-repo drift for emit-vision is exactly the 15-line `/v1` proxy block and nothing else — the single change sprint 235 exists to ship.
+
+**Resolution — executed 2026-07-23.** Migrated the server to the canonical name, filename only, content byte-identical:
+
+```bash
+mv /etc/nginx/sites-available/emit-vision.conf /etc/nginx/sites-available/emit-vision
+rm -f /etc/nginx/sites-enabled/emit-vision.conf
+ln -sfn /etc/nginx/sites-available/emit-vision /etc/nginx/sites-enabled/emit-vision
+nginx -t && nginx -s reload
+```
+
+Verified:
+- md5 before (`emit-vision.conf`) and after (`emit-vision`): `74ef1c8cd41c7017eb5887f857fd7cb0` — identical, so the reload was a no-op behaviorally.
+- `nginx -t` passed before reload; `systemctl is-active nginx` → `active` after.
+- Live traffic unaffected: `emitvision.com` 200, `app.emitvision.com` 307 → `/login` (expected auth redirect), `api.emitvision.com/readyz` 200 `{"ok":true,"build":"960"}`.
+- `GET /projects/emit-vision/nginx-drift` now returns `status: drift`, `localLines: 125`, `serverLines: 110`, with the `/v1` block present in the diff — acceptance criterion 1 now genuinely met.
+- Remote `test -f /etc/nginx/sites-enabled/emit-vision` now returns `configured` (was `missing`).
+
+Sprint 235's opt-in now targets the file that is actually serving traffic. Sprint 232 remains unblocked and safe to run.
 
 ## Out of scope
 - Any dashboard UI — that's sprint 231.

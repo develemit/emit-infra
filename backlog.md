@@ -26,8 +26,8 @@ file to promote items into proper sprints when the list grows worth addressing.
 - (sprint 114, 2026-06-28) SSE reconnection on token expiry not handled — tokens are static per deployment so acceptable for now; revisit if token rotation is added
 - (sprint 115, 2026-06-29) **[manual ops]** Activate healthchecks.io DMS for emit-vision: create a check (15-min period, 5-min grace) at healthchecks.io, add `HEALTHCHECKS_URL=<ping-url>` to Hetzner `.env`, run `docker compose -f infra/docker/docker-compose.infra.yml up -d dms-ping`
 
-<!-- follow-up-scan: date=2026-07-10 through=207 clean=false -->
-> _Sprint scan: incremental scan 2026-07-10 through sprint-207. 9 orphans found from sprints 183–204. Prior scan: 2026-07-01 through sprint-154._
+<!-- follow-up-scan: date=2026-07-17 through=229 clean=true -->
+> _Sprint scan: incremental scan 2026-07-17 through sprint-229. 0 orphans (1 defer from 229 already in backlog). Prior scan: 2026-07-17 through sprint-225._
 
 - (sprint 04, 2026-06-03) `pnpm build` fails on `/_error` and `/500` static pre-render — `<Html>` outside pages/_document error in Next.js 15.5.19 (upstream bug; dev server and typecheck/lint are clean) `[hold]`
 ~~- (sprint 04, 2026-06-03) Provision wizard uses local Zod schema mirroring `ProjectConfigSchema` — consider extracting shared browser-safe types into `@emit-infra/types`; run `/plan-sprint "shared types package"` to plan~~
@@ -106,7 +106,13 @@ file to promote items into proper sprints when the list grows worth addressing.
 - ~~(sprint 44, 2026-06-12) `rollback --list` only queries the first compose image for rollback tags; a multi-image compose stack would silently omit tags for other images~~ → sprint-46 (2026-06-12)
 - ~~(sprint 38, 2026-06-11) `revokeR2Token()` in `packages/core/src/r2.ts` uses `console.warn` for failure logging — accept a logger parameter instead~~ → sprint-45 (2026-06-12)
 - ~~(sprint 09, 2026-06-06) Calling repos with `permissions: contents: read` at the workflow level need `contents: write` for git tag push — add to scaffolded workflow~~ → sprint-47 (2026-06-12)
-- (sprint 172, 2026-07-02) call sites still import from `~/lib/api` barrel — could update to import from specific domain modules for better tree-shaking and faster IDE go-to-definition
+- ~~(sprint 189) SLA cache not invalidated on annotation write~~ → sprint-226 (2026-07-17)
+- ~~(sprint 192) Multiple metrics fire separate push notifications~~ → sprint-227 (2026-07-17)
+- ~~(sprint 222) secrets-sync --yes / non-interactive mode~~ → sprint-228 (2026-07-17)
+- ~~(sprint 172) Barrel imports from ~/lib/api~~ → sprint-229 (2026-07-17)
+- ~~(sprint 214/222/225) Pre-existing lint errors in audit.ts, init-deploy.ts~~ → resolved: lint passes clean after sprints 220-225 (2026-07-17)
+- ~~(sprint 213) ops.ts route integration tests~~ → resolved: covered by sprint-215 (2026-07-17)
+~~- (sprint 172, 2026-07-02) call sites still import from `~/lib/api` barrel — could update to import from specific domain modules for better tree-shaking and faster IDE go-to-definition~~
 - (sprint 175, 2026-07-02) sprint 175 planned `secrets-sync.test.ts` but drift logic is in `secrets.ts` — if/when `secrets-sync.ts` (the SSE push route) needs unit tests, add them post sprint-176 implementation
 - (sprint 176, 2026-07-02) `secrets-apply` route uses `base64 -d` (GNU coreutils) — verify works on target Ubuntu servers; may fail on non-GNU base64
 - (sprint 176, 2026-07-02) "Sync to server" button only appears for missing keys; extra server-side keys (in `extra[]`) are not cleaned up by the apply route — would need a separate "prune extra" SSH step
@@ -114,8 +120,8 @@ file to promote items into proper sprints when the list grows worth addressing.
 - (sprint 177, 2026-07-02) `httpCircuit` resets on API server restart; a failed first probe post-boot could leave a circuit open that delays recovery visibility — acceptable for now
 - (sprint 191, 2026-07-03) `backupAgeHours` metric in status-monitor uses `grep -o '"lastRun":"[^"]*"'` — silently unavailable if backup-status.json format changes
 - (sprint 192, 2026-07-03) AlertRulesSection initializes from config at mount — won't reflect server-side changes until page reload
-- (sprint 192, 2026-07-03) Multiple metrics firing simultaneously send separate push notifications (no bundling)
-- (sprint 193, 2026-07-03) `nx run dashboard:build` still fails due to pre-existing Next.js 15 `Html` outside `pages/_document` bug on `/500` and `/_error` static routes (tracked since sprint 04)
+~~- (sprint 192, 2026-07-03) Multiple metrics firing simultaneously send separate push notifications (no bundling)~~
+~~- (sprint 193, 2026-07-03) `nx run dashboard:build` still fails due to pre-existing Next.js 15 `Html` outside `pages/_document` bug on `/500` and `/_error` static routes (tracked since sprint 04)~~ _(duplicate of sprint 04 [hold])_
 - (sprint 195, 2026-07-03) `pairIncidents` is duplicated between `fleet.ts` and `digest-scheduler.ts` — extract to a shared lib helper if a third callsite appears
 - (sprint 199, 2026-07-03) Rollback via webhook not yet implemented — manual `emit-infra deploy` for now
 - (sprint 202, 2026-07-03) develemail worker has no HTTP health check — may want Docker HEALTHCHECK inspection in future
@@ -133,15 +139,18 @@ file to promote items into proper sprints when the list grows worth addressing.
 - (sprint 184, 2026-07-10) readJsonlTail with `tail: 0` returns first window instead of all items — no caller passes 0, noting for completeness
 - (sprint 187, 2026-07-10) palette-items `filterItems` is pure and would be a cheap first target for dashboard component tests
 - (sprint 188, 2026-07-10) CSV escaping test covers structure but doesn't exercise the comma-in-field branch (ISO timestamps contain colons not commas)
-- (sprint 189, 2026-07-10) SLA cache is not invalidated when an annotation is written — false-positive flag change won't affect cached SLA until 120s TTL expires
+~~- (sprint 189, 2026-07-10) SLA cache is not invalidated when an annotation is written — false-positive flag change won't affect cached SLA until 120s TTL expires~~
 - (sprint 204, 2026-07-10) label-read's `ps -q | head -1` picks arbitrary container — could target first app service explicitly, but harmless as a fallback
 - (sprint 212, 2026-07-10) Could suppress the `GHCR_TOKEN not set` warning in dry-run mode since no docker pull occurs
-- (sprint 213, 2026-07-10) ops.ts route integration tests (sprint 215 covers full route testing)
-- (sprint 214, 2026-07-10) Pre-existing lint errors in audit.ts, init-deploy.ts, init-deploy.test.ts, vitest.config.ts — 7 errors unrelated to this sprint, should be swept in a future lint-cleanup sprint
+~~- (sprint 213, 2026-07-10) ops.ts route integration tests (sprint 215 covers full route testing)~~ _(resolved: covered by sprint-215)_
+~~- (sprint 214, 2026-07-10) Pre-existing lint errors in audit.ts, init-deploy.ts, init-deploy.test.ts, vitest.config.ts — 7 errors unrelated to this sprint, should be swept in a future lint-cleanup sprint~~ _(resolved: lint now passes clean after sprints 220-225)_
 - (sprint 215, 2026-07-11) Full SSE stream integration test for the `confirmationFor` path (deploy/provision/destroy confirmation flow) — the SSE agent loop and hijacked-response streaming are out of scope per sprint spec
 - (sprint 218, 2026-07-11) The filter-tab pattern may be reusable in other list views (e.g., if a future page adds similar all/warn/fail filtering) — no action needed now
 - (sprint 220, 2026-07-11) container-log-viewer state reset and stream re-run happen in separate effects (one useEffect for reset, one inside useSseStream); ordering is correct in React 18 but could be collapsed into a key-based remount if component-level isolation ever becomes a concern
-- (sprint 222, 2026-07-11) The 7 pre-existing lint errors in audit.ts and init-deploy.ts (unused vars) plus vitest.config.ts tsconfig exclusion are tech debt — not introduced here, but worth a cleanup pass
-- (sprint 222, 2026-07-11) secrets-sync.ts lacked a --yes / non-interactive mode like destroy has; currently always requires a real env file to exist
+~~- (sprint 222, 2026-07-11) The 7 pre-existing lint errors in audit.ts and init-deploy.ts (unused vars) plus vitest.config.ts tsconfig exclusion are tech debt — not introduced here, but worth a cleanup pass~~ _(resolved: lint now passes clean after sprints 220-225)_
+~~- (sprint 222, 2026-07-11) secrets-sync.ts lacked a --yes / non-interactive mode like destroy has; currently always requires a real env file to exist~~
 - (sprint 224, 2026-07-11) DesktopContainerRow (139 lines) could be split further if it grows — currently fine
-- (sprint 225, 2026-07-11) Pre-existing lint errors in init-deploy.ts/init-deploy.test.ts and vitest.config.ts remain; not in sprint scope
+~~- (sprint 225, 2026-07-11) Pre-existing lint errors in init-deploy.ts/init-deploy.test.ts and vitest.config.ts remain; not in sprint scope~~ _(resolved: lint now passes clean after sprints 220-225)_
+- (sprint 229, 2026-07-17) The `api.ts` barrel is retained — it could be deleted once its own test (`api.test.ts`) is confirmed to only test internal structure, but this is cosmetic and not urgent
+- (sprint 230, 2026-07-23) `project-status.ts:106` field misalignment: the remote status command runs `cat /opt/<name>/.deployed-version 2>/dev/null || echo ""`, but when that file exists **without a trailing newline** `cat` emits no newline and the next command's output lands on the same line — every field after it shifts by one. Live proof on emit-vision: `buildNumber: '960active'` (build number fused with `systemctl is-active`), `nginxStatus: 'configured'`, `nginxConfigured: false`, `sslExpiry`/`activeSlot` null despite being present on the server. Same hazard applies to the `.deployed-at` and `.active-slot` reads in the same command. Fix: wrap each file read as `echo "$(cat <path> 2>/dev/null)"` so exactly one newline is always emitted. Affects any project whose marker files lack trailing newlines — worth a fleet check.
+- ~~(sprint 230, 2026-07-23) martialops also returns `missing-server` — same class of gap as emit-vision, lower urgency since no incident has been reported for it yet.~~ _(not a gap: martialops is shelved and has no server; its config still declares `nginx.customConfigSrc`, so `missing-server` is the correct report)_
