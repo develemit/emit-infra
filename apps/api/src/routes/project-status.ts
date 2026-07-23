@@ -4,8 +4,9 @@ import { join } from 'node:path'
 import { readFile } from 'node:fs/promises'
 import { z } from 'zod'
 import { sshExec } from '@emit-infra/core'
-import { findProject, sshKeyPath, SAFE_NAME_RE, SAFE_DOMAIN_RE } from '../lib/project-helpers.js'
+import { findProject, sshKeyPath, SAFE_NAME_RE } from '../lib/project-helpers.js'
 import { createTtlCache } from '../lib/ttl-cache.js'
+import { buildStatusCommand, parseStatusLines } from '../lib/status-command.js'
 
 const STATUS_TTL = 20_000
 type StatusData = {
@@ -93,54 +94,45 @@ export async function projectStatusRoutes(app: FastifyInstance): Promise<void> {
     const projectConfig = await readProjectConfig(name)
 
     const domain = project.config.domain
-    // Domain is interpolated into a remote path — only probe the cert when it
-    // looks like a real hostname (bare-IP projects have no letsencrypt cert).
-    const sslProbe = SAFE_DOMAIN_RE.test(domain)
-      ? `openssl x509 -enddate -noout -in /etc/letsencrypt/live/${domain}/fullchain.pem 2>/dev/null | sed 's/notAfter=//' || echo ""`
-      : 'echo ""'
 
     try {
       const [raw, httpStatus, historyEpoch] = await Promise.all([
-        sshExec(
-          host,
-          `uptime -p; df -h / | tail -1 | awk '{print $5, $3, $2}'; free -m | awk 'NR==2{printf "%.0f %dM %dM\\n", $3/$2*100, $3, $2}'; docker ps -q --filter status=running | wc -l; docker ps -aq | wc -l; docker ps -q --filter status=restarting --filter status=dead | wc -l; cat /opt/${name}/.deployed-version 2>/dev/null || echo ""; systemctl is-active nginx 2>/dev/null || echo "unknown"; test -f /etc/nginx/sites-enabled/${name} && echo "configured" || echo "missing"; ${sslProbe}; cd /opt/${name} && docker compose ps --format '{{.Service}}' 2>/dev/null | grep -qi redis && docker compose exec -T redis timeout 5 redis-cli ping 2>/dev/null || echo ""; cd /opt/${name} && docker compose ps --format '{{.Service}}' 2>/dev/null | grep -qi redis && docker compose exec -T redis timeout 5 redis-cli eval 'local f=0;local w=0;for _,k in ipairs(redis.call("KEYS","bull:*:failed")) do f=f+redis.call("LLEN",k) end;for _,k in ipairs(redis.call("KEYS","bull:*:wait")) do w=w+redis.call("LLEN",k) end;return tostring(f)..":"..tostring(w)' 0 2>/dev/null || echo ""; cat /opt/${name}/.deployed-at 2>/dev/null || echo ""; cat /opt/${name}/.active-slot 2>/dev/null || echo ""`,
-          key,
-        ),
+        sshExec(host, buildStatusCommand(name, domain), key),
         checkHttp(domain),
         lastDeployEpoch(name),
       ])
-      const [uptimeLine, diskLine, memLine, containerLine, totalLine, unhealthyLine, buildNumberLine, nginxStatusLine, nginxConfigLine, sslExpiryLine, redisLine, queueLine, deployedAtLine, activeSlotLine] = raw.split('\n').map(l => l.trim())
-      const diskParts = (diskLine ?? '').split(' ')
-      const memParts = (memLine ?? '').split(' ')
+      const fields = parseStatusLines(raw)
+      const diskParts = fields.disk.split(' ')
+      const memParts = fields.mem.split(' ')
       const data: StatusData = {
-        uptime: uptimeLine ?? '',
+        uptime: fields.uptime,
         disk: toInt((diskParts[0] ?? '').replace('%', '')),
         diskUsed: diskParts[1] ?? '',
         diskTotal: diskParts[2] ?? '',
         memory: toInt(memParts[0]),
         memUsed: memParts[1] ?? '',
         memTotal: memParts[2] ?? '',
-        containerCount: toInt(containerLine),
-        containerTotal: toInt(totalLine),
-        containerUnhealthy: toInt(unhealthyLine),
+        containerCount: toInt(fields.containersRunning),
+        containerTotal: toInt(fields.containersTotal),
+        containerUnhealthy: toInt(fields.containersUnhealthy),
         httpStatus,
         serverType: projectConfig?.['serverType'] as string | undefined,
         region: projectConfig?.['region'] as string | undefined,
         ip: host,
-        buildNumber: buildNumberLine || null,
-        nginxStatus: nginxStatusLine && nginxStatusLine !== 'unknown' ? nginxStatusLine : null,
-        nginxConfigured: nginxConfigLine === 'configured',
-        sslExpiry: sslExpiryLine || null,
-        redisStatus: redisLine === 'PONG' ? 'healthy' : redisLine ? 'unhealthy' : null,
-        queueFailed: queueLine ? parseInt(queueLine.split(':')[0] ?? '', 10) || 0 : null,
-        queueWait: queueLine ? parseInt(queueLine.split(':')[1] ?? '', 10) || 0 : null,
+        buildNumber: fields.buildNumber || null,
+        nginxStatus: fields.nginxStatus && fields.nginxStatus !== 'unknown' ? fields.nginxStatus : null,
+        nginxConfigured: fields.nginxConfigured === 'configured',
+        sslExpiry: fields.sslExpiry || null,
+        redisStatus: fields.redis === 'PONG' ? 'healthy' : fields.redis ? 'unhealthy' : null,
+        queueFailed: fields.queue ? parseInt(fields.queue.split(':')[0] ?? '', 10) || 0 : null,
+        queueWait: fields.queue ? parseInt(fields.queue.split(':')[1] ?? '', 10) || 0 : null,
         deployedAt: (() => {
-          const server = deployedAtLine ? parseInt(deployedAtLine, 10) : 0
+          const server = parseInt(fields.deployedAt, 10)
           const history = historyEpoch ? parseInt(historyEpoch, 10) : 0
           const best = Math.max(server || 0, history || 0)
           return best > 0 ? String(best) : null
         })(),
-        activeSlot: activeSlotLine || null,
+        activeSlot: fields.activeSlot || null,
       }
       statusCache.set(name, data)
       return void reply.send(data)
