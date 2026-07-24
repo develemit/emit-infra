@@ -5,9 +5,11 @@ import { createInterface } from 'node:readline'
 import chalk from 'chalk'
 import { execa } from 'execa'
 import { loadConfig } from '@emit-infra/core'
+import { registerSecretsScaffold } from './secrets-scaffold.js'
 
 export function registerSecretsSync(program: Command): void {
   const secretsCmd = program.command('secrets')
+  registerSecretsScaffold(secretsCmd)
   secretsCmd
     .command('sync [name]')
     .description('Push .env secrets to GitHub repo secrets via gh CLI')
