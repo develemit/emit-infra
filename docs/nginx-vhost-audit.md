@@ -16,7 +16,7 @@ For each project: read `.emit-infra.json`'s `nginx` block, check the declared vh
 
 | Project | `customConfigSrc` | File exists | Blue-green | Drift status | Verdict |
 |---|---|---|---|---|---|
-| emit-vision | `infra/nginx/emit-vision.conf` | yes | yes | **drift** (125 local / 110 server lines) | **exposed** |
+| emit-vision | `infra/nginx/emit-vision.conf` | yes | yes | ok (0 diff, 125/125) — synced 2026-07-24 | **rolled out** (was exposed) |
 | develemail | `infra/nginx/prod.conf` | yes | yes | ok (0 diff) | **safe** |
 | emit-social | `docker/nginx/prod.conf` | yes | yes | ok (0 diff) | **n/a** |
 | tastease | `docker/nginx/prod.conf` | yes | yes | drift (179 local / 125 server lines, cosmetic) | **safe** |
@@ -32,7 +32,7 @@ For each project: read `.emit-infra.json`'s `nginx` block, check the declared vh
 - **Relative calls:** browser code calls `/v1/billing/portal`, `/v1/admin/org/sso`, `/v1/admin/org/sso/enforced` (real backend API). It also calls `/api/keys/rotate`, `/api/prefs-cache`, `/api/views`, `/api/me/preferences` — but these resolve to Next.js's *own* route handlers under `apps/web/src/app/api/**` and are not a proxying concern.
 - **Vhost reality:** the repo file `infra/nginx/emit-vision.conf` already has the fix — a `location /v1/` block preceding `location /` in the `app.emitvision.com` server, added specifically to close this gap. The **server** does not have it yet: `GET /projects/emit-vision/nginx-drift` returns `status: "drift"` with the `app.emitvision.com` server block's `location /v1/` line appearing only on the local side of the diff; the server's block still goes straight from the SSL cert lines to `location /`.
 - **Live confirmation:** `curl -sI https://app.emitvision.com/v1/projects` → `HTTP/2 404` with `x-powered-by: Next.js` — the request is reaching the Next.js app's 404 page, not the API.
-- **Remediation:** already scoped as sprint 235 — flip `nginx.syncOnDeploy: true` and deploy to push the already-correct repo vhost to the server.
+- **Remediation:** ✅ **Rolled out 2026-07-24 (sprint 235).** Set `nginx.syncOnDeploy: true` in `.emit-infra.json` and ran a normal `emit-infra deploy` — no manual SSH. The drift diff was purely additive (the `/v1/` block was the only delta; zero server-only lines lost). The deploy's vhost-sync task backed up the old file, copied the repo vhost, passed `nginx -t`, and **reloaded** (not restarted) nginx. Post-deploy: `curl https://app.emitvision.com/v1/projects` → `401` with API JSON `{"error":"invalid_api_key"}` (was `404` Next.js HTML); drift now reports `ok` (server byte-identical to repo). Saved segments (`/v1/segments` → `401`) and other previously-broken client `/v1/*` calls now reach the API. This was the first real end-to-end use of the sprint 230-232 machinery.
 
 ### develemail — safe
 
@@ -90,7 +90,7 @@ For each project: read `.emit-infra.json`'s `nginx` block, check the declared vh
 
 Safest (already verified zero-diff) first, riskiest (broken or unmanaged) last:
 
-1. **emit-vision** — already scoped as sprint 235; the fix is written and verified correct, this is the first real use of the sprint-232 machinery end to end.
+1. **emit-vision** — ✅ **done (sprint 235, 2026-07-24).** First real end-to-end use of the sprint-230-232 machinery; deployed via a normal `emit-infra deploy`, drift now `ok`, `/v1/*` reaches the API in production.
 2. **develemail** — zero drift (`ok`, 71/71 lines identical). Flipping the flag is a no-op push that proves the mechanism on a second, already-clean project before it's trusted anywhere with real drift to resolve.
 3. **emit-social** — zero drift (`ok`, 52/52 lines identical), same reasoning as develemail. Also unaffected by the framework-proxy question entirely (separate subdomains).
 4. **tastease** — drift is real but cosmetic (upstream variable renames only); the routing-critical `location /api/` block survives on both sides and is live-confirmed working. Before flipping, verify the blue-green include on the server actually defines `api_upstream`/`web_upstream`/`marketing_upstream` (it must, since the live curl check succeeded) so the sync doesn't accidentally reference upstreams the deploy script no longer writes under the old names.
@@ -101,4 +101,4 @@ Safest (already verified zero-diff) first, riskiest (broken or unmanaged) last:
 
 ## Summary
 
-Of seven managed projects, **two are currently exposed to the emit-vision failure class**: emit-vision itself (fix written, not yet deployed — sprint 235 closes this) and diner-decider (currently working via a hand-rolled Next.js proxy route, but invisible to emit-infra and one refactor away from the same silent break). Two projects (develemail, tastease) use the correct nginx-level pattern already and are safe, with tastease carrying cosmetic drift worth syncing. Two projects (emit-social, martialops) use a separate-subdomain architecture where the question doesn't apply; martialops is additionally shelved with no live server. One project (test-smoke) is a test fixture.
+Of seven managed projects, **two were exposed to the emit-vision failure class**: emit-vision itself (✅ rolled out via sprint 235 on 2026-07-24 — `/v1/*` now routes to the API at the nginx layer in production) and diner-decider (currently working via a hand-rolled Next.js proxy route, but invisible to emit-infra and one refactor away from the same silent break). Two projects (develemail, tastease) use the correct nginx-level pattern already and are safe, with tastease carrying cosmetic drift worth syncing. Two projects (emit-social, martialops) use a separate-subdomain architecture where the question doesn't apply; martialops is additionally shelved with no live server. One project (test-smoke) is a test fixture.
