@@ -30,6 +30,35 @@ function parseEnvFile(content: string): [string, string][] {
     .filter((entry): entry is [string, string] => entry !== null)
 }
 
+// Sentinel printed by the server-side probe when /opt/<name>/.env doesn't
+// exist yet, so a first-time apply can skip the backup step.
+const NO_SERVER_ENV_MARKER = '__EMIT_INFRA_NO_ENV__'
+
+function mergeEnv(
+  serverEntries: [string, string][],
+  localEntries: [string, string][],
+): { merged: Map<string, string>; added: string[]; updated: string[]; preserved: number } {
+  const serverMap = new Map(serverEntries)
+  const localKeys = new Set(localEntries.map(([k]) => k))
+  const merged = new Map(serverMap)
+  const added: string[] = []
+  const updated: string[] = []
+
+  for (const [k, v] of localEntries) {
+    if (!serverMap.has(k)) added.push(k)
+    else if (serverMap.get(k) !== v) updated.push(k)
+    merged.set(k, v)
+  }
+
+  const preserved = serverEntries.filter(([k]) => !localKeys.has(k)).length
+  return { merged, added, updated, preserved }
+}
+
+function formatTimestamp(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`
+}
+
 // URL-typed vars that must use Docker service names in production, never localhost.
 const URL_KEYS = /^(DATABASE_URL|REDIS_URL|CLICKHOUSE_URL|MONGO_URL|AMQP_URL|BROKER_URL|.*_URL|.*_DSN|.*_HOST)$/i
 const LOCALHOST_PATTERN = /\b(localhost|127\.0\.0\.1)\b/
@@ -52,33 +81,51 @@ export async function secretsSyncRoutes(app: FastifyInstance) {
 
       const name = params.data.name
       const projectDir = join(homedir(), 'projects', name)
-      const envFilePath = existsSync(join(projectDir, '.env.prod'))
-        ? join(projectDir, '.env.prod')
-        : join(projectDir, '.env')
+      const envFilePath = [project.config.ci?.envFile, '.env.prod', '.env']
+        .filter((f): f is string => Boolean(f))
+        .map(f => join(projectDir, f))
+        .find(p => existsSync(p))
 
-      if (!existsSync(envFilePath)) {
+      if (!envFilePath) {
         return reply.status(404).send({ error: `No env file found in ~/projects/${name}/` })
       }
 
       const content = await readFile(envFilePath, 'utf-8')
-      const entries = parseEnvFile(content)
+      const localEntries = parseEnvFile(content)
 
-      if (entries.length === 0) {
+      if (localEntries.length === 0) {
         return reply.status(400).send({ error: 'No secrets found in env file' })
       }
 
-      const b64 = Buffer.from(entries.map(([k, v]) => `${k}=${v}`).join('\n') + '\n').toString('base64')
-      // Defense-in-depth: b64 is interpolated into a remote shell command. The
-      // ssh helper has no stdin support, so assert the payload is pure base64.
-      if (!/^[A-Za-z0-9+/=]+$/.test(b64)) {
-        return reply.status(500).send({ error: 'invalid secrets payload' })
-      }
       const key = sshKeyPath(project.config.sshKeyName)
       const host = project.config.serverIp ?? project.config.domain
 
       try {
-        await sshExec(host, `echo -n '${b64}' | base64 -d > /opt/${name}/.env`, key)
-        return reply.send({ ok: true })
+        const serverRaw = await sshExec(
+          host,
+          `[ -f /opt/${name}/.env ] && cat /opt/${name}/.env || echo '${NO_SERVER_ENV_MARKER}'`,
+          key,
+        )
+        const hadExistingFile = serverRaw.trim() !== NO_SERVER_ENV_MARKER
+        const serverEntries = hadExistingFile ? parseEnvFile(serverRaw) : []
+
+        const { merged, added, updated, preserved } = mergeEnv(serverEntries, localEntries)
+
+        const b64 = Buffer.from(
+          [...merged.entries()].map(([k, v]) => `${k}=${v}`).join('\n') + '\n',
+        ).toString('base64')
+        // Defense-in-depth: b64 is interpolated into a remote shell command. The
+        // ssh helper has no stdin support, so assert the payload is pure base64.
+        if (!/^[A-Za-z0-9+/=]+$/.test(b64)) {
+          return reply.status(500).send({ error: 'invalid secrets payload' })
+        }
+
+        const backupCmd = hadExistingFile
+          ? `cp /opt/${name}/.env /opt/${name}/.env.bak-${formatTimestamp(new Date())} && `
+          : ''
+        await sshExec(host, `${backupCmd}echo -n '${b64}' | base64 -d > /opt/${name}/.env`, key)
+
+        return reply.send({ ok: true, added, updated, preserved })
       } catch (err) {
         return reply.status(503).send({ error: err instanceof Error ? err.message : 'SSH error' })
       }

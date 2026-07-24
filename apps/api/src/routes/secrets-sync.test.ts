@@ -88,14 +88,16 @@ describe('POST /projects/:name/secrets-apply', () => {
     vi.mocked(discoverProjects).mockResolvedValue([mockProject])
     vi.mocked(existsSync).mockReturnValue(true)
     vi.mocked(readFile).mockResolvedValue('FOO=bar\nBAZ=qux\n')
-    vi.mocked(sshExec).mockResolvedValue('')
+    vi.mocked(sshExec)
+      .mockResolvedValueOnce('__EMIT_INFRA_NO_ENV__')
+      .mockResolvedValueOnce('')
 
     const res = await app.inject({ method: 'POST', url: '/projects/myapp/secrets-apply' })
 
     expect(res.statusCode).toBe(200)
-    expect(res.json()).toEqual({ ok: true })
-    const cmd = vi.mocked(sshExec).mock.calls[0]?.[1] ?? ''
-    expect(cmd).toMatch(/^echo -n '[A-Za-z0-9+/=]+' \| base64 -d > \/opt\/myapp\/\.env$/)
+    expect(res.json()).toEqual({ ok: true, added: ['FOO', 'BAZ'], updated: [], preserved: 0 })
+    const writeCmd = vi.mocked(sshExec).mock.calls[1]?.[1] ?? ''
+    expect(writeCmd).toMatch(/^echo -n '[A-Za-z0-9+/=]+' \| base64 -d > \/opt\/myapp\/\.env$/)
   })
 
   it('returns 503 with { error } when SSH fails', async () => {
@@ -108,5 +110,78 @@ describe('POST /projects/:name/secrets-apply', () => {
 
     expect(res.statusCode).toBe(503)
     expect(res.json()).toEqual({ error: 'Connection refused' })
+  })
+
+  it('resolves the env source using ci.envFile precedence over .env.prod', async () => {
+    const projectWithCiEnvFile = {
+      ...mockProject,
+      config: {
+        ...mockProject.config,
+        ci: { preCommit: [], prePush: [], ghcrOrg: 'org', sshKey: '~/.ssh/emit-deploy', envFile: '.env.ci' },
+      },
+    }
+    vi.mocked(discoverProjects).mockResolvedValue([projectWithCiEnvFile])
+    // Only .env.ci and .env.prod exist; ci.envFile must win.
+    vi.mocked(existsSync).mockImplementation((p) => String(p).endsWith('.env.ci') || String(p).endsWith('.env.prod'))
+    vi.mocked(readFile).mockResolvedValue('FOO=fromci\n')
+    vi.mocked(sshExec)
+      .mockResolvedValueOnce('__EMIT_INFRA_NO_ENV__')
+      .mockResolvedValueOnce('')
+
+    const res = await app.inject({ method: 'POST', url: '/projects/myapp/secrets-apply' })
+
+    expect(res.statusCode).toBe(200)
+    expect(readFile).toHaveBeenCalledWith(expect.stringContaining('.env.ci'), 'utf-8')
+  })
+
+  it('preserves server-only keys and reports local values winning on shared keys', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    vi.mocked(existsSync).mockReturnValue(true)
+    vi.mocked(readFile).mockResolvedValue('FOO=newval\nNEWKEY=added\n')
+    vi.mocked(sshExec)
+      .mockResolvedValueOnce('FOO=oldval\nSERVER_ONLY=keepme\n')
+      .mockResolvedValueOnce('')
+
+    const res = await app.inject({ method: 'POST', url: '/projects/myapp/secrets-apply' })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual({ ok: true, added: ['NEWKEY'], updated: ['FOO'], preserved: 1 })
+    const writeCmd = vi.mocked(sshExec).mock.calls[1]?.[1] ?? ''
+    const b64 = writeCmd.match(/echo -n '([A-Za-z0-9+/=]+)'/)?.[1] ?? ''
+    const written = Buffer.from(b64, 'base64').toString('utf-8')
+    expect(written).toContain('FOO=newval')
+    expect(written).toContain('SERVER_ONLY=keepme')
+    expect(written).not.toContain('FOO=oldval')
+  })
+
+  it('backs up the existing server .env before writing', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    vi.mocked(existsSync).mockReturnValue(true)
+    vi.mocked(readFile).mockResolvedValue('FOO=bar\n')
+    vi.mocked(sshExec)
+      .mockResolvedValueOnce('FOO=old\n')
+      .mockResolvedValueOnce('')
+
+    await app.inject({ method: 'POST', url: '/projects/myapp/secrets-apply' })
+
+    const writeCmd = vi.mocked(sshExec).mock.calls[1]?.[1] ?? ''
+    expect(writeCmd).toMatch(/^cp \/opt\/myapp\/\.env \/opt\/myapp\/\.env\.bak-\d{14} && echo -n /)
+  })
+
+  it('skips the backup on a first-time apply with no existing server file', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    vi.mocked(existsSync).mockReturnValue(true)
+    vi.mocked(readFile).mockResolvedValue('FOO=bar\n')
+    vi.mocked(sshExec)
+      .mockResolvedValueOnce('__EMIT_INFRA_NO_ENV__')
+      .mockResolvedValueOnce('')
+
+    const res = await app.inject({ method: 'POST', url: '/projects/myapp/secrets-apply' })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual({ ok: true, added: ['FOO'], updated: [], preserved: 0 })
+    const writeCmd = vi.mocked(sshExec).mock.calls[1]?.[1] ?? ''
+    expect(writeCmd).not.toMatch(/^cp /)
+    expect(writeCmd).toMatch(/^echo -n /)
   })
 })
