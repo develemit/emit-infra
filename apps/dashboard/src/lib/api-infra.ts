@@ -72,6 +72,12 @@ export type ResponseTimes =
   | { available: false }
   | { available: true; p50ms: number; p95ms: number; p99ms: number; sampleCount: number }
 
+export type NginxDrift =
+  | { status: 'unconfigured' }
+  | { status: 'missing-local'; localPath: string }
+  | { status: 'missing-server'; localPath: string; serverPath: string }
+  | { status: 'ok' | 'drift'; localPath: string; serverPath: string; localLines: number; serverLines: number; diff: string[] }
+
 export async function getDiskDirs(name: string): Promise<DiskDir[]> {
   const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/disk-dirs`, { cache: 'no-store', headers: authHeaders() })
   if (!res.ok) return []
@@ -123,4 +129,11 @@ export async function getResponseTimes(name: string): Promise<ResponseTimes> {
   const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/response-times`, { cache: 'no-store', headers: authHeaders() })
   if (!res.ok) return { available: false }
   return res.json() as Promise<ResponseTimes>
+}
+
+export async function getNginxDrift(name: string): Promise<NginxDrift | null> {
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/nginx-drift`, { cache: 'no-store', headers: authHeaders() })
+  if (res.status === 503) return null
+  if (!res.ok) return null
+  return res.json() as Promise<NginxDrift>
 }

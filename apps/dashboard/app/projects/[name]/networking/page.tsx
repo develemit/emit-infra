@@ -1,13 +1,14 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
-import { getNginxEndpoints, type NginxEndpointsData } from '@/lib/api'
+import { getNginxEndpoints, type NginxEndpointsData } from '@/lib/api-infra'
 import { useServerMetrics } from '@/lib/use-server-metrics'
 import { useDeployMarkers } from '@/lib/use-deploy-markers'
 import type { DeployMarker } from '@/components/detail/resource-chart'
 import { SubPageShell } from '@/components/detail/sub-page-shell'
 import { ResponseTimePanel } from '@/components/detail/response-time-panel'
 import { NginxEndpointsPanel } from '@/components/detail/nginx-endpoints-panel'
+import { NginxConfigPanel } from '@/components/detail/nginx-config-panel'
 import { CertPanel } from '@/components/detail/cert-panel'
 import { NetworkChart } from '@/components/detail/network-chart'
 import { QueueChart } from '@/components/detail/queue-chart'
@@ -55,6 +56,7 @@ export default function NetworkingPage() {
           endpoints={nginxEndpoints.available ? nginxEndpoints.endpoints : []}
         />
       )}
+      <NginxConfigPanel name={name} />
       <CertPanel name={name} />
       {networkPoints.length >= 2 && (
         <NetworkChart points={networkPoints} deploys={deployMarkers} hours={24} />
