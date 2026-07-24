@@ -82,14 +82,15 @@ describe('GET /projects/:name/secrets-drift', () => {
 
   it('returns status ok when all required keys are present on server', async () => {
     vi.mocked(discoverProjects).mockResolvedValue([mockProject])
-    vi.mocked(sshExec).mockResolvedValue('DATABASE_URL\nAPI_KEY\nSECRET_TOKEN')
+    vi.mocked(sshExec).mockResolvedValue('DATABASE_URL\nAPI_KEY\nSECRET_TOKEN\n__EMIT_INFRA_SECRETS_DRIFT_EMPTY__\n')
 
     const res = await app.inject({ method: 'GET', url: '/projects/myapp/secrets-drift' })
 
     expect(res.statusCode).toBe(200)
-    const data = res.json() as { status: string; missing: string[]; extra: string[]; present: string[] }
+    const data = res.json() as { status: string; missing: string[]; extra: string[]; present: string[]; empty: string[] }
     expect(data.status).toBe('ok')
     expect(data.missing).toEqual([])
+    expect(data.empty).toEqual([])
     expect(data.present).toContain('DATABASE_URL')
   })
 
@@ -115,5 +116,51 @@ describe('GET /projects/:name/secrets-drift', () => {
     const data = res.json() as { status: string; extra: string[] }
     expect(data.status).toBe('ok')
     expect(data.extra).toContain('UNEXPECTED_KEY')
+  })
+
+  it('reports empty-valued keys separately and drives status drift', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    vi.mocked(sshExec).mockResolvedValue(
+      'DATABASE_URL\nAPI_KEY\nSECRET_TOKEN\n__EMIT_INFRA_SECRETS_DRIFT_EMPTY__\nSECRET_TOKEN',
+    )
+
+    const res = await app.inject({ method: 'GET', url: '/projects/myapp/secrets-drift' })
+
+    expect(res.statusCode).toBe(200)
+    const data = res.json() as { status: string; missing: string[]; empty: string[]; present: string[] }
+    expect(data.status).toBe('drift')
+    expect(data.missing).toEqual([])
+    expect(data.empty).toEqual(['SECRET_TOKEN'])
+  })
+
+  it('reports mixed missing and empty keys', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    vi.mocked(sshExec).mockResolvedValue(
+      'DATABASE_URL\nAPI_KEY\n__EMIT_INFRA_SECRETS_DRIFT_EMPTY__\nAPI_KEY',
+    )
+
+    const res = await app.inject({ method: 'GET', url: '/projects/myapp/secrets-drift' })
+
+    expect(res.statusCode).toBe(200)
+    const data = res.json() as { status: string; missing: string[]; empty: string[] }
+    expect(data.status).toBe('drift')
+    expect(data.missing).toEqual(['SECRET_TOKEN'])
+    expect(data.empty).toEqual(['API_KEY'])
+  })
+
+  it('excludes empty-valued keys from present', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    vi.mocked(sshExec).mockResolvedValue(
+      'DATABASE_URL\nAPI_KEY\nSECRET_TOKEN\n__EMIT_INFRA_SECRETS_DRIFT_EMPTY__\nAPI_KEY',
+    )
+
+    const res = await app.inject({ method: 'GET', url: '/projects/myapp/secrets-drift' })
+
+    expect(res.statusCode).toBe(200)
+    const data = res.json() as { present: string[]; empty: string[] }
+    expect(data.present).not.toContain('API_KEY')
+    expect(data.present).toContain('DATABASE_URL')
+    expect(data.present).toContain('SECRET_TOKEN')
+    expect(data.empty).toEqual(['API_KEY'])
   })
 })

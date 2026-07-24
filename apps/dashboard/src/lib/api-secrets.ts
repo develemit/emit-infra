@@ -4,7 +4,7 @@ const API_BASE = getApiBase()
 
 export type SecretsDrift =
   | { status: 'unconfigured' }
-  | { status: 'ok' | 'drift'; missing: string[]; extra: string[]; present: string[] }
+  | { status: 'ok' | 'drift'; missing: string[]; extra: string[]; present: string[]; empty: string[] }
 
 export function syncSecrets(name: string): { url: string } {
   return { url: `${API_BASE}/projects/${encodeURIComponent(name)}/secrets-sync` }

@@ -45,14 +45,31 @@ export function SecretsPanel({ name }: SecretsPanelProps) {
     void fetchDrift()
   }, [name])
 
-  // Don't render if unconfigured
-  if (drift === null || drift.status === 'unconfigured') {
+  // Unreachable (503) — stay silent, the fleet card already surfaces connectivity issues.
+  if (drift === null) {
     return null
+  }
+
+  if (drift.status === 'unconfigured') {
+    return (
+      <div className="rounded-xl border border-border bg-card" style={{ padding: 18 }}>
+        <div className="flex items-center gap-2 mb-2">
+          <Icon name="lock" size={16} style={{ color: 'var(--fg-muted)' }} />
+          <span className="text-[13.5px] font-semibold text-fg">Secrets</span>
+          <span className="text-[11px] font-semibold text-warn uppercase tracking-wide ml-2">Not monitored</span>
+        </div>
+        <p className="text-[12px] text-subtle">
+          This project declares no <code>requiredEnvKeys</code>, so secrets drift isn&apos;t checked.
+          Run <code>emit-infra secrets scaffold-required-keys {name}</code> to get started.
+        </p>
+      </div>
+    )
   }
 
   const missing = drift.missing ?? []
   const extra = drift.extra ?? []
   const present = drift.present ?? []
+  const empty = drift.empty ?? []
 
   return (
     <div className="rounded-xl border border-border bg-card" style={{ padding: 18 }}>
@@ -61,9 +78,9 @@ export function SecretsPanel({ name }: SecretsPanelProps) {
         <span className="text-[13.5px] font-semibold text-fg">Secrets</span>
         <div className="flex-1" />
         <span className="text-[12px] text-subtle font-mono mr-3">
-          {missing.length} missing · {extra.length} extra · {present.length} present
+          {missing.length} missing · {empty.length} empty · {extra.length} extra · {present.length} present
         </span>
-        {missing.length > 0 && (
+        {(missing.length > 0 || empty.length > 0) && (
           <button
             onClick={() => void handleSync()}
             disabled={syncing || synced}
@@ -102,6 +119,17 @@ export function SecretsPanel({ name }: SecretsPanelProps) {
               <span className="text-[11px] font-semibold text-err uppercase tracking-wide">Missing Keys</span>
               <div className="flex flex-wrap gap-2">
                 {missing.map(key => (
+                  <Badge key={key} variant="err">{key}</Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {empty.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <span className="text-[11px] font-semibold text-err uppercase tracking-wide">Empty Keys</span>
+              <div className="flex flex-wrap gap-2">
+                {empty.map(key => (
                   <Badge key={key} variant="err">{key}</Badge>
                 ))}
               </div>
