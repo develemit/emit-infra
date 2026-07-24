@@ -43,6 +43,7 @@ export const ProjectConfigSchema = z.object({
     .object({
       wildcardCert: z.boolean().default(false),
       customConfigSrc: z.string().optional(),
+      syncOnDeploy: z.boolean().default(false),
     })
     .optional(),
   stripe: z

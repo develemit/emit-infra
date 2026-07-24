@@ -1,0 +1,73 @@
+---
+- name: Stat existing nginx vhost
+  stat:
+    path: "/etc/nginx/sites-available/{{ project_name }}"
+  register: vhost_stat
+
+- name: Back up existing nginx vhost
+  copy:
+    src: "/etc/nginx/sites-available/{{ project_name }}"
+    dest: "/etc/nginx/sites-available/{{ project_name }}.bak"
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0644"
+  when: vhost_stat.stat.exists
+
+- name: Copy nginx vhost from repo
+  copy:
+    src: "{{ nginx_custom_config_src }}"
+    dest: "/etc/nginx/sites-available/{{ project_name }}"
+    owner: root
+    group: root
+    mode: "0644"
+  register: vhost_copy
+
+- name: Validate nginx config
+  command: nginx -t
+  register: vhost_validate
+  changed_when: false
+  ignore_errors: true
+
+- name: Restore previous vhost on validation failure
+  copy:
+    src: "/etc/nginx/sites-available/{{ project_name }}.bak"
+    dest: "/etc/nginx/sites-available/{{ project_name }}"
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0644"
+  when:
+    - vhost_validate is failed
+    - vhost_stat.stat.exists
+
+- name: Fail deploy on nginx vhost validation failure
+  fail:
+    msg: >-
+      nginx vhost sync failed for {{ project_name }} at
+      /etc/nginx/sites-available/{{ project_name }}: nginx -t reported:
+      {{ vhost_validate.stderr }}
+      A common cause is the vhost referencing an upstream name that the
+      blue-green include file does not define yet. The previous vhost
+      {{ 'was restored from backup' if vhost_stat.stat.exists else 'could not be restored — no prior vhost existed' }}.
+  when: vhost_validate is failed
+
+- name: Reload nginx after vhost sync
+  service:
+    name: nginx
+    state: reloaded
+  when:
+    - vhost_validate is succeeded
+    - vhost_copy is changed
+
+- name: Remove nginx vhost backup
+  file:
+    path: "/etc/nginx/sites-available/{{ project_name }}.bak"
+    state: absent
+  when: vhost_validate is succeeded
+
+- name: Report nginx vhost sync status
+  debug:
+    msg: >-
+      {{ 'nginx vhost updated for ' + project_name if vhost_copy is changed
+      else 'nginx vhost already current for ' + project_name }}

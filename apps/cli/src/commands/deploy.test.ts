@@ -82,6 +82,52 @@ describe('buildDeployExtraVars — standard strategy', () => {
   })
 })
 
+describe('buildDeployExtraVars — nginx.syncOnDeploy', () => {
+  it('omits nginx_custom_config_src when syncOnDeploy is unset', () => {
+    const config = {
+      ...baseConfig,
+      deploy: deployConfig,
+      nginx: { wildcardCert: false, syncOnDeploy: false, customConfigSrc: 'nginx/vhost.conf' },
+    }
+    const vars = buildDeployExtraVars(config, '/cwd', {}, () => false)
+
+    expect(vars.nginx_custom_config_src).toBeUndefined()
+  })
+
+  it('omits nginx_custom_config_src when syncOnDeploy is false', () => {
+    const config = {
+      ...baseConfig,
+      deploy: deployConfig,
+      nginx: { wildcardCert: false, syncOnDeploy: false, customConfigSrc: 'nginx/vhost.conf' },
+    }
+    const vars = buildDeployExtraVars(config, '/cwd', {}, () => false)
+
+    expect(vars.nginx_custom_config_src).toBeUndefined()
+  })
+
+  it('omits nginx_custom_config_src when syncOnDeploy is true but customConfigSrc is missing', () => {
+    const config = {
+      ...baseConfig,
+      deploy: deployConfig,
+      nginx: { wildcardCert: false, syncOnDeploy: true },
+    }
+    const vars = buildDeployExtraVars(config, '/cwd', {}, () => false)
+
+    expect(vars.nginx_custom_config_src).toBeUndefined()
+  })
+
+  it('sets nginx_custom_config_src joined to cwd when syncOnDeploy is true and customConfigSrc is set', () => {
+    const config = {
+      ...baseConfig,
+      deploy: deployConfig,
+      nginx: { wildcardCert: false, syncOnDeploy: true, customConfigSrc: 'nginx/vhost.conf' },
+    }
+    const vars = buildDeployExtraVars(config, '/cwd', {}, () => false)
+
+    expect(vars.nginx_custom_config_src).toBe(join('/cwd', 'nginx/vhost.conf'))
+  })
+})
+
 describe('buildDeployExtraVars — blue-green with separate structure', () => {
   const bgConfig = {
     ...baseConfig,

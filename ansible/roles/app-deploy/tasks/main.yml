@@ -107,6 +107,10 @@
   include_tasks: deploy-standard.yml
   when: not (blue_green | default(false)) and not (zero_downtime | default(false))
 
+- name: Sync nginx vhost
+  include_tasks: sync-vhost.yml
+  when: nginx_custom_config_src is defined
+
 # ── Post-deploy ──────────────────────────────────────────────────
 - name: Read deployed build number from container label
   shell: >

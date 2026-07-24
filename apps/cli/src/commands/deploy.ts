@@ -66,6 +66,10 @@ function printDryRunPlan(
       console.log(`  Extra file:  ${ef.src} → ${ef.dest} ${exists ? chalk.green('✓') : chalk.red('✗ missing')}`)
     }
   }
+  if (extraVars.nginx_custom_config_src) {
+    const exists = existsSync(extraVars.nginx_custom_config_src as string)
+    console.log(`  Nginx vhost: ${extraVars.nginx_custom_config_src} ${exists ? chalk.green('✓') : chalk.red('✗ missing')}`)
+  }
 
   console.log(chalk.bold('\nAnsible extra-vars:'))
   console.log(JSON.stringify(extraVars, null, 2))
@@ -123,6 +127,10 @@ export function buildDeployExtraVars(
 
   if (config.healthCheck?.url) {
     extraVars.health_check_url = config.healthCheck.url
+  }
+
+  if (config.nginx?.syncOnDeploy && config.nginx.customConfigSrc) {
+    extraVars.nginx_custom_config_src = join(cwd, config.nginx.customConfigSrc)
   }
 
   if (config.postgres) {
