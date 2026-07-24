@@ -25,6 +25,28 @@
     mode: "0644"
   loop: "{{ extra_files | default([]) }}"
 
+- name: Stat existing .env file
+  stat:
+    path: "{{ app_dir }}/.env"
+  register: env_stat
+  when: copy_env | default(false)
+
+- name: Generate .env backup timestamp
+  command: date +%Y%m%d%H%M%S
+  register: env_backup_ts
+  changed_when: false
+  when: copy_env | default(false) and env_stat.stat.exists
+
+- name: Back up existing .env file
+  copy:
+    src: "{{ app_dir }}/.env"
+    dest: "{{ app_dir }}/.env.bak-{{ env_backup_ts.stdout }}"
+    remote_src: true
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0600"
+  when: copy_env | default(false) and env_stat.stat.exists
+
 - name: Copy .env file
   copy:
     src: "{{ env_src | default('.env') }}"

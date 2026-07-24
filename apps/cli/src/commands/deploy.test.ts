@@ -1,18 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Command } from 'commander'
 import { join } from 'node:path'
-import { buildDeployExtraVars, registerDeploy } from './deploy.js'
+import { buildDeployExtraVars, computeEnvRemoval, enforceEnvRemovalGuard, registerDeploy } from './deploy.js'
 
 vi.mock('@emit-infra/core', () => ({
   loadConfig: vi.fn(),
   runAnsible: vi.fn(),
+  sshExec: vi.fn(),
 }))
 
 vi.mock('./configure.js', () => ({
   resolveInventoryPath: vi.fn().mockResolvedValue('/fake/inventory.ini'),
 }))
 
-import { loadConfig, runAnsible } from '@emit-infra/core'
+import { loadConfig, runAnsible, sshExec } from '@emit-infra/core'
 
 const baseConfig = {
   name: 'test-project',
@@ -181,6 +182,165 @@ describe('buildDeployExtraVars — blue-green with separate structure', () => {
 
     expect(vars.post_deploy_exec).toBeUndefined()
     expect(vars.bg_post_exec).toBe('api:pnpm migrate')
+  })
+})
+
+describe('computeEnvRemoval', () => {
+  it('returns server keys absent from local keys', () => {
+    expect(computeEnvRemoval(['A', 'B'], ['A', 'B', 'C'])).toEqual(['C'])
+  })
+
+  it('excludes BUILD_NUMBER from the removal set', () => {
+    expect(computeEnvRemoval(['A'], ['A', 'BUILD_NUMBER'])).toEqual([])
+  })
+
+  it('returns an empty set when local keys are a superset of server keys', () => {
+    expect(computeEnvRemoval(['A', 'B', 'C'], ['A', 'B'])).toEqual([])
+  })
+
+  it('returns an empty set for a first deploy with no server keys', () => {
+    expect(computeEnvRemoval(['A', 'B'], [])).toEqual([])
+  })
+
+  it('sorts the returned keys', () => {
+    expect(computeEnvRemoval([], ['ZKEY', 'AKEY'])).toEqual(['AKEY', 'ZKEY'])
+  })
+})
+
+describe('enforceEnvRemovalGuard', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('proceeds silently when the server has no keys absent from local', async () => {
+    vi.mocked(sshExec).mockResolvedValue('A\nB\n')
+
+    await enforceEnvRemovalGuard({
+      host: 'host',
+      sshKey: '/key',
+      projectName: 'proj',
+      envSrc: '/cwd/.env',
+      localKeys: ['A', 'B', 'C'],
+      allowEnvRemoval: false,
+    })
+
+    expect(sshExec).toHaveBeenCalledWith('host', expect.stringContaining('/opt/proj/.env'), '/key')
+  })
+
+  it('does not block a first deploy with no existing server .env', async () => {
+    vi.mocked(sshExec).mockResolvedValue('')
+
+    await expect(
+      enforceEnvRemovalGuard({
+        host: 'host',
+        sshKey: '/key',
+        projectName: 'proj',
+        envSrc: '/cwd/.env',
+        localKeys: ['A'],
+        allowEnvRemoval: false,
+      }),
+    ).resolves.toBeUndefined()
+  })
+
+  it('aborts non-zero and lists removed keys when --allow-env-removal is not passed', async () => {
+    vi.mocked(sshExec).mockResolvedValue('A\nB\nSECRET\n')
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('process.exit') })
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await expect(
+      enforceEnvRemovalGuard({
+        host: 'host',
+        sshKey: '/key',
+        projectName: 'proj',
+        envSrc: '/cwd/.env',
+        localKeys: ['A', 'B'],
+        allowEnvRemoval: false,
+      }),
+    ).rejects.toThrow('process.exit')
+
+    expect(exitSpy).toHaveBeenCalledWith(1)
+    const errorText = errorSpy.mock.calls.map(c => c.join(' ')).join('\n')
+    expect(errorText).toContain('SECRET')
+    expect(errorText).toContain('/cwd/.env')
+    exitSpy.mockRestore()
+    errorSpy.mockRestore()
+  })
+
+  it('proceeds with a warning naming the removed keys when --allow-env-removal is passed', async () => {
+    vi.mocked(sshExec).mockResolvedValue('A\nB\nSECRET\n')
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('process.exit') })
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    await enforceEnvRemovalGuard({
+      host: 'host',
+      sshKey: '/key',
+      projectName: 'proj',
+      envSrc: '/cwd/.env',
+      localKeys: ['A', 'B'],
+      allowEnvRemoval: true,
+    })
+
+    expect(exitSpy).not.toHaveBeenCalled()
+    const warnText = warnSpy.mock.calls.map(c => c.join(' ')).join('\n')
+    expect(warnText).toContain('SECRET')
+    exitSpy.mockRestore()
+    warnSpy.mockRestore()
+  })
+
+  it('prints the resolved env_src and a local/server key-count delta', async () => {
+    vi.mocked(sshExec).mockResolvedValue('A\nB\n')
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await enforceEnvRemovalGuard({
+      host: 'host',
+      sshKey: '/key',
+      projectName: 'proj',
+      envSrc: '/cwd/secrets.prod.env',
+      localKeys: ['A', 'B', 'C'],
+      allowEnvRemoval: false,
+    })
+
+    const logText = logSpy.mock.calls.map(c => c.join(' ')).join('\n')
+    expect(logText).toContain('/cwd/secrets.prod.env')
+    expect(logText).toContain('3 keys')
+    expect(logText).toContain('2 keys')
+    logSpy.mockRestore()
+  })
+
+  it('excludes BUILD_NUMBER from the removal decision', async () => {
+    vi.mocked(sshExec).mockResolvedValue('A\nBUILD_NUMBER\n')
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('process.exit') })
+
+    await enforceEnvRemovalGuard({
+      host: 'host',
+      sshKey: '/key',
+      projectName: 'proj',
+      envSrc: '/cwd/.env',
+      localKeys: ['A'],
+      allowEnvRemoval: false,
+    })
+
+    expect(exitSpy).not.toHaveBeenCalled()
+    exitSpy.mockRestore()
+  })
+
+  it('aborts non-zero when the server is unreachable', async () => {
+    vi.mocked(sshExec).mockRejectedValue(new Error('ssh failed'))
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('process.exit') })
+
+    await expect(
+      enforceEnvRemovalGuard({
+        host: 'host',
+        sshKey: '/key',
+        projectName: 'proj',
+        envSrc: '/cwd/.env',
+        localKeys: ['A'],
+        allowEnvRemoval: false,
+      }),
+    ).rejects.toThrow('process.exit')
+
+    expect(exitSpy).toHaveBeenCalledWith(1)
+    exitSpy.mockRestore()
   })
 })
 

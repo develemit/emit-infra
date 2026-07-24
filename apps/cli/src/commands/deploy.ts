@@ -1,9 +1,11 @@
 import { Command } from 'commander'
 import { join, dirname } from 'node:path'
 import { readFileSync, existsSync } from 'node:fs'
+import { homedir } from 'node:os'
 import chalk from 'chalk'
-import { loadConfig, runAnsible, type ProjectConfig } from '@emit-infra/core'
+import { loadConfig, runAnsible, sshExec, type ProjectConfig } from '@emit-infra/core'
 import { resolveInventoryPath } from './configure.js'
+import { parseKeyList, filterExcludedKeys } from './secrets-scaffold.js'
 
 const BACKUP_ENV_KEYS = ['CF_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY'] as const
 
@@ -203,6 +205,54 @@ export function buildDeployExtraVars(
   return extraVars
 }
 
+export function computeEnvRemoval(localKeys: string[], serverKeys: string[]): string[] {
+  const localSet = new Set(localKeys)
+  return filterExcludedKeys(serverKeys.filter(k => !localSet.has(k))).sort()
+}
+
+async function readServerEnvKeys(host: string, projectName: string, sshKey: string): Promise<string[]> {
+  const raw = await sshExec(
+    host,
+    `grep -v '^#' /opt/${projectName}/.env 2>/dev/null | grep '=' | cut -d= -f1 | tr -d ' '`,
+    sshKey,
+  )
+  return parseKeyList(raw)
+}
+
+export async function enforceEnvRemovalGuard(opts: {
+  host: string
+  sshKey: string
+  projectName: string
+  envSrc: string
+  localKeys: string[]
+  allowEnvRemoval: boolean
+}): Promise<void> {
+  let serverKeys: string[]
+  try {
+    serverKeys = await readServerEnvKeys(opts.host, opts.projectName, opts.sshKey)
+  } catch {
+    console.error(chalk.red(`Could not read /opt/${opts.projectName}/.env on ${opts.host} to check for key removal — is the host reachable?`))
+    process.exit(1)
+    return
+  }
+
+  console.log(chalk.bold('Env file:    ') + `${opts.envSrc} (${opts.localKeys.length} keys) → server (${serverKeys.length} keys)`)
+
+  const removed = computeEnvRemoval(opts.localKeys, serverKeys)
+  if (removed.length === 0) return
+
+  if (!opts.allowEnvRemoval) {
+    console.error(chalk.red(`\nThis deploy would remove ${removed.length} key(s) present on the server .env but absent from ${opts.envSrc}:\n`))
+    removed.forEach(k => console.error(chalk.red(`  - ${k}`)))
+    console.error(chalk.yellow('\nRe-run with --allow-env-removal if this is intentional.'))
+    process.exit(1)
+    return
+  }
+
+  console.warn(chalk.yellow(`\n⚠ --allow-env-removal set — removing ${removed.length} key(s) from the server .env:\n`))
+  removed.forEach(k => console.warn(chalk.yellow(`  - ${k}`)))
+}
+
 export function registerDeploy(program: Command): void {
   program
     .command('deploy [name]')
@@ -210,7 +260,8 @@ export function registerDeploy(program: Command): void {
     .option('--config <path>', 'Path to .emit-infra.json')
     .option('--inventory <path>', 'Path to Ansible inventory file')
     .option('-n, --dry-run', 'Validate config and show deploy plan without making SSH connections')
-    .action(async (_name: string | undefined, opts: { config?: string; inventory?: string; dryRun?: boolean }) => {
+    .option('--allow-env-removal', 'Allow a deploy to remove server .env keys absent from the local env file')
+    .action(async (_name: string | undefined, opts: { config?: string; inventory?: string; dryRun?: boolean; allowEnvRemoval?: boolean }) => {
       const config = loadConfig(opts.config)
 
       if (!opts.dryRun) {
@@ -233,6 +284,17 @@ export function registerDeploy(program: Command): void {
       if (opts.dryRun) {
         printDryRunPlan(config, inventory, extraVars)
         return
+      }
+
+      if (extraVars.copy_env) {
+        await enforceEnvRemovalGuard({
+          host: config.serverIp ?? config.domain,
+          sshKey: join(homedir(), '.ssh', config.sshKeyName),
+          projectName: config.name,
+          envSrc: extraVars.env_src as string,
+          localKeys: Object.keys(parseEnvFile(extraVars.env_src as string)),
+          allowEnvRemoval: Boolean(opts.allowEnvRemoval),
+        })
       }
 
       await runAnsible('deploy', inventory, extraVars)
