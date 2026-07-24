@@ -44,6 +44,10 @@ export const ProjectConfigSchema = z.object({
       wildcardCert: z.boolean().default(false),
       customConfigSrc: z.string().optional(),
       syncOnDeploy: z.boolean().default(false),
+      // apiPathPrefix and apiUpstream must both be set for the vhost template to
+      // render an API location block — either one alone renders nothing.
+      apiPathPrefix: z.string().optional(),
+      apiUpstream: z.string().optional(),
     })
     .optional(),
   stripe: z

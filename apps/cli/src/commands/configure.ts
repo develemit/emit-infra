@@ -36,6 +36,11 @@ export function registerConfigure(program: Command): void {
         extraVars.nginx_custom_config_src = resolve(process.cwd(), config.nginx.customConfigSrc)
       }
 
+      if (config.nginx?.apiPathPrefix && config.nginx?.apiUpstream) {
+        extraVars.nginx_api_path_prefix = config.nginx.apiPathPrefix
+        extraVars.nginx_api_upstream = config.nginx.apiUpstream
+      }
+
       await runAnsible('provision', inventory, extraVars)
 
       console.log(chalk.green(`\nDone. Run "emit-infra deploy ${config.name}" to deploy the app.`))

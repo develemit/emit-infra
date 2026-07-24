@@ -241,6 +241,10 @@ export function registerSetup(program: Command): void {
         if (config.nginx?.customConfigSrc) {
           ansibleVars.nginx_custom_config_src = join(process.cwd(), config.nginx.customConfigSrc)
         }
+        if (config.nginx?.apiPathPrefix && config.nginx?.apiUpstream) {
+          ansibleVars.nginx_api_path_prefix = config.nginx.apiPathPrefix
+          ansibleVars.nginx_api_upstream = config.nginx.apiUpstream
+        }
         if (config.deploy?.composeDest) {
           ansibleVars.compose_file = config.deploy.composeDest
         }

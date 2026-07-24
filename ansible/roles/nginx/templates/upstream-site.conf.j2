@@ -30,6 +30,21 @@ server {
     ssl_certificate /etc/letsencrypt/live/{{ domain }}/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/{{ domain }}/privkey.pem;
 
+{% if nginx_api_path_prefix is defined and nginx_api_upstream is defined %}
+    # API path prefix routed directly to the upstream at the proxy layer.
+    # proxy_pass has NO trailing slash / URI component: with one, nginx strips
+    # the matched prefix before forwarding and every API call breaks. This
+    # block must precede location / or requests fall through to the web
+    # upstream and never reach the API.
+    location {{ nginx_api_path_prefix }} {
+        proxy_pass http://{{ nginx_api_upstream }};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+{% endif %}
     location / {
         proxy_pass http://{{ project_name }}_{% if blue_green | default(false) %}web{% else %}backend{% endif %};
         proxy_http_version 1.1;
@@ -48,6 +63,21 @@ server {
     listen 80;
     server_name {{ domain }}{% if nginx_www | default(true) %} www.{{ domain }}{% endif %};
 
+{% if nginx_api_path_prefix is defined and nginx_api_upstream is defined %}
+    # API path prefix routed directly to the upstream at the proxy layer.
+    # proxy_pass has NO trailing slash / URI component: with one, nginx strips
+    # the matched prefix before forwarding and every API call breaks. This
+    # block must precede location / or requests fall through to the web
+    # upstream and never reach the API.
+    location {{ nginx_api_path_prefix }} {
+        proxy_pass http://{{ nginx_api_upstream }};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+{% endif %}
     location / {
         proxy_pass http://{{ project_name }}_{% if blue_green | default(false) %}web{% else %}backend{% endif %};
         proxy_http_version 1.1;

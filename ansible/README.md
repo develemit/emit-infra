@@ -95,6 +95,17 @@ ssh deploy@<server-ip> /opt/emit-vision/blue-green-deploy.sh
 | **Deploy Strategy (Optional)** |
 | `zero_downtime` | bool | `false` | — | Use zero-downtime deploy (app-deploy role): start standby container, health-check, nginx swap |
 | `nginx_api_port` | int | — | — | If set, create an `api.{{ domain }}` nginx server block (automatic for blue-green) |
+| `nginx_api_path_prefix` | string | — | with `nginx_api_upstream` | Path prefix (e.g. `/v1/`) routed directly to `nginx_api_upstream` on the main domain, ahead of `location /`. Both fields must be set or neither renders. |
+| `nginx_api_upstream` | string | — | with `nginx_api_path_prefix` | Upstream name to proxy the prefix to (e.g. `emit-vision_api`). Must already be defined — in blue-green projects this comes from the per-service upstreams in `blue-green/{{ project_name }}.conf`. |
+
+### API path prefix routing (`nginx_api_path_prefix` / `nginx_api_upstream`)
+
+Set both fields to route an API path prefix straight to its upstream at the nginx layer instead of relying on the web app to proxy it onward (Next.js `rewrites()`, Vite proxy, etc.) — those work in dev but are unreliable in production containers, and a silent miss falls through to the app's own 404 page. Two gotchas, easy to get backwards:
+
+1. **No trailing slash on `proxy_pass`.** `proxy_pass http://{{ nginx_api_upstream }};` — a trailing slash makes nginx strip the matched prefix before forwarding, and every API call breaks.
+2. **The block must precede `location /`.** Otherwise the request falls through to the web upstream and never reaches the API.
+
+Both fields are optional and must be set together — omitting either renders no block, byte-identical to today's output. This only fits projects whose vhost the template (`upstream-site.conf.j2` / `site.conf.j2`) can express; a project with a genuinely custom vhost (multiple hostnames, extra upstreams) should keep using `nginx_custom_config_src` instead.
 
 ## Inventory Example
 
