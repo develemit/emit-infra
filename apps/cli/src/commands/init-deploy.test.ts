@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, writeFileSync, readFileSync, existsSync, mkdirSync, rmSync } from 'node:fs'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
@@ -135,7 +135,7 @@ describe('init-deploy config generation', () => {
     writeFileSync(join(appsDir, 'web', 'Dockerfile'), 'FROM node:20')
 
     const { execaSync } = await import('execa')
-    const result = execaSync('npx', ['tsx', join(__dirname, '..', 'index.ts'), 'init-deploy', '--port-base', '4000', '-y'], {
+    execaSync('npx', ['tsx', join(__dirname, '..', 'index.ts'), 'init-deploy', '--port-base', '4000', '-y'], {
       cwd: dir,
       env: { ...process.env, NODE_ENV: 'test' },
       reject: false,
@@ -145,5 +145,7 @@ describe('init-deploy config generation', () => {
     expect(config.blueGreen).toBeDefined()
     expect(config.blueGreen.services).toHaveLength(2)
     expect(config.name).toBe('test-project')
-  })
+    // Cold-starts npx + tsx compilation of the CLI entrypoint: ~3s idle, but it
+    // races vitest's 5s default under parallel load and flakes the whole suite.
+  }, 30_000)
 })

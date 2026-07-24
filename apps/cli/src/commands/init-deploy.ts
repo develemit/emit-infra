@@ -1,5 +1,5 @@
 import { Command } from 'commander'
-import { writeFileSync, readFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs'
+import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs'
 import { join, basename } from 'node:path'
 import chalk from 'chalk'
 import { detectServices, detectHealthPaths, type DetectedService } from '../lib/detect-project.js'

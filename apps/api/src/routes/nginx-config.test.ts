@@ -46,7 +46,7 @@ const mockProject = {
   ...mockProjectUnconfigured,
   config: {
     ...mockProjectUnconfigured.config,
-    nginx: { wildcardCert: false, customConfigSrc: 'infra/nginx/myapp.conf' },
+    nginx: { wildcardCert: false, syncOnDeploy: false, customConfigSrc: 'infra/nginx/myapp.conf' },
   },
 }
 
