@@ -14,7 +14,11 @@ type NginxDriftResult =
   | { status: 'unconfigured' }
   | { status: 'missing-local'; localPath: string }
   | { status: 'missing-server'; localPath: string; serverPath: string }
+  | { status: 'disabled'; localPath: string; serverPath: string }
   | { status: 'ok' | 'drift'; localPath: string; serverPath: string; localLines: number; serverLines: number; diff: string[] }
+
+const SPLIT_MARKER = '__EMIT_INFRA_NGINX_DRIFT_SPLIT__'
+const AVAILABLE_MARKER = '__EMIT_INFRA_NGINX_DRIFT_AVAILABLE__'
 
 const driftCache = createTtlCache<NginxDriftResult | null>(DRIFT_TTL)
 
@@ -37,7 +41,8 @@ export async function nginxConfigRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const localPath = join(project.projectDir, customConfigSrc)
-      const serverPath = `/etc/nginx/sites-available/${name}`
+      const enabledPath = `/etc/nginx/sites-enabled/${name}`
+      const availablePath = `/etc/nginx/sites-available/${name}`
 
       if (!existsSync(localPath)) {
         return void reply.send({ status: 'missing-local', localPath })
@@ -52,14 +57,26 @@ export async function nginxConfigRoutes(app: FastifyInstance): Promise<void> {
       const key = sshKeyPath(project.config.sshKeyName)
       const host = project.config.serverIp ?? project.config.domain
 
+      const script = `cat ${enabledPath} 2>/dev/null || true; echo ${SPLIT_MARKER}; test -f ${availablePath} && echo ${AVAILABLE_MARKER} || true`
+
       try {
-        const [localRaw, serverRaw] = await Promise.all([
+        const [localRaw, combinedRaw] = await Promise.all([
           readFile(localPath, 'utf-8'),
-          sshExec(host, `cat ${serverPath} 2>/dev/null || true`, key),
+          sshExec(host, script, key),
         ])
 
+        const splitIdx = combinedRaw.indexOf(SPLIT_MARKER)
+        const serverRaw = splitIdx === -1 ? combinedRaw : combinedRaw.slice(0, splitIdx)
+        const tail = splitIdx === -1 ? '' : combinedRaw.slice(splitIdx + SPLIT_MARKER.length)
+        const availableExists = tail.includes(AVAILABLE_MARKER)
+
         if (serverRaw.trim() === '') {
-          const result: NginxDriftResult = { status: 'missing-server', localPath, serverPath }
+          if (availableExists) {
+            const result: NginxDriftResult = { status: 'disabled', localPath, serverPath: availablePath }
+            driftCache.set(name, result)
+            return void reply.send(result)
+          }
+          const result: NginxDriftResult = { status: 'missing-server', localPath, serverPath: enabledPath }
           driftCache.set(name, result)
           return void reply.send(result)
         }
@@ -71,7 +88,7 @@ export async function nginxConfigRoutes(app: FastifyInstance): Promise<void> {
         const result: NginxDriftResult = {
           status: diff.length === 0 ? 'ok' : 'drift',
           localPath,
-          serverPath,
+          serverPath: enabledPath,
           localLines: localLines.length,
           serverLines: serverLines.length,
           diff,
