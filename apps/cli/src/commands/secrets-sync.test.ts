@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Command } from 'commander'
-import { registerSecretsSync } from './secrets-sync.js'
+import { registerSecretsSync, diffEnvSources } from './secrets-sync.js'
 
 vi.mock('@emit-infra/core', () => ({
   loadConfig: vi.fn(),
@@ -26,6 +26,7 @@ vi.mock('node:readline', () => ({
 
 import { loadConfig } from '@emit-infra/core'
 import { existsSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { execa } from 'execa'
 import { createInterface } from 'node:readline'
 
@@ -156,5 +157,87 @@ describe('secrets-sync command', () => {
     expect(mockRl.question).toHaveBeenCalled()
     expect(mockRl.close).toHaveBeenCalled()
     expect(execa).not.toHaveBeenCalled()
+  })
+
+  it('warns when the deploy-resolved env source differs from the synced file', async () => {
+    const cwd = process.cwd()
+    const syncPath = join(cwd, '.env.prod')
+    const deployPath = join(cwd, 'infra/secrets.prod.env')
+
+    vi.mocked(loadConfig).mockReturnValue({
+      ...baseConfig,
+      ci: { envFile: 'infra/secrets.prod.env' },
+    } as ReturnType<typeof loadConfig>)
+    vi.mocked(existsSync).mockImplementation((p) => p === syncPath || p === deployPath)
+    vi.mocked(readFileSync).mockImplementation((p) => {
+      if (p === syncPath) return 'SHARED=local-value\nONLY_SYNC=x'
+      if (p === deployPath) return 'SHARED=server-value\nONLY_DEPLOY=y'
+      return ''
+    })
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    const program = new Command()
+    program.exitOverride()
+    registerSecretsSync(program)
+    await program.parseAsync(['node', 'cli', 'secrets', 'sync', '--dry-run'])
+
+    const output = logSpy.mock.calls.map((c) => c.join(' ')).join('\n')
+    expect(output).toContain('deploy reads a different env file than sync')
+    expect(output).toContain('ONLY_SYNC')
+    expect(output).toContain('ONLY_DEPLOY')
+    expect(output).toContain('SHARED')
+    expect(output).not.toContain('local-value')
+    expect(output).not.toContain('server-value')
+
+    logSpy.mockRestore()
+  })
+
+  it('does not warn when sync and deploy resolve to the same file', async () => {
+    vi.mocked(existsSync).mockReturnValue(true)
+    vi.mocked(readFileSync).mockReturnValue('KEY1=val1')
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    const program = new Command()
+    program.exitOverride()
+    registerSecretsSync(program)
+    await program.parseAsync(['node', 'cli', 'secrets', 'sync', '--dry-run'])
+
+    const output = logSpy.mock.calls.map((c) => c.join(' ')).join('\n')
+    expect(output).not.toContain('deploy reads a different env file than sync')
+
+    logSpy.mockRestore()
+  })
+})
+
+describe('diffEnvSources', () => {
+  it('reports keys only present in the sync source', () => {
+    const diff = diffEnvSources([['A', '1'], ['B', '2']], [['A', '1']])
+    expect(diff.onlyInSync).toEqual(['B'])
+    expect(diff.onlyInDeploy).toEqual([])
+    expect(diff.differing).toEqual([])
+  })
+
+  it('reports keys only present in the deploy source', () => {
+    const diff = diffEnvSources([['A', '1']], [['A', '1'], ['C', '3']])
+    expect(diff.onlyInSync).toEqual([])
+    expect(diff.onlyInDeploy).toEqual(['C'])
+    expect(diff.differing).toEqual([])
+  })
+
+  it('reports keys whose values differ between the two sources', () => {
+    const diff = diffEnvSources([['A', 'local']], [['A', 'server']])
+    expect(diff.onlyInSync).toEqual([])
+    expect(diff.onlyInDeploy).toEqual([])
+    expect(diff.differing).toEqual(['A'])
+  })
+
+  it('returns no differences for identical env files', () => {
+    const diff = diffEnvSources([['A', '1'], ['B', '2']], [['A', '1'], ['B', '2']])
+    expect(diff).toEqual({ onlyInSync: [], onlyInDeploy: [], differing: [] })
+  })
+
+  it('returns no differences when both sources are empty', () => {
+    const diff = diffEnvSources([], [])
+    expect(diff).toEqual({ onlyInSync: [], onlyInDeploy: [], differing: [] })
   })
 })

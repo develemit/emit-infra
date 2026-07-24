@@ -38,7 +38,7 @@ node dist/apps/cli/index.js --help
 | `emit-infra deploy` | SSH → pull latest Docker images → `docker compose up -d` |
 | `emit-infra status` | SSH health check: uptime, disk %, memory %, running containers |
 | `emit-infra audit` | Inspect Dockerfiles + remote image sizes for production-readiness issues |
-| `emit-infra secrets sync` | Push local `.env` values to GitHub repo secrets via `gh` CLI |
+| `emit-infra secrets sync` | Push local `.env` values to GitHub repo secrets via `gh` CLI — **not** the same file `deploy` copies to the server, see below |
 | `emit-infra destroy` | Destroy all Terraform-managed infrastructure (irreversible) |
 
 All commands except `setup` and `init` read `.emit-infra.json` from the current directory (or a parent) to locate the project config.
@@ -124,6 +124,34 @@ test-results
 *.md
 .env*
 ```
+
+## Production secrets: two files, two destinations
+
+`emit-infra secrets sync` and `emit-infra deploy` read **different env files by
+default**, and push them to **different places**. Putting a new production
+secret in only one of them is the single easiest way to break production
+silently — the secret shows up wherever you put it, and is simply absent
+everywhere else, with no error.
+
+| File | Read by | Destination |
+|---|---|---|
+| `.env.prod` (falls back to `.env`) | `emit-infra secrets sync` | GitHub repo secrets (`gh secret set`) |
+| `ci.envFile` in `.emit-infra.json` → e.g. `infra/secrets.prod.env` (falls back to `.env.prod`, then `.env`) | `emit-infra deploy` (`copy_env`) | server `/opt/<name>/.env` |
+
+If a project's `.emit-infra.json` has no `ci.envFile`, both commands resolve to
+`.env.prod` and there's no split to worry about. If `ci.envFile` points
+somewhere else, the two commands are reading two different files — and `secrets
+sync` now warns you when that's the case and the files disagree (see below).
+
+**How to add a new production secret, correctly:**
+
+1. Check whether this project's `.emit-infra.json` sets `ci.envFile`. If not, there's one file (`.env.prod`) and you're done after step 2.
+2. Add the key to `.env.prod` (or whatever file `secrets sync` resolves) — this is what reaches GitHub Actions.
+3. Add the same key, with the same value, to the file `ci.envFile` points at — this is what reaches the server on the next `deploy`.
+4. Run `emit-infra secrets sync --dry-run` and confirm no divergence warning fires for the key you just added.
+
+See `docs/DEPLOYMENT-PITFALLS.md` (pitfall #22) for a worked example of what
+happens when this is missed.
 
 ## Project config
 

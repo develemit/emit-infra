@@ -226,6 +226,8 @@ deploy:
 - After any sync, verify with `gh secret list` — check the update timestamps on sensitive secrets and confirm the source was correct.
 - Add a guard in sync tooling to reject files containing `localhost` URLs or dev-port patterns (e.g. `:55432`, `:56379`).
 
+**See also:** #22 below — a related but distinct trap where `secrets sync` and `deploy` read two different *production* files, not a dev-vs-prod mixup.
+
 ---
 
 ## 12. Docker Compose network label conflict when the network was pre-created manually
@@ -456,6 +458,7 @@ reply.header(
 14. `iss missing from the response` on OAuth callback? → Forward `iss` query param to `client.callback()` (see #19)
 15. Session cookie not sent after OAuth redirect to app subdomain? → Set `Domain` to parent domain on the cookie (see #20)
 16. OAuth callback 500 with `42P01` (undefined table)? → Migrations never ran in production — copy migrations into the Docker image and remove the `NODE_ENV === 'production'` guard (see #21)
+17. New production secret works in CI but not on the server (or vice versa)? → `secrets sync` and `deploy` read different files when `ci.envFile` is set — add the key to both, run `secrets sync --dry-run` to check (see #22)
 
 ---
 
@@ -527,3 +530,28 @@ Drizzle's `migrate()` creates a `__drizzle_migrations` tracking table and only a
 **Cause:** `blue-green-deploy.sh` ran `MIGRATE_PRE` (typically `docker compose run --rm api node migrate.mjs`) **before** `compose pull`. The `run` used the locally-cached `:latest` image — the previous release — whose migrations folder doesn't contain the new migration files. The migration step succeeds (nothing pending from the old image's perspective) and silently applies nothing.
 
 **Fix:** The script now pulls images for the inactive slot first, then runs `MIGRATE_PRE`, so the migration container is the new release. If you hit this on a server with an old copy of the script, run the migrate command manually after a pull, or just redeploy — Ansible re-copies the fixed script on every deploy.
+
+---
+
+## 22. `secrets sync` and `deploy` read different production env files — a secret added to one never reaches the other
+
+**Symptom:** A newly added production environment variable is visible in GitHub Actions (`gh secret list` shows it) but the running container on the server never sees it — the app behaves as if the variable is unset, with no error anywhere. In the worst case the missing variable silently degrades a feature instead of crashing: emit-vision's outgoing verification/reset emails stopped sending for an extended period while `POST /auth/resend` kept returning `200 {"message":"verification_sent_if_found"}`, because the four `DEVELEMAIL_*`/`EMAIL_FROM_ADDRESS` keys had been added to the file `secrets sync` reads, but never to the file `deploy` copies to the server.
+
+**Cause:** `emit-infra secrets sync` and `emit-infra deploy` resolve their env file **independently**, and the two resolvers don't agree:
+
+- `apps/cli/src/commands/secrets-sync.ts` → `resolveEnvFile(cwd)`: `.env.prod` if it exists, else `.env`. It never looks at `ci.envFile`.
+- `apps/cli/src/commands/deploy.ts:145` → `[config.ci?.envFile, '.env.prod', '.env']`, first existing file wins.
+
+When a project's `.emit-infra.json` sets `ci.envFile` to something other than `.env.prod` (emit-vision uses `infra/secrets.prod.env`), the two commands are reading **two different files** — one destined for GitHub repo secrets, the other for the server's `/opt/<name>/.env`. Adding a secret to the "obvious" file (`.env.prod`) gets it into CI but not onto the server, or vice versa. Both files can drift indefinitely with nothing to notice.
+
+The residue that proved this happened: emit-vision's `.env.prod` had 9 keys, 4 of which were exactly the email vars — added there, never added to `infra/secrets.prod.env` (36 keys), which `deploy` actually reads.
+
+**Fix (detection, already shipped):** `emit-infra secrets sync` now resolves the deploy-side file the same way `deploy.ts` does and compares it against the file it's about to sync. If they differ, it prints a non-blocking warning naming (by key, never by value) which keys are only in the sync source, only in the deploy source, or present in both with different values. Run `emit-infra secrets sync --dry-run` any time you add a production secret and confirm no warning fires for the key you just added.
+
+**Fix (process):** When adding a new production secret, add it to *both* destinations:
+1. The file `secrets sync` reads (`.env.prod`, or check `--env-file`).
+2. The file `deploy` reads (`ci.envFile` in `.emit-infra.json` if set, else the same `.env.prod`).
+
+See `README.md`'s "Production secrets: two files, two destinations" section for the full table and a checklist.
+
+**What to check in a new project:** does `.emit-infra.json` set `ci.envFile`? If yes, that project has the split and both files need every production key kept in sync manually — `secrets sync`'s warning is the safety net, not a substitute for adding the key to both files.
