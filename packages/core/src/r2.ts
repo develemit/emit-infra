@@ -1,4 +1,54 @@
+import { createHash } from 'node:crypto'
+
 const CF_API = 'https://api.cloudflare.com/client/v4'
+
+/**
+ * R2 bucket-scoped permission groups. Verified live against
+ * `GET /accounts/{id}/tokens/permission_groups` on 2026-07-24 — re-check there
+ * if token creation starts failing, since these are opaque Cloudflare IDs.
+ */
+export const R2_ITEM_WRITE_PERMISSION_GROUP = '2efd5506f9c8494dacb1fa10a3e7d5b6'
+export const R2_ITEM_READ_PERMISSION_GROUP = '6a018a9f2fc74eb6b293b0c548f38b39'
+
+/**
+ * Resource string identifying a single R2 bucket in a token policy. The
+ * `_default_` segment is the jurisdiction and is required — omitting it yields a
+ * policy Cloudflare accepts but that grants nothing usable.
+ */
+export function r2BucketResource(accountId: string, bucketName: string): string {
+  return `com.cloudflare.edge.r2.bucket.${accountId}_default_${bucketName}`
+}
+
+/**
+ * S3-compatible credentials are derived from an account-owned API token, not
+ * returned directly: the access key id is the token id, and the secret is the
+ * SHA-256 of the token's `value` (which Cloudflare returns only at creation).
+ */
+export function deriveR2Credentials(
+  tokenId: string,
+  tokenValue: string,
+): { accessKeyId: string; secretAccessKey: string } {
+  return {
+    accessKeyId: tokenId,
+    secretAccessKey: createHash('sha256').update(tokenValue).digest('hex'),
+  }
+}
+
+export function buildR2TokenPayload(accountId: string, bucketName: string): Record<string, unknown> {
+  return {
+    name: `emit-infra-${bucketName}`,
+    policies: [
+      {
+        effect: 'allow',
+        resources: { [r2BucketResource(accountId, bucketName)]: '*' },
+        permission_groups: [
+          { id: R2_ITEM_WRITE_PERMISSION_GROUP },
+          { id: R2_ITEM_READ_PERMISSION_GROUP },
+        ],
+      },
+    ],
+  }
+}
 
 interface CfResponse<T> {
   result: T
@@ -71,43 +121,34 @@ export async function createR2Token(
   bucketName: string,
   apiToken: string,
 ): Promise<{ tokenId: string; accessKeyId: string; secretAccessKey: string }> {
-  const result = await cfFetch<{ id: string; accessKeyId: string; secretAccessKey: string }>(
-    `/accounts/${accountId}/r2/tokens`,
+  // Account-owned tokens, NOT /r2/tokens — that route does not exist and
+  // returns 404 "no route matches this url".
+  const result = await cfFetch<{ id: string; value: string }>(
+    `/accounts/${accountId}/tokens`,
     apiToken,
-    {
-      method: 'POST',
-      body: JSON.stringify({
-        name: `emit-infra-${bucketName}`,
-        policies: [
-          {
-            effect: 'allow',
-            resources: {
-              [`com.cloudflare.edge.r2.bucket.${accountId}_${bucketName}`]: '*',
-            },
-            permission_groups: [
-              { id: '2efd5506f9c8494dacb1fa10a3e7d5b8', name: 'Workers R2 Storage Bucket Item Write' },
-              { id: '6a018a9f2fc74eb6b293b0c548f08ef1', name: 'Workers R2 Storage Bucket Item Read' },
-            ],
-          },
-        ],
-      }),
-    },
+    { method: 'POST', body: JSON.stringify(buildR2TokenPayload(accountId, bucketName)) },
   )
 
-  if (!result?.id || !result?.accessKeyId || !result?.secretAccessKey) {
-    throw new Error('R2 token creation succeeded but response missing id, accessKeyId, or secretAccessKey')
+  if (!result?.id || !result?.value) {
+    throw new Error('R2 token creation succeeded but response missing id or value')
   }
 
-  return { tokenId: result.id, accessKeyId: result.accessKeyId, secretAccessKey: result.secretAccessKey }
+  return { tokenId: result.id, ...deriveR2Credentials(result.id, result.value) }
 }
 
+/**
+ * Tokens minted by `createR2Token` are account-owned, so they must be deleted
+ * under /accounts/{id}/tokens — /user/tokens silently fails for them, which
+ * meant rotation never actually revoked the credential it replaced.
+ */
 export async function revokeR2Token(
+  accountId: string,
   apiToken: string,
   tokenId: string,
   logger?: (msg: string) => void,
 ): Promise<boolean> {
   try {
-    const res = await fetch(`${CF_API}/user/tokens/${tokenId}`, {
+    const res = await fetch(`${CF_API}/accounts/${accountId}/tokens/${tokenId}`, {
       method: 'DELETE',
       headers: {
         Authorization: `Bearer ${apiToken}`,

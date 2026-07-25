@@ -66,7 +66,7 @@ export function registerR2RotateToken(program: Command): void {
       if (tokenIdMatch && tokenIdMatch[1]) {
         const oldTokenId = tokenIdMatch[1]
         console.log(chalk.gray(`Revoking old token ${oldTokenId.slice(0, 8)}...`))
-        const revoked = await revokeR2Token(cfToken, oldTokenId)
+        const revoked = await revokeR2Token(accountId, cfToken, oldTokenId)
         if (revoked) {
           console.log(chalk.green(`  ✓ Revoked old token`))
         } else {
