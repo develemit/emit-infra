@@ -18,7 +18,7 @@ For each live project: run `scaffold-required-keys --dry-run` to see what the se
 
 | Project | Declared keys | Drift status | Missing | Empty | Verdict |
 |---|---|---|---|---|---|
-| develemail | 15 (14 scaffolded + 1 added) | drift | `INBOUND_SECRET` | none | **gap found** |
+| develemail | 15 (14 scaffolded + 1 added) | **ok** (was drift) | none — *fixed 2026-07-24* | none | **gap found → RESOLVED** |
 | emit-social | 26 | ok | none | none | safe |
 | tastease | 42 | ok | none | none | safe |
 | diner-decider | 44 | drift | none | 4 (`BACKUP_S3_ACCESS_KEY_ID`, `BACKUP_S3_SECRET_ACCESS_KEY`, `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY`) | **gap found** |
@@ -34,7 +34,7 @@ For each live project: run `scaffold-required-keys --dry-run` to see what the se
 - **Compose comparison:** `${VAR}` refs across `docker-compose.prod.yml` + `.blue.yml` + `.green.yml` total 12 names, 11 of which the server already has. The 12th, `INBOUND_SECRET`, is referenced with no fallback default by both the `api` service (`docker-compose.blue.yml:39`) and the `inbound` service (line 60) — "Shared secret for the internal inbound receive endpoint. The inbound SMTP handler uses this to authenticate with the API" per `.env.example`. It does not appear anywhere in the scaffold's key list, meaning the server's `.env` has **no `INBOUND_SECRET` line at all** (not merely empty).
 - **Action taken:** added `INBOUND_SECRET` to `requiredEnvKeys` manually after scaffolding (a local `.emit-infra.json` edit, in scope per this sprint). Confirmed via `GET /projects/develemail/secrets-drift`: `status: "drift"`, `missing: ["INBOUND_SECRET"]`.
 - **Why this matters:** with the key absent, docker-compose substitutes an empty string and both containers start "healthy" while the inbound→API authentication check runs against an empty expected secret. Depending on how the API compares the header value, this is either a hard failure on every inbound email (silently rejected) or — worse — an auth check that trivially passes for an empty-string caller. Either way it is exactly the silent-failure class this initiative exists to catch.
-- **Remediation:** not performed here (production env changes are out of scope for this sprint). Needs the actual secret value generated and set on the server; see backlog.
+- **Remediation — DONE 2026-07-24.** Impact confirmed first: inbound logs showed constant `Domain refresh failed with status 401`, i.e. inbound domain refresh was fully non-functional (fail-closed, so no security hole). Generated a 32-byte hex secret per `.env.example`'s documented method and set it in **both** `.env.prod` (the `ci.envFile` deploy source, so it survives the next deploy) and the server `/opt/develemail/.env`; hash-verified both sides match without printing the value. Recreated the green-slot `api`+`inbound` containers with `-p develemail-green`. Verified: secret present in both container envs (len 64), inbound 401 count now 0, direct auth test → **HTTP 200 with the secret, 401 without**, `secrets-drift` → `ok`. Backups: `.env.prod.bak-20260724` (local), `/opt/develemail/.env.bak-inbound-20260724` (server).
 
 ### emit-social — safe
 
