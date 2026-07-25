@@ -1,7 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from 'vitest'
 import { Command } from 'commander'
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { buildDeployExtraVars, computeEnvRemoval, enforceEnvRemovalGuard, registerDeploy } from './deploy.js'
+import { buildDeployExtraVars, computeEnvRemoval, enforceEnvRemovalGuard, parseEnvFile, registerDeploy } from './deploy.js'
 
 vi.mock('@emit-infra/core', () => ({
   loadConfig: vi.fn(),
@@ -370,5 +372,109 @@ describe('deploy command --dry-run', () => {
 
     expect(runAnsible).toHaveBeenCalledOnce()
     expect(runAnsible).toHaveBeenCalledWith('deploy', '/inv.ini', expect.objectContaining({ project_name: 'test-project' }))
+  })
+})
+
+describe('parseEnvFile', () => {
+  let dir: string
+
+  beforeAll(() => {
+    dir = mkdtempSync(join(tmpdir(), 'deploy-parse-env-'))
+  })
+
+  afterAll(() => rmSync(dir, { recursive: true, force: true }))
+
+  function write(name: string, content: string): string {
+    const p = join(dir, name)
+    writeFileSync(p, content)
+    return p
+  }
+
+  it('parses keys containing digits', () => {
+    // Regression: an earlier /^\s*[A-Z_]+=/ filter dropped every one of these,
+    // which made the env-removal guard report them as phantom removals.
+    const p = write('digits.env', [
+      'R2_BUCKET=my-bucket',
+      'R2_ACCESS_KEY_ID=abc123',
+      'R2_SECRET_ACCESS_KEY=shh',
+      'S3_REGION=auto',
+      'DATABASE_URL=postgres://x',
+    ].join('\n'))
+
+    const env = parseEnvFile(p)
+
+    expect(Object.keys(env).sort()).toEqual([
+      'DATABASE_URL', 'R2_ACCESS_KEY_ID', 'R2_BUCKET', 'R2_SECRET_ACCESS_KEY', 'S3_REGION',
+    ])
+    expect(env['R2_BUCKET']).toBe('my-bucket')
+    expect(env['S3_REGION']).toBe('auto')
+  })
+
+  it('still skips comments, blanks and garbage lines', () => {
+    const p = write('mixed.env', [
+      '# FOO=bar',
+      '   # R2_COMMENTED=nope',
+      '',
+      '   ',
+      'not an env line',
+      '=leading-equals',
+      '9STARTS_WITH_DIGIT=nope',
+      'REAL_KEY=yes',
+      'R2_ALSO_REAL=yes',
+    ].join('\n'))
+
+    expect(Object.keys(parseEnvFile(p)).sort()).toEqual(['R2_ALSO_REAL', 'REAL_KEY'])
+  })
+
+  it('tolerates leading whitespace before the key', () => {
+    const p = write('indented.env', '  R2_BUCKET=b\n\tDATABASE_URL=d\n')
+    expect(Object.keys(parseEnvFile(p)).sort()).toEqual(['DATABASE_URL', 'R2_BUCKET'])
+  })
+
+  it('returns an empty object for a missing file', () => {
+    expect(parseEnvFile(join(dir, 'does-not-exist.env'))).toEqual({})
+  })
+
+  it('agrees with the SSH-side key extraction on the same content', () => {
+    // The server side reads keys with `grep '=' | cut -d= -f1`; the local parser
+    // must not be stricter, or the guard manufactures removals.
+    const content = ['R2_ENDPOINT=x', 'R2_BUCKET=y', 'CF_ACCOUNT_ID=z', 'PLAIN=1'].join('\n')
+    const p = write('agree.env', content)
+    const shellEquivalent = content
+      .split('\n')
+      .filter(l => l.includes('=') && !l.trimStart().startsWith('#'))
+      .map(l => l.slice(0, l.indexOf('=')).trim())
+
+    expect(Object.keys(parseEnvFile(p)).sort()).toEqual(shellEquivalent.sort())
+  })
+})
+
+describe('computeEnvRemoval — pinned emit-vision false positive', () => {
+  it('reports no removals when digit-containing keys are present on both sides', () => {
+    // This is the exact case that blocked an emit-vision deploy on 2026-07-24:
+    // the four R2_* keys existed in the local file but the parser dropped them,
+    // so the guard believed the deploy would delete them from the server.
+    const localKeys = [
+      'DATABASE_URL', 'REDIS_URL', 'SESSION_SECRET',
+      'R2_ENDPOINT', 'R2_BUCKET', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY',
+    ]
+    const serverKeys = [...localKeys, 'BUILD_NUMBER']
+
+    expect(computeEnvRemoval(localKeys, serverKeys)).toEqual([])
+  })
+
+  it('would have reported four removals with the old digit-blind key list', () => {
+    // Demonstrates the bug's mechanism: drop the digit keys from the local side
+    // (what the old regex effectively did) and the same server state yields the
+    // four phantom removals from the original error message.
+    const digitBlindLocalKeys = ['DATABASE_URL', 'REDIS_URL', 'SESSION_SECRET']
+    const serverKeys = [
+      'DATABASE_URL', 'REDIS_URL', 'SESSION_SECRET',
+      'R2_ENDPOINT', 'R2_BUCKET', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'BUILD_NUMBER',
+    ]
+
+    expect(computeEnvRemoval(digitBlindLocalKeys, serverKeys).sort()).toEqual(
+      ['R2_ACCESS_KEY_ID', 'R2_BUCKET', 'R2_ENDPOINT', 'R2_SECRET_ACCESS_KEY'],
+    )
   })
 })

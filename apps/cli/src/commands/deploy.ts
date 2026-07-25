@@ -9,12 +9,16 @@ import { parseKeyList, filterExcludedKeys } from './secrets-scaffold.js'
 
 const BACKUP_ENV_KEYS = ['CF_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY'] as const
 
-function parseEnvFile(path: string): Record<string, string> {
+// Digits must be allowed after the first character: keys like R2_BUCKET and
+// S3_REGION are real and were silently dropped by an earlier [A-Z_]+ pattern,
+// which made the env-removal guard report phantom removals. Mirrors the shape
+// used by the SSH-side reads and apps/api/src/routes/secrets.ts.
+export function parseEnvFile(path: string): Record<string, string> {
   if (!existsSync(path)) return {}
   return Object.fromEntries(
     readFileSync(path, 'utf8')
       .split('\n')
-      .filter(line => /^\s*[A-Z_]+=/.test(line))
+      .filter(line => /^\s*[A-Za-z_][A-Za-z0-9_]*=/.test(line))
       .map(line => {
         const idx = line.indexOf('=')
         return [line.slice(0, idx).trim(), line.slice(idx + 1).trim()] as [string, string]
@@ -86,7 +90,12 @@ function printDryRunPlan(
 function checkBackupEnv(config: ProjectConfig): void {
   if (!config.postgres?.backupBucket) return
 
-  const envCandidates = ['.env.prod', '.env'].map(f => join(process.cwd(), f))
+  // Same candidate precedence as the deploy path (see buildDeployExtraVars), so
+  // a project whose real server env lives at ci.envFile isn't checked against a
+  // different file than the one actually deployed.
+  const envCandidates = [config.ci?.envFile, '.env.prod', '.env']
+    .filter(Boolean)
+    .map(f => join(process.cwd(), f!))
   const envPath = envCandidates.find(p => existsSync(p)) ?? join(process.cwd(), '.env')
   const env = parseEnvFile(envPath)
   const missing = BACKUP_ENV_KEYS.filter(k => !env[k])
