@@ -21,7 +21,7 @@ For each live project: run `scaffold-required-keys --dry-run` to see what the se
 | develemail | 15 (14 scaffolded + 1 added) | **ok** (was drift) | none — *fixed 2026-07-24* | none | **gap found → RESOLVED** |
 | emit-social | 26 | ok | none | none | safe |
 | tastease | 42 | ok | none | none | safe |
-| diner-decider | 44 | drift | none | 4 (`BACKUP_S3_ACCESS_KEY_ID`, `BACKUP_S3_SECRET_ACCESS_KEY`, `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY`) | **gap found** |
+| diner-decider | 44 | **ok** (was drift) | none | none — *fixed 2026-07-24* | **gap found → RESOLVED** |
 | emit-vision | 36 (pre-existing, untouched) | ok | none | none | safe (preserved) |
 | martialops | *(intentionally not declared)* | n/a | — | — | skipped — see note below |
 | test-smoke | *(intentionally not declared)* | n/a | — | — | skipped — test fixture |
@@ -54,7 +54,11 @@ For each live project: run `scaffold-required-keys --dry-run` to see what the se
 - **`.env.example` comparison:** `SERVER_IP` and `GHCR_TOKEN` appear in `.env.example` but not on the server — both are explicitly commented `# --- deploy (used by scripts/deploy.sh, not the app itself) ---`, i.e. deploy-time/CI-time values, not runtime app requirements. Not a gap.
 - **Drift (the real finding):** `GET /projects/diner-decider/secrets-drift` → `status: "drift"` with `empty: ["BACKUP_S3_ACCESS_KEY_ID", "BACKUP_S3_SECRET_ACCESS_KEY", "STORAGE_ACCESS_KEY_ID", "STORAGE_SECRET_ACCESS_KEY"]`. All four keys exist as lines in the server `.env` but with empty values.
 - **Why this matters:** these are the S3-compatible credentials for both the database backup sidecar and the app's file-storage integration. Empty credentials mean either integration is very likely silently failing every auth attempt — backups may not be landing in S3, and any user-facing upload/download feature backed by `STORAGE_*` may be broken — while the containers themselves report healthy, since docker-compose treats an empty substitution as valid. This is the diner-decider-specific instance of the exact failure class emit-vision hit.
-- **Remediation:** not performed here. Needs the real credential values sourced and set; see backlog. Recommend checking recent backup job success/failure and any upload-feature error logs as the fastest way to confirm impact before rotating credentials.
+- **Remediation — DONE 2026-07-24.** Impact confirmed first, and it was worse than the audit could see: the backup sidecar had been failing **every night** (`Unable to locate credentials` / `[backup] S3 upload FAILED`, daily 07-20 → 07-24), so there were **no off-site DB backups**. Photo uploads were also exposed — `apps/api/src/lib/storage.ts:9` sets `useCloud = Boolean(STORAGE_ENDPOINT)`, which *is* set, so it builds an S3 client with empty credentials rather than falling back to local disk.
+- **Key insight:** `STORAGE_*` and `BACKUP_S3_*` point at the **same bucket and same R2 account** (`diner-decider-photos`), so a single credential pair serves both.
+- **Fix:** minted a new R2 **bucket token** (not an account-level API token) scoped to `com.cloudflare.edge.r2.bucket.<acct>_default_diner-decider-photos` with Item Read+Write only — scope verified by reading the token back (no account-wide resource). Wrote the pair into all four keys in **both** `.env.prod` (the `ci.envFile` deploy source, so it survives the next deploy) and the server `/opt/diner-decider/.env`; hash-verified both sides match without printing values. Recreated the `backup` sidecar (`-p diner-decider`) and green `api` (`-p diner-decider-green`).
+- **Verified:** a real 4.7 MiB dump uploaded — `upload: ... to s3://diner-decider-photos/db-backups/diner-decider_20260725_002920.sql.gz`, `[backup] uploaded`, and `.backup-status.json` → `{"status":"ok"}` (first success since at least 07-20). Green api has all four `STORAGE_*` set, no local-disk fallback warning. `secrets-drift` → `ok`.
+- **Token record:** id + creds saved 0600 at `~/.emit-infra/diner-decider/r2-app-token.env` (includes the revoke URL). Backups: `.env.prod.bak-r2-20260724` (local), `/opt/diner-decider/.env.bak-r2-20260724` (server).
 
 ### emit-vision — safe (preserved)
 
