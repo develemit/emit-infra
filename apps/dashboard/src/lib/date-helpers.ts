@@ -1,3 +1,31 @@
+const MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+]
+
+/**
+ * Formats a `YYYY-MM` string without routing through Date. `new Date('2026-07-01')`
+ * parses as UTC midnight, so rendering it in local time shows the *previous*
+ * month for any timezone behind UTC — July data was labelled "June" in Phoenix.
+ * Falls back to the raw string rather than inventing a month.
+ */
+export function formatBillingMonth(month: string): string {
+  const [year, monthNum] = month.split('-')
+  const name = MONTH_NAMES[Number(monthNum) - 1]
+  if (!year || !name) return month
+  return `${name} ${year}`
+}
+
 export interface SslDaysResult {
   value: string
   color?: string

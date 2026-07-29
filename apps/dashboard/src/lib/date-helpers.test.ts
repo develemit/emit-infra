@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { sslDaysLeft, deployedAgo, formatAgo, formatTimestamp, formatTimeLabel } from './date-helpers'
+import {
+  sslDaysLeft,
+  deployedAgo,
+  formatAgo,
+  formatTimestamp,
+  formatTimeLabel,
+  formatBillingMonth,
+} from './date-helpers'
 
 const FIXED_NOW = new Date('2026-07-11T12:00:00Z').getTime()
 
@@ -137,5 +144,46 @@ describe('formatTimeLabel', () => {
     const result25 = formatTimeLabel(FIXED_NOW, 25)
     expect(result24).toMatch(/^\d{2}:\d{2}$/)
     expect(result25).toMatch(/^[A-Z][a-z]{2} \d+$/)
+  })
+})
+
+describe('formatBillingMonth', () => {
+  it('renders the month named in the string, not a timezone-shifted one', () => {
+    expect(formatBillingMonth('2026-07')).toBe('July 2026')
+    expect(formatBillingMonth('2026-01')).toBe('January 2026')
+    expect(formatBillingMonth('2026-12')).toBe('December 2026')
+  })
+
+  it('is independent of local timezone, unlike the old Date-based path', () => {
+    // Pins the original hazard: 'YYYY-MM-01' parses as UTC midnight, so
+    // rendering it in local time lands on the previous month anywhere behind
+    // UTC. getTimezoneOffset() is positive for those zones.
+    const behindUtc = new Date('2026-07-01T00:00:00Z').getTimezoneOffset() > 0
+    if (behindUtc) {
+      const viaDate = new Date('2026-07-01').toLocaleString('en', {
+        month: 'long',
+        year: 'numeric',
+      })
+      expect(viaDate).not.toBe('July 2026')
+    }
+    expect(formatBillingMonth('2026-07')).toBe('July 2026')
+  })
+
+  it('handles every month without an off-by-one', () => {
+    const names = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
+    ]
+    names.forEach((name, i) => {
+      const mm = String(i + 1).padStart(2, '0')
+      expect(formatBillingMonth(`2026-${mm}`)).toBe(`${name} 2026`)
+    })
+  })
+
+  it('falls back to the raw string on malformed input', () => {
+    expect(formatBillingMonth('2026-13')).toBe('2026-13')
+    expect(formatBillingMonth('2026-00')).toBe('2026-00')
+    expect(formatBillingMonth('garbage')).toBe('garbage')
+    expect(formatBillingMonth('')).toBe('')
   })
 })

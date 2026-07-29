@@ -3,13 +3,19 @@ import { z } from 'zod'
 import { sshExec } from '@emit-infra/core'
 import { createTtlCache } from '../lib/ttl-cache.js'
 import { findProject, sshKeyPath } from '../lib/project-helpers.js'
-import { getServerTypeMonthlyPrice } from '../lib/hetzner.js'
+import { getServerTypeMonthlyPrice, getLiveServerTypeByIp } from '../lib/hetzner.js'
 
 const COST_TTL = 3_600_000
 const R2_PRICE_PER_GB_MONTH = 0.015
 
 interface CostEstimate {
-  server: { eurPerMonth: number | null; type: string; region: string }
+  server: {
+    eurPerMonth: number | null
+    type: string
+    region: string
+    liveType: string | null
+    typeDrift: boolean
+  }
   storage: { usdPerMonth: number | null; totalBytes: number | null; bucketName: string | null }
 }
 
@@ -33,8 +39,19 @@ export async function costRoutes(app: FastifyInstance): Promise<void> {
 
       const { serverType, region } = project.config
 
-      // Server cost — null on any failure, never throws
-      const eurPerMonth = await getServerTypeMonthlyPrice(serverType, region).catch(() => null)
+      // Compare the configured type against what Hetzner actually runs. Config
+      // drift here is silent and expensive: emit-vision claimed cx22 (€5.49)
+      // while really running cpx22 (€22.99), a 4x understatement.
+      const liveType = project.config.serverIp
+        ? await getLiveServerTypeByIp(project.config.serverIp).catch(() => null)
+        : null
+      const typeDrift = liveType !== null && liveType.toLowerCase() !== serverType.toLowerCase()
+
+      // Price what is actually running when we know it, so drift can't produce a
+      // confident price for a server that doesn't exist.
+      const eurPerMonth = await getServerTypeMonthlyPrice(liveType ?? serverType, region).catch(
+        () => null,
+      )
 
       // Storage cost — null if no bucket configured, null on SSH failure
       const bucket = project.config.postgres?.backupBucket ?? null
@@ -68,7 +85,7 @@ export async function costRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const result: CostEstimate = {
-        server: { eurPerMonth, type: serverType, region },
+        server: { eurPerMonth, type: serverType, region, liveType, typeDrift },
         storage: { usdPerMonth, totalBytes, bucketName: bucket },
       }
 

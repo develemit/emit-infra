@@ -2,8 +2,9 @@
 import { useEffect, useState } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getApiBase } from '@/lib/api-auth'
+import { formatBillingMonth } from '@/lib/date-helpers'
 
-interface BillingBreakdownItem {
+interface ServerBreakdownItem {
   type: 'server'
   name: string
   serverRate: number
@@ -11,6 +12,15 @@ interface BillingBreakdownItem {
   monthlyRate: number
   spendToDate: number
 }
+
+interface FloatingIpBreakdownItem {
+  type: 'floating_ip'
+  name: string
+  monthlyRate: number
+  spendToDate: number
+}
+
+type BillingBreakdownItem = ServerBreakdownItem | FloatingIpBreakdownItem
 
 interface BillingData {
   month: string
@@ -74,10 +84,7 @@ export function BillingWidget() {
     )
   }
 
-  const monthLabel = new Date(data.month + '-01').toLocaleString('en', {
-    month: 'long',
-    year: 'numeric',
-  })
+  const monthLabel = formatBillingMonth(data.month)
 
   return (
     <div className="rounded-xl border border-border bg-card p-4">
@@ -113,11 +120,13 @@ export function BillingWidget() {
 
       <div className="flex flex-col gap-1.5 border-t border-border pt-3">
         {data.breakdown.map((item) => (
-          <div key={item.name} className="flex items-center justify-between">
+          <div key={`${item.type}-${item.name}`} className="flex items-center justify-between">
             <span className="text-[12px] font-mono text-muted">{item.name}</span>
             <div className="flex items-center gap-3 text-[11px] font-mono">
               <span className="text-subtle">
-                {eur(item.serverRate)} + {eur(item.ipv4Rate)} IPv4
+                {item.type === 'server'
+                  ? `${eur(item.serverRate)} + ${eur(item.ipv4Rate)} IPv4`
+                  : `${eur(item.monthlyRate)} floating IP`}
               </span>
               <span className="text-fg font-semibold">{eur(item.spendToDate)} this month</span>
             </div>

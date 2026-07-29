@@ -54,16 +54,16 @@ There is also a **units inconsistency** between the two paths: `hetzner.ts:73` r
 - `apps/dashboard/src/components/billing-widget.tsx` — month label, non-server line-item rendering
 
 ## Acceptance criteria
-- [ ] `spendToDate` never exceeds a resource's monthly cap; the dashboard no longer shows spent > projected.
-- [ ] The cap arithmetic is a pure, unit-tested helper covering under/at/over the cap, with no dependency on the current date.
-- [ ] The month label matches `data.month` in a behind-UTC timezone, covered by a test that would fail on the old code.
-- [ ] The floating IP (€3.50/mo) appears as a billing line item and is included in both `spendToDate` and `projectedMonthly`.
-- [ ] The floating IP is still attached and `api.emitvision.com` still resolves to it — this sprint counts it, never removes it.
-- [ ] `GET /billing/hetzner` projects €41.45/mo, matching the sum of its own line items.
-- [ ] `/projects/:name/cost` returns a non-null `eurPerMonth` for a project with a valid `serverType`.
-- [ ] `/cost` and the billing widget report the same units (gross) for the same server type.
-- [ ] A configured `serverType` that disagrees with the live server type is surfaced rather than silently priced.
-- [ ] `pnpm test`, `pnpm typecheck`, `pnpm lint` clean across all 5 projects.
+- [x] `spendToDate` never exceeds a resource's monthly cap; the dashboard no longer shows spent > projected.
+- [x] The cap arithmetic is a pure, unit-tested helper covering under/at/over the cap, with no dependency on the current date.
+- [x] The month label matches `data.month` in a behind-UTC timezone, covered by a test that would fail on the old code.
+- [x] The floating IP (€3.50/mo) appears as a billing line item and is included in both `spendToDate` and `projectedMonthly`.
+- [x] The floating IP is still attached and `api.emitvision.com` still resolves to it — this sprint counts it, never removes it.
+- [x] `GET /billing/hetzner` projects €41.45/mo, matching the sum of its own line items.
+- [x] `/projects/:name/cost` returns a non-null `eurPerMonth` for a project with a valid `serverType`.
+- [x] `/cost` and the billing widget report the same units (gross) for the same server type.
+- [x] A configured `serverType` that disagrees with the live server type is surfaced rather than silently priced.
+- [x] `pnpm test`, `pnpm typecheck`, `pnpm lint` clean across all 5 projects.
 
 ## Out of scope
 - The `cpx22` → `cx33` rescale itself and the `serverType` config correction — both already done (2026-07-28; emit-vision commit `fb8df37`).
@@ -72,3 +72,51 @@ There is also a **units inconsistency** between the two paths: `hetzner.ts:73` r
 - Rightsizing any other server. The other four are `cx23` at €6.49, which is the fleet's best-value tier; no action needed.
 - Volume, load-balancer, and snapshot line items beyond the generic non-server support from task 3 — all are currently zero.
 - Cost alerting or budget thresholds.
+
+## Completed
+
+**Date:** 2026-07-29
+
+### Summary
+All four defects were real and all four are fixed, but they differed sharply in impact — worth recording, because the sprint's own framing overstated one of them.
+
+**The cap (item 1)** is now `cappedSpend(hourlyRate, monthlyRate, hoursElapsed)`, an exported pure function in `billing.ts` returning `min(hourly * hours, monthly)`. It takes hours as a parameter rather than reading the clock, so the boundary is testable without date mocking. Live proof: the endpoint now reports `spendToDate` €41.11 against `projectedMonthly` €41.45, where before it reported €55.89 against €51.95 — spend exceeding projection, which is impossible on a real invoice. Every server line item now shows spend exactly equal to its monthly rate (day 29 of 31, so the cap has engaged); before the fix each would have overshot.
+
+**The month label (item 2)** moved out of the widget into `formatBillingMonth` in `date-helpers.ts`, which formats the `YYYY-MM` string directly and never constructs a `Date`. This is a deviation from the sprint's `## Files involved`, which named only `billing-widget.tsx`: inlining the fix would have left it untestable, and the repo already had `date-helpers.ts` as the home for exactly this kind of pure formatter. I proved the regression rather than assuming it — temporarily restoring the old `new Date(month + '-01')` path makes 4 tests fail with `expected 'June 2026' to be 'July 2026'`, and also `expected 'December 2025' to be 'January 2026'`, so the old code rolled the *year* back too on January data. This machine is `America/Phoenix` (UTC−7); on a UTC CI box the divergence assertion self-skips via `getTimezoneOffset() > 0` while the correctness assertions still run.
+
+**The floating IP (item 3)** required a shape discovery the sprint got wrong by omission: Hetzner's `pricing.floating_ips` exposes **only `price_monthly`, no `price_hourly`** — unlike `primary_ips`, which has both. Reading a non-existent hourly rate would have produced `NaN` spend. So floating-IP spend is prorated across the month via an implied hourly rate (`monthly / hoursInMonth`), which finally gives `hoursElapsedThisMonth()`'s `hoursInMonth` return value a purpose — it was computed and discarded before. `BillingLineItem` is now a discriminated union (`ServerLineItem | FloatingIpLineItem`) so a floating IP simply has no `serverRate`/`ipv4Rate` rather than carrying zeroed fields, and the widget branches on `item.type`.
+
+**The dead token (item 4)** was the highest-impact find and the reason the whole overspend stayed hidden: `hetzner.ts` read `HETZNER_API_TOKEN`, which is set nowhere, so `getServerTypeMonthlyPrice` returned `null` at its first guard on every call and `cost.ts` swallowed it with `.catch(() => null)`. `/cost` had therefore *never* reported a server price. It now returns €8.99 for emit-vision and €6.49 for the cx23 boxes.
+
+**Correction to this sprint's own reasoning.** The `## Reason` section claimed that fixing item 4 would make `/cost` and the widget "disagree on every price by the VAT rate" unless units were unified. That is not true on this account: the pricing API reports `vat_rate: 0.000000`, and `net == gross` for all 29 nbg1 server types. The `.net` → `.gross` change is therefore **preventive, not corrective** — it has zero numerical effect today and matters only if this account ever becomes VAT-liable. The acceptance criterion ("report the same units (gross)") is genuinely met, since both paths now read `.gross` and both report 8.99, but the motivation as written was overstated and readers should not go looking for a VAT discrepancy that was never visible.
+
+**Drift detection (task 7)** matches by `serverIp`, not project name, because the two routinely differ — project `emit-vision` runs a server named `emit-vision-prod`, so a name match would have silently found nothing. `/cost` now returns `liveType` and `typeDrift`, prices the live type when known (so stale config can't produce a confident price for a box that doesn't exist), and keeps `type` as the configured value. Live: all three checked projects resolve `liveType` against real Hetzner data with `typeDrift: false`, confirming the comparison runs rather than merely defaulting to null.
+
+### Files changed
+- `apps/api/src/routes/billing.ts` — exported `cappedSpend`; floating-IP fetch, pricing and line items; `BillingLineItem` split into a discriminated union; extracted `buildServerLineItem` / `buildFloatingIpLineItem` / `round2` / `priceForLocation` helpers
+- `apps/api/src/routes/billing.test.ts` — added the third fetch mock the existing happy path needed; `cappedSpend` under/at/over/zero coverage; floating-IP inclusion, totals-match-line-items, spend ≤ projection, description fallback to IP
+- `apps/api/src/lib/hetzner.ts` — `HETZNER_API_TOKEN` → `HCLOUD_TOKEN`; `.net` → `.gross` with the interface updated to declare both; extracted a shared `fetchJson` helper; added `getLiveServerTypeByIp` with a 1-hour cache
+- `apps/api/src/routes/cost.ts` — drift detection via `serverIp`; prices the live type when known; response carries `liveType` and `typeDrift`
+- `apps/api/src/routes/cost.test.ts` — added `getLiveServerTypeByIp` to the module mock (it would otherwise be `undefined` and throw on `.catch`); drift, no-drift, case-insensitive, no-`serverIp`, and lookup-failure branches
+- `apps/dashboard/src/lib/date-helpers.ts` — (new function) `formatBillingMonth`, timezone-independent `YYYY-MM` formatting with raw-string fallback
+- `apps/dashboard/src/lib/date-helpers.test.ts` — 4 tests including the behind-UTC divergence check and all-twelve-months sweep
+- `apps/dashboard/src/components/billing-widget.tsx` — uses `formatBillingMonth`; breakdown type is a discriminated union; renders non-server line items by branching on `item.type`
+
+### Verification
+- `pnpm test`: **688 pass** across 4 projects — cli 118, api 349 (was 337), dashboard 192 (was 188), core 29
+- `pnpm typecheck`: clean across all 5 projects
+- `pnpm lint`: clean across all 5 projects
+- Regression proof (month label): reverting `formatBillingMonth` to the old `Date` path fails 4 tests with `expected 'June 2026' to be 'July 2026'` and `expected 'December 2025' to be 'January 2026'`; fix restored afterwards
+- Live `GET /billing/hetzner` (read-only): `projectedMonthly` €41.45 exactly as predicted; `spendToDate` €41.11 ≤ projection; both totals equal the sum of their line items to the cent; floating IP present as `emit-vision production static IP` (monthly €3.50, prorated spend €3.16)
+- Live `GET /projects/:name/cost` (read-only): emit-vision €8.99 / diner-decider €6.49 / develemail €6.49 — all non-null where every call previously returned `null`; `liveType` resolved for all three, `typeDrift: false`
+- Units: `/cost` €8.99 equals the widget's `serverRate` €8.99; API reports `vat_rate: 0.000000` and `net == gross` for all 29 nbg1 types, so this is code-level consistency with no numerical delta today
+- Floating IP untouched: still attached to server `135642228`, `api.emitvision.com` still resolves to `46.225.249.8`, `/healthz` 200
+
+### Follow-ups
+- `[defer]` The sprint's `## Reason` overstates the VAT/units issue — `vat_rate` is 0 on this account, so `net == gross` and the units fix is preventive only. Corrected in the summary above; left in place in `## Reason` as the historical record of why the sprint was written.
+- `[defer]` `apps/api/src/routes/cost.test.ts` is now 338 lines, over the 300-line house target. Splitting it (drift cases vs storage cases) was out of scope here but worth doing before it grows again.
+- `[defer]` Drift detection only works for projects that declare `serverIp`. Projects without one (martialops currently) silently get `liveType: null` and `typeDrift: false` — indistinguishable from "checked and matching". A tri-state (`unknown`) would be more honest than a boolean.
+- `[defer]` Floating-IP spend is prorated from the monthly price because Hetzner's pricing API exposes no `price_hourly` for floating IPs. If Hetzner ever adds one, switch to it and the special case disappears.
+- `[defer]` Volumes, load balancers, and snapshots are still uncounted (all zero on this account today). The discriminated-union line-item shape makes adding them mechanical.
+- `[defer]` The billing widget itself has no component test — the month fix is covered at the `formatBillingMonth` level, and the `item.type` render branch is covered only by typecheck.
+- `[defer]` The widget's React key is `${item.type}-${item.name}`; two floating IPs sharing a description would collide. Cosmetic only, and there is one floating IP today.
