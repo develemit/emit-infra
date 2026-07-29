@@ -265,7 +265,10 @@ build_image() {
 
 if [[ ${#TO_BUILD[@]} -gt 0 ]]; then
   deploy_step "Building + pushing images"
-  MAX_PARALLEL=${EMIT_BUILD_PARALLEL:-2}
+  # Two concurrent emulated linux/amd64 Node builds can exhaust the Docker
+  # build VM's memory, so a plain push must default to sequential. Raise via
+  # EMIT_BUILD_PARALLEL on a host with more Docker build memory configured.
+  MAX_PARALLEL=${EMIT_BUILD_PARALLEL:-1}
   pids=()
   for svc in "${TO_BUILD[@]}"; do
     build_image "$svc" &
