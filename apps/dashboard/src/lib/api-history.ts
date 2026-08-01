@@ -10,6 +10,8 @@ export interface DeployHistoryEntry {
   completedAt: string
   durationSec: number
   servicesBuilt: string[]
+  /** Per-phase seconds (ci, auth, build, retag, preDeploy, deploy). Absent on pre-2026-08 entries. */
+  phases?: Record<string, number>
   message?: string
 }
 

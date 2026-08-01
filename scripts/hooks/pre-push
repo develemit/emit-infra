@@ -17,6 +17,8 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
 fi
 
 source "$EMIT_INFRA_DIR/scripts/lib/ci-utils.sh"
+source "$EMIT_INFRA_DIR/scripts/lib/deploy-plan.sh"
+source "$EMIT_INFRA_DIR/scripts/lib/docker-build.sh"
 
 # ── read config ────────────────────────────────────────────────────────────────
 eval "$(python3 -c "
@@ -41,8 +43,20 @@ out('BUILD_ARGS_JSON', json.dumps(ci.get('buildArgs', {})))
 out('BUILD_TARGETS_JSON', json.dumps(ci.get('buildTargets', {})))
 out('BUILD_VARIANTS_JSON', json.dumps(ci.get('buildVariants', {})))
 out('PRE_DEPLOY_JSON', json.dumps(ci.get('preDeploy', [])))
-out('DEPLOY_IGNORE_PATHS', ' '.join(ci.get('deployIgnorePaths', [])))
+out('DEPLOY_IGNORE_PATHS_OVERRIDE', ' '.join(ci.get('deployIgnorePaths', [])))
+out('DEPLOY_IGNORE_PATHS_EXTRA', ' '.join(ci.get('deployIgnorePathsExtra', [])))
+out('BUILD_TRIGGER_PATHS', ' '.join(ci.get('buildTriggerPaths', [])))
+out('BUILD_CACHE', ci.get('buildCache', 'inline'))
 ")"
+
+# ci.deployIgnorePaths replaces the built-in defaults; deployIgnorePathsExtra
+# appends to them. See docs/PRE-PUSH-HOOK.md.
+if [[ -n "$DEPLOY_IGNORE_PATHS_OVERRIDE" ]]; then
+  IFS=' ' read -r -a DEPLOY_IGNORE_PATHS <<< "$DEPLOY_IGNORE_PATHS_OVERRIDE"
+else
+  DEPLOY_IGNORE_PATHS=("${EMIT_DEFAULT_DEPLOY_IGNORE_PATHS[@]}")
+fi
+for _p in $DEPLOY_IGNORE_PATHS_EXTRA; do DEPLOY_IGNORE_PATHS+=("$_p"); done
 
 SSH_KEY="${SSH_KEY/#\~/$HOME}"
 SHA=$(git rev-parse HEAD)
@@ -87,29 +101,38 @@ if [[ -z "$GHCR_ORG" ]]; then
   exit 0
 fi
 
-# ── last deployed sha (used by path filter + smart build) ─────────────────────
-LAST_SHA=$(python3 -c "
-import json
-try:
-    d = json.load(open('$ROOT/.deploy-status.json'))
-    if d.get('status') == 'deployed': print(d.get('sha', ''))
-except: pass
-" 2>/dev/null || true)
+# ── dry-run guard ─────────────────────────────────────────────────────────────
+# `git push --dry-run` runs pre-push hooks with no way to tell it apart, so a
+# dry run used to build and deploy for real. Detect it from the invoking git
+# process's argv instead. CI has already run at this point, which is all a dry
+# run should ever do.
+if [[ "${EMIT_FORCE_DEPLOY:-0}" != "1" ]] && detect_dry_run_push; then
+  echo "→ git push --dry-run detected; CI ran, skipping deploy (EMIT_FORCE_DEPLOY=1 to override)"
+  exit 0
+fi
 
-# ── path filter: skip deploy when only ci.deployIgnorePaths changed ───────────
+# Optional belt-and-braces prompt for anyone who wants one; off by default so a
+# normal push stays non-interactive.
+if [[ "${EMIT_DEPLOY_CONFIRM:-0}" == "1" && -e /dev/tty ]]; then
+  read -r -p "Deploy $PROJECT_NAME to production? [y/N] " _reply < /dev/tty || _reply=""
+  if [[ ! "$_reply" =~ ^[Yy] ]]; then
+    echo "→ deploy declined; push continues"
+    exit 0
+  fi
+fi
+
+# ── last deployed sha (used by path filter + smart build) ─────────────────────
+LAST_SHA=$(resolve_last_deployed_sha "$ROOT")
+
+# ── path filter: skip deploy when only ignored paths changed ──────────────────
 # Ignore-list semantics: deploy is skipped only if EVERY file changed since the
 # last deploy matches an ignore pattern. Unknown paths always deploy (safe
 # default). Override with EMIT_FORCE_DEPLOY=1 (e.g. after env-only changes,
 # which are gitignored and invisible to this diff).
-if [[ "${EMIT_FORCE_DEPLOY:-0}" != "1" && -n "$DEPLOY_IGNORE_PATHS" && -n "$LAST_SHA" ]] && git rev-parse --quiet --verify "$LAST_SHA" >/dev/null; then
-  EXCLUDE_SPECS=()
-  for p in $DEPLOY_IGNORE_PATHS; do
-    EXCLUDE_SPECS+=(":(exclude)$p")
-  done
-  if ! git diff --name-only "$LAST_SHA"..HEAD -- . "${EXCLUDE_SPECS[@]}" | grep -q .; then
-    echo "→ only non-deploy paths changed since last deploy (${LAST_SHA:0:7}); skipping deploy (EMIT_FORCE_DEPLOY=1 to override)"
-    exit 0
-  fi
+if [[ "${EMIT_FORCE_DEPLOY:-0}" != "1" ]] && \
+   only_ignored_paths_changed "$LAST_SHA" "${DEPLOY_IGNORE_PATHS[@]}"; then
+  echo "→ only non-deploy paths changed since last deploy (${LAST_SHA:0:7}); skipping deploy (EMIT_FORCE_DEPLOY=1 to override)"
+  exit 0
 fi
 
 echo "→ pushing to main — running deploy"
@@ -121,20 +144,31 @@ fi
 
 trap 'deploy_done failed; echo "✗ deploy failed"; exit 1' ERR
 
-# ── smart build: only rebuild services changed since last deploy ───────────────
-needs_build() {
-  local svc="$1"
-  if [[ -z "$LAST_SHA" ]] || ! git rev-parse "$LAST_SHA" &>/dev/null; then
-    return 0
+# ── smart build: only rebuild services affected since last deploy ─────────────
+# Prefer the real Nx dependency graph over a `packages/` glob so a change to one
+# package doesn't rebuild every service. Non-Nx repos (and services whose name
+# isn't an Nx project) fall back to the original glob behavior.
+# If either nx query fails, NX_ALL_PROJECTS is cleared so every service falls
+# back to the glob — an empty affected list must never be mistaken for "nx ran
+# and found nothing".
+NX_ALL_PROJECTS=""
+NX_AFFECTED_PROJECTS=""
+if [[ -n "$LAST_SHA" ]] && git rev-parse --quiet --verify "$LAST_SHA" >/dev/null && nx_available; then
+  if NX_ALL_PROJECTS=$(nx_projects) &&
+     NX_AFFECTED_PROJECTS=$(nx_projects --affected --base="$LAST_SHA" --head=HEAD); then
+    echo "→ nx affected since ${LAST_SHA:0:7}: ${NX_AFFECTED_PROJECTS//$'\n'/ }"
+  else
+    echo "→ nx graph query failed; falling back to path-glob rebuild detection"
+    NX_ALL_PROJECTS=""
+    NX_AFFECTED_PROJECTS=""
   fi
-  git diff --name-only "$LAST_SHA"..HEAD -- "apps/$svc/" packages/ pnpm-lock.yaml | grep -q .
-}
+fi
 
 IFS=' ' read -r -a ALL_SVCS <<< "$BG_SERVICES"
 TO_BUILD=()
 TO_RETAG=()
 for svc in "${ALL_SVCS[@]}"; do
-  if needs_build "$svc"; then
+  if service_needs_build "$svc" "$LAST_SHA" "$NX_ALL_PROJECTS" "$NX_AFFECTED_PROJECTS" "$BUILD_TRIGGER_PATHS"; then
     TO_BUILD+=("$svc")
   else
     TO_RETAG+=("$svc")
@@ -160,8 +194,10 @@ PRE_DEPLOY_COUNT=$(python3 -c "import json; print(len(json.loads('$PRE_DEPLOY_JS
 STEPS=$((STEPS + PRE_DEPLOY_COUNT))
 
 deploy_init "$STEPS"
+deploy_record_phase ci "$_EMIT_CI_DURATION"
 
 # ── GHCR auth (isolated config to avoid docker-credential-desktop hangs) ──────
+deploy_phase auth
 deploy_step "GHCR auth"
 TOKEN="${GHCR_TOKEN:-$(gh auth token 2>/dev/null || true)}"
 if [[ -z "$TOKEN" ]]; then
@@ -175,95 +211,8 @@ fi
 echo "$TOKEN" | docker --config "$DOCKER_CI_CONFIG" login ghcr.io -u "${GHCR_USER:-$GHCR_ORG}" --password-stdin
 export DOCKER_CONFIG="$DOCKER_CI_CONFIG"
 
-# ── image name helper ──────────────────────────────────────────────────────────
-image_name() {
-  local svc="$1"
-  if [[ -n "$IMAGE_PREFIX" ]]; then
-    echo "ghcr.io/$GHCR_ORG/${IMAGE_PREFIX}${svc}"
-  elif [[ -n "$GHCR_REPO" ]]; then
-    echo "ghcr.io/$GHCR_ORG/$GHCR_REPO/$svc"
-  else
-    echo "ghcr.io/$GHCR_ORG/$svc"
-  fi
-}
-
-# ── resolve build args for a service ───────────────────────────────────────────
-get_build_args() {
-  local svc="$1"
-  python3 -c "
-import json, os
-args = json.loads('$BUILD_ARGS_JSON')
-for a in args.get('$svc', []):
-    val = os.environ.get(a['env'], '')
-    print(f'--build-arg {a[\"name\"]}={val}')
-" 2>/dev/null || true
-}
-
-# ── resolve build variants for a service (extra Dockerfile targets) ───────────
-get_build_variants() {
-  local svc="$1"
-  python3 -c "
-import json
-variants = json.loads('$BUILD_VARIANTS_JSON')
-for v in variants.get('$svc', []):
-    print(f'{v[\"target\"]} {v[\"tagSuffix\"]}')
-" 2>/dev/null || true
-}
-
-# ── build changed services ────────────────────────────────────────────────────
-get_build_target() {
-  local svc="$1"
-  python3 -c "
-import json
-targets = json.loads('$BUILD_TARGETS_JSON')
-print(targets.get('$svc', ''))
-" 2>/dev/null || true
-}
-
-build_image() {
-  local svc="$1"
-  local img
-  img=$(image_name "$svc")
-  local extra_args
-  extra_args=$(get_build_args "$svc")
-  local target target_flag=""
-  target=$(get_build_target "$svc")
-  [[ -n "$target" ]] && target_flag="--target $target"
-
-  echo "==> Building $svc..."
-  # shellcheck disable=SC2086
-  docker buildx build \
-    --platform linux/amd64 \
-    -f "apps/$svc/Dockerfile" \
-    $target_flag \
-    --build-arg BUILD_NUMBER="$BUILD_NUMBER" \
-    $extra_args \
-    -t "$img:$SHA" \
-    -t "$img:$BUILD_NUMBER" \
-    -t "$img:latest" \
-    --push \
-    --quiet \
-    .
-
-  get_build_variants "$svc" | while read -r target suffix; do
-    [[ -z "$target" ]] && continue
-    echo "==> Building $svc variant '$target' (tag suffix $suffix)..."
-    # shellcheck disable=SC2086
-    docker buildx build \
-      --platform linux/amd64 \
-      -f "apps/$svc/Dockerfile" \
-      --target "$target" \
-      --build-arg BUILD_NUMBER="$BUILD_NUMBER" \
-      $extra_args \
-      -t "$img:${BUILD_NUMBER}${suffix}" \
-      -t "$img:latest${suffix}" \
-      --push \
-      --quiet \
-      .
-  done
-}
-
 if [[ ${#TO_BUILD[@]} -gt 0 ]]; then
+  deploy_phase build
   deploy_step "Building + pushing images"
   # Two concurrent emulated linux/amd64 Node builds can exhaust the Docker
   # build VM's memory, so a plain push must default to sequential. Raise via
@@ -282,21 +231,14 @@ if [[ ${#TO_BUILD[@]} -gt 0 ]]; then
 fi
 
 if [[ ${#TO_RETAG[@]} -gt 0 ]]; then
+  deploy_phase retag
   deploy_step "Re-tagging unchanged images"
-  for svc in "${TO_RETAG[@]}"; do
-    img=$(image_name "$svc")
-    echo "==> Re-tagging $svc:latest as :$SHA / :$BUILD_NUMBER..."
-    docker buildx imagetools create -t "$img:$SHA" -t "$img:$BUILD_NUMBER" "$img:latest"
-    get_build_variants "$svc" | while read -r target suffix; do
-      [[ -z "$target" ]] && continue
-      echo "==> Re-tagging $svc variant latest${suffix} as :${BUILD_NUMBER}${suffix}..."
-      docker buildx imagetools create -t "$img:${BUILD_NUMBER}${suffix}" "$img:latest${suffix}"
-    done
-  done
+  for svc in "${TO_RETAG[@]}"; do retag_image "$svc"; done
 fi
 
 # ── pre-deploy commands (migrations etc.) ──────────────────────────────────────
 if [[ "$PRE_DEPLOY_COUNT" -gt 0 ]]; then
+  deploy_phase preDeploy
   python3 -c "
 import json
 cmds = json.loads('$PRE_DEPLOY_JSON')
@@ -310,6 +252,7 @@ for cmd in cmds:
 fi
 
 # ── deploy via emit-infra ─────────────────────────────────────────────────────
+deploy_phase deploy
 deploy_step "Deploying via emit-infra"
 echo "→ running emit-infra deploy"
 export GHCR_TOKEN="$TOKEN"

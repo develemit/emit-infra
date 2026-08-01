@@ -105,6 +105,14 @@ export const ProjectConfigSchema = z.object({
         )
         .optional(),
       preDeploy: z.array(z.string()).optional(),
+      /** Replaces the built-in deploy-skip defaults (sprint/**, docs/**, backlog.md, *.md). */
+      deployIgnorePaths: z.array(z.string()).optional(),
+      /** Appended to the built-in deploy-skip defaults. */
+      deployIgnorePathsExtra: z.array(z.string()).optional(),
+      /** Extra paths that force a rebuild; '%s' expands to the service name. */
+      buildTriggerPaths: z.array(z.string()).optional(),
+      /** Defaults to 'inline' in the hook; optional here so existing configs stay valid. */
+      buildCache: z.enum(['inline', 'off']).optional(),
     })
     .optional(),
   requiredEnvKeys: z.string().array().optional(),

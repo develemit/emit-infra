@@ -12,7 +12,12 @@
 #   deploy_init <total_steps>
 #   deploy_set_services web api worker  # record which services are being built
 #   deploy_step "label"
+#   deploy_phase <name>                 # start timing a phase (closes the previous one)
+#   deploy_record_phase <name> <sec>    # record a phase timed elsewhere (e.g. ci)
 #   deploy_done deployed|failed         # write final status + append to history
+#
+# Phase durations land in .deploy-history.jsonl as {"phases":{"build":312,...}}
+# so slow deploys can be diagnosed from data instead of scrollback.
 
 # Guard against double-sourcing without resetting in-flight state
 [[ -n "${_EMIT_CI_UTILS_LOADED:-}" ]] && return 0
@@ -31,6 +36,10 @@ _EMIT_SERVICES_BUILT=""
 _EMIT_LOG_FILE=""
 _EMIT_DEPLOY_LOG_FILE=""
 _EMIT_TEE_PID=""
+_EMIT_PHASES=""
+_EMIT_PHASE_NAME=""
+_EMIT_PHASE_EPOCH=0
+_EMIT_CI_DURATION=0
 
 # Mirror stdout/stderr to a log file via a background tee we can wait on.
 # A plain `exec > >(tee ...)` loses buffered output when the script exits
@@ -80,6 +89,28 @@ _emit_services_json() {
 
 deploy_set_services() { _EMIT_SERVICES_BUILT="$*"; }
 
+# ── per-phase timing ──────────────────────────────────────────────────────────
+deploy_record_phase() {
+  local name="${1//\"/}" sec="$2"
+  [[ -n "$_EMIT_PHASES" ]] && _EMIT_PHASES+=","
+  _EMIT_PHASES+="$(printf '"%s":%d' "$name" "$sec")"
+}
+
+_emit_close_phase() {
+  [[ -n "$_EMIT_PHASE_NAME" ]] || return 0
+  deploy_record_phase "$_EMIT_PHASE_NAME" "$(( $(date +%s) - _EMIT_PHASE_EPOCH ))"
+  _EMIT_PHASE_NAME=""
+}
+
+# Start timing a phase; closes the previous one. deploy_done closes the last.
+deploy_phase() {
+  _emit_close_phase
+  _EMIT_PHASE_NAME="${1//\"/}"
+  _EMIT_PHASE_EPOCH=$(date +%s)
+}
+
+_emit_phases_json() { printf '{%s}\n' "$_EMIT_PHASES"; }
+
 _emit_write_atomic() {
   local content="$1" dest="$2" tmp="${2}.tmp"
   printf '%s\n' "$content" > "$tmp" && mv "$tmp" "$dest"
@@ -118,6 +149,7 @@ ci_done() {
   local completed_at
   completed_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
   local duration=$(( $(date +%s) - _EMIT_STARTED_EPOCH ))
+  _EMIT_CI_DURATION=$duration
 
   _emit_write_atomic \
     "$(printf '{"status":"%s","sha":"%s","branch":"%s","completedAt":"%s"}' \
@@ -162,6 +194,7 @@ deploy_step() {
 }
 
 deploy_done() {
+  _emit_close_phase
   local completed_at
   completed_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
   local duration=$(( $(date +%s) - _EMIT_STARTED_EPOCH ))
@@ -171,8 +204,8 @@ deploy_done() {
       "$1" "$_EMIT_SHA" "$_EMIT_BRANCH" "$completed_at")" \
     .deploy-status.json
 
-  printf '{"status":"%s","sha":"%s","branch":"%s","startedAt":"%s","completedAt":"%s","durationSec":%d,"servicesBuilt":%s,"message":"%s"}\n' \
-    "$1" "$_EMIT_SHA" "$_EMIT_BRANCH" "$_EMIT_STARTED" "$completed_at" "$duration" "$(_emit_services_json)" "$_EMIT_MSG" >> .deploy-history.jsonl
+  printf '{"status":"%s","sha":"%s","branch":"%s","startedAt":"%s","completedAt":"%s","durationSec":%d,"servicesBuilt":%s,"phases":%s,"message":"%s"}\n' \
+    "$1" "$_EMIT_SHA" "$_EMIT_BRANCH" "$_EMIT_STARTED" "$completed_at" "$duration" "$(_emit_services_json)" "$(_emit_phases_json)" "$_EMIT_MSG" >> .deploy-history.jsonl
 
   _emit_truncate_history .deploy-history.jsonl
   [[ -d ".deploy-logs" ]] && _emit_rotate_logs .deploy-logs
