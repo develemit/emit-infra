@@ -58,6 +58,9 @@ file to promote items into proper sprints when the list grows worth addressing.
 
 - (sprint 256, 2026-08-01) Several ambient orphaned `nx run api:dev` processes (some days old, across projects) found running during verification; a fleet-wide look at stale dev-server processes is worth scheduling.
 
+- (sprint 257, 2026-08-01) Root-config commits mark every nx project affected in emit-billing (surfaced the web:build bug on first push) — consider scoping if root-level edits become common.
+- (sprint 257, 2026-08-01) emit-billing has no deploy infrastructure (no server, blueGreen, or inventory) — deploy wiring deferred; its own initiative when the time comes.
+
 ## ✅ Converted to Sprints
 
 - ~~(sprint 115, 2026-06-29) **[manual ops]** Activate healthchecks.io DMS for emit-vision~~ → sprint-261 (formerly 250) (2026-08-01) — _partially done and worse than it looked: the `dms-ping` container was deployed and reports `Up`, but `HEALTHCHECKS_URL` is empty, so both its success and failure branches `wget` an empty string. It has never pinged anything. Sprint 261 makes it fail loudly and declares the key in `requiredEnvKeys` so the sprint-239 empty-value detector covers it._
