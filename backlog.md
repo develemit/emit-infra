@@ -56,6 +56,8 @@ file to promote items into proper sprints when the list grows worth addressing.
 - (sprint 255, 2026-08-01) Scoped dual-arch installs to remove the pnpm install tax from lean services (only `web` + api's `migrate` need dual-arch; pnpm has no per-command override — needs per-scope manifests or a post-install arch prune). This is what would close the gap to the original ≥40% build-time target for `worker`/`inbound`/`api`.
 - (sprint 255, 2026-08-01) Re-measure `worker`/`inbound` build times once install-scoping exists — should see near-full native-execution win, they ship zero `node_modules`.
 
+- (sprint 256, 2026-08-01) Several ambient orphaned `nx run api:dev` processes (some days old, across projects) found running during verification; a fleet-wide look at stale dev-server processes is worth scheduling.
+
 ## ✅ Converted to Sprints
 
 - ~~(sprint 115, 2026-06-29) **[manual ops]** Activate healthchecks.io DMS for emit-vision~~ → sprint-261 (formerly 250) (2026-08-01) — _partially done and worse than it looked: the `dms-ping` container was deployed and reports `Up`, but `HEALTHCHECKS_URL` is empty, so both its success and failure branches `wget` an empty string. It has never pinged anything. Sprint 261 makes it fail loudly and declares the key in `requiredEnvKeys` so the sprint-239 empty-value detector covers it._
