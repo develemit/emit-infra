@@ -29,8 +29,10 @@ and nothing to do with `/wire-ci-utils`** (that command wires a project's own
 `scripts/ci.sh` / `scripts/deploy.sh`, not this hook).
 
 Currently wired: `develemail`, `emit-vision`, `diner-decider` (`.husky/`), and
-`tastease` (`.githooks/`). A project with no symlink gets nothing until someone
-runs `emit-infra hooks install` there.
+`tastease`, `emit-social`, `emit-billing` (`.githooks/`). `emit-billing` is
+CI-only (`ci.ghcrOrg` unset — it has no deploy infrastructure yet). A project
+with no symlink gets nothing until someone runs `emit-infra hooks install`
+there. `martialops` is deliberately unwired for now.
 
 Because the libs are sourced from `$EMIT_INFRA_DIR` at runtime, they propagate
 the same way. There is no version pinning: a broken template breaks every
