@@ -6,27 +6,27 @@ import chalk from 'chalk'
 import { loadConfig, runAnsible, sshExec, type ProjectConfig } from '@emit-infra/core'
 import { resolveInventoryPath } from './configure.js'
 import { parseKeyList, filterExcludedKeys } from './secrets-scaffold.js'
+import { parseEnvEntries } from '../lib/env-file.js'
 
 const BACKUP_ENV_KEYS = ['CF_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY'] as const
 
-// Digits must be allowed after the first character: keys like R2_BUCKET and
-// S3_REGION are real and were silently dropped by an earlier [A-Z_]+ pattern,
-// which made the env-removal guard report phantom removals. Mirrors the shape
-// used by the SSH-side reads and apps/api/src/routes/secrets.ts.
 export function parseEnvFile(path: string): Record<string, string> {
   if (!existsSync(path)) return {}
-  return Object.fromEntries(
-    readFileSync(path, 'utf8')
-      .split('\n')
-      .filter(line => /^\s*[A-Za-z_][A-Za-z0-9_]*=/.test(line))
-      .map(line => {
-        const idx = line.indexOf('=')
-        return [line.slice(0, idx).trim(), line.slice(idx + 1).trim()] as [string, string]
-      }),
-  )
+  return Object.fromEntries(parseEnvEntries(readFileSync(path, 'utf8')))
 }
 
-function printDryRunPlan(
+// Local-only: never touches the network, safe to call from --dry-run. A file
+// that exists but can't be read (permissions, race with printDryRunPlan's own
+// existsSync check) must not crash the dry run, so the count is best-effort.
+function localEnvKeyCount(path: string): number | null {
+  try {
+    return Object.keys(parseEnvFile(path)).length
+  } catch {
+    return null
+  }
+}
+
+export function printDryRunPlan(
   config: ProjectConfig,
   inventory: string,
   extraVars: Record<string, unknown>,
@@ -63,8 +63,15 @@ function printDryRunPlan(
     }
   }
   if (extraVars.env_src) {
-    const exists = existsSync(extraVars.env_src as string)
-    console.log(`  Env file:    ${extraVars.env_src} ${exists ? chalk.green('✓') : chalk.red('✗ missing')}`)
+    const envPath = extraVars.env_src as string
+    const exists = existsSync(envPath)
+    if (exists) {
+      const count = localEnvKeyCount(envPath)
+      const suffix = count === null ? '' : ` (${count} keys)`
+      console.log(`  Env file:    ${envPath} ${chalk.green('✓' + suffix)}`)
+    } else {
+      console.log(`  Env file:    ${envPath} ${chalk.red('✗ missing')}`)
+    }
   }
   if (extraVars.extra_files) {
     for (const ef of extraVars.extra_files as Array<{ src: string; dest: string }>) {

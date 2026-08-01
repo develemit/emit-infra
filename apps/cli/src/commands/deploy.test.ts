@@ -3,7 +3,7 @@ import { Command } from 'commander'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { buildDeployExtraVars, computeEnvRemoval, enforceEnvRemovalGuard, parseEnvFile, registerDeploy } from './deploy.js'
+import { buildDeployExtraVars, computeEnvRemoval, enforceEnvRemovalGuard, parseEnvFile, printDryRunPlan, registerDeploy } from './deploy.js'
 
 vi.mock('@emit-infra/core', () => ({
   loadConfig: vi.fn(),
@@ -372,6 +372,42 @@ describe('deploy command --dry-run', () => {
 
     expect(runAnsible).toHaveBeenCalledOnce()
     expect(runAnsible).toHaveBeenCalledWith('deploy', '/inv.ini', expect.objectContaining({ project_name: 'test-project' }))
+  })
+})
+
+describe('printDryRunPlan — env file key count', () => {
+  let dir: string
+
+  beforeAll(() => {
+    dir = mkdtempSync(join(tmpdir(), 'deploy-dryrun-env-'))
+  })
+
+  afterAll(() => rmSync(dir, { recursive: true, force: true }))
+
+  it('prints the local key count for an existing env file', () => {
+    const p = join(dir, 'present.env')
+    writeFileSync(p, 'FOO=1\nBAR=2\nR2_BUCKET=3\n')
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    printDryRunPlan(baseConfig as ReturnType<typeof loadConfig>, '/inv.ini', { env_src: p })
+
+    const output = logSpy.mock.calls.map((c) => c.join(' ')).join('\n')
+    expect(output).toContain('(3 keys)')
+    logSpy.mockRestore()
+  })
+
+  it('renders the existing ✗ missing marker for a missing env file, without throwing', () => {
+    const p = join(dir, 'does-not-exist.env')
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    expect(() =>
+      printDryRunPlan(baseConfig as ReturnType<typeof loadConfig>, '/inv.ini', { env_src: p }),
+    ).not.toThrow()
+
+    const output = logSpy.mock.calls.map((c) => c.join(' ')).join('\n')
+    expect(output).toContain('✗ missing')
+    expect(output).not.toContain('keys)')
+    logSpy.mockRestore()
   })
 })
 

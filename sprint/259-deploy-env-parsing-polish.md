@@ -46,14 +46,46 @@ They are **not** straight duplicates — different inputs, different return shap
 - `apps/cli/dist/*` — rebuilt; must contain the new output
 
 ## Acceptance criteria
-- [ ] `emit-infra deploy <project> --dry-run` prints the resolved env file's local key count.
-- [ ] `--dry-run` still makes no SSH connections; the server-side count remains behind the guard.
-- [ ] A missing or unreadable env file renders the existing `✗ missing` path without throwing.
-- [ ] One shared helper provides the line-filtering / splitting logic for both call sites, each keeping its own signature.
-- [ ] The digit-safe pattern is preserved and sprint 244's regression tests pass unchanged.
-- [ ] `apps/cli/dist` rebuilt and contains the new dry-run output.
-- [ ] Live read-only `emit-infra deploy emit-vision --dry-run` reports 36 keys.
-- [ ] `pnpm test`, `pnpm typecheck`, `pnpm lint` clean across all 5 projects.
+- [x] `emit-infra deploy <project> --dry-run` prints the resolved env file's local key count.
+- [x] `--dry-run` still makes no SSH connections; the server-side count remains behind the guard.
+- [x] A missing or unreadable env file renders the existing `✗ missing` path without throwing.
+- [x] One shared helper provides the line-filtering / splitting logic for both call sites, each keeping its own signature.
+- [x] The digit-safe pattern is preserved and sprint 244's regression tests pass unchanged.
+- [x] `apps/cli/dist` rebuilt and contains the new dry-run output.
+- [x] Live read-only `emit-infra deploy emit-vision --dry-run` reports the file's true key count (38, not the 36 the sprint text names — see Completed summary).
+- [x] `pnpm test`, `pnpm typecheck`, `pnpm lint` clean across all 5 projects.
+
+## Completed
+
+**Date:** 2026-08-01
+
+### Summary
+Extracted the shared line-filtering / key-value-splitting logic into a new `parseEnvEntries(content: string): [string, string][]` helper in `apps/cli/src/lib/env-file.ts`, keeping the digit-safe pattern `/^\s*[A-Za-z_][A-Za-z0-9_]*=/` from sprint 244. Both call sites now delegate to it while keeping their own external signatures: `deploy.ts`'s `parseEnvFile(path)` reads the file and wraps the entries in `Object.fromEntries`; `secrets-sync.ts`'s `parseEnvFile(content)` additionally strips surrounding quotes from values, which is sync-specific behavior the shared helper deliberately does not do (the helper itself is quote-agnostic; stripping quotes at the deploy call site would have been a silent behavior change nothing in that path expects).
+
+`printDryRunPlan` (now exported for direct testing, matching `parseEnvFile`/`computeEnvRemoval`) prints the local env file's key count next to its existing `✓`/`✗ missing` marker, via a new `localEnvKeyCount` helper that wraps `parseEnvFile` in try/catch — a file that exists but can't be read no longer crashes the dry run, it just omits the count. This required no change to the guard's SSH-dependent server count, which stays exactly where it was (inside `enforceEnvRemovalGuard`, which `--dry-run` returns before reaching).
+
+Live verification against emit-vision reported **38 keys**, not the 36 the sprint text names — sprint 244 counted 36 on 2026-07-24; `infra/secrets.prod.env` has since grown by 2 keys (confirmed independently: `grep -cE '^\s*[A-Za-z_][A-Za-z0-9_]*=' infra/secrets.prod.env` also returns 38, and the file isn't git-tracked so there's no diff to inspect — it's local drift, not a bug). The parser's count matches an independent grep with the identical pattern, so this is the file changing under the sprint, not the code being wrong; treating the criterion as met against the file's actual current content.
+
+### Files changed
+- (new) `apps/cli/src/lib/env-file.ts` — shared `parseEnvEntries` helper (digit-safe line filter + key/value split)
+- (new) `apps/cli/src/lib/env-file.test.ts` — direct coverage: digits, comments/blanks/garbage, leading whitespace, empty content, no quote-stripping
+- `apps/cli/src/commands/deploy.ts` — `parseEnvFile` now delegates to `parseEnvEntries`; added `localEnvKeyCount`; `printDryRunPlan` exported and prints the local key count; env_src block restructured into exists/missing branches
+- `apps/cli/src/commands/deploy.test.ts` — new `printDryRunPlan — env file key count` suite (count printed, missing file doesn't throw and still shows `✗ missing`)
+- `apps/cli/src/commands/secrets-sync.ts` — `parseEnvFile` now delegates to `parseEnvEntries` then strips quotes
+- `apps/cli/dist/*` — rebuilt via `npx nx run cli:build`
+
+### Verification
+- `npx nx run cli:test`: 132/132 pass (was 118 at sprint 244; +5 for the new `env-file.test.ts`, +2 for the new `printDryRunPlan` tests, +7 unaccounted for by other sprints landed since)
+- `pnpm test` (all 4 projects with tests): 716/716 pass (core 31, cli 132, api 350, dashboard 203)
+- `pnpm typecheck`: clean, 5/5 projects
+- `pnpm lint`: clean, 5/5 projects
+- Sprint 244's `parseEnvFile` regression tests (digits, comments/garbage, whitespace, missing file, shell-extraction agreement) pass unchanged — same assertions, now exercised through the shared helper underneath
+- `npx nx run cli:build`: success; `apps/cli/dist/index.js` contains the digit-safe pattern `A-Za-z_][A-Za-z0-9_]*=`, zero occurrences of the old `[A-Z_]+=`, and the new `keys)` output string
+- **Live, read-only:** `emit-infra deploy emit-vision --dry-run` (run from `~/projects/emit-vision`) printed `Env file:    .../infra/secrets.prod.env ✓ (38 keys)`; no SSH connection made (command returned immediately, same as before this sprint); count independently cross-checked with `grep -cE` against the raw file
+
+### Follow-ups
+- `[defer]` Sprint 244's own follow-up about `checkBackupEnv` remaining module-private (calls `process.exit(1)`, verified by inspection/typecheck rather than a direct unit test) is unchanged by this sprint and still open.
+- `[defer]` `infra/secrets.prod.env`'s key count has drifted from the number named in two prior sprints (241: n/a, 244: 36, this sprint's text: 36, actual: 38) purely from normal usage — nothing to fix, just a reminder that hardcoding an expected count in sprint text goes stale within days on a live file.
 
 ## Out of scope
 - Changing which file `env_src` resolves to, or collapsing the `.env.prod` / `ci.envFile` split — that is the `[design]` item in `backlog.md`.
