@@ -49,6 +49,10 @@ file to promote items into proper sprints when the list grows worth addressing.
 - (sprint 253, 2026-08-01) Add coarse `date +%s` timestamps inside `blue-green-deploy.sh` around pull/start/health-check/switch/stop — the blue-green task (25.6s avg) is opaque to Ansible task timing. (May be absorbed by sprint 254.)
 - (sprint 253, 2026-08-01) The 1500s deploy-history outlier remains uninvestigated and unexplained.
 
+- (sprint 254, 2026-08-01) Consolidate develemail's `infra/postfix/` 4-file `extraFiles` loop into a single directory `copy` task (~10-15s saved). Safe — unlike `infra/opendkim/`, postfix has no runtime-written files. Scoped to develemail's own config, not shared role code.
+- (sprint 254, 2026-08-01) Verify develemail worker's `SIGTERM` shutdown behavior, then consider shortening the old slot's `docker compose stop` timeout (observed 11s `stop_old` on develemail vs 1s on tastease). Verify before touching — blind cut risks killing an in-flight worker job; role is shared.
+- (sprint 254, 2026-08-01) Consider `ansible.posix.synchronize` (rsync) for per-file copy tasks if a bigger floor win is wanted later — bigger shared-role blast radius, worth its own sprint.
+
 ## ✅ Converted to Sprints
 
 - ~~(sprint 115, 2026-06-29) **[manual ops]** Activate healthchecks.io DMS for emit-vision~~ → sprint-261 (formerly 250) (2026-08-01) — _partially done and worse than it looked: the `dms-ping` container was deployed and reports `Up`, but `HEALTHCHECKS_URL` is empty, so both its success and failure branches `wget` an empty string. It has never pinged anything. Sprint 261 makes it fail loudly and declares the key in `requiredEnvKeys` so the sprint-239 empty-value detector covers it._
