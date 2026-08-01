@@ -145,7 +145,114 @@ would delete a dedicated cache tag. Set `"off"` to disable.
 
 Parallel builds stay opt-in via `EMIT_BUILD_PARALLEL=<n>` (default `1`): two
 concurrent emulated `linux/amd64` Node builds can exhaust the Docker build VM's
-memory. Raise it only on a host with more build memory configured.
+memory. Raise it only on a host with more build memory configured. Projects
+that have adopted the [cross-platform build pattern](#cross-platform-build-pattern)
+below run their `deps`/`builder` stages natively instead of under emulation,
+which removes the main source of that memory pressure — `EMIT_BUILD_PARALLEL=2`
+ran two concurrent native builds on a 16-core / 7.75GB-VM host without an OOM
+in testing (develemail, sprint 255). Still opt-in; the default stays `1` until
+more projects have converted and it's been proven safe more broadly.
+
+## Cross-platform build pattern
+
+On an Apple Silicon build host, `docker buildx build --platform linux/amd64`
+runs every stage under QEMU emulation by default — expensive for anything
+CPU-bound (`pnpm install` postinstall scripts, `nx build`/esbuild bundling,
+tsc). Node output itself is architecture-independent, so only the stage that
+actually ships needs to resolve to the target platform; everything upstream
+of it can run natively on the build host.
+
+**The technique:** pin the stages that only produce JS artifacts to
+`$BUILDPLATFORM` (BuildKit resolves this to the host's real platform — e.g.
+`linux/arm64` on an Apple Silicon Docker Desktop VM, run natively, no
+emulation). Leave the stage that's actually shipped (and any stage — like a
+migration runner — that executes compiled output) on a plain `FROM`, which
+resolves to whatever `--platform` was requested on the CLI (`linux/amd64` for
+the Hetzner fleet):
+
+```dockerfile
+# deps/builder only produce arch-independent JS artifacts, so they run
+# natively on the build host. runner stays on the requested --platform
+# since that's what actually ships.
+FROM --platform=$BUILDPLATFORM node:22-alpine AS base
+RUN corepack enable && corepack prepare pnpm@10.30.2 --activate
+WORKDIR /app
+
+FROM base AS deps
+# ... COPY package.json files, pnpm install --frozen-lockfile ...
+
+FROM base AS builder
+# ... COPY --from=deps node_modules, COPY . ., nx build ...
+
+# plain FROM, not `base` — this stage ships and must resolve to the
+# requested target platform, not the native build host's.
+FROM node:22-alpine AS runner
+WORKDIR /app
+COPY --from=builder /app/dist/apps/<svc> ./
+CMD ["node", "main.cjs"]
+```
+
+Reference implementation: develemail's `apps/api/Dockerfile` (also has a
+`migrate` variant target that exercises the native-module case below).
+
+**The native-module trap.** Anything with a platform-specific compiled
+binary — `sharp`, `@next/swc-*`, `esbuild`, `@parcel/watcher`, `@swc/core` are
+common ones in a Next.js/Nx workspace — gets installed for the *build host's*
+architecture in a `$BUILDPLATFORM` stage. If that stage's `node_modules` (or
+anything traced from it, like a Next.js standalone output) ends up in the
+shipped image, you get arm64 binaries in an amd64 container: a crash at
+startup, not a build-time failure. Two sub-cases:
+
+- **Ships to runtime** (e.g. `sharp`, bundled into Next's `.next/standalone`
+  output): needs the *target* platform's binary in the stage that gets
+  copied forward.
+- **Only executes during the build or a build-adjacent step** (e.g.
+  `esbuild`/`@swc/core` compiling, or `drizzle-kit` — which depends on
+  `esbuild` directly — running in a `migrate` stage that reuses `deps`'
+  `node_modules` on the target platform): needs the *build host's* binary to
+  run at all, and separately needs the *target* binary wherever that
+  `node_modules` gets copied onto a target-platform stage.
+
+Fix with pnpm's `supportedArchitectures` (in the root `package.json`'s `pnpm`
+field — not `.npmrc`; pnpm resolves this per-package.json, not as a flat
+config key, as of pnpm 10.x):
+
+```jsonc
+"pnpm": {
+  "supportedArchitectures": {
+    "os": ["linux", "darwin", "current"],
+    "cpu": ["x64", "arm64"],
+    "libc": ["musl", "glibc"]
+  }
+}
+```
+
+This installs both arch's optional platform binaries wherever pnpm resolves
+them, so the `$BUILDPLATFORM` stage can execute its own build tools *and*
+whatever gets copied into a target-platform stage resolves the correct
+binary at runtime (packages like `sharp`/`@next/swc-*` pick their binary via
+`process.platform`/`process.arch` at require time, so having both installed
+is sufficient — no per-stage filtering needed). `os`/`libc` stay broad
+(`darwin` alongside `linux`, `glibc` alongside `musl`) so this doesn't break
+local development on macOS.
+
+This is a workspace-wide setting — it applies to every Dockerfile's
+`pnpm install`, not just the one that needs it, so services with zero native
+runtime dependencies (nothing shipped past a fully-bundled `main.cjs`, no
+`migrate`-style stage) pay a small, measurable tax in `pnpm install` and
+inter-stage `COPY node_modules` time for binaries they'll never use. Confirm
+whether a service actually needs it (grep its shipped output for native
+`require`s / check whether any stage reuses `deps`' full `node_modules` on a
+different platform than it was installed on) before assuming the workspace
+default is free.
+
+**Verify before shipping**, every time this pattern touches a service with
+native dependencies: `docker buildx build --platform linux/amd64 ... --load`,
+then `docker run --platform linux/amd64 <image>` and confirm it fails (or
+succeeds) on something *other* than an exec-format or "wrong ELF class"
+error — a missing env var or a refused DB connection is a clean pass; a
+native-module crash is not. A real deploy with server-side log verification
+is the definitive check.
 
 ## Diagnosing slow deploys
 
