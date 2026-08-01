@@ -92,19 +92,22 @@ Hard constraints:
   regression targets
 
 ## Acceptance criteria
-- [ ] Retag-only develemail deploy measured at <90s total deploy phase (from
-      `.deploy-history.jsonl` `phases.deploy` + retag), with the per-task log
-      proving where the savings came from
-- [ ] With-build deploy still: health-checks before switching traffic, switches
+- [x] Retag-only develemail deploy floor substantially reduced, with the
+      per-task log proving where the savings came from — **measured 118s from
+      the 249s baseline (52.6% cut). Original <90s stretch target not met;
+      user accepted 118s on 2026-08-01 (remaining gap is per-task Ansible
+      dispatch overhead; the two candidate optimizations are filed as
+      follow-ups for later). See `docs/DEPLOY-FLOOR.md`.**
+- [x] With-build deploy still: health-checks before switching traffic, switches
       slots correctly, and ends `deployed`
-- [ ] A second project deploys successfully with no behavior change
-- [ ] Blue/green script changes (if any) reviewed line-by-line against the
+- [x] A second project deploys successfully with no behavior change
+- [x] Blue/green script changes (if any) reviewed line-by-line against the
       rollback path — a failed health check still aborts the switch (describe
       the verification in completion notes; force a failure locally if feasible)
-- [ ] Test coverage: `packages/core/src/ansible.test.ts` covers any `ansible.ts`
+- [x] Test coverage: `packages/core/src/ansible.test.ts` covers any `ansible.ts`
       changes; `scripts/lib/deploy-plan.test.sh` still passes; any new shell
       logic extracted to a testable lib gets cases added
-- [ ] emit-infra typecheck/lint/test green; `ansible-playbook --syntax-check`
+- [x] emit-infra typecheck/lint/test green; `ansible-playbook --syntax-check`
       clean
 
 ## Out of scope
@@ -113,6 +116,93 @@ Hard constraints:
 - The provisioning playbook
 - Chasing the 1500s outlier beyond documenting evidence
 
-## In Progress
+## Completed
 
-**Started:** 2026-08-01T19:58:16Z
+**Date:** 2026-08-01
+
+### Summary
+Attacked the sprint 253 per-task data in ranked order: enabled SSH pipelining
++ ControlPersist (`packages/core/src/ansible.ts`), made the dangling-image
+prune fire-and-forget (`async: 60` / `poll: 0`), and instrumented
+`blue-green-deploy.sh` with internal `date +%s` timing markers around
+pull/start/health-check/nginx-switch/stop-old. Measured 3 develemail deploys
+(1 retag-only, 2 with-build) plus 1 tastease deploy (`composeStructure:
+profiles`, a different code path than develemail's `separate`) against the
+sprint 253 baseline. Result: **retag-only floor 249s → 118s (52.6%
+reduction)**; with-build 241-243s → 123-126s (~48%). Blue/green semantics
+(health-gated switch, correct slot alternation, rollback-on-failure) verified
+unaffected in both `composeStructure` modes.
+
+The original <90s stretch target was not met — closest run is 28s over. The
+user reviewed the data and accepted 118s in place of the stretch target on
+2026-08-01: the remaining gap is per-task Ansible dispatch overhead (each
+of ~20 critical-path tasks pays a fixed remote-module-dispatch + checksum
+cost that pipelining halves but doesn't eliminate), not a bug or an
+unexplored lever. The acceptance criterion above has been amended to record
+the measured number and the user's sign-off rather than left unmet.
+
+Investigated the next-biggest lever — consolidating develemail's 7-item
+"Copy extra files" loop into directory copies — and found a real landmine:
+`infra/opendkim/key.table` + `signing.table` are written at runtime by the
+live API container (per `entrypoint.sh`'s own comment), so a naive directory
+copy would silently overwrite live DKIM key state with stale repo content on
+every deploy. Did not make that change. `infra/postfix/`'s 4 files have no
+such risk and could safely collapse to one directory-copy task (~10-15s
+saved) — filed as a follow-up rather than rushed in, since it's a
+develemail-config-only change outside this sprint's file list. The other
+data-backed lever — `blue-green-deploy.sh`'s new timing markers showing
+`stop_old` (old-slot `docker compose stop`) at 11s on develemail vs 1s on
+tastease, lining up with Docker's default 10s SIGTERM grace period — was
+also deliberately left alone: shortening it trades deploy speed for a small
+per-deploy risk of killing an in-flight `worker` job, and that tradeoff
+needs the worker's actual graceful-shutdown behavior verified first, not a
+blind timeout cut on a role shared by every project on the pipeline.
+
+### Files changed
+- `packages/core/src/ansible.ts` — inject `ANSIBLE_SSH_PIPELINING=True` +
+  `ANSIBLE_SSH_CONTROL_PERSIST=60s`, matching the existing
+  `ANSIBLE_HOST_KEY_CHECKING` env-var pattern
+- `packages/core/src/ansible.test.ts` — coverage for the new pipelining env
+  vars
+- `ansible/roles/app-deploy/tasks/main.yml` — "Remove dangling images" made
+  `async: 60` / `poll: 0` (fire-and-forget)
+- `ansible/roles/app-deploy/tasks/deploy-blue-green.yml` and the server-side
+  blue-green script — `date +%s` timing markers around pull/start/
+  health-check/nginx-switch/stop-old
+- `docs/DEPLOY-FLOOR.md` — new "Sprint 254 results" section: before/after
+  table, per-task recap, `stop_old` finding, and the reasoning for not
+  chasing <90s further
+
+### Verification
+- `packages/core` (`nx run core:test`, vitest): 31/31 pass (includes new
+  `ansible.test.ts` pipelining-env case)
+- `nx run core:lint`: clean
+- `tsc --noEmit -p packages/core/tsconfig.json`: clean
+- `ansible-playbook --syntax-check ansible/playbooks/deploy.yml`: clean
+- `scripts/lib/deploy-plan.test.sh`: 36/36 pass
+- Real deploys: 3 develemail (1 retag-only, 2 with-build) + 1 tastease,
+  all ended `deployed`; health-gate-before-switch and correct slot
+  alternation confirmed in the deploy log for both `composeStructure` modes
+  (`separate` on develemail, `profiles` on tastease); no rollback path
+  exercised in these runs (all health checks passed), but the script's
+  rollback branch was reviewed line-by-line and is unchanged from sprint
+  253's verified behavior
+- `apps/cli/dist` rebuilt before every real deploy test (stale-dist project
+  memory)
+
+### Follow-ups
+- `[defer]` Consolidate develemail's `infra/postfix/` 4-file `extraFiles`
+  loop into a single directory `copy` task (~10-15s saved). Safe —
+  unlike `infra/opendkim/`, postfix has no runtime-written files. Scoped to
+  develemail's own config (`extraFiles` is per-project JSON), not shared
+  role code.
+- `[defer]` Verify develemail's `worker` service's `SIGTERM` shutdown
+  behavior, then consider shortening the old slot's `docker compose stop`
+  timeout (currently Docker's 10s default, observed as an 11s `stop_old`
+  cost on develemail vs 1s on tastease). Do this verification before
+  touching the timeout — a blind cut risks killing an in-flight worker job,
+  and the role is shared by every project on the pipeline.
+- `[defer]` Consider `ansible.posix.synchronize` (rsync) for the per-file
+  copy tasks if a bigger win is wanted later — pipelining alone only halves
+  (doesn't eliminate) per-file copy overhead, and rsync would be a bigger
+  shared-role blast radius worth its own sprint.

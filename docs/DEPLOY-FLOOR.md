@@ -131,3 +131,76 @@ underlying cost repeated: per-file copy overhead with no connection reuse.
   `runAnsible` already passes `ANSIBLE_HOST_KEY_CHECKING`).
 - **Deploy behavior was unaffected.** All 3 measurement deploys completed
   successfully; `.deploy-status.json` ended `deployed` after each.
+
+## Sprint 254 results: after numbers
+
+Implemented hypothesis #1 (SSH pipelining + ControlPersist) and #2
+(`blue-green-deploy.sh` internal timing markers) from above, plus made the
+trailing dangling-image prune fire-and-forget (`async`/`poll: 0`). Measured
+with the same instrumentation, on the same host, against `ci.envFile` /
+`.deploy-history.jsonl` `phases.deploy` (the hook-measured deploy phase,
+which includes a small wrapper overhead over the playbook's own self-report):
+
+| Run | SHA | Type | `deploy` phase (hook) | Playbook self-reported |
+|---|---|---|---|---|
+| 1 | `7d01411` | retag-only (floor) | 118s | 114.6s (1:54.6) |
+| 2 | `2c43bd4` | with-build (api) | 126s | 122.8s (2:02.8) |
+| 3 | `2209cb1` | with-build (api, revert) | 123s | 119.3s (1:59.3) |
+
+**Retag-only floor: 249s → 118s, a 52.6% reduction.** With-build: 241–243s →
+123–126s, a ~48% reduction. **This does not clear the <90s acceptance
+target** — the closest run (retag-only) is 28s over.
+
+A second project (`tastease`, `composeStructure: profiles` — a different
+code path through `blue-green-deploy.sh`'s `compose_cmd_*` branching than
+develemail's `separate` structure) deployed cleanly with the same changes:
+deploy phase 99s, correct `blue → green` switch, health-gated (api healthy
+on attempt 2), pre-deploy migration ran, old slot stopped. No regression in
+either `composeStructure` mode.
+
+### Where the remaining ~115-120s goes (from the retag-only run's per-task recap)
+
+| Rank | Task | Duration | vs. sprint 253 baseline |
+|---|---|---|---|
+| 1 | Copy extra files (7-item loop) | 25–28s | 60.35s (−~55%) |
+| 2 | Run blue-green deploy script | 20–22s | 25.60s (−~15-20%) |
+| 3 | Copy blue-green compose files | 6.5–8.8s | 16.93s (−~55%) |
+| — | Remove dangling images (async dispatch) | 6–7s | not separately profiled before |
+| — | Write deployed version file | 5.5–7s | 11.69s (−~45%) |
+| — | Copy .env file | 5.5–6s | 11.72s (−~50%) |
+
+Pipelining cut every per-file copy task roughly in half, but did **not**
+eliminate them — each still pays a fixed per-task cost (remote Python
+module dispatch + checksum stat), independent of the SSH connection reuse
+pipelining provides. With ~20 tasks in the critical path at ~1-8s each,
+this fixed per-task floor is now the dominant remaining cost, not raw SSH
+overhead.
+
+The new timing markers broke open task #2 (previously fully opaque):
+`pull` 2-5s, `start` 1-2s, `health_check` 5s, `nginx_switch` 0s,
+**`stop_old` 11s on develemail / 1s on tastease**. 11s lines up almost
+exactly with Docker's default 10s `stop` grace period — develemail's old
+slot apparently doesn't exit promptly on `SIGTERM`. This is a real,
+data-backed lever (shortening the old slot's stop timeout via `docker
+compose stop -t N`) but **was deliberately not pulled this sprint**: the
+old slot's `worker` service may have an in-flight job when stopped, and a
+shorter grace period trades deploy speed for a small, per-deploy risk of
+killing that job mid-work. That tradeoff needs verification of the
+worker's actual shutdown behavior, not a blind timeout cut on a role shared
+by every project on the pipeline.
+
+**Why the <90s target wasn't fully pursued:** the next-biggest lever
+(shrinking "Copy extra files" further) was investigated and rejected for
+develemail specifically. `infra/opendkim/` also contains `key.table` and
+`signing.table`, which `infra/opendkim/entrypoint.sh` documents as written
+at runtime by the live API container when domains are created/verified —
+consolidating that directory into a single recursive `copy` (as hypothesis
+#3 above suggests) would silently overwrite those with stale checked-in
+repo copies on every deploy, breaking DKIM for any domain added since the
+last commit. `infra/postfix/` has no such landmine (its 4 files are exactly
+develemail's 4 `extraFiles` entries, 1:1) and could safely collapse to one
+directory-copy task — worth ~10-15s — but that's a develemail-config-only
+change (`extraFiles` is plain per-project JSON, not shared role code; no
+other project has more than 1 entry) outside this sprint's file list, and
+the projected gain still wouldn't clear 90s on its own. Filed as a
+follow-up rather than rushed.
