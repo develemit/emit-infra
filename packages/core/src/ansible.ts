@@ -16,7 +16,11 @@ export async function runAnsible(
     args.push('--extra-vars', JSON.stringify(extraVars))
   }
 
-  const env = { ...process.env, ANSIBLE_HOST_KEY_CHECKING: 'False' }
+  const env = {
+    ...process.env,
+    ANSIBLE_HOST_KEY_CHECKING: 'False',
+    ANSIBLE_CALLBACKS_ENABLED: 'ansible.posix.profile_tasks,ansible.posix.timer',
+  }
 
   if (!onLine) {
     await execa('ansible-playbook', args, { stdio: 'inherit', env })
