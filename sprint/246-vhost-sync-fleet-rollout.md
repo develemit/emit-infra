@@ -47,12 +47,63 @@ Sprint 235 set the rollout order deliberately: **develemail first** (zero drift 
 - `apps/api/src/routes/nginx-config.ts` — read-only reference (the drift route)
 
 ## Acceptance criteria
-- [ ] develemail, emit-social, and tastease each have `nginx.syncOnDeploy: true`.
-- [ ] Each project's drift was checked *before* the flag was set, and any drift was deliberately resolved rather than overwritten blind.
-- [ ] The rollback branch of `sync-vhost.yml` has been exercised against a real nginx at least once, with the outcome recorded.
-- [ ] Each project's primary domain and API subdomain return their expected HTTP status after the change.
-- [ ] The drift route reports no drift for all three projects at the end.
-- [ ] `pnpm test`, `pnpm typecheck`, `pnpm lint` clean across all 5 projects (config-only changes should not affect these, but confirm).
+- [x] develemail, emit-social, and tastease each have `nginx.syncOnDeploy: true`.
+- [x] Each project's drift was checked *before* the flag was set, and any drift was deliberately resolved rather than overwritten blind.
+- [x] The rollback branch of `sync-vhost.yml` has been exercised against a real nginx at least once, with the outcome recorded.
+- [x] Each project's primary domain and API subdomain return their expected HTTP status after the change.
+- [x] The drift route reports no drift for all three projects at the end.
+- [x] `pnpm test`, `pnpm typecheck`, `pnpm lint` clean across all 5 projects (config-only changes should not affect these, but confirm).
+
+## Completed
+
+**Date:** 2026-08-01
+
+### Summary
+`nginx.syncOnDeploy: true` is now live for develemail, emit-social, and tastease, closing out the sprint-234/235 rollout order. All three projects reported **zero drift** at the pre-flip check — the tastease cosmetic upstream-variable drift the sprint-234 audit flagged had already been reconciled by sprint 237 and confirmed gone by sprint 236's served-config drift fix (re-verified independently here immediately before flipping). No drift resolution work was needed for any of the three; every deploy's vhost-sync task reported "nginx vhost already current," meaning the sync was a verified no-op push, not a corrective overwrite.
+
+**Rollback exercise (sprint-232 gap, task 2).** Rather than testing against a production box, I built a disposable scratch target: a `debian:12` Docker container with a real `nginx` install, `sites-available`/`sites-enabled` laid out to match production, and a valid baseline vhost. I ran `sync-vhost.yml` itself (via Ansible's `community.docker.docker` connection plugin, not a hand-rolled simulation) with an intentionally-broken vhost (`this_is_not_a_valid_directive`). Observed: backup → copy → `nginx -t` fails → previous vhost restored from `.bak` byte-for-byte → play fails with the designed error message → reload skipped. Post-run, the vhost content matched the original exactly and `nginx -t` passed. One notable-but-correct detail: the `.bak` file is deliberately *not* removed on a failed validation (removal is gated on `vhost_validate is succeeded`), so a failed sync leaves a forensic backup on disk — expected behavior, not a bug. Container and temp files were torn down afterward; nothing production-facing was touched by this step.
+
+**Deploy order and results.** Followed sprint 235's order (develemail → emit-social → tastease). Before each deploy I confirmed the global `emit-infra` CLI's `dist/index.js` bundle actually contained sprint 244's env-parser fix (nx cache had preserved the original build mtime, which briefly looked stale but wasn't — verified by grepping the bundled regex). Each deploy was a real `emit-infra deploy <name>` (no `BUILD_NUMBER` override, so only the vhost changed, not the app images), and each completed with `failed=0`, `nginx -t: ok`, and a `reload`-not-`restart` semantics preserved by the unchanged `sync-vhost.yml` logic.
+
+**One dangling-diff finding, unrelated to this sprint's scope.** Before editing emit-social's `.emit-infra.json`, `git status` showed a pre-existing uncommitted diff there — sprint 243's `requiredEnvKeys` scaffold (2026-07-24) had been written to disk but never committed in the emit-social repo itself (develemail's equivalent write *was* committed; tastease's and diner-decider's state wasn't checked beyond confirming tastease was clean). Committed it separately, attributed to sprint 243, before adding this sprint's own change on top — see Follow-ups.
+
+### Files changed
+- `~/projects/develemail/.emit-infra.json` — added `nginx.syncOnDeploy: true` (committed in the develemail repo as `362e118`)
+- `~/projects/emit-social/.emit-infra.json` — committed sprint 243's dangling `requiredEnvKeys` write (`73f58c3`), then added `nginx.syncOnDeploy: true` (committed as `f0f748d`)
+- `~/projects/tastease/.emit-infra.json` — added `nginx.syncOnDeploy: true` (committed in the tastease repo as `0f47ab6`)
+- `sprint/246-vhost-sync-fleet-rollout.md` — marked complete with this summary
+
+### Verification
+**Drift, before → after (all via `GET /projects/:name/nginx-drift` against the local dev API on port 7001):**
+| project | before | after |
+|---|---|---|
+| develemail | ok (71/71, 0 diff) | ok (71/71, 0 diff) |
+| emit-social | ok (52/52, 0 diff) | ok (52/52, 0 diff) |
+| tastease | ok (179/179, 0 diff) | ok (179/179, 0 diff) |
+
+**HTTP status, before → after (all identical):**
+| project | endpoint | before | after |
+|---|---|---|---|
+| develemail | `develemail.com/` | 307 | 307 |
+| develemail | `develemail.com/api/unsubscribe/confirm` (POST) | 400 | 400 |
+| emit-social | `social.develemit.com/` | 307 | 307 |
+| emit-social | `api.social.develemit.com/` | 401 | 401 |
+| tastease | `tastease.app/` | 200 | 200 |
+| tastease | `app.tastease.app/` | 302 | 302 |
+| tastease | `app.tastease.app/api/push/public-key` | 401 | 401 |
+| tastease | `app.tastease.app/api/healthz` | 200 | 200 |
+
+- Rollback branch: exercised against a real Debian nginx install in Docker; vhost restored byte-for-byte, `nginx -t` passed post-restore, `.bak` correctly preserved on failure (see Summary).
+- `emit-infra` deploys: develemail, emit-social, tastease each `failed=0`, vhost-sync task chain ran with `nginx -t: ok` and "vhost already current" on every run (no drift to correct).
+- emit-infra (this repo): `pnpm test` 192/192 pass, `pnpm typecheck` clean (5/5 projects), `pnpm lint` clean (5/5 projects).
+- develemail: `pnpm typecheck`/`pnpm test`/`pnpm lint` all clean.
+- emit-social: `pnpm typecheck`/`pnpm test`/`pnpm lint` all clean.
+- tastease: `pnpm typecheck`/`pnpm test`/`pnpm lint` all clean.
+
+### Follow-ups
+- `[address-next]` emit-social's sprint-243 `requiredEnvKeys` write sat uncommitted in that repo for 8 days before this sprint caught and committed it. Worth a quick check of diner-decider's `.emit-infra.json` (excluded from this sprint's scope, but it had its own uncommitted diffs observed in passing) to see if the same sprint left something uncommitted there too.
+- `[defer]` diner-decider is next in the rollout order per the sprint-234 audit, but stays blocked on sprint 247's `/api/*` migration as this sprint's Context section specifies.
+- `none` otherwise — no new issues surfaced by this rollout.
 
 ## Out of scope
 - diner-decider — blocked on sprint 247's `/api/*` migration.
