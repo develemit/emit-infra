@@ -82,17 +82,17 @@ could dominate. Measure first.
 - `~/projects/develemail` — measurement target
 
 ## Acceptance criteria
-- [ ] Per-task durations appear in `.deploy-logs/<sha>.log` for a real deploy
+- [x] Per-task durations appear in `.deploy-logs/<sha>.log` for a real deploy
       without any manual flags — instrumentation is always-on
-- [ ] A retag-only (floor) deploy and a with-build deploy are both captured
-- [ ] `docs/DEPLOY-FLOOR.md` ranks tasks by cost and names the top 3
+- [x] A retag-only (floor) deploy and a with-build deploy are both captured
+- [x] `docs/DEPLOY-FLOOR.md` ranks tasks by cost and names the top 3
       contributors to the ~200s floor, with numbers
-- [ ] Deploy behavior is unchanged — instrumentation only; the measured deploys
+- [x] Deploy behavior is unchanged — instrumentation only; the measured deploys
       succeed and `.deploy-status.json` ends `deployed`
-- [ ] Test coverage: if `ansible.ts` changes, `packages/core/src/ansible.test.ts`
+- [x] Test coverage: if `ansible.ts` changes, `packages/core/src/ansible.test.ts`
       gains/updates a test asserting the callback config is passed; existing
       core tests stay green
-- [ ] emit-infra typecheck/lint/test green
+- [x] emit-infra typecheck/lint/test green
 
 ## Out of scope
 - Fixing anything found — that's sprint 254. Resist the urge; the one exception
@@ -101,3 +101,60 @@ could dominate. Measure first.
   findings doc
 - The 1500s outlier's root cause (note any evidence found, don't chase it)
 - Dashboard display of timings (sprint 256)
+
+## Completed
+
+**Date:** 2026-08-01
+
+### Summary
+Enabled `ansible.posix.profile_tasks` + `timer` callbacks via
+`ANSIBLE_CALLBACKS_ENABLED` in `runAnsible` (env-var injection, matching how
+`ANSIBLE_HOST_KEY_CHECKING` was already passed — no `ansible.cfg` needed,
+and none exists at repo root). Verified locally with `ansible-config dump`
+that the env var is picked up correctly despite a user-level
+`~/.ansible.cfg`.
+
+Measured three real production deploys on develemail: one forced
+retag-only floor run (`EMIT_FORCE_DEPLOY=1`, no service changes) and two
+with-build runs (a one-line comment added to `apps/api/src/main.ts` to force
+an `api` image build, then reverted — same throwaway-marker pattern already
+used in develemail for `sprint/999-*.md` pre-push-hook validation). All
+three deploys succeeded; `.deploy-status.json` ended `deployed` each time.
+Marker commits/files were cleaned up afterward so develemail's tree and
+history are back to a clean, real state.
+
+Key finding: build time doesn't touch the deploy-phase floor at all (239-247s
+across all 3 runs, <4% variance) — the floor is dominated by per-file SSH
+copy overhead (no pipelining configured) rather than anything build-related.
+Full ranking and hypothesis list for sprint 254 in `docs/DEPLOY-FLOOR.md`.
+
+Did not add internal timestamps to `ansible/roles/app-deploy/files/
+blue-green-deploy.sh` (the sprint's "if feasible" stretch goal) — it's a
+shared script copied to every emit-infra project's server, and editing it
+carries real blast radius for a measurement-only sprint. Flagged as sprint
+254's first step instead.
+
+### Files changed
+- `packages/core/src/ansible.ts` — inject `ANSIBLE_CALLBACKS_ENABLED=ansible.posix.profile_tasks,ansible.posix.timer` into the ansible-playbook env
+- `packages/core/src/ansible.test.ts` — new test asserting the callback env var is set
+- (new) `docs/DEPLOY-FLOOR.md` — ranked findings and sprint-254 hypothesis list
+
+### Verification
+- `npx vitest run packages/core`: 30/30 pass (including new callback test)
+- `pnpm test` (full monorepo): 192/192 pass
+- `pnpm lint` / `pnpm typecheck`: clean across all projects
+- `ansible-config dump --only-changed`: confirms `CALLBACKS_ENABLED` env var takes effect
+- 3 real develemail production deploys (775404d, cb9fb28, 89904ee): all `deployed`, per-task timing present in `.deploy-logs/<sha>.log`
+
+### Follow-ups
+- `[address-next]` Sprint 254 should start by enabling SSH pipelining
+  (`ANSIBLE_SSH_PIPELINING=True` / `pipelining = True`) — the #1 and #3
+  ranked tasks (Copy extra files, Copy blue-green compose files, ~77s
+  combined) are both per-file copy loops with no connection reuse, and
+  pipelining is the standard fix.
+- `[defer]` Add coarse `date +%s` timestamps inside
+  `blue-green-deploy.sh` around pull/start/health-check/switch/stop before
+  sprint 254 tries to optimize that task (25.6s avg, currently opaque to
+  Ansible).
+- `[defer]` The 1500s deploy-history outlier was not investigated (out of
+  scope this sprint) — still unexplained.
