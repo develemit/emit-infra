@@ -53,6 +53,9 @@ file to promote items into proper sprints when the list grows worth addressing.
 - (sprint 254, 2026-08-01) Verify develemail worker's `SIGTERM` shutdown behavior, then consider shortening the old slot's `docker compose stop` timeout (observed 11s `stop_old` on develemail vs 1s on tastease). Verify before touching — blind cut risks killing an in-flight worker job; role is shared.
 - (sprint 254, 2026-08-01) Consider `ansible.posix.synchronize` (rsync) for per-file copy tasks if a bigger floor win is wanted later — bigger shared-role blast radius, worth its own sprint.
 
+- (sprint 255, 2026-08-01) Scoped dual-arch installs to remove the pnpm install tax from lean services (only `web` + api's `migrate` need dual-arch; pnpm has no per-command override — needs per-scope manifests or a post-install arch prune). This is what would close the gap to the original ≥40% build-time target for `worker`/`inbound`/`api`.
+- (sprint 255, 2026-08-01) Re-measure `worker`/`inbound` build times once install-scoping exists — should see near-full native-execution win, they ship zero `node_modules`.
+
 ## ✅ Converted to Sprints
 
 - ~~(sprint 115, 2026-06-29) **[manual ops]** Activate healthchecks.io DMS for emit-vision~~ → sprint-261 (formerly 250) (2026-08-01) — _partially done and worse than it looked: the `dms-ping` container was deployed and reports `Up`, but `HEALTHCHECKS_URL` is empty, so both its success and failure branches `wget` an empty string. It has never pinged anything. Sprint 261 makes it fail loudly and declares the key in `requiredEnvKeys` so the sprint-239 empty-value detector covers it._
