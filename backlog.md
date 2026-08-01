@@ -66,6 +66,11 @@ file to promote items into proper sprints when the list grows worth addressing.
 
 - (sprint 259, 2026-08-01) `checkBackupEnv` remains module-private with a `process.exit(1)` path verified only by inspection — sprint 244's follow-up about direct unit coverage still open.
 
+- (sprint 261, 2026-08-01) **healthchecks.io DMS deferred by user decision** — accepted risk; superseded by the self-hosted DMS exploration below. Code-side fail-loud work is deployed (emit-vision 7222750); `dms-ping` stopped on server (next deploy revives its crash loop — retire it in the repo compose when the replacement lands).
+- (sprint 261, 2026-08-01) Self-hosted DMS initiative (user-requested): cross-validate emit-vision pulse vs direct health probes in emit-infra's status monitor ("everything down per pulse + direct probes up ⇒ emit-vision is down"), add ingest-freshness probing (not just /healthz 200), fill in missing `healthCheck.url` for develemail/diner-decider/emit-social, and consider a fleet-server sentinel (cron on develemail's server pinging emit-vision, alerting via develemail email) for coverage while the Mac is asleep.
+- (sprint 261, 2026-08-01) `provision-list/healthchecks-io.md` claims completion falsely — fix when DMS approach is settled.
+- (sprint 261, 2026-08-01) tastease `uptime-ping` has the same silent empty-URL ping shape — audit with the DMS work.
+
 ## ✅ Converted to Sprints
 
 - ~~(sprint 115, 2026-06-29) **[manual ops]** Activate healthchecks.io DMS for emit-vision~~ → sprint-261 (formerly 250) (2026-08-01) — _partially done and worse than it looked: the `dms-ping` container was deployed and reports `Up`, but `HEALTHCHECKS_URL` is empty, so both its success and failure branches `wget` an empty string. It has never pinged anything. Sprint 261 makes it fail loudly and declares the key in `requiredEnvKeys` so the sprint-239 empty-value detector covers it._
