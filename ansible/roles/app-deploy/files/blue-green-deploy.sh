@@ -172,8 +172,10 @@ cleanup() {
 trap cleanup EXIT
 
 # ── 1. Pull new images ───────────────────────────────────────────────────────
+_t1_start=$(date +%s)
 echo "==> Pulling images for ${INACTIVE} slot..."
 $(compose_cmd_inactive) pull
+echo "==> [timing] pull: $(( $(date +%s) - _t1_start ))s"
 
 # ── 2. Pre-deploy migration ──────────────────────────────────────────────────
 # Must run AFTER the pull: MIGRATE_PRE commands typically `docker compose run`
@@ -186,10 +188,13 @@ if [ -n "$MIGRATE_PRE" ]; then
 fi
 
 # ── 3. Start inactive slot ───────────────────────────────────────────────────
+_t3_start=$(date +%s)
 echo "==> Starting ${INACTIVE} slot..."
 $(compose_cmd_inactive) up -d --remove-orphans
+echo "==> [timing] start: $(( $(date +%s) - _t3_start ))s"
 
 # ── 4. Health check inactive slot ─────────────────────────────────────────────
+_t4_start=$(date +%s)
 for i in $(seq 0 $((SVC_COUNT - 1))); do
   hc="${HC_ARR[$i]:-skip}"
   if [ "$hc" = "skip" ]; then
@@ -216,8 +221,10 @@ for i in $(seq 0 $((SVC_COUNT - 1))); do
     exit 1
   fi
 done
+echo "==> [timing] health_check: $(( $(date +%s) - _t4_start ))s"
 
 # ── 5. Switch nginx to inactive slot ──────────────────────────────────────────
+_t5_start=$(date +%s)
 echo "==> Switching nginx to ${INACTIVE} slot..."
 
 upstream_block="# Active slot: ${INACTIVE} — written by blue-green-deploy.sh $(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -249,6 +256,7 @@ fi
 nginx -s reload
 SWITCHED=1
 rm -f "${NGINX_CONF_PATH}.bak"
+echo "==> [timing] nginx_switch: $(( $(date +%s) - _t5_start ))s"
 
 # ── 6. Record new active slot ────────────────────────────────────────────────
 echo "$INACTIVE" > "$SLOT_FILE"
@@ -279,8 +287,10 @@ if [ "$SLOT_GRACE_SECONDS" -gt 0 ]; then
 fi
 
 # ── 9. Stop old slot ─────────────────────────────────────────────────────────
+_t9_start=$(date +%s)
 echo "==> Stopping old ${ACTIVE} slot..."
 $(compose_cmd_active) stop $(slot_scope "$ACTIVE")
+echo "==> [timing] stop_old: $(( $(date +%s) - _t9_start ))s"
 
 # ── 10. Prune ─────────────────────────────────────────────────────────────────
 if [ "$PRUNE_STRATEGY" = "aggressive" ]; then

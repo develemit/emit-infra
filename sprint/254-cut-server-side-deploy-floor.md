@@ -112,3 +112,7 @@ Hard constraints:
 - Restructuring the role layout or deploy modes
 - The provisioning playbook
 - Chasing the 1500s outlier beyond documenting evidence
+
+## In Progress
+
+**Started:** 2026-08-01T19:58:16Z

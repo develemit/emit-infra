@@ -65,6 +65,14 @@ describe('runAnsible', () => {
     expect(opts.env.ANSIBLE_CALLBACKS_ENABLED).toBe('ansible.posix.profile_tasks,ansible.posix.timer')
   })
 
+  it('enables SSH pipelining with ControlPersist in env', async () => {
+    await runAnsible('deploy', '/inv/hosts')
+
+    const opts = (mockedExeca.mock.calls[0] as any)[2]
+    expect(opts.env.ANSIBLE_SSH_PIPELINING).toBe('True')
+    expect(opts.env.ANSIBLE_SSH_ARGS).toContain('ControlPersist')
+  })
+
   it('uses stdio inherit when no onLine provided', async () => {
     await runAnsible('deploy', '/inv/hosts')
 

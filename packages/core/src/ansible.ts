@@ -20,6 +20,13 @@ export async function runAnsible(
     ...process.env,
     ANSIBLE_HOST_KEY_CHECKING: 'False',
     ANSIBLE_CALLBACKS_ENABLED: 'ansible.posix.profile_tasks,ansible.posix.timer',
+    // Reuses one SSH session across all tasks instead of paying a fresh
+    // connection + checksum round-trip per task/loop-item (sprint 254:
+    // ~103s of the ~247s floor was per-file copy overhead). Requires
+    // `requiretty` disabled in sudoers on targets — true by default on the
+    // Debian/Ubuntu hosts this role provisions (unlike RHEL-family distros).
+    ANSIBLE_SSH_PIPELINING: 'True',
+    ANSIBLE_SSH_ARGS: '-o ControlMaster=auto -o ControlPersist=60s',
   }
 
   if (!onLine) {

@@ -164,3 +164,5 @@
 
 - name: Remove dangling images
   command: docker image prune -f
+  async: 60
+  poll: 0
