@@ -72,18 +72,99 @@ like that get spotted when they happen, not sprints later.
 - the existing deploy-history row component — one-line integration
 
 ## Acceptance criteria
-- [ ] Deploys with `phases` show the stacked bar + per-phase seconds; deploys
+- [x] Deploys with `phases` show the stacked bar + per-phase seconds; deploys
       without render exactly as before (no layout shift, no crash)
-- [ ] The develemail 1500s-style case (one phase dominating) is visually
+- [x] The develemail 1500s-style case (one phase dominating) is visually
       unmistakable
-- [ ] Test coverage: `apps/dashboard/src/lib/deploy-phases.test.ts` covers
+- [x] Test coverage: `apps/dashboard/src/lib/deploy-phases.test.ts` covers
       absent/partial/complete/zero cases; `apps/api/src/routes/history.test.ts`
       asserts `phases` passthrough for new-format lines and absence for old
-- [ ] dataviz skill consulted for the bar's colors/markup
-- [ ] api + dashboard typecheck, lint, test green
+- [x] dataviz skill consulted for the bar's colors/markup
+- [x] api + dashboard typecheck, lint, test green
 
 ## Out of scope
 - Aggregations/trends across deploys (avg build time charts, etc.)
 - CI history phases (`.ci-history.jsonl` has no phase data)
 - Alerting on slow phases
 - Backfilling `phases` for old history entries
+
+## Completed
+
+**Date:** 2026-08-01
+
+### Summary
+The API route needed no change: `readJsonl` parses each line with plain
+`JSON.parse` and the route returns `{ deploys }` verbatim, so `phases` already
+passed through untouched — verified by hitting the real develemail
+deploy-history endpoint before writing any code. All the work was on the
+dashboard side: a pure helper (`deploy-phases.ts`) orders/labels/percentages
+a `phases` object against a fixed canonical order (`ci, auth, build, retag,
+preDeploy, deploy`), dropping missing or zero-second phases and returning `[]`
+for an absent object. A small presentational component
+(`deploy-phase-bar.tsx`) renders that as a thin (6px) stacked bar with 2px
+surface gaps and rounded outer ends, plus a visible text fallback (`ci 88s ·
+build 297s · deploy 40s`) below it, then wires into `deploy-timeline.tsx`
+with a one-line addition.
+
+Colors follow the dataviz skill's categorical method: six new CSS custom
+properties (`--phase-ci` … `--phase-deploy`) added to both theme blocks in
+`globals.css`, assigned in the fixed phase order to the palette's slots 1–6
+(blue/orange/aqua/yellow/magenta/green), and validated with the skill's
+`validate_palette.js` against this app's actual light (`#ffffff`) and dark
+(`#110f13`) card surfaces — both modes clear every hard gate (CVD, normal-vision
+floor, lightness/chroma bands); light mode carries a contrast WARN on three
+slots, mitigated by the always-visible text summary (the relief rule, not a
+tooltip-only fallback).
+
+Testing the API route surfaced a pre-existing gap: `history.test.ts`'s
+"happy path" tests only ever exercised the empty-array branch, because
+`existsSync` (from `node:fs`, separate from the mocked `node:fs/promises`)
+was never mocked and always saw the real (nonexistent) path. Added a scoped
+`node:fs` mock with `existsSync` defaulting to `false` and a
+`mockReturnValueOnce(true)` override plus a hand-rolled `open()` file-handle
+mock (`stat`/`read`/`close`) for the one test that needed real fixture
+content — kept narrowly scoped so it doesn't change behavior for the other
+15 tests in the file.
+
+Visually verified via a throwaway Playwright script (no `chromium-cli` in
+this environment; borrowed Playwright's install from a sibling project) against
+the live dashboard + API dev servers: develemail's real history renders
+distinct colored segments with correct proportions (the 469s deploy with
+`build: 336` obviously dominates the bar), and 48 pre-2026-08 entries further
+down the same list render with no bar and no layout shift.
+
+### Files changed
+- `apps/dashboard/src/lib/deploy-phases.ts` — (new) pure phase ordering/
+  labeling/percentage helper
+- `apps/dashboard/src/lib/deploy-phases.test.ts` — (new) 11 tests covering
+  absent/zero/partial/complete/dominant-phase/full-six-phase cases
+- `apps/dashboard/src/components/detail/deploy-phase-bar.tsx` — (new)
+  stacked-bar + text-summary subcomponent
+- `apps/dashboard/src/components/detail/deploy-timeline.tsx` — wired
+  `DeployPhaseBar` into each deploy row
+- `apps/dashboard/app/globals.css` — added `--phase-*` categorical CSS vars
+  for both light and dark themes
+- `apps/api/src/routes/history.test.ts` — added `node:fs` `existsSync` mock
+  and a phases-passthrough regression test with real fixture content via a
+  hand-rolled file-handle mock
+
+### Verification
+- `pnpm nx run api:test`: 350/350 pass (incl. new phases-passthrough test)
+- `pnpm nx run dashboard:test`: 203/203 pass (incl. new 11 deploy-phases tests)
+- `pnpm nx run-many -t typecheck -p api,dashboard`: clean
+- `pnpm nx run-many -t lint -p api,dashboard`: clean
+- `node scripts/validate_palette.js` (dataviz skill) against this app's
+  actual card surfaces: all hard gates pass in both light and dark
+- Manual: curled the real develemail deploy-history API to confirm `phases`
+  passthrough before touching the route; screenshotted the live pipelines
+  page (Playwright) showing correct stacked bars for `phases`-bearing
+  entries and unchanged rendering for the 48 pre-phases entries further down
+  develemail's own history
+
+### Follow-ups
+- `[defer]` Several ambient orphaned `nx run api:dev` processes (some days
+  old, from past sessions across this and other projects) were discovered
+  running during manual verification; a broad `pkill -f "nx run api:dev"`
+  used to stop this sprint's own ad-hoc server incidentally killed a handful
+  of them. None were load-bearing for this sprint, but the fleet of stale
+  dev-server processes itself is worth a look.

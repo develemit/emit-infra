@@ -11,9 +11,26 @@ vi.mock('node:fs/promises', () => ({
   open: vi.fn().mockRejectedValue(new Error('no file')),
 }))
 
+vi.mock('node:fs', () => ({
+  existsSync: vi.fn().mockReturnValue(false),
+}))
+
 import { discoverProjects } from '../lib/discover-projects.js'
 import { readFile, open } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import { historyRoutes } from './history.js'
+
+function mockFileHandle(content: string) {
+  const data = Buffer.from(content, 'utf8')
+  return {
+    stat: vi.fn().mockResolvedValue({ size: data.length }),
+    read: vi.fn().mockImplementation(async (buf: Buffer, offset: number, length: number, position: number) => {
+      data.copy(buf, offset, position, position + length)
+      return { bytesRead: length, buffer: buf }
+    }),
+    close: vi.fn().mockResolvedValue(undefined),
+  }
+}
 
 const mockProject = {
   config: {
@@ -126,6 +143,34 @@ describe('GET /projects/:name/deploy-history', () => {
     expect(res.statusCode).toBe(200)
     const data = res.json() as { deploys: unknown[] }
     expect(Array.isArray(data.deploys)).toBe(true)
+  })
+
+  it('passes phases through for new-format entries and omits it for old-format entries', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    const lines = [
+      JSON.stringify({
+        status: 'deployed', sha: 'a'.repeat(40), branch: 'main',
+        startedAt: '2026-08-01T00:00:00Z', completedAt: '2026-08-01T00:03:30Z',
+        durationSec: 210, servicesBuilt: ['api'],
+        phases: { ci: 23, auth: 1, build: 71, retag: 14, deploy: 123 },
+      }),
+      JSON.stringify({
+        status: 'deployed', sha: 'b'.repeat(40), branch: 'main',
+        startedAt: '2026-07-01T00:00:00Z', completedAt: '2026-07-01T00:02:00Z',
+        durationSec: 120, servicesBuilt: ['api'],
+      }),
+    ]
+    vi.mocked(existsSync).mockReturnValueOnce(true)
+    vi.mocked(open).mockResolvedValue(mockFileHandle(lines.join('\n') + '\n') as never)
+
+    const res = await app.inject({ method: 'GET', url: '/projects/myapp/deploy-history' })
+
+    expect(res.statusCode).toBe(200)
+    const data = res.json() as { deploys: { sha: string; phases?: Record<string, number> }[] }
+    const withPhases = data.deploys.find(d => d.sha === 'a'.repeat(40))
+    const withoutPhases = data.deploys.find(d => d.sha === 'b'.repeat(40))
+    expect(withPhases?.phases).toEqual({ ci: 23, auth: 1, build: 71, retag: 14, deploy: 123 })
+    expect(withoutPhases?.phases).toBeUndefined()
   })
 })
 

@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import type { DeployHistoryEntry } from '@/lib/api-history'
 import { formatDuration } from '@/lib/format-duration'
 import { formatTimestamp } from '@/lib/date-helpers'
+import { DeployPhaseBar } from './deploy-phase-bar'
 
 interface Props {
   deploys: DeployHistoryEntry[]
@@ -100,6 +101,7 @@ export function DeployTimeline({ deploys, name, repoUrl }: Props) {
                   {d.message && (
                     <div className="mt-0.5 text-[11px] text-subtle truncate max-w-[420px]">{d.message}</div>
                   )}
+                  <DeployPhaseBar phases={d.phases} />
                 </div>
               </div>
             )

@@ -46,6 +46,13 @@
   --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.35);
   --shadow-lg: 0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04);
   --ring: rgba(16, 185, 129, 0.5);
+  /* Categorical, fixed order — deploy phase bar (dataviz skill slots 1-6) */
+  --phase-ci: #3987e5;
+  --phase-auth: #d95926;
+  --phase-build: #199e70;
+  --phase-retag: #c98500;
+  --phase-preDeploy: #d55181;
+  --phase-deploy: #008300;
   color-scheme: dark;
 }
 
@@ -78,6 +85,13 @@
   --shadow: 0 1px 2px rgba(0,0,0,0.05), 0 4px 16px rgba(0,0,0,0.06);
   --shadow-lg: 0 24px 64px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.04);
   --ring: rgba(5, 150, 105, 0.45);
+  /* Categorical, fixed order — deploy phase bar (dataviz skill slots 1-6) */
+  --phase-ci: #2a78d6;
+  --phase-auth: #eb6834;
+  --phase-build: #1baf7a;
+  --phase-retag: #eda100;
+  --phase-preDeploy: #e87ba4;
+  --phase-deploy: #008300;
   color-scheme: light;
 }
 
