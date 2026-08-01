@@ -90,8 +90,12 @@ only_ignored_paths_changed() {
   [[ -n "$base" ]] || return 1
   git rev-parse --quiet --verify "$base" >/dev/null 2>&1 || return 1
 
-  local specs=()
-  while IFS= read -r spec; do specs+=("$spec"); done < <(deploy_ignore_specs "$@")
+  # husky's hook wrapper runs this under `sh -e`, ignoring the bash shebang;
+  # macOS's /bin/sh is bash in POSIX mode, which disables `<()` process
+  # substitution. A captured-variable + here-string avoids it.
+  local specs=() spec_list
+  spec_list=$(deploy_ignore_specs "$@")
+  while IFS= read -r spec; do specs+=("$spec"); done <<< "$spec_list"
 
   ! git diff --name-only "$base"..HEAD -- . "${specs[@]}" | grep -q .
 }
