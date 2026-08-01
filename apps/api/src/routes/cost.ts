@@ -8,13 +8,17 @@ import { getServerTypeMonthlyPrice, getLiveServerTypeByIp } from '../lib/hetzner
 const COST_TTL = 3_600_000
 const R2_PRICE_PER_GB_MONTH = 0.015
 
+// 'unknown' covers both "no serverIp to check" and "Hetzner lookup failed" —
+// neither has earned the reassurance that 'matching' implies.
+type DriftStatus = 'matching' | 'drifted' | 'unknown'
+
 interface CostEstimate {
   server: {
     eurPerMonth: number | null
     type: string
     region: string
     liveType: string | null
-    typeDrift: boolean
+    driftStatus: DriftStatus
   }
   storage: { usdPerMonth: number | null; totalBytes: number | null; bucketName: string | null }
 }
@@ -41,11 +45,18 @@ export async function costRoutes(app: FastifyInstance): Promise<void> {
 
       // Compare the configured type against what Hetzner actually runs. Config
       // drift here is silent and expensive: emit-vision claimed cx22 (€5.49)
-      // while really running cpx22 (€22.99), a 4x understatement.
+      // while really running cpx22 (€22.99), a 4x understatement. A project
+      // with no serverIp, or one where the Hetzner lookup fails, hasn't been
+      // checked at all — that's 'unknown', not the same as 'matching'.
       const liveType = project.config.serverIp
         ? await getLiveServerTypeByIp(project.config.serverIp).catch(() => null)
         : null
-      const typeDrift = liveType !== null && liveType.toLowerCase() !== serverType.toLowerCase()
+      const driftStatus: DriftStatus =
+        liveType === null
+          ? 'unknown'
+          : liveType.toLowerCase() === serverType.toLowerCase()
+            ? 'matching'
+            : 'drifted'
 
       // Price what is actually running when we know it, so drift can't produce a
       // confident price for a server that doesn't exist.
@@ -85,7 +96,7 @@ export async function costRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const result: CostEstimate = {
-        server: { eurPerMonth, type: serverType, region, liveType, typeDrift },
+        server: { eurPerMonth, type: serverType, region, liveType, driftStatus },
         storage: { usdPerMonth, totalBytes, bucketName: bucket },
       }
 

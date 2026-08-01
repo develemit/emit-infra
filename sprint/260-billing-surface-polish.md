@@ -42,18 +42,49 @@ This matters because drift detection exists precisely to catch a silent, expensi
 - `apps/dashboard/src/components/billing-widget.tsx` — read-only unless a consumer update is needed
 
 ## Acceptance criteria
-- [ ] `/cost` distinguishes "checked and matching" from "couldn't check" — a project without `serverIp` is not reported the same as one that genuinely matches.
-- [ ] A failed Hetzner lookup also reports unknown rather than matching.
-- [ ] Pricing still uses the live type when known.
-- [ ] Every consumer of the changed field was found by grep and updated.
-- [ ] A widget component test covers the server branch, the floating-IP branch, the month label, and the unavailable state.
-- [ ] The month-label widget test fails if the widget reverts to inline `new Date(...)`.
-- [ ] Both cost test files are under 300 lines.
-- [ ] Live read-only check confirms correct state for one project with and one without a `serverIp`.
-- [ ] `pnpm test`, `pnpm typecheck`, `pnpm lint` clean across all 5 projects.
+- [x] `/cost` distinguishes "checked and matching" from "couldn't check" — a project without `serverIp` is not reported the same as one that genuinely matches.
+- [x] A failed Hetzner lookup also reports unknown rather than matching.
+- [x] Pricing still uses the live type when known.
+- [x] Every consumer of the changed field was found by grep and updated.
+- [x] A widget component test covers the server branch, the floating-IP branch, the month label, and the unavailable state.
+- [x] The month-label widget test fails if the widget reverts to inline `new Date(...)`.
+- [x] Both cost test files are under 300 lines.
+- [x] Live read-only check confirms correct state for one project with and one without a `serverIp`.
+- [x] `pnpm test`, `pnpm typecheck`, `pnpm lint` clean across all 5 projects.
 
 ## Out of scope
 - Volume, load-balancer, and snapshot line items — all zero on this account; the discriminated-union shape already makes adding them mechanical.
 - Switching floating-IP spend off proration — Hetzner's pricing API exposes no `price_hourly` for floating IPs.
 - Cost alerting or budget thresholds.
 - Re-litigating the `net`/`gross` decision.
+
+## Completed
+
+**Date:** 2026-08-01
+
+### Summary
+All three follow-ups from sprint 245 landed.
+
+**Drift tri-state (item 1).** `typeDrift: boolean` was replaced outright with `driftStatus: 'matching' | 'drifted' | 'unknown'` in `cost.ts` — a full replace, not a supplement, since a grep for `typeDrift`/`liveType` across `apps/dashboard` and `apps/cli` found no consumers beyond `cost.ts` itself and its test file. `driftStatus` is `'unknown'` whenever `liveType` resolves to `null` — no `serverIp` configured, or the Hetzner lookup throws — and only `'matching'`/`'drifted'` once a live type was actually fetched and compared case-insensitively. Pricing behavior is unchanged: it still prices `liveType ?? serverType`. Live proof: `GET /projects/emit-vision/cost` (has `serverIp`) now returns `driftStatus: "matching"`; `GET /projects/martialops/cost` (no `serverIp`, deliberately removed when the project was shelved) returns `driftStatus: "unknown"` rather than the old, indistinguishable `typeDrift: false`.
+
+**Widget component test (item 2).** New `billing-widget.test.tsx` stubs `global.fetch` (matching the pattern in `apps/dashboard/src/lib/api.test.ts`) and covers: a server line item renders `€8.99 + €0.50 IPv4`; a floating-IP-only breakdown renders `€3.50 floating IP` with no `IPv4` fragment anywhere in the document; a `2026-07` payload renders `July 2026`; an `{ error }` response renders the "Billing unavailable" fallback. I proved the month-label test actually regresses on a revert — temporarily inlining the old `new Date(data.month + '-01').toLocaleDateString(...)` in place of `formatBillingMonth` makes the "July 2026" test fail (this machine is `America/Phoenix`, UTC−7, so the date-string reparse rolls the month back), then restored the fix. `billing-widget.tsx` itself needed no changes — it already branched on `item.type` and called `formatBillingMonth` from sprint 245.
+
+**Test file split (item 3).** `cost.test.ts` (338 lines) split along the route-vs-drift-detection seam it already had: the 404/400/happy-path/missing-pricing/storage/caching tests stayed in `cost.test.ts` (233 lines); the five drift-status tests, the `projectWithIp` helper, and the `CostBody` type moved to a new `cost-drift.test.ts` (157 lines), both files importing the same `costRoutes` per the file-per-route convention. Both are now well under the 300-line target.
+
+### Files changed
+- `apps/api/src/routes/cost.ts` — `typeDrift: boolean` → `driftStatus: 'matching' | 'drifted' | 'unknown'`
+- `apps/api/src/routes/cost.test.ts` — drift tests extracted out; 338 → 233 lines
+- (new) `apps/api/src/routes/cost-drift.test.ts` — extracted drift-status tests, updated to assert `driftStatus` instead of `typeDrift`
+- (new) `apps/dashboard/src/components/billing-widget.test.tsx` — server/floating-IP/month-label/unavailable render coverage
+
+### Verification
+- `pnpm test`: 4 test projects, all green — core 31, cli 132, api 350 (12 in cost.ts + cost-drift.test.ts), dashboard 207 (incl. 4 new billing-widget tests)
+- `pnpm typecheck`: clean across all 5 projects
+- `pnpm lint`: clean across all 5 projects
+- Regression proof (month label): reverting `billing-widget.tsx` to inline `new Date(...)` fails the "July 2026" widget test; fix restored afterwards
+- Live `GET /projects/emit-vision/cost` (read-only, has `serverIp`): `driftStatus: "matching"`, `liveType: "cx33"`
+- Live `GET /projects/martialops/cost` (read-only, no `serverIp`): `driftStatus: "unknown"`, `liveType: null` — no longer indistinguishable from a matching project
+- Consumer grep: `grep -rn "typeDrift\|liveType" apps/dashboard apps/cli apps/api` — only hits were in `cost.ts`/`cost.test.ts` themselves, so no other consumer needed updating
+
+### Follow-ups
+- `none`
