@@ -24,10 +24,9 @@ file to promote items into proper sprints when the list grows worth addressing.
 
 ~~- (sprint 112, 2026-06-28) `container-row.tsx` React components (MobileContainerRow, DesktopContainerRow) have no tests — jsdom rendering overhead deferred; address in a visual-test sprint~~
 - (sprint 114, 2026-06-28) SSE reconnection on token expiry not handled — tokens are static per deployment so acceptable for now; revisit if token rotation is added
-- (sprint 115, 2026-06-29) **[manual ops]** Activate healthchecks.io DMS for emit-vision: create a check (15-min period, 5-min grace) at healthchecks.io, add `HEALTHCHECKS_URL=<ping-url>` to Hetzner `.env`, run `docker compose -f infra/docker/docker-compose.infra.yml up -d dms-ping`
 
-<!-- follow-up-scan: date=2026-07-17 through=229 clean=true -->
-> _Sprint scan: incremental scan 2026-07-17 through sprint-229. 0 orphans (1 defer from 229 already in backlog). Prior scan: 2026-07-17 through sprint-225._
+<!-- follow-up-scan: date=2026-08-01 through=245 clean=false -->
+> _Sprint scan: incremental scan 2026-08-01 through sprint-245. 6 orphans promoted to sprints 246-251. All three sprint-243 `[blocker]` items and the sprint-234 `[address-next]` item were verified already resolved during the 2026-07-24/29 live work. Prior scan: 2026-07-17 through sprint-229._
 
 - (sprint 04, 2026-06-03) `pnpm build` fails on `/_error` and `/500` static pre-render — `<Html>` outside pages/_document error in Next.js 15.5.19 (upstream bug; dev server and typecheck/lint are clean) `[hold]`
 ~~- (sprint 04, 2026-06-03) Provision wizard uses local Zod schema mirroring `ProjectConfigSchema` — consider extracting shared browser-safe types into `@emit-infra/types`; run `/plan-sprint "shared types package"` to plan~~
@@ -41,6 +40,7 @@ file to promote items into proper sprints when the list grows worth addressing.
 
 ## ✅ Converted to Sprints
 
+- ~~(sprint 115, 2026-06-29) **[manual ops]** Activate healthchecks.io DMS for emit-vision~~ → sprint-250 (2026-08-01) — _partially done and worse than it looked: the `dms-ping` container was deployed and reports `Up`, but `HEALTHCHECKS_URL` is empty, so both its success and failure branches `wget` an empty string. It has never pinged anything. Sprint 250 makes it fail loudly and declares the key in `requiredEnvKeys` so the sprint-239 empty-value detector covers it._
 - ~~(sprint 206/207) Pre-existing lint errors across billing.ts, cert.ts, history.ts, incidents-export.ts, operations.ts~~ → sprint-208 (2026-07-10)
 - ~~(sprint 191) `.alerts.jsonl` and `.alert-state.json` never pruned — 90-day retention~~ → sprint-209 (2026-07-10)
 - ~~(sprint 190) Fix MobileContainerRow restart test failure~~ → sprint-210 (2026-07-10)
