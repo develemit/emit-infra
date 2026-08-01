@@ -46,6 +46,9 @@ file to promote items into proper sprints when the list grows worth addressing.
 - (sprint 252, 2026-08-01) `pnpm nx show projects` prints two `Issue while reading .npmrc` warnings for `${NPM_TOKEN}` on every invocation in develemail — cosmetic, unrelated, pre-existing.
 - (sprint 252, 2026-08-01) `nx configure-ai-agents` nag appears on every develemail CI run — cosmetic, pre-existing.
 
+- (sprint 253, 2026-08-01) Add coarse `date +%s` timestamps inside `blue-green-deploy.sh` around pull/start/health-check/switch/stop — the blue-green task (25.6s avg) is opaque to Ansible task timing. (May be absorbed by sprint 254.)
+- (sprint 253, 2026-08-01) The 1500s deploy-history outlier remains uninvestigated and unexplained.
+
 ## ✅ Converted to Sprints
 
 - ~~(sprint 115, 2026-06-29) **[manual ops]** Activate healthchecks.io DMS for emit-vision~~ → sprint-261 (formerly 250) (2026-08-01) — _partially done and worse than it looked: the `dms-ping` container was deployed and reports `Up`, but `HEALTHCHECKS_URL` is empty, so both its success and failure branches `wget` an empty string. It has never pinged anything. Sprint 261 makes it fail loudly and declares the key in `requiredEnvKeys` so the sprint-239 empty-value detector covers it._
