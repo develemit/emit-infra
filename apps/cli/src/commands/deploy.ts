@@ -74,9 +74,10 @@ export function printDryRunPlan(
     }
   }
   if (extraVars.extra_files) {
-    for (const ef of extraVars.extra_files as Array<{ src: string; dest: string }>) {
+    for (const ef of extraVars.extra_files as Array<{ src: string; dest: string; dir?: boolean }>) {
       const exists = existsSync(ef.src)
-      console.log(`  Extra file:  ${ef.src} → ${ef.dest} ${exists ? chalk.green('✓') : chalk.red('✗ missing')}`)
+      const label = ef.dir ? 'Extra dir:  ' : 'Extra file: '
+      console.log(`  ${label} ${ef.src} → ${ef.dest} ${exists ? chalk.green('✓') : chalk.red('✗ missing')}`)
     }
   }
   if (extraVars.nginx_custom_config_src) {
@@ -133,6 +134,7 @@ export function buildDeployExtraVars(
       extraVars.extra_files = config.deploy.extraFiles.map((f) => ({
         src: join(cwd, f.src),
         dest: f.dest,
+        dir: f.dir,
       }))
     }
     if (config.deploy.postDeployExec && config.deploy.postDeployExec.length > 0) {

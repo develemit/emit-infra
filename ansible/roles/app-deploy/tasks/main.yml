@@ -23,7 +23,20 @@
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: "0644"
-  loop: "{{ extra_files | default([]) }}"
+  loop: "{{ extra_files | default([]) | rejectattr('dir') | list }}"
+
+# Directory-mode entries collapse a whole extraFiles directory into one copy
+# task instead of one per file. Only safe for directories with no
+# runtime-written files — never use this for infra/opendkim (see its
+# entrypoint.sh: key.table/signing.table are written by the live container).
+- name: Copy extra directories
+  copy:
+    src: "{{ item.src }}/"
+    dest: "{{ app_dir }}/{{ item.dest }}/"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0644"
+  loop: "{{ extra_files | default([]) | selectattr('dir') | list }}"
 
 - name: Stat existing .env file
   stat:

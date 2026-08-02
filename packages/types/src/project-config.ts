@@ -62,7 +62,17 @@ export const ProjectConfigSchema = z.object({
       composeDest: z.string().default('docker-compose.yml'),
       appPort: z.coerce.string().optional(),
       extraFiles: z
-        .array(z.object({ src: z.string(), dest: z.string() }))
+        .array(
+          z.object({
+            src: z.string(),
+            dest: z.string(),
+            // When true, src/dest are directories and the whole directory is
+            // copied in one Ansible task instead of per-file. Only safe for
+            // directories with no runtime-written files (see infra/opendkim's
+            // key.table/signing.table for the counterexample).
+            dir: z.boolean().default(false),
+          }),
+        )
         .default([]),
       postDeployExec: z
         .array(z.object({ service: z.string(), command: z.string() }))

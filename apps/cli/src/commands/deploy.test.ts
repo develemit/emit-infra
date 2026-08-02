@@ -30,9 +30,35 @@ const deployConfig = {
   composeSrc: 'docker-compose.prod.yml',
   composeDest: 'docker-compose.yml',
   appDir: '/app',
-  extraFiles: [] as { src: string; dest: string }[],
+  extraFiles: [] as { src: string; dest: string; dir: boolean }[],
   postDeployExec: [] as { service: string; command: string }[],
 }
+
+describe('buildDeployExtraVars — extraFiles dir mode', () => {
+  it('passes dir:false through for plain file entries', () => {
+    const config = {
+      ...baseConfig,
+      deploy: { ...deployConfig, extraFiles: [{ src: 'infra/opendkim/opendkim.conf', dest: 'infra/opendkim/opendkim.conf', dir: false }] },
+    }
+    const vars = buildDeployExtraVars(config, '/cwd', {}, () => false)
+
+    expect(vars.extra_files).toEqual([
+      { src: join('/cwd', 'infra/opendkim/opendkim.conf'), dest: 'infra/opendkim/opendkim.conf', dir: false },
+    ])
+  })
+
+  it('passes dir:true through for directory entries', () => {
+    const config = {
+      ...baseConfig,
+      deploy: { ...deployConfig, extraFiles: [{ src: 'infra/postfix', dest: 'infra/postfix', dir: true }] },
+    }
+    const vars = buildDeployExtraVars(config, '/cwd', {}, () => false)
+
+    expect(vars.extra_files).toEqual([
+      { src: join('/cwd', 'infra/postfix'), dest: 'infra/postfix', dir: true },
+    ])
+  })
+})
 
 describe('buildDeployExtraVars — standard strategy', () => {
   it('sets project_name, compose_src, compose_dest', () => {
