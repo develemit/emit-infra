@@ -80,6 +80,10 @@ file to promote items into proper sprints when the list grows worth addressing.
 - (sprint 264, 2026-08-02) emit-billing has no server/DNS/deploy config at all — fine if intentional; a gap if it's meant to go live.
 - (sprint 264, 2026-08-02) martialops apex domain doesn't resolve; its one resolving hostname has a mismatched SSH key — check DNS/server records for staleness (not urgent).
 
+- (sprint 265, 2026-08-02) Retag-only floor landed at ~108s vs the ≤100s target — no in-scope lever remains (rsync/dispatch overhead already deferred). Accept ~108s as the floor, or plan the rsync sprint if the gap starts to matter.
+- (sprint 265, 2026-08-02) `docs/DEPLOY-FLOOR.md` at 329 lines (over ~300 guideline) — chronological measurement log; splitting would hurt the narrative. Flagged, not urgent.
+- (sprint 265, 2026-08-02) Graceful-shutdown config inconsistent across develemail services (`SHUTDOWN_DRAIN_TIMEOUT_MS` env var for worker vs hardcoded 5s constants in api/inbound `shutdown.ts`) — unify only if a 4th service needs the pattern.
+
 ## ✅ Converted to Sprints
 
 - ~~(sprint 115, 2026-06-29) **[manual ops]** Activate healthchecks.io DMS for emit-vision~~ → sprint-261 (formerly 250) (2026-08-01) — _partially done and worse than it looked: the `dms-ping` container was deployed and reports `Up`, but `HEALTHCHECKS_URL` is empty, so both its success and failure branches `wget` an empty string. It has never pinged anything. Sprint 261 makes it fail loudly and declares the key in `requiredEnvKeys` so the sprint-239 empty-value detector covers it._
