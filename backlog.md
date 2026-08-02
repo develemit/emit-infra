@@ -56,6 +56,8 @@ file to promote items into proper sprints when the list grows worth addressing.
 - (sprint 265, 2026-08-02) `[hold: deliberate — chronological log]` `docs/DEPLOY-FLOOR.md` at 329 lines (over ~300 guideline) — chronological measurement log; splitting would hurt the narrative. Flagged, not urgent.
 - (sprint 265, 2026-08-02) `[hold: only when a 4th service needs the pattern]` Graceful-shutdown config inconsistent across develemail services (`SHUTDOWN_DRAIN_TIMEOUT_MS` env var for worker vs hardcoded 5s constants in api/inbound `shutdown.ts`) — unify only if a 4th service needs the pattern.
 
+- (sprint 269, 2026-08-02) `init-deploy.test.ts` blue-green test spawns a real `tsx` subprocess that races cold compilation under parallel load (timeout bumped to 30s as a band-aid) — pre-warm or mock instead of shelling out.
+
 ## ✅ Converted to Sprints
 
 - ~~(sprint 246, 2026-08-01) diner-decider is next in the rollout order per the sprint-234 audit, but stays blocked on sprint 258's (formerly 247) `/api/*` migration as this sprint's Context section specifies. _Note added during the auto-loop: that migration already landed on 2026-07-24 in commit `4e0f44e`, so the only residual work is enabling `syncOnDeploy` — see the sprint-258 obsolescence note below._~~
