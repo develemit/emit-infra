@@ -40,3 +40,18 @@ proven on a quieter host. Roll back immediately on any `nginx -t` failure.
       comparison recorded
 - [ ] Ansible template fixed + syntax-check clean (test if role code changes)
 - [ ] Pitfalls doc updated
+
+## Completed
+
+**Date:** 2026-08-02 — **retired unexecuted, by user decision (option B).**
+
+Zero changes were made to any host. The pre-flight recon (recorded above the
+footer in `/tmp/sprint-run-emit-infra-274.log`) found this sprint unsafe as
+written: the extensionless vhost filename is canonical across three ansible
+task files and the dashboard drift route (pitfalls #16), so the rename this
+sprint required would have broken drift detection and deploy backup/restore
+fleet-wide and risked re-triggering the #16 502 incident. With `sites-enabled/`
+verified pristine on all five hosts, the user chose to park the hardening
+rather than rescope it now. The full rescope, the exact bite conditions, and
+the do-it-when triggers are recorded in `backlog.md` under
+"(sprint 274 retired, 2026-08-02)".
