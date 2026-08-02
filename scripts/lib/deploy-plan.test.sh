@@ -153,6 +153,90 @@ check_true "buildTriggerPaths %s expands to service name" \
 check_false "buildTriggerPaths %s does not match other services" \
   service_needs_build web "$B4" "$ALL" "" "deploy/%s.yml"
 
+echo "run_build_fanout"
+
+FAIL_COUNT=0
+_count_fail() { FAIL_COUNT=$((FAIL_COUNT + 1)); }
+build_image() { [[ "$1" == bad* ]] && return 1; return 0; }
+
+FAIL_COUNT=0
+run_build_fanout 1 _count_fail good1 good2
+check "no failures -> on_fail never called" "$FAIL_COUNT" "0"
+
+FAIL_COUNT=0
+run_build_fanout 1 _count_fail good1 bad1 good2
+check "one failure -> on_fail called once" "$FAIL_COUNT" "1"
+
+FAIL_COUNT=0
+run_build_fanout 1 _count_fail bad1 good1 bad2
+check "multiple failures -> on_fail called per failure" "$FAIL_COUNT" "2"
+
+FAIL_COUNT=0
+run_build_fanout 3 _count_fail good1 bad1 good2 bad2 good3
+check "parallel batches (max_parallel>1) still catch every failure" "$FAIL_COUNT" "2"
+
+unset -f build_image _count_fail
+
+# sprint 270 / sprint 267: `wait "$pid" || exit 1` used to bypass the ERR
+# trap's `deploy_done failed` (wait sits left of `||`, and the explicit exit
+# that follows doesn't fire ERR either), leaving .deploy-status.json stuck at
+# "deploying" on a failed backgrounded build. run_build_fanout must reach
+# deploy_done failed by calling on_fail directly, with no trap involved.
+CIUTILS="$(cd "$(dirname "$LIB")" && pwd)/ci-utils.sh"
+BUILD_WORK=$(mktemp -d)
+(
+  cd "$BUILD_WORK"
+  git init -q .
+  git config user.email t@t.t && git config user.name t
+  git commit -q --allow-empty -m base
+  source "$CIUTILS"
+  source "$LIB"
+  build_image() { [[ "$1" == "bad" ]] && return 1; return 0; }
+  _fail_deploy() { deploy_done failed; exit 1; }
+  deploy_init 1
+  run_build_fanout 1 _fail_deploy good bad good2
+) >/dev/null 2>&1
+BUILD_STATUS=$(python3 -c "import json; print(json.load(open('$BUILD_WORK/.deploy-status.json'))['status'])" 2>/dev/null || echo MISSING)
+check "forced build failure ends .deploy-status.json failed" "$BUILD_STATUS" "failed"
+BUILD_HIST_STATUS=$(python3 -c "import json; print(json.loads(open('$BUILD_WORK/.deploy-history.jsonl').readlines()[-1])['status'])" 2>/dev/null || echo MISSING)
+check "history line records the failure" "$BUILD_HIST_STATUS" "failed"
+rm -rf "$BUILD_WORK"
+
+echo "push_payload_summary"
+
+PAYLOAD_WORK=$(mktemp -d)
+git -C "$PAYLOAD_WORK" init -q .
+git -C "$PAYLOAD_WORK" config user.email t@t.t && git -C "$PAYLOAD_WORK" config user.name t
+git -C "$PAYLOAD_WORK" commit -q --allow-empty -m base
+PAYLOAD_BASE=$(git -C "$PAYLOAD_WORK" rev-parse HEAD)
+git -C "$PAYLOAD_WORK" commit -q --allow-empty -m "first change"
+PAYLOAD_MID=$(git -C "$PAYLOAD_WORK" rev-parse HEAD)
+git -C "$PAYLOAD_WORK" commit -q --allow-empty -m "second change"
+PAYLOAD_HEAD=$(git -C "$PAYLOAD_WORK" rev-parse HEAD)
+
+MULTI_OUT=$(cd "$PAYLOAD_WORK" && push_payload_summary "$PAYLOAD_BASE" "$PAYLOAD_HEAD")
+case "$MULTI_OUT" in
+  *"2 commit(s)"*) ok "multi-commit push reports correct count" ;;
+  *) no "multi-commit push reports correct count (got: $MULTI_OUT)" ;;
+esac
+case "$MULTI_OUT" in
+  *"first change"*) ok "oldest commit's subject is reported, not the newest" ;;
+  *) no "oldest commit's subject is reported, not the newest (got: $MULTI_OUT)" ;;
+esac
+
+SINGLE_OUT=$(cd "$PAYLOAD_WORK" && push_payload_summary "$PAYLOAD_MID" "$PAYLOAD_HEAD")
+case "$SINGLE_OUT" in
+  *"1 commit(s)"*) ok "single-commit push reports count 1" ;;
+  *) no "single-commit push reports count 1 (got: $SINGLE_OUT)" ;;
+esac
+
+NEWBRANCH_OUT=$(cd "$PAYLOAD_WORK" && push_payload_summary "0000000000000000000000000000000000000000" "$PAYLOAD_HEAD")
+case "$NEWBRANCH_OUT" in
+  *"new branch"*) ok "unresolvable remote sha (new branch push) doesn't error" ;;
+  *) no "unresolvable remote sha (new branch push) doesn't error (got: $NEWBRANCH_OUT)" ;;
+esac
+rm -rf "$PAYLOAD_WORK"
+
 echo "detect_dry_run_push"
 
 # Drive the real code path: a git push into a local bare remote, with a hook
