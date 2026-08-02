@@ -80,20 +80,113 @@ deployer; this is the highest-value remaining opt-in.
 - `docs/PRE-PUSH-HOOK.md` — pattern addendum only if warranted
 
 ## Acceptance criteria
-- [ ] All four images build with `deps`/`builder` on `$BUILDPLATFORM`; shipped
+- [x] All four images build with `deps`/`builder` on `$BUILDPLATFORM`; shipped
       stages resolve to `linux/amd64`
-- [ ] Native-dep audit + runner-contents table in completion notes, written
+- [x] Native-dep audit + runner-contents table in completion notes, written
       before conversion
-- [ ] `docker run --platform linux/amd64` smoke test per image before the
+- [x] `docker run --platform linux/amd64` smoke test per image before the
       real deploy
-- [ ] Real push deploys healthy (all services up, healthz 200); warm-cache
+- [x] Real push deploys healthy (all services up, healthz 200); warm-cache
       `phases.build` recorded next to the 200s baseline, target ≥40% down —
       if measured short of target, report honestly and stop rather than
       forcing it
-- [ ] emit-vision CI (six targets) green on the conversion commit
-- [ ] Test coverage: emit-infra untouched expected (`pnpm test:hooks` still
+- [x] emit-vision CI (six targets) green on the conversion commit
+- [x] Test coverage: emit-infra untouched expected (`pnpm test:hooks` still
       green); any emit-vision test suite affected stays green
-- [ ] `supportedArchitectures` decision recorded with reasoning
+- [x] `supportedArchitectures` decision recorded with reasoning
+
+## Completed
+
+**Date:** 2026-08-02
+
+### Summary
+Converted all four emit-vision service Dockerfiles (`api`, `web`, `worker`,
+`marketing`) to pin their `builder` stage to `FROM --platform=$BUILDPLATFORM`,
+following the develemail sprint-255 pattern exactly. Runner stages were
+already plain `FROM node:24-alpine` (emit-vision doesn't use a shared `base`
+stage the way develemail's example does), so no other stage needed touching.
+
+Audit before conversion (task 1) found emit-vision is the *fully-untaxed*
+case the pattern doc only speculated about: a workspace-wide grep for
+`sharp`/`@next/swc-*`/`esbuild`/`@parcel/watcher`/`@swc/core`/`bcrypt`/etc.
+across every `package.json` (root, all `apps/*`, all `packages/*`) found
+exactly one hit — `apps/extension`, which isn't one of the four converted
+services. `api`/`worker` bundle with `tsup` (`noExternal: [/.+/]`) into a
+single `.cjs`, so their runner copies zero `node_modules` (the only
+`COPY --from=builder` besides the bundle is `geoip-lite`'s static `data/`
+directory — data files, not code, arch-independent). `web`/`marketing` ship
+Next.js `standalone` output with no native binding anywhere in the traced
+dependency graph. `pg-native` appears in both tsup configs' `external` list
+defensively but isn't an installed dependency anywhere in the lockfile, so
+it's a no-op. Result: **`pnpm.supportedArchitectures` was deliberately not
+added** — every shipped artifact is architecture-independent, so the
+workspace-wide install tax the setting would impose has no offsetting
+benefit here.
+
+Runner-contents table (native-dep audit, task 1):
+
+| service   | runner ships          | native deps in shipped surface | verdict |
+|-----------|------------------------|----------------------------------|---------|
+| api       | `tsup` bundled `.cjs` + `migrate.cjs`×2 + geoip-lite data | none | untaxed |
+| worker    | `tsup` bundled `.cjs` | none | untaxed |
+| web       | Next.js `standalone` + `static` | none (`sharp` not a dependency) | untaxed |
+| marketing | Next.js `standalone` + `static` + `public` | none | untaxed |
+
+Local smoke tests (task 2/acceptance criterion 3) — `docker buildx build
+--platform linux/amd64 ... --load` followed by `docker run --platform
+linux/amd64` per image — passed for all four: `api`/`worker` failed cleanly
+on a missing `DATABASE_URL` env var (expected, not an exec-format error);
+`web`/`marketing` started their Next server cleanly with no env vars set.
+No arch mismatch anywhere.
+
+Real deploy (task 4) pushed clean: all four services healthy on the blue
+slot, `healthz` 200, Postgres/ClickHouse migrations ran successfully. Per
+the pattern doc's cache-cold warning, pushed a second small commit (adding
+explanatory comments to the four Dockerfiles' builder-pin line, matching the
+doc's own suggested comment style) to get a genuine warm-cache
+`phases.build` reading. Both pushes measured identically:
+
+- Baseline (2026-08-01, `539f387`, emulated): **build: 200s**
+- After (2026-08-02, `490db8f`, cache-cold): **build: 119s** (-40.5%)
+- After (2026-08-02, `f9cf321`, warm-cache): **build: 119s** (-40.5%, confirmed stable)
+
+Hit the ≥40% target on both measurements — no gap between cold and warm
+readings, consistent with the "fully untaxed, fully bundled" case having
+nothing extra for a warm cache to save on beyond what native execution
+already saves over emulation.
+
+Updated `docs/PRE-PUSH-HOOK.md`'s native-module-trap section (task 6) with a
+short addendum documenting emit-vision as a confirmed real-world instance of
+the untaxed path — the doc previously only described the tax/no-tax
+distinction hypothetically.
+
+### Files changed
+- `~/projects/emit-vision/apps/api/Dockerfile` — pin `builder` to
+  `$BUILDPLATFORM`, add explanatory comment
+- `~/projects/emit-vision/apps/web/Dockerfile` — same
+- `~/projects/emit-vision/apps/worker/Dockerfile` — same
+- `~/projects/emit-vision/apps/marketing/Dockerfile` — same
+- `docs/PRE-PUSH-HOOK.md` — addendum documenting emit-vision's fully-untaxed
+  case under "The native-module trap"
+- `sprint/266-emit-vision-native-builds.md` — this file
+
+### Verification
+- Local `docker buildx build --platform linux/amd64 --load` + `docker run`:
+  4/4 images pass, no exec-format errors
+- Real push ×2 (`490db8f`, `f9cf321`): both deployed successfully, all
+  services healthy, `https://api.emitvision.com/healthz` → 200
+- emit-vision pre-push CI (lint, typecheck, check-tokens, i18n-audit, test,
+  build) on the conversion commit: `✓ CI passed (490db8f...)`
+- `pnpm test:hooks` (emit-infra, untouched by this sprint): 36/36 passed
+- `phases.build`: 200s → 119s → 119s (-40.5%, target ≥40% met and stable
+  across cold/warm cache)
+
+### Follow-ups
+- `[defer]` emit-vision's `apps/extension` still has `sharp` as a dependency
+  but wasn't part of this sprint's scope (only web/api/worker/marketing) —
+  worth a quick check whether `extension` ships as a Docker image at all
+  before assuming it's untouched by this pattern.
+- none other
 
 ## Out of scope
 - Scoped dual-arch installs (still the parked item-4 decision)

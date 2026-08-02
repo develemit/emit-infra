@@ -248,6 +248,19 @@ whether a service actually needs it (grep its shipped output for native
 different platform than it was installed on) before assuming the workspace
 default is free.
 
+**The untaxed path, confirmed in practice (sprint 266):** emit-vision's four
+services (`web`, `api`, `worker`, `marketing`) converted with zero
+`supportedArchitectures` — a full workspace-wide grep across every
+`package.json` (including transitively-copied `packages/*`) turned up no
+`sharp`/`@next/swc-*`/`esbuild`/`@parcel/watcher`/`@swc/core`-class package
+anywhere in the four services' shipped surface: `api`/`worker` ship a single
+`tsup --bundle` `.cjs` with zero `node_modules` in the runner (aside from a
+data-only asset directory, not code), and `web`/`marketing`'s Next.js
+standalone output traced no native binding either. Result: 200s → 119s
+build phase (-40%) with no install tax paid anywhere. Don't reach for
+`supportedArchitectures` by default — grep first; plenty of workspaces have
+nothing that needs it.
+
 **Verify before shipping**, every time this pattern touches a service with
 native dependencies: `docker buildx build --platform linux/amd64 ... --load`,
 then `docker run --platform linux/amd64 <image>` and confirm it fails (or
