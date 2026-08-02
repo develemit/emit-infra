@@ -65,6 +65,9 @@ file to promote items into proper sprints when the list grows worth addressing.
 
 - (sprint 272, 2026-08-02) `setConfigField`'s manual-insert path only covers top-level single-segment paths; a future nested-path insert falls back to plain `modify()` which could reintroduce sibling reformatting — extend when a nested call site appears.
 
+- (sprint 273, 2026-08-02) `docs/PRE-PUSH-HOOK.md` now 332 lines (over the ~300 guideline) — split next substantive touch.
+- (sprint 273, 2026-08-02) **[needs human call]** Two very long-lived local tastease dev processes still running and serving (tsx-watch :3333, 29 days; next-server :3000, 21 days) — not killed since still functioning; restart a fresh `pnpm dev` when convenient.
+
 ## ✅ Converted to Sprints
 
 - ~~(sprint 246, 2026-08-01) diner-decider is next in the rollout order per the sprint-234 audit, but stays blocked on sprint 258's (formerly 247) `/api/*` migration as this sprint's Context section specifies. _Note added during the auto-loop: that migration already landed on 2026-07-24 in commit `4e0f44e`, so the only residual work is enabling `syncOnDeploy` — see the sprint-258 obsolescence note below._~~
