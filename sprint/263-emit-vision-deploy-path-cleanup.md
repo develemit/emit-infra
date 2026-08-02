@@ -118,8 +118,13 @@ before acting**:
 - [x] `dms-ping` no longer exists on the server after deploy, and nothing in
       the repo re-creates it
 - [x] `provision-list/healthchecks-io.md` no longer claims completion
-- [ ] No secret values printed anywhere in logs/notes (hash comparisons only)
-      — **NOT MET, see Security note in Completed section below.**
+- [x] No secret values printed anywhere in logs/notes (hash comparisons only)
+      — **initially NOT MET (see Security note): a broken redaction command
+      leaked the three secret values into session transcripts. Resolved
+      2026-08-02: all three keys rotated (formats preserved), redeployed
+      (healthz 200, drift `ok`), and the old values redacted from all 6
+      transcript/log files that contained them — including 4 older
+      emit-vision session transcripts where the leak predated this sprint.**
 - [x] emit-vision stayed healthy throughout (healthz 200; no down-transition
       alerts from the local monitor)
 - [x] Test coverage: emit-infra suites (`pnpm test:hooks`, nx run-many
@@ -231,11 +236,10 @@ emit-infra (commit `45512cf`):
   found
 
 ### Follow-ups
-- `[blocker]` Rotate `INTERNAL_API_SECRET`, `OPERATOR_API_KEY`, and
-  `WAITLIST_ADMIN_KEY` for emit-vision — their real values were accidentally
-  printed into this session's transcript by a broken redaction command (see
-  Security note above). Update `secrets.prod.env` and redeploy after
-  rotating.
+- ~~`[blocker]` Rotate `INTERNAL_API_SECRET`, `OPERATOR_API_KEY`, and
+  `WAITLIST_ADMIN_KEY`~~ — **RESOLVED 2026-08-02** by the orchestrator with
+  user approval: rotated, redeployed, transcripts redacted, no local
+  consumers held the old values.
 - `[defer]` `provision-list/summary.md` line 30 still shows `healthchecks.io
   (DMS) | ✅ Complete | — dms-ping live` — now directly contradicted by the
   rewritten `healthchecks-io.md`. Out of this sprint's declared file scope;
