@@ -34,6 +34,11 @@ CI-only (`ci.ghcrOrg` unset — it has no deploy infrastructure yet). A project
 with no symlink gets nothing until someone runs `emit-infra hooks install`
 there. `martialops` is deliberately unwired for now.
 
+`emit-billing`'s Dockerfiles are deliberately **not** converted to the
+[cross-platform build pattern](#cross-platform-build-pattern) below (sprint
+268): CI-only means Docker builds never run, so native conversion buys
+nothing today. Revisit once it's provisioned with deploy infrastructure.
+
 Because the libs are sourced from `$EMIT_INFRA_DIR` at runtime, they propagate
 the same way. There is no version pinning: a broken template breaks every
 project's push at once, so run the test suite before committing changes here.
