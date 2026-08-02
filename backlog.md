@@ -25,8 +25,8 @@ file to promote items into proper sprints when the list grows worth addressing.
 ~~- (sprint 112, 2026-06-28) `container-row.tsx` React components (MobileContainerRow, DesktopContainerRow) have no tests — jsdom rendering overhead deferred; address in a visual-test sprint~~
 - (sprint 114, 2026-06-28) SSE reconnection on token expiry not handled — tokens are static per deployment so acceptable for now; revisit if token rotation is added
 
-<!-- follow-up-scan: date=2026-08-01 through=245 clean=false -->
-> _Sprint scan: incremental scan 2026-08-01 through sprint-245. 6 orphans promoted to sprints 246-251. All three sprint-243 `[blocker]` items and the sprint-234 `[address-next]` item were verified already resolved during the 2026-07-24/29 live work. Prior scan: 2026-07-17 through sprint-229._
+<!-- follow-up-scan: date=2026-08-02 through=268 clean=true -->
+> _Sprint scan: incremental scan 2026-08-02 through sprint-268. No orphans — all 246-268 follow-ups were filed to this backlog at loop time; 26 items dispatched this run (20 converted/covered → sprints 269-274 or already-landed sprints, 6 annotated as holds). Prior scan: 2026-08-01 through sprint-245._
 
 - (sprint 04, 2026-06-03) `pnpm build` fails on `/_error` and `/500` static pre-render — `<Html>` outside pages/_document error in Next.js 15.5.19 (upstream bug; dev server and typecheck/lint are clean) `[hold]`
 ~~- (sprint 04, 2026-06-03) Provision wizard uses local Zod schema mirroring `ProjectConfigSchema` — consider extracting shared browser-safe types into `@emit-infra/types`; run `/plan-sprint "shared types package"` to plan~~
@@ -38,63 +38,78 @@ file to promote items into proper sprints when the list grows worth addressing.
 ~~- (sprint 34, 2026-06-11) Switch certbot HTTP-01 from `certbot --nginx` (rewrites config in-place) to `certbot certonly --webroot` with manual ssl cert path injection so Ansible stays in control of the nginx config file. Complex architectural change — run `/plan-sprint "certbot certonly webroot migration"` before queuing.~~
 - (sprint 40, 2026-06-11) Blue-green slot-aware port selection in `emit-infra status` — active slot may use a different API port than `config.deploy.appPort`. Revisit once blue-green is production-proven on emit-vision. `[hold]`
 
-- (sprint 246, 2026-08-01) diner-decider is next in the rollout order per the sprint-234 audit, but stays blocked on sprint 258's (formerly 247) `/api/*` migration as this sprint's Context section specifies. _Note added during the auto-loop: that migration already landed on 2026-07-24 in commit `4e0f44e`, so the only residual work is enabling `syncOnDeploy` — see the sprint-258 obsolescence note below._
-- (sprint 246, 2026-08-01) **Sprint 258 (formerly 247) is obsolete as written.** Its premise — that diner-decider still proxies `/api/*` through a hand-rolled Next.js Route Handler — was already false when the sprint was authored. Commit `4e0f44e` (2026-07-24, during the dinerdecider.com outage fix) deleted `apps/web/src/app/api/[...path]/route.ts` and its test, and added `location /api/ { proxy_pass http://diner-decider_api/; }` to `infra/nginx/prod.conf`. Only OAuth callbacks and a `hello` route remain under `apps/web/src/app/api`, which are legitimate Next.js routes, not a proxy. Sprint 258 should be retired or rewritten down to its one residual task: enable `nginx.syncOnDeploy` for diner-decider.
-- (sprint 246, 2026-08-01) An emit-infra CLI command reformats other projects' `.emit-infra.json` as a side effect — diner-decider's has a 73-line uncommitted diff that is **pure JSON whitespace reformatting** (compact arrays expanded by a `JSON.stringify(…, null, 2)` rewrite), with zero semantic change. Harmless individually, but it leaves spurious diffs in every project a config-writing command touches, which is how emit-social's real sprint-243 write hid uncommitted for 8 days. Worth making config writes preserve formatting, or at minimum committing their own changes.
+- (sprint 253, 2026-08-01) The 1500s deploy-history outlier remains uninvestigated `[hold: passive watch — dashboard phase bars will catch a recurrence]`
 
-- (sprint 252, 2026-08-01) develemail had an unpushed local commit sitting on top of the last-deployed sha before this sprint ran — worth a habit of checking `git status`/`git log origin/main..HEAD` before assuming a "safe" test push won't bundle unrelated work.
-- (sprint 252, 2026-08-01) `pnpm nx show projects` prints two `Issue while reading .npmrc` warnings for `${NPM_TOKEN}` on every invocation in develemail — cosmetic, unrelated, pre-existing.
-- (sprint 252, 2026-08-01) `nx configure-ai-agents` nag appears on every develemail CI run — cosmetic, pre-existing.
+- (sprint 254, 2026-08-01) `[hold: only if the ~108s floor starts to matter]` Consider `ansible.posix.synchronize` (rsync) for per-file copy tasks if a bigger floor win is wanted later — bigger shared-role blast radius, worth its own sprint.
 
-- (sprint 253, 2026-08-01) Add coarse `date +%s` timestamps inside `blue-green-deploy.sh` around pull/start/health-check/switch/stop — the blue-green task (25.6s avg) is opaque to Ansible task timing. (May be absorbed by sprint 254.)
-- (sprint 253, 2026-08-01) The 1500s deploy-history outlier remains uninvestigated and unexplained.
+- (sprint 255, 2026-08-01) `[hold: review ~2026-08-09 with a week of fleet phase data — the parked item-4 decision]` Scoped dual-arch installs to remove the pnpm install tax from lean services (only `web` + api's `migrate` need dual-arch; pnpm has no per-command override — needs per-scope manifests or a post-install arch prune). This is what would close the gap to the original ≥40% build-time target for `worker`/`inbound`/`api`.
+- (sprint 255, 2026-08-01) `[hold: paired with the scoped-dual-arch decision above]` Re-measure `worker`/`inbound` build times once install-scoping exists — should see near-full native-execution win, they ship zero `node_modules`.
 
-- (sprint 254, 2026-08-01) Consolidate develemail's `infra/postfix/` 4-file `extraFiles` loop into a single directory `copy` task (~10-15s saved). Safe — unlike `infra/opendkim/`, postfix has no runtime-written files. Scoped to develemail's own config, not shared role code.
-- (sprint 254, 2026-08-01) Verify develemail worker's `SIGTERM` shutdown behavior, then consider shortening the old slot's `docker compose stop` timeout (observed 11s `stop_old` on develemail vs 1s on tastease). Verify before touching — blind cut risks killing an in-flight worker job; role is shared.
-- (sprint 254, 2026-08-01) Consider `ansible.posix.synchronize` (rsync) for per-file copy tasks if a bigger floor win is wanted later — bigger shared-role blast radius, worth its own sprint.
+- (sprint 257, 2026-08-01) `[hold: only if root-level edits become common]` Root-config commits mark every nx project affected in emit-billing (surfaced the web:build bug on first push) — consider scoping if root-level edits become common.
+- (sprint 257, 2026-08-01) `[hold: pending user intent to provision]` emit-billing has no deploy infrastructure (no server, blueGreen, or inventory) — deploy wiring deferred; its own initiative when the time comes.
 
-- (sprint 255, 2026-08-01) Scoped dual-arch installs to remove the pnpm install tax from lean services (only `web` + api's `migrate` need dual-arch; pnpm has no per-command override — needs per-scope manifests or a post-install arch prune). This is what would close the gap to the original ≥40% build-time target for `worker`/`inbound`/`api`.
-- (sprint 255, 2026-08-01) Re-measure `worker`/`inbound` build times once install-scoping exists — should see near-full native-execution win, they ship zero `node_modules`.
-
-- (sprint 256, 2026-08-01) Several ambient orphaned `nx run api:dev` processes (some days old, across projects) found running during verification; a fleet-wide look at stale dev-server processes is worth scheduling.
-
-- (sprint 257, 2026-08-01) Root-config commits mark every nx project affected in emit-billing (surfaced the web:build bug on first push) — consider scoping if root-level edits become common.
-- (sprint 257, 2026-08-01) emit-billing has no deploy infrastructure (no server, blueGreen, or inventory) — deploy wiring deferred; its own initiative when the time comes.
-
-- (sprint 258, 2026-08-01) Fleet sweep for stale orphaned compose projects squatting blue/green ports after historical renames (`docker compose ls -a` + `docker ps` vs each project's port list) — the diner-decider variant of this blocked blue-slot deploys and was only found when a deploy failed.
-- (sprint 258, 2026-08-01) `emit-infra status <name>` breaks when `terraform output` prints a "No outputs found" warning — warning text gets concatenated into the SSH hostname. Parse `terraform output -json` or filter warning lines.
-
-- (sprint 259, 2026-08-01) `checkBackupEnv` remains module-private with a `process.exit(1)` path verified only by inspection — sprint 244's follow-up about direct unit coverage still open.
-
-- (sprint 261, 2026-08-01) **healthchecks.io DMS deferred by user decision** — accepted risk; superseded by the self-hosted DMS exploration below. Code-side fail-loud work is deployed (emit-vision 7222750); `dms-ping` stopped on server (next deploy revives its crash loop — retire it in the repo compose when the replacement lands).
 - (sprint 261, 2026-08-01) **[discovery]** Self-hosted DMS initiative (user-requested, parked for discovery — do not plan into sprints until revisited): cross-validate emit-vision pulse vs direct health probes in emit-infra's status monitor ("everything down per pulse + direct probes up ⇒ emit-vision is down"), add ingest-freshness probing (not just /healthz 200), fill in missing `healthCheck.url` for develemail/diner-decider/emit-social, and consider a fleet-server sentinel (cron on develemail's server pinging emit-vision, alerting via develemail email) for coverage while the Mac is asleep.
-- (sprint 261, 2026-08-01) `provision-list/healthchecks-io.md` claims completion falsely — fix when DMS approach is settled.
-- (sprint 261, 2026-08-01) tastease `uptime-ping` has the same silent empty-URL ping shape — audit with the DMS work.
-
-- (sprint 262, 2026-08-01) `martialops.conf` sits unsymlinked in tastease's `sites-available/` (confirmed inert) — same stale-file category; archive or confirm-intentional in a future pass.
-- (sprint 262, 2026-08-01) Real fix for the nginx bare-glob hazard — switch all five hosts' `nginx.conf` to `include sites-enabled/*.conf;` — is a live-box behavior change, now known fleet-wide; worth its own sprint if it bites again.
-
-- (sprint 263, 2026-08-02) `provision-list/summary.md` line 30 in emit-vision still claims `healthchecks.io (DMS) | ✅ Complete | dms-ping live` — contradicted by the rewritten `healthchecks-io.md`; one-line fix next time that file is touched.
 
 - (sprint 264, 2026-08-02) **[needs human call]** develemail's `wonderful_bardeen` container (unlabeled opendkim image, no compose project, ~6 weeks old, shares DKIM volumes with the live opendkim service) — left in place; likely a forgotten one-off predating the compose service. Evidence in `docs/FLEET-SWEEP-2026-08.md`.
-- (sprint 264, 2026-08-02) emit-billing has no server/DNS/deploy config at all — fine if intentional; a gap if it's meant to go live.
-- (sprint 264, 2026-08-02) martialops apex domain doesn't resolve; its one resolving hostname has a mismatched SSH key — check DNS/server records for staleness (not urgent).
+- (sprint 264, 2026-08-02) `[hold: duplicate of the sprint-257 provisioning hold above]` emit-billing has no server/DNS/deploy config at all — fine if intentional; a gap if it's meant to go live.
 
-- (sprint 265, 2026-08-02) Retag-only floor landed at ~108s vs the ≤100s target — no in-scope lever remains (rsync/dispatch overhead already deferred). Accept ~108s as the floor, or plan the rsync sprint if the gap starts to matter.
-- (sprint 265, 2026-08-02) `docs/DEPLOY-FLOOR.md` at 329 lines (over ~300 guideline) — chronological measurement log; splitting would hurt the narrative. Flagged, not urgent.
-- (sprint 265, 2026-08-02) Graceful-shutdown config inconsistent across develemail services (`SHUTDOWN_DRAIN_TIMEOUT_MS` env var for worker vs hardcoded 5s constants in api/inbound `shutdown.ts`) — unify only if a 4th service needs the pattern.
-
-- (discovered 2026-08-02) **Direct `emit-infra deploy` doesn't record deploy status/history** — only the pre-push hook's ci-utils writes `.deploy-status.json` / `.deploy-history.jsonl`. Consequence: a project deployed via CLI (e.g. emit-vision twice on 2026-08-01) shows a stale last-deploy in the dashboard AND gives the hook a stale `LAST_SHA`, so its next push rebuilds every service unnecessarily. Fix: have the CLI deploy path write the same status/history/phases records.
-
-- (sprint 266, 2026-08-02) emit-vision `apps/extension` still depends on `sharp` but was outside the conversion scope — check whether it ships as a Docker image at all before assuming the native-build pattern applies.
-
-- (sprint 267, 2026-08-02) Hook edge: a failed backgrounded `build_image` exits via `|| exit 1`, which bypasses the ERR trap — `.deploy-status.json` stays `deploying` instead of `failed`. Benign (history fallback + next push overwrite cover it) but `deploy-status` can't be fully trusted after a failed deploy; small fix in `scripts/hooks/pre-push`.
-
-- (sprint 268, 2026-08-02) Fold tastease's `migrate`-stage restructuring into `docs/PRE-PUSH-HOOK.md`'s native-module-trap section as a second confirmed example, next time the doc is touched.
-- (sprint 268, 2026-08-02) tastease/emit-social lacked historical emulated multi-service `phases.build` baselines — before/after deltas there are stage-level estimates; fleet-wide phase data collection is now complete for the parked scoped-dual-arch decision.
+- (sprint 265, 2026-08-02) `[hold: deliberate — chronological log]` `docs/DEPLOY-FLOOR.md` at 329 lines (over ~300 guideline) — chronological measurement log; splitting would hurt the narrative. Flagged, not urgent.
+- (sprint 265, 2026-08-02) `[hold: only when a 4th service needs the pattern]` Graceful-shutdown config inconsistent across develemail services (`SHUTDOWN_DRAIN_TIMEOUT_MS` env var for worker vs hardcoded 5s constants in api/inbound `shutdown.ts`) — unify only if a 4th service needs the pattern.
 
 ## ✅ Converted to Sprints
 
+- ~~(sprint 246, 2026-08-01) diner-decider is next in the rollout order per the sprint-234 audit, but stays blocked on sprint 258's (formerly 247) `/api/*` migration as this sprint's Context section specifies. _Note added during the auto-loop: that migration already landed on 2026-07-24 in commit `4e0f44e`, so the only residual work is enabling `syncOnDeploy` — see the sprint-258 obsolescence note below._~~
+  → resolved (sprint 267 onboarded diner-decider; syncOnDeploy landed in 258) (2026-08-02)
+- ~~(sprint 246, 2026-08-01) **Sprint 258 (formerly 247) is obsolete as written.** Its premise — that diner-decider still proxies `/api/*` through a hand-rolled Next.js Route Handler — was already false when the sprint was authored. Commit `4e0f44e` (2026-07-24, during the dinerdecider.com outage fix) deleted `apps/web/src/app/api/[...path]/route.ts` and its test, and added `location /api/ { proxy_pass http://diner-decider_api/; }` to `infra/nginx/prod.conf`. Only OAuth callbacks and a `hello` route remain under `apps/web/src/app/api`, which are legitimate Next.js routes, not a proxy. Sprint 258 should be retired or rewritten down to its one residual task: enable `nginx.syncOnDeploy` for diner-decider.~~
+  → resolved by sprint-258 itself (retired to residual scope, completed) (2026-08-02)
+- ~~(sprint 246, 2026-08-01) An emit-infra CLI command reformats other projects' `.emit-infra.json` as a side effect — diner-decider's has a 73-line uncommitted diff that is **pure JSON whitespace reformatting** (compact arrays expanded by a `JSON.stringify(…, null, 2)` rewrite), with zero semantic change. Harmless individually, but it leaves spurious diffs in every project a config-writing command touches, which is how emit-social's real sprint-243 write hid uncommitted for 8 days. Worth making config writes preserve formatting, or at minimum committing their own changes.~~
+  → sprint-272 (2026-08-02)
+- ~~(sprint 252, 2026-08-01) develemail had an unpushed local commit sitting on top of the last-deployed sha before this sprint ran — worth a habit of checking `git status`/`git log origin/main..HEAD` before assuming a "safe" test push won't bundle unrelated work.~~
+  → sprint-270 (push payload summary) (2026-08-02)
+- ~~(sprint 252, 2026-08-01) `pnpm nx show projects` prints two `Issue while reading .npmrc` warnings for `${NPM_TOKEN}` on every invocation in develemail — cosmetic, unrelated, pre-existing.~~
+  → sprint-273 item 6 (2026-08-02)
+- ~~(sprint 252, 2026-08-01) `nx configure-ai-agents` nag appears on every develemail CI run — cosmetic, pre-existing.~~
+  → sprint-273 item 6 (2026-08-02)
+- ~~(sprint 253, 2026-08-01) Add coarse `date +%s` timestamps inside `blue-green-deploy.sh` around pull/start/health-check/switch/stop — the blue-green task (25.6s avg) is opaque to Ansible task timing. (May be absorbed by sprint 254.)~~
+  → absorbed by sprint-254 (timing markers landed) (2026-08-02)
+- ~~(sprint 254, 2026-08-01) Consolidate develemail's `infra/postfix/` 4-file `extraFiles` loop into a single directory `copy` task (~10-15s saved). Safe — unlike `infra/opendkim/`, postfix has no runtime-written files. Scoped to develemail's own config, not shared role code.~~
+  → sprint-265 (landed) (2026-08-02)
+- ~~(sprint 254, 2026-08-01) Verify develemail worker's `SIGTERM` shutdown behavior, then consider shortening the old slot's `docker compose stop` timeout (observed 11s `stop_old` on develemail vs 1s on tastease). Verify before touching — blind cut risks killing an in-flight worker job; role is shared.~~
+  → sprint-265 (graceful shutdown landed) (2026-08-02)
+- ~~(sprint 256, 2026-08-01) Several ambient orphaned `nx run api:dev` processes (some days old, across projects) found running during verification; a fleet-wide look at stale dev-server processes is worth scheduling.~~
+  → sprint-273 item 5 (2026-08-02)
+- ~~(sprint 258, 2026-08-01) Fleet sweep for stale orphaned compose projects squatting blue/green ports after historical renames (`docker compose ls -a` + `docker ps` vs each project's port list) — the diner-decider variant of this blocked blue-slot deploys and was only found when a deploy failed.~~
+  → sprint-264 (completed; zero orphans) (2026-08-02)
+- ~~(sprint 258, 2026-08-01) `emit-infra status <name>` breaks when `terraform output` prints a "No outputs found" warning — warning text gets concatenated into the SSH hostname. Parse `terraform output -json` or filter warning lines.~~
+  → sprint-271 (2026-08-02)
+- ~~(sprint 259, 2026-08-01) `checkBackupEnv` remains module-private with a `process.exit(1)` path verified only by inspection — sprint 244's follow-up about direct unit coverage still open.~~
+  → sprint-271 (2026-08-02)
+- ~~(sprint 261, 2026-08-01) **healthchecks.io DMS deferred by user decision** — accepted risk; superseded by the self-hosted DMS exploration below. Code-side fail-loud work is deployed (emit-vision 7222750); `dms-ping` stopped on server (next deploy revives its crash loop — retire it in the repo compose when the replacement lands).~~
+  → record kept; dms-ping retired from repo compose in sprint-263 (2026-08-02)
+- ~~(sprint 261, 2026-08-01) `provision-list/healthchecks-io.md` claims completion falsely — fix when DMS approach is settled.~~
+  → sprint-263 (rewritten honestly) (2026-08-02)
+- ~~(sprint 261, 2026-08-01) tastease `uptime-ping` has the same silent empty-URL ping shape — audit with the DMS work.~~
+  → sprint-264 (audited and resolved) (2026-08-02)
+- ~~(sprint 262, 2026-08-01) `martialops.conf` sits unsymlinked in tastease's `sites-available/` (confirmed inert) — same stale-file category; archive or confirm-intentional in a future pass.~~
+  → sprint-273 item 1 (2026-08-02)
+- ~~(sprint 262, 2026-08-01) Real fix for the nginx bare-glob hazard — switch all five hosts' `nginx.conf` to `include sites-enabled/*.conf;` — is a live-box behavior change, now known fleet-wide; worth its own sprint if it bites again.~~
+  → sprint-274 (2026-08-02)
+- ~~(sprint 263, 2026-08-02) `provision-list/summary.md` line 30 in emit-vision still claims `healthchecks.io (DMS) | ✅ Complete | dms-ping live` — contradicted by the rewritten `healthchecks-io.md`; one-line fix next time that file is touched.~~
+  → sprint-273 item 2 (2026-08-02)
+- ~~(sprint 264, 2026-08-02) martialops apex domain doesn't resolve; its one resolving hostname has a mismatched SSH key — check DNS/server records for staleness (not urgent).~~
+  → sprint-273 item 4 (2026-08-02)
+- ~~(sprint 265, 2026-08-02) Retag-only floor landed at ~108s vs the ≤100s target — no in-scope lever remains (rsync/dispatch overhead already deferred). Accept ~108s as the floor, or plan the rsync sprint if the gap starts to matter.~~
+  → resolved: ~108s accepted as the floor (user, 2026-08-02); rsync stays [hold]
+- ~~(discovered 2026-08-02) **Direct `emit-infra deploy` doesn't record deploy status/history** — only the pre-push hook's ci-utils writes `.deploy-status.json` / `.deploy-history.jsonl`. Consequence: a project deployed via CLI (e.g. emit-vision twice on 2026-08-01) shows a stale last-deploy in the dashboard AND gives the hook a stale `LAST_SHA`, so its next push rebuilds every service unnecessarily. Fix: have the CLI deploy path write the same status/history/phases records.~~
+  → sprint-269 (2026-08-02)
+- ~~(sprint 266, 2026-08-02) emit-vision `apps/extension` still depends on `sharp` but was outside the conversion scope — check whether it ships as a Docker image at all before assuming the native-build pattern applies.~~
+  → sprint-273 item 3 (2026-08-02)
+- ~~(sprint 267, 2026-08-02) Hook edge: a failed backgrounded `build_image` exits via `|| exit 1`, which bypasses the ERR trap — `.deploy-status.json` stays `deploying` instead of `failed`. Benign (history fallback + next push overwrite cover it) but `deploy-status` can't be fully trusted after a failed deploy; small fix in `scripts/hooks/pre-push`.~~
+  → sprint-270 (2026-08-02)
+- ~~(sprint 268, 2026-08-02) Fold tastease's `migrate`-stage restructuring into `docs/PRE-PUSH-HOOK.md`'s native-module-trap section as a second confirmed example, next time the doc is touched.~~
+  → sprint-273 item 7 (2026-08-02)
+- ~~(sprint 268, 2026-08-02) tastease/emit-social lacked historical emulated multi-service `phases.build` baselines — before/after deltas there are stage-level estimates; fleet-wide phase data collection is now complete for the parked scoped-dual-arch decision.~~
+  → informational; recorded in sprint-268 notes; data collection complete (2026-08-02)
 - ~~(sprint 115, 2026-06-29) **[manual ops]** Activate healthchecks.io DMS for emit-vision~~ → sprint-261 (formerly 250) (2026-08-01) — _partially done and worse than it looked: the `dms-ping` container was deployed and reports `Up`, but `HEALTHCHECKS_URL` is empty, so both its success and failure branches `wget` an empty string. It has never pinged anything. Sprint 261 makes it fail loudly and declares the key in `requiredEnvKeys` so the sprint-239 empty-value detector covers it._
 - ~~(sprint 206/207) Pre-existing lint errors across billing.ts, cert.ts, history.ts, incidents-export.ts, operations.ts~~ → sprint-208 (2026-07-10)
 - ~~(sprint 191) `.alerts.jsonl` and `.alert-state.json` never pruned — 90-day retention~~ → sprint-209 (2026-07-10)
