@@ -90,6 +90,9 @@ file to promote items into proper sprints when the list grows worth addressing.
 
 - (sprint 267, 2026-08-02) Hook edge: a failed backgrounded `build_image` exits via `|| exit 1`, which bypasses the ERR trap — `.deploy-status.json` stays `deploying` instead of `failed`. Benign (history fallback + next push overwrite cover it) but `deploy-status` can't be fully trusted after a failed deploy; small fix in `scripts/hooks/pre-push`.
 
+- (sprint 268, 2026-08-02) Fold tastease's `migrate`-stage restructuring into `docs/PRE-PUSH-HOOK.md`'s native-module-trap section as a second confirmed example, next time the doc is touched.
+- (sprint 268, 2026-08-02) tastease/emit-social lacked historical emulated multi-service `phases.build` baselines — before/after deltas there are stage-level estimates; fleet-wide phase data collection is now complete for the parked scoped-dual-arch decision.
+
 ## ✅ Converted to Sprints
 
 - ~~(sprint 115, 2026-06-29) **[manual ops]** Activate healthchecks.io DMS for emit-vision~~ → sprint-261 (formerly 250) (2026-08-01) — _partially done and worse than it looked: the `dms-ping` container was deployed and reports `Up`, but `HEALTHCHECKS_URL` is empty, so both its success and failure branches `wget` an empty string. It has never pinged anything. Sprint 261 makes it fail loudly and declares the key in `requiredEnvKeys` so the sprint-239 empty-value detector covers it._
