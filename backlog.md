@@ -61,6 +61,8 @@ file to promote items into proper sprints when the list grows worth addressing.
 - (sprint 270, 2026-08-02) `push_payload_summary` output isn't captured in `.ci-logs/`/`.deploy-logs/` (runs between the two capture windows) — fine for an informational line; note if full audit-logging is ever wanted.
 - (sprint 270, 2026-08-02) `docs/PRE-PUSH-HOOK.md` doesn't yet document `run_build_fanout` / the fix-5 status-integrity change — fold in next doc touch.
 
+- (sprint 271, 2026-08-02) `logs.ts` has a copy-pasted pre-fix `getTerraformOutput` with the same `-raw` warning-corruption bug fixed in `status.ts`; `packages/core/src/terraform.ts`'s exported version (used by `setup.ts`) is also `-raw`-based. Extract one shared `-json` helper in `@emit-infra/core` and have all three consume it.
+
 ## ✅ Converted to Sprints
 
 - ~~(sprint 246, 2026-08-01) diner-decider is next in the rollout order per the sprint-234 audit, but stays blocked on sprint 258's (formerly 247) `/api/*` migration as this sprint's Context section specifies. _Note added during the auto-loop: that migration already landed on 2026-07-24 in commit `4e0f44e`, so the only residual work is enabling `syncOnDeploy` — see the sprint-258 obsolescence note below._~~
