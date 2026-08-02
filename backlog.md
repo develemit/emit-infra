@@ -84,6 +84,8 @@ file to promote items into proper sprints when the list grows worth addressing.
 - (sprint 265, 2026-08-02) `docs/DEPLOY-FLOOR.md` at 329 lines (over ~300 guideline) — chronological measurement log; splitting would hurt the narrative. Flagged, not urgent.
 - (sprint 265, 2026-08-02) Graceful-shutdown config inconsistent across develemail services (`SHUTDOWN_DRAIN_TIMEOUT_MS` env var for worker vs hardcoded 5s constants in api/inbound `shutdown.ts`) — unify only if a 4th service needs the pattern.
 
+- (discovered 2026-08-02) **Direct `emit-infra deploy` doesn't record deploy status/history** — only the pre-push hook's ci-utils writes `.deploy-status.json` / `.deploy-history.jsonl`. Consequence: a project deployed via CLI (e.g. emit-vision twice on 2026-08-01) shows a stale last-deploy in the dashboard AND gives the hook a stale `LAST_SHA`, so its next push rebuilds every service unnecessarily. Fix: have the CLI deploy path write the same status/history/phases records.
+
 ## ✅ Converted to Sprints
 
 - ~~(sprint 115, 2026-06-29) **[manual ops]** Activate healthchecks.io DMS for emit-vision~~ → sprint-261 (formerly 250) (2026-08-01) — _partially done and worse than it looked: the `dms-ping` container was deployed and reports `Up`, but `HEALTHCHECKS_URL` is empty, so both its success and failure branches `wget` an empty string. It has never pinged anything. Sprint 261 makes it fail loudly and declares the key in `requiredEnvKeys` so the sprint-239 empty-value detector covers it._
