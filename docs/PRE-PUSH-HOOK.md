@@ -266,6 +266,27 @@ build phase (-40%) with no install tax paid anywhere. Don't reach for
 `supportedArchitectures` by default — grep first; plenty of workspaces have
 nothing that needs it.
 
+**Both sub-cases confirmed in practice.** diner-decider (sprint 267) hit the
+**ships-to-runtime** sub-case: its `api` shipped `sharp` for the R2 photo
+pipeline, so the runner stage needed the target platform's `sharp` binary
+traced forward from `node_modules`. tastease (sprint 268) hit the
+**build-adjacent** sub-case, and it's worth walking through because no prior
+sprint (255/266/267) had actually triggered it: `apps/api`'s `migrate` target
+was `FROM builder AS migrate` — an empty stage that just inherits `builder`
+wholesale. Once `builder` moved to `$BUILDPLATFORM`, `migrate` would have
+silently inherited that native platform too (`FROM <alias>` doesn't
+re-resolve against the CLI's requested `--platform`). `migrate` runs `npx tsx
+packages/db/src/migrate.ts` on the server at container *start*, and `tsx`
+shells out to esbuild's native binary at that point — not at build time — so
+a native-host `migrate` image would have crashed on the amd64 server with an
+exec-format error the first time someone ran a migration, well after the
+image had already built and pushed successfully. Fixed by giving `migrate`
+its own plain `FROM node:22-alpine` stage (matching develemail's reference
+`migrate` pattern) instead of inheriting `builder`, plus
+`pnpm.supportedArchitectures` in tastease's root `package.json` so both
+platforms' esbuild binaries are available for `tsx` to pick the right one
+from at runtime.
+
 **Verify before shipping**, every time this pattern touches a service with
 native dependencies: `docker buildx build --platform linux/amd64 ... --load`,
 then `docker run --platform linux/amd64 <image>` and confirm it fails (or
