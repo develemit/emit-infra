@@ -1,9 +1,9 @@
-import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from 'vitest'
 import { Command } from 'commander'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { buildDeployExtraVars, computeEnvRemoval, enforceEnvRemovalGuard, parseEnvFile, printDryRunPlan, registerDeploy } from './deploy.js'
+import { buildDeployExtraVars, checkBackupEnv, computeEnvRemoval, enforceEnvRemovalGuard, parseEnvFile, printDryRunPlan, registerDeploy } from './deploy.js'
 
 vi.mock('@emit-infra/core', () => ({
   loadConfig: vi.fn(),
@@ -510,6 +510,91 @@ describe('parseEnvFile', () => {
       .map(l => l.slice(0, l.indexOf('=')).trim())
 
     expect(Object.keys(parseEnvFile(p)).sort()).toEqual(shellEquivalent.sort())
+  })
+})
+
+describe('checkBackupEnv', () => {
+  let dir: string
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'deploy-backup-env-'))
+  })
+
+  afterEach(() => rmSync(dir, { recursive: true, force: true }))
+
+  it('does nothing when the project has no backup bucket configured', () => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('process.exit') })
+
+    expect(() => checkBackupEnv({ ...baseConfig } as ReturnType<typeof loadConfig>, dir)).not.toThrow()
+
+    expect(exitSpy).not.toHaveBeenCalled()
+    exitSpy.mockRestore()
+  })
+
+  it('does nothing when all required R2 keys are present', () => {
+    writeFileSync(join(dir, '.env'), [
+      'CF_ACCOUNT_ID=acct',
+      'R2_ACCESS_KEY_ID=key',
+      'R2_SECRET_ACCESS_KEY=secret',
+    ].join('\n'))
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('process.exit') })
+    const config = { ...baseConfig, postgres: { version: '16', backupRetainDays: 7, backupBucket: 'my-bucket' } } as ReturnType<typeof loadConfig>
+
+    expect(() => checkBackupEnv(config, dir)).not.toThrow()
+
+    expect(exitSpy).not.toHaveBeenCalled()
+    exitSpy.mockRestore()
+  })
+
+  it('exits 1 and lists the missing keys when required R2 credentials are absent', () => {
+    writeFileSync(join(dir, '.env'), 'CF_ACCOUNT_ID=acct\n')
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('process.exit') })
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const config = { ...baseConfig, postgres: { version: '16', backupRetainDays: 7, backupBucket: 'my-bucket' } } as ReturnType<typeof loadConfig>
+
+    expect(() => checkBackupEnv(config, dir)).toThrow('process.exit')
+
+    expect(exitSpy).toHaveBeenCalledWith(1)
+    const errorText = errorSpy.mock.calls.map(c => c.join(' ')).join('\n')
+    expect(errorText).toContain('R2_ACCESS_KEY_ID')
+    expect(errorText).toContain('R2_SECRET_ACCESS_KEY')
+    expect(errorText).not.toContain('missing: CF_ACCOUNT_ID')
+    exitSpy.mockRestore()
+    errorSpy.mockRestore()
+  })
+
+  it('exits 1 when no env file exists at all', () => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('process.exit') })
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const config = { ...baseConfig, postgres: { version: '16', backupRetainDays: 7, backupBucket: 'my-bucket' } } as ReturnType<typeof loadConfig>
+
+    expect(() => checkBackupEnv(config, dir)).toThrow('process.exit')
+
+    expect(exitSpy).toHaveBeenCalledWith(1)
+    exitSpy.mockRestore()
+  })
+
+  it('checks ci.envFile when declared, ahead of .env.prod and .env', () => {
+    // ci.envFile takes precedence — write the real credentials there, and a
+    // decoy incomplete file at .env to prove it isn't the one being read.
+    writeFileSync(join(dir, '.env'), 'CF_ACCOUNT_ID=decoy\n')
+    const ciEnvPath = join(dir, 'secrets.prod.env')
+    writeFileSync(ciEnvPath, [
+      'CF_ACCOUNT_ID=acct',
+      'R2_ACCESS_KEY_ID=key',
+      'R2_SECRET_ACCESS_KEY=secret',
+    ].join('\n'))
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('process.exit') })
+    const config = {
+      ...baseConfig,
+      postgres: { version: '16', backupRetainDays: 7, backupBucket: 'my-bucket' },
+      ci: { envFile: 'secrets.prod.env' },
+    } as ReturnType<typeof loadConfig>
+
+    expect(() => checkBackupEnv(config, dir)).not.toThrow()
+
+    expect(exitSpy).not.toHaveBeenCalled()
+    exitSpy.mockRestore()
   })
 })
 

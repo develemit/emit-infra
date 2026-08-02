@@ -95,7 +95,7 @@ export function printDryRunPlan(
   console.log(chalk.yellow('\nDRY RUN complete — no changes were made.\n'))
 }
 
-function checkBackupEnv(config: ProjectConfig): void {
+export function checkBackupEnv(config: ProjectConfig, cwd: string = process.cwd()): void {
   if (!config.postgres?.backupBucket) return
 
   // Same candidate precedence as the deploy path (see buildDeployExtraVars), so
@@ -103,8 +103,8 @@ function checkBackupEnv(config: ProjectConfig): void {
   // different file than the one actually deployed.
   const envCandidates = [config.ci?.envFile, '.env.prod', '.env']
     .filter(Boolean)
-    .map(f => join(process.cwd(), f!))
-  const envPath = envCandidates.find(p => existsSync(p)) ?? join(process.cwd(), '.env')
+    .map(f => join(cwd, f!))
+  const envPath = envCandidates.find(p => existsSync(p)) ?? join(cwd, '.env')
   const env = parseEnvFile(envPath)
   const missing = BACKUP_ENV_KEYS.filter(k => !env[k])
 
@@ -283,7 +283,7 @@ export function registerDeploy(program: Command): void {
       const config = loadConfig(opts.config)
 
       if (!opts.dryRun) {
-        checkBackupEnv(config)
+        checkBackupEnv(config, process.cwd())
       }
 
       if (opts.dryRun) {
