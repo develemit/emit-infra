@@ -71,6 +71,9 @@ file to promote items into proper sprints when the list grows worth addressing.
 - (sprint 261, 2026-08-01) `provision-list/healthchecks-io.md` claims completion falsely — fix when DMS approach is settled.
 - (sprint 261, 2026-08-01) tastease `uptime-ping` has the same silent empty-URL ping shape — audit with the DMS work.
 
+- (sprint 262, 2026-08-01) `martialops.conf` sits unsymlinked in tastease's `sites-available/` (confirmed inert) — same stale-file category; archive or confirm-intentional in a future pass.
+- (sprint 262, 2026-08-01) Real fix for the nginx bare-glob hazard — switch all five hosts' `nginx.conf` to `include sites-enabled/*.conf;` — is a live-box behavior change, now known fleet-wide; worth its own sprint if it bites again.
+
 ## ✅ Converted to Sprints
 
 - ~~(sprint 115, 2026-06-29) **[manual ops]** Activate healthchecks.io DMS for emit-vision~~ → sprint-261 (formerly 250) (2026-08-01) — _partially done and worse than it looked: the `dms-ping` container was deployed and reports `Up`, but `HEALTHCHECKS_URL` is empty, so both its success and failure branches `wget` an empty string. It has never pinged anything. Sprint 261 makes it fail loudly and declares the key in `requiredEnvKeys` so the sprint-239 empty-value detector covers it._
