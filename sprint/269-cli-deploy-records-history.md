@@ -37,9 +37,68 @@ history.ts`, `project-status.ts`) — no schema drift.
    `resolve_last_deployed_sha` returns the CLI-deployed sha.
 
 ## Acceptance criteria
-- [ ] CLI deploy writes status transitions + a history line with `phases`,
+- [x] CLI deploy writes status transitions + a history line with `phases`,
       shape-identical to hook-written records (fixture test proves it)
-- [ ] `resolve_last_deployed_sha` picks up a CLI deploy (shell test added to
+- [x] `resolve_last_deployed_sha` picks up a CLI deploy (shell test added to
       `scripts/lib/deploy-plan.test.sh` with a CLI-written fixture line)
-- [ ] `packages/core` tests cover the new helper incl. failure path
-- [ ] emit-infra typecheck/lint/test + `pnpm test:hooks` green; CLI dist rebuilt
+- [x] `packages/core` tests cover the new helper incl. failure path
+- [x] emit-infra typecheck/lint/test + `pnpm test:hooks` green; CLI dist rebuilt
+
+## Completed
+
+**Date:** 2026-08-02
+
+### Summary
+Added `packages/core/src/deploy-records.ts` (`deployRecordInit`/`deployRecordDone`),
+a TypeScript port of `ci-utils.sh`'s `deploy_init`/`deploy_done` that a CLI-side
+deploy can call directly, writing `.deploy-status.json` and appending to
+`.deploy-history.jsonl` in the target project's cwd with the exact same key
+set/order as the hook (`status,sha,branch,startedAt,completedAt,durationSec,
+servicesBuilt,phases,message` for history lines), including
+`_emit_truncate_history` parity (cap 1000, keep newest 500). Git context
+(sha/branch/message) is read via `execa git ...` with try/catch-to-`''`
+fallbacks, matching the bash `|| true` behavior for non-git cwds.
+`apps/cli/src/commands/deploy.ts`'s `registerDeploy` action now calls
+`deployRecordInit` immediately before `runAnsible('deploy', ...)` and
+`deployRecordDone` after — `'deployed'` on success, `'failed'` (then rethrow)
+on error — timing the ansible run itself as the sole `phases.deploy` entry.
+`servicesBuilt` is always `[]` since CLI deploys never build.
+
+Rebuilding `packages/core/dist` and `apps/cli/dist` surfaced a real bug this
+sprint exists to prevent: `apps/cli/src/commands/init-deploy.test.ts` spawns a
+real `tsx` subprocess that imports the *built* `@emit-infra/core` package, and
+a stale `packages/core/dist` (missing the new export) crashed that subprocess
+with a `SyntaxError`, which looked like flaky test — a live demonstration of
+the stale-dist pitfall the sprint context called out.
+
+Proved it end-to-end with a real CLI deploy of emit-vision
+(`emit-infra deploy` from `~/projects/emit-vision`, blue-green, ~81s,
+pre-approved validation step): the resulting `.deploy-status.json` and
+`.deploy-history.jsonl` entries carry the correct sha/branch/durationSec/
+phases/message, and `resolve_last_deployed_sha .` against that directory now
+returns the CLI-deployed sha instead of falling back to a stale hook-written
+entry.
+
+### Files changed
+- (new) `packages/core/src/deploy-records.ts` — `deployRecordInit`/`deployRecordDone` helper, byte-shape-compatible with `ci-utils.sh`
+- (new) `packages/core/src/deploy-records.test.ts` — unit tests: init/done shape, failure path, history append/truncation parity, git-failure fallback
+- `packages/core/src/index.ts` — export the new helper
+- `apps/cli/src/commands/deploy.ts` — wire `deployRecordInit`/`deployRecordDone` around `runAnsible` in `registerDeploy`
+- `apps/cli/src/commands/deploy.test.ts` — mock the two new `@emit-infra/core` exports
+- `scripts/lib/deploy-plan.test.sh` — fixture case proving `resolve_last_deployed_sha` reads a CLI-shaped history line identically to a hook-written one
+
+### Verification
+- `pnpm nx run core:test`: 38/38 pass (incl. 7 new `deploy-records.test.ts` cases)
+- `pnpm nx run cli:test`: 134/134 pass
+- `pnpm nx run-many -t test`: all green
+- `pnpm nx run-many -t typecheck`: clean
+- `pnpm nx run-many -t lint`: clean
+- `pnpm test:hooks`: 37/37 pass (incl. new CLI-fixture case)
+- Real CLI deploy of emit-vision: `.deploy-status.json`/`.deploy-history.jsonl` correct, `resolve_last_deployed_sha` returns the CLI-deployed sha
+- `packages/core/dist` and `apps/cli/dist` rebuilt after the code change
+
+### Follow-ups
+- `[defer]` `init-deploy.test.ts`'s blue-green-config test spawns a real `tsx`
+  subprocess with a 5s default timeout that regularly races cold `npx`/tsx
+  compilation under parallel load (already bumped to 30s locally in that
+  file) — worth a follow-up to pre-warm or mock instead of shelling out.

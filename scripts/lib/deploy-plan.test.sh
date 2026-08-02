@@ -58,6 +58,15 @@ printf '{"status":"failed","sha":"f"}\n' > .deploy-history.jsonl
 check "no successful deploy on record -> empty (full rebuild)" \
   "$(resolve_last_deployed_sha "$WORK")" ""
 
+# sprint 269: a CLI deploy (packages/core/src/deploy-records.ts) writes the
+# same shape ci-utils.sh's deploy_done does, so the reader can't tell them
+# apart — this is a fixture line shaped like deployRecordDone's output.
+: > .deploy-status.json
+printf '{"status":"deployed","sha":"cli9876","branch":"main","startedAt":"2026-08-02T00:00:00Z","completedAt":"2026-08-02T00:00:12Z","durationSec":12,"servicesBuilt":[],"phases":{"deploy":12},"message":"cli deploy"}\n' \
+  > .deploy-history.jsonl
+check "CLI-written history line resolves like a hook-written one" \
+  "$(resolve_last_deployed_sha "$WORK")" "cli9876"
+
 rm -f .deploy-status.json .deploy-history.jsonl
 
 echo "deploy_ignore_specs / only_ignored_paths_changed"

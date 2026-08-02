@@ -9,6 +9,8 @@ vi.mock('@emit-infra/core', () => ({
   loadConfig: vi.fn(),
   runAnsible: vi.fn(),
   sshExec: vi.fn(),
+  deployRecordInit: vi.fn().mockResolvedValue({ sha: '', branch: '', message: '', startedAt: '', startedEpochMs: 0 }),
+  deployRecordDone: vi.fn().mockResolvedValue(undefined),
 }))
 
 vi.mock('./configure.js', () => ({

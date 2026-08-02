@@ -3,7 +3,7 @@ import { join, dirname } from 'node:path'
 import { readFileSync, existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import chalk from 'chalk'
-import { loadConfig, runAnsible, sshExec, type ProjectConfig } from '@emit-infra/core'
+import { loadConfig, runAnsible, sshExec, deployRecordInit, deployRecordDone, type ProjectConfig } from '@emit-infra/core'
 import { resolveInventoryPath } from './configure.js'
 import { parseKeyList, filterExcludedKeys } from './secrets-scaffold.js'
 import { parseEnvEntries } from '../lib/env-file.js'
@@ -315,7 +315,19 @@ export function registerDeploy(program: Command): void {
         })
       }
 
-      await runAnsible('deploy', inventory, extraVars)
+      const deployCtx = await deployRecordInit(process.cwd())
+      const phaseStartedAt = Date.now()
+      try {
+        await runAnsible('deploy', inventory, extraVars)
+      } catch (err) {
+        await deployRecordDone(process.cwd(), deployCtx, 'failed', {
+          deploy: Math.round((Date.now() - phaseStartedAt) / 1000),
+        })
+        throw err
+      }
+      await deployRecordDone(process.cwd(), deployCtx, 'deployed', {
+        deploy: Math.round((Date.now() - phaseStartedAt) / 1000),
+      })
 
       console.log(chalk.green(`\nDeployed successfully.`))
     })
