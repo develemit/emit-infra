@@ -98,21 +98,113 @@ three-week no-op.
   if retirement path taken
 
 ## Acceptance criteria
-- [ ] Evidence table in `docs/FLEET-SWEEP-2026-08.md` covers every reachable
+- [x] Evidence table in `docs/FLEET-SWEEP-2026-08.md` covers every reachable
       server, every compose project on it, and a verdict for each
-- [ ] Zero `orphan` verdicts remain unresolved: each is removed (with
+- [x] Zero `orphan` verdicts remain unresolved: each is removed (with
       before/after evidence) or explicitly downgraded to `unknown` for user
       review
-- [ ] No `unknown` was removed
-- [ ] tastease `uptime-ping`: truth determined and acted on per the decision
+- [x] No `unknown` was removed
+- [x] tastease `uptime-ping`: truth determined and acted on per the decision
       rule; no secret values printed (hash/emptiness only)
-- [ ] Post-sweep health: every touched server's project passes its health
+- [x] Post-sweep health: every touched server's project passes its health
       check; retag-only develemail deploy completes clean
-- [ ] Test coverage: no emit-infra source changes expected — if any happen,
+- [x] Test coverage: no emit-infra source changes expected — if any happen,
       colocated tests included; `pnpm test:hooks` and nx
       typecheck/lint/test remain green; tastease CI (its pre-push hook)
       green on any tastease commit
-- [ ] Diner-decider re-verified clean (baseline confirmation)
+- [x] Diner-decider re-verified clean (baseline confirmation)
+
+## Completed
+
+**Date:** 2026-08-02
+
+### Summary
+Swept every fleet server with a reachable, config-bearing project
+(develemail, diner-decider, emit-social, emit-vision, tastease) for
+orphaned Docker Compose projects squatting host ports — the failure mode
+sprint 258 found on diner-decider (`diner-blue` surviving a project
+rename, invisible to `--remove-orphans`). **Result: zero orphans found
+anywhere in the fleet.** Sprint 258's diner-decider cleanup held as the
+clean baseline, and it hasn't recurred on any other server — every
+project's blue/green compose-project naming stayed consistent with its
+current project name.
+
+One stray was found: an unlabeled, non-compose `wonderful_bardeen`
+container on develemail (opendkim image, `restart: no`, created
+2026-06-15, sharing the `dkim-keys`/`dkim-tables` volumes with the live
+`develemail-opendkim` service). It doesn't publish any host port, so it
+isn't a deploy-blocking orphan and doesn't meet this sprint's removal bar
+— left running and flagged `unknown` in the evidence doc for the user to
+rule on, per the rule that develemail (busiest prod box, live mail flow)
+is inspect-only unless an orphan is unambiguous.
+
+emit-billing and martialops were skipped: emit-billing's domain has no
+DNS record at all and no `deploy.composeSrc` configured (never
+provisioned). martialops's apex domain doesn't resolve either; the only
+resolving hostname (`www.martialops.app`) pointed at an IP whose SSH host
+key didn't match `known_hosts`, a strong signal the IP has been
+reassigned to an unrelated box — did not connect rather than risk talking
+to the wrong server.
+
+tastease's `uptime-ping` audit: replayed the exact ping request the
+container's entrypoint sends (same URL, same `Authorization: Bearer
+$EMIT_VISION_API_KEY` header) from inside the running container and got
+`200 OK` — the ping genuinely lands. (Without the header, the same
+endpoint 401s, confirming the auth is what makes it succeed — this isn't
+a coincidental 200.) Unlike emit-vision's `dms-ping`, this one is not
+silently broken, so per the decision rule it was left alone with no
+compose or `requiredEnvKeys` changes. No secret values were ever printed
+— only presence, byte length, and the URL's host component were checked.
+
+Proved the sweep didn't regress the deploy path with a real retag-only
+develemail deploy (`sprint/999-*.md`-only marker commit +
+`EMIT_FORCE_DEPLOY=1 git push`, mirroring sprint 253's methodology):
+completed in 1:57, all four services (web/api/worker/inbound) came up
+healthy on the blue slot, nginx switched cleanly. Removed the marker with
+a second commit + forced push (build 577) to prove the reverse direction
+too — also clean, green slot healthy.
+
+### Files changed
+- (new) `docs/FLEET-SWEEP-2026-08.md` — full evidence table, target-list
+  reachability notes, and the tastease uptime-ping audit writeup
+- `sprint/264-fleet-orphan-compose-sweep.md` — this file
+
+### Verification
+- `docker compose ls -a` + `docker ps -a` on all 5 reachable servers:
+  captured, cross-checked against each project's `blueGreen.services[]`
+  port map — zero orphans, one `unknown` (develemail stray, left in
+  place)
+- tastease uptime-ping: replayed real ping request from inside the
+  container → `200 OK` with auth header, `401` without — confirms live
+  and landing
+- Retag-only develemail deploy (build 576): 1:57 total, web/api healthy
+  on attempt 1-2, active slot green→blue
+- Reverse marker-removal deploy (build 577): 1:59 total, active slot
+  blue→green, all four services healthy
+- `pnpm test:hooks`: 36/36 pass
+- `git status --porcelain` in emit-infra: only the sprint file and the new
+  doc touched — no source changes, so nx typecheck/lint/test weren't
+  triggered (nothing affected)
+- tastease: no commits made (uptime-ping left unchanged), so no pre-push
+  hook run was needed there
+- diner-decider: `docker compose ls -a` shows only `diner-decider`,
+  `diner-decider-blue`, `diner-decider-green` — no `diner-blue` recurrence,
+  baseline confirmed clean
+
+### Follow-ups
+- `[defer]` develemail's `wonderful_bardeen` container (opendkim image,
+  unlabeled, no compose project, running ~6 weeks, shares DKIM volumes
+  with the live opendkim service) — not removed, needs a human call since
+  it doesn't block deploys but its origin is unclear. Evidence in
+  `docs/FLEET-SWEEP-2026-08.md`.
+- `[defer]` emit-billing has no server provisioned at all (no DNS, no
+  `deploy` config) — if it's meant to be live, that's a bigger gap than
+  this sprint's scope; if it's intentionally unprovisioned, no action
+  needed.
+- `[defer]` martialops's apex domain doesn't resolve and its only
+  resolving hostname points at a host with a mismatched SSH key —- worth
+  checking DNS/server records aren't stale, but not urgent since nothing
+  indicates martialops traffic is currently being served incorrectly.
 
 ## Out of scope
 - Building automated orphan detection into the CLI/dashboard (worth a backlog
