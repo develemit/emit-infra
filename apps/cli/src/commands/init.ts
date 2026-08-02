@@ -2,7 +2,7 @@ import { Command } from 'commander'
 import { writeFileSync, existsSync, mkdirSync, readFileSync, appendFileSync } from 'node:fs'
 import { join } from 'node:path'
 import chalk from 'chalk'
-import type { ProjectConfig } from '@emit-infra/core'
+import { createConfigFile, type ProjectConfig } from '@emit-infra/core'
 import { installHooks } from '../lib/scaffold-hooks.js'
 
 export function registerInit(program: Command): void {
@@ -29,7 +29,7 @@ export function registerInit(program: Command): void {
         process.exit(1)
       }
 
-      writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n')
+      createConfigFile(configPath, config)
       console.log(chalk.green(`Created ${configPath}`))
 
       const tfDir = join(process.cwd(), 'terraform')

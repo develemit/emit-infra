@@ -1,0 +1,147 @@
+{
+  "name": "emit-vision",
+  "domain": "emitvision.com",
+  "region": "nbg1",
+  "serverType": "cx33",
+  "serverIp": "178.105.227.175",
+  "sshKeyName": "emit-vision-deploy",
+  "github": {
+    "repo": "develemit/emit-vision"
+  },
+  "deploy": {
+    "composeSrc": "infra/docker/docker-compose.infra.yml",
+    "composeDest": "docker-compose.infra.yml",
+    "extraFiles": [
+      {
+        "src": "infra/docker/clickhouse-backup.sh",
+        "dest": "clickhouse-backup.sh"
+      }
+    ],
+    "postDeployExec": [
+      {
+        "service": "api",
+        "command": "node packages/db/src/migrate.cjs"
+      },
+      {
+        "service": "api",
+        "command": "node packages/clickhouse/src/migrate.cjs"
+      }
+    ]
+  },
+  "nginx": {
+    "customConfigSrc": "infra/nginx/emit-vision.conf",
+    "wildcardCert": true,
+    "syncOnDeploy": true
+  },
+  "requiredEnvKeys": [
+    "API_URL",
+    "APP_URL",
+    "CLICKHOUSE_DATABASE",
+    "CLICKHOUSE_PASSWORD",
+    "CLICKHOUSE_RETENTION_DAYS",
+    "CLICKHOUSE_URL",
+    "CORS_ORIGIN",
+    "DATABASE_URL",
+    "DEVELEMAIL_API_KEY",
+    "DEVELEMAIL_BASE_URL",
+    "DEVELEMAIL_PROJECT_ID",
+    "DOMAIN",
+    "EMAIL_FROM_ADDRESS",
+    "GHCR_ORG",
+    "GH_WEBHOOK_SECRET",
+    "GOOGLE_CLIENT_ID",
+    "GOOGLE_CLIENT_SECRET",
+    "INTERNAL_API_SECRET",
+    "LOCAL_API_KEY",
+    "NEXT_PUBLIC_APP_URL",
+    "NEXT_PUBLIC_DOCS_URL",
+    "NEXT_PUBLIC_MARKETING_URL",
+    "OPERATOR_API_KEY",
+    "R2_ACCESS_KEY_ID",
+    "R2_BUCKET",
+    "R2_ENDPOINT",
+    "R2_SECRET_ACCESS_KEY",
+    "REDIS_URL",
+    "S3_BUCKET",
+    "SERVER_IP",
+    "SESSION_SECRET",
+    "SSO_ENCRYPTION_KEY",
+    "STRIPE_PRICE_ID_PRO",
+    "STRIPE_PRICE_ID_STARTER",
+    "STRIPE_PRICE_ID_TEAM",
+    "STRIPE_SECRET_KEY",
+    "STRIPE_WEBHOOK_SECRET",
+    "WAITLIST_ADMIN_KEY"
+  ],
+  "ci": {
+    "preCommit": [
+      "lint",
+      "typecheck",
+      "check-tokens"
+    ],
+    "prePush": [
+      "lint",
+      "typecheck",
+      "check-tokens",
+      "i18n-audit",
+      "test",
+      "build"
+    ],
+    "envFile": "infra/secrets.prod.env",
+    "ghcrOrg": "develemit",
+    "imagePrefix": "emit-",
+    "sshKey": "~/.ssh/emit-vision-deploy",
+    "buildArgs": {
+      "web": [
+        {
+          "name": "API_BASE_URL",
+          "env": "API_BASE_URL"
+        }
+      ],
+      "marketing": [
+        {
+          "name": "NEXT_PUBLIC_APP_URL",
+          "env": "NEXT_PUBLIC_APP_URL"
+        },
+        {
+          "name": "NEXT_PUBLIC_MARKETING_URL",
+          "env": "NEXT_PUBLIC_MARKETING_URL"
+        },
+        {
+          "name": "NEXT_PUBLIC_DOCS_URL",
+          "env": "NEXT_PUBLIC_DOCS_URL"
+        }
+      ]
+    }
+  },
+  "healthCheck": {
+    "url": "https://api.emitvision.com/healthz"
+  },
+  "blueGreen": {
+    "services": [
+      {
+        "name": "web",
+        "bluePort": 4300,
+        "greenPort": 4400,
+        "healthPath": "/"
+      },
+      {
+        "name": "api",
+        "bluePort": 4301,
+        "greenPort": 4401,
+        "healthPath": "/readyz"
+      },
+      {
+        "name": "worker",
+        "bluePort": 4302,
+        "greenPort": 4402
+      },
+      {
+        "name": "marketing",
+        "bluePort": 4303,
+        "greenPort": 4403
+      }
+    ],
+    "composeStructure": "separate"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "test-project",
+  "domain": "test.com",
+  "region": "nbg1",
+  "serverType": "cx22",
+  "sshKeyName": "emit-deploy",
+  "github": { "repo": "user/test" }
+}

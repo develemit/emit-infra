@@ -1,0 +1,127 @@
+{
+  "name": "diner-decider",
+  "domain": "dinerdecider.com",
+  "region": "nbg1",
+  "serverType": "cx23",
+  "sshKeyName": "emit-deploy",
+  "github": {
+    "repo": "develemit/diner_decider"
+  },
+  "r2": {
+    "buckets": [
+      "diner-decider-photos"
+    ]
+  },
+  "deploy": {
+    "composeSrc": "docker-compose.prod.yml",
+    "composeDest": "docker-compose.prod.yml",
+    "extraFiles": []
+  },
+  "ci": {
+    "preCommit": [
+      "lint",
+      "typecheck"
+    ],
+    "prePush": [
+      "lint",
+      "typecheck",
+      "build",
+      "test"
+    ],
+    "envFile": ".env.prod",
+    "ghcrOrg": "develemit",
+    "imagePrefix": "diner-decider-",
+    "sshKey": "~/.ssh/emit-deploy",
+    "buildArgs": {
+      "web": [
+        {
+          "name": "API_INTERNAL_URL",
+          "env": "API_INTERNAL_URL"
+        },
+        {
+          "name": "NEXT_PUBLIC_API_URL",
+          "env": "NEXT_PUBLIC_API_URL"
+        },
+        {
+          "name": "NEXT_PUBLIC_APP_URL",
+          "env": "NEXT_PUBLIC_APP_URL"
+        },
+        {
+          "name": "NEXT_PUBLIC_VAPID_PUBLIC_KEY",
+          "env": "NEXT_PUBLIC_VAPID_PUBLIC_KEY"
+        }
+      ]
+    }
+  },
+  "serverIp": "167.233.43.96",
+  "healthCheck": {
+    "url": "https://dinerdecider.com/api/health"
+  },
+  "nginx": {
+    "customConfigSrc": "infra/nginx/prod.conf",
+    "syncOnDeploy": true
+  },
+  "blueGreen": {
+    "services": [
+      {
+        "name": "web",
+        "bluePort": 3001,
+        "greenPort": 3002,
+        "healthPath": "/"
+      },
+      {
+        "name": "api",
+        "bluePort": 5012,
+        "greenPort": 5022,
+        "healthPath": "/health"
+      }
+    ],
+    "composeStructure": "separate"
+  },
+  "requiredEnvKeys": [
+    "APPLE_OAUTH_CLIENT_ID",
+    "APPLE_OAUTH_KEY_ID",
+    "APPLE_OAUTH_PRIVATE_KEY",
+    "APPLE_OAUTH_TEAM_ID",
+    "BACKUP_S3_ACCESS_KEY_ID",
+    "BACKUP_S3_BUCKET",
+    "BACKUP_S3_ENDPOINT",
+    "BACKUP_S3_SECRET_ACCESS_KEY",
+    "DATABASE_URL",
+    "DEVELEMAIL_API_KEY",
+    "DEVELEMAIL_BASE_URL",
+    "EMIT_VISION_API_KEY",
+    "EMIT_VISION_DSN",
+    "EMIT_VISION_ENDPOINT",
+    "EMIT_VISION_INGEST_KEY",
+    "EMIT_VISION_PROJECT_ID",
+    "GHCR_ORG",
+    "GOOGLE_OAUTH_CLIENT_ID",
+    "GOOGLE_OAUTH_CLIENT_SECRET",
+    "GOOGLE_PLACES_API_KEY",
+    "NEXT_PUBLIC_API_URL",
+    "NEXT_PUBLIC_APP_URL",
+    "NEXT_PUBLIC_VAPID_PUBLIC_KEY",
+    "POSTGRES_DB",
+    "POSTGRES_PASSWORD",
+    "POSTGRES_USER",
+    "REDIS_URL",
+    "SESSION_SECRET",
+    "STORAGE_ACCESS_KEY_ID",
+    "STORAGE_BUCKET",
+    "STORAGE_ENDPOINT",
+    "STORAGE_PUBLIC_URL",
+    "STORAGE_REGION",
+    "STORAGE_SECRET_ACCESS_KEY",
+    "STRIPE_PRICE_MONTHLY",
+    "STRIPE_PRICE_YEARLY",
+    "STRIPE_RESTRICTED_KEY",
+    "STRIPE_SECRET_KEY",
+    "STRIPE_WEBHOOK_SECRET",
+    "VAPID_PRIVATE_KEY",
+    "VAPID_PUBLIC_KEY",
+    "VAPID_SUBJECT",
+    "WEB_ORIGIN",
+    "YEAR_IN_REVIEW_SECRET"
+  ]
+}

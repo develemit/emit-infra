@@ -1,5 +1,6 @@
 export { ProjectConfigSchema, type ProjectConfig } from './config.js'
 export { loadConfig } from './load-config.js'
+export { createConfigFile, setConfigField } from './config-writer.js'
 export { runTerraform, getTerraformOutput } from './terraform.js'
 export { runAnsible } from './ansible.js'
 export { deployRecordInit, deployRecordDone, type DeployContext } from './deploy-records.js'

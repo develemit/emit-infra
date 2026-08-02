@@ -172,6 +172,9 @@ importers:
       execa:
         specifier: ^9.0.0
         version: 9.6.1
+      jsonc-parser:
+        specifier: ^3.2.0
+        version: 3.2.0
       zod:
         specifier: ^3.23.0
         version: 3.25.76

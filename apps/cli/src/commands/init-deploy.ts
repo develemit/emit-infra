@@ -2,6 +2,7 @@ import { Command } from 'commander'
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs'
 import { join, basename } from 'node:path'
 import chalk from 'chalk'
+import { setConfigField } from '@emit-infra/core'
 import { detectServices, detectHealthPaths, type DetectedService } from '../lib/detect-project.js'
 
 interface InitDeployOpts {
@@ -53,14 +54,14 @@ export function registerInitDeploy(program: Command): void {
       }
       console.log()
 
-      config.blueGreen = {
+      const blueGreen = {
         services: blueGreenServices,
         composeStructure: opts.compose,
         ...(opts.migratePre ? { migratePre: opts.migratePre } : {}),
         ...(opts.migratePost ? { migratePost: opts.migratePost } : {}),
       }
 
-      writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n')
+      setConfigField(configPath, ['blueGreen'], blueGreen)
       console.log(chalk.green(`Updated ${configPath} with blueGreen config`))
 
       if (opts.compose === 'separate') {

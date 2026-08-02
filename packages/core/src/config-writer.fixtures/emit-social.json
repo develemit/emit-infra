@@ -1,0 +1,85 @@
+{
+  "name": "emit-social",
+  "domain": "social.develemit.com",
+  "region": "nbg1",
+  "serverType": "cx23",
+  "sshKeyName": "emit-deploy",
+  "github": {
+    "repo": "develemit/emit-social"
+  },
+  "postgres": {
+    "version": "16"
+  },
+  "nginx": {
+    "wildcardCert": true,
+    "customConfigSrc": "docker/nginx/prod.conf",
+    "syncOnDeploy": true
+  },
+  "deploy": {
+    "composeSrc": "docker-compose.infra.yml"
+  },
+  "healthCheck": {
+    "url": "https://api.social.develemit.com/health"
+  },
+  "ci": {
+    "prePush": ["lint", "typecheck", "test", "build"],
+    "envFile": ".env.prod",
+    "ghcrOrg": "develemit",
+    "imagePrefix": "emit-social-",
+    "sshKey": "~/.ssh/emit-deploy",
+    "buildArgs": {
+      "web": [
+        { "name": "NEXT_PUBLIC_API_URL", "env": "NEXT_PUBLIC_API_URL" },
+        { "name": "NEXT_PUBLIC_AUTH_ENABLED", "env": "NEXT_PUBLIC_AUTH_ENABLED" }
+      ]
+    }
+  },
+  "blueGreen": {
+    "services": [
+      {
+        "name": "web",
+        "bluePort": 3000,
+        "greenPort": 3100,
+        "containerPort": 3000,
+        "healthPath": "/login"
+      },
+      {
+        "name": "api",
+        "bluePort": 4000,
+        "greenPort": 4100,
+        "containerPort": 4000,
+        "healthPath": "/health"
+      }
+    ],
+    "composeStructure": "separate",
+    "migratePre": "docker compose -f /opt/emit-social/docker-compose.blue.yml --env-file /opt/emit-social/.env run --rm api node migrate.mjs"
+  },
+  "requiredEnvKeys": [
+    "ADMIN_PASSWORD_HASH",
+    "COOKIE_DOMAIN",
+    "DATABASE_URL",
+    "DEVELEMAIL_API_KEY",
+    "DEVELEMAIL_API_URL",
+    "DEVELEMAIL_PROJECT_ID",
+    "EMIT_VISION_API_KEY",
+    "EMIT_VISION_API_URL",
+    "EMIT_VISION_DSN",
+    "EMIT_VISION_EVENT_MAP",
+    "EMIT_VISION_INGEST_KEY",
+    "EMIT_VISION_PROJECT_ID",
+    "EMIT_VISION_SOURCE_PROJECT_ID",
+    "HQ_EXPORT_TOKEN",
+    "INTEGRATIONS",
+    "NEXT_PUBLIC_API_URL",
+    "NEXT_PUBLIC_AUTH_ENABLED",
+    "POSTGRES_DB",
+    "POSTGRES_PASSWORD",
+    "POSTGRES_USER",
+    "SERVER_IP",
+    "SESSION_SECRET",
+    "STRIPE_SECRET_KEY",
+    "SYNC_ENABLED",
+    "SYNC_SCHEDULE_UTC",
+    "WEB_ORIGIN"
+  ]
+}

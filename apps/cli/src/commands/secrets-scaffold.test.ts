@@ -11,20 +11,20 @@ import {
 vi.mock('@emit-infra/core', () => ({
   loadConfig: vi.fn(),
   sshExec: vi.fn(),
+  setConfigField: vi.fn(),
 }))
 
 vi.mock('node:fs', () => ({
   existsSync: vi.fn(),
   readFileSync: vi.fn(),
-  writeFileSync: vi.fn(),
 }))
 
 vi.mock('node:os', () => ({
   homedir: vi.fn().mockReturnValue('/home/test'),
 }))
 
-import { loadConfig, sshExec } from '@emit-infra/core'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { loadConfig, sshExec, setConfigField } from '@emit-infra/core'
+import { existsSync, readFileSync } from 'node:fs'
 
 const baseConfig = {
   name: 'test-project',
@@ -97,7 +97,7 @@ describe('secrets scaffold-required-keys command', () => {
     await program.parseAsync(['node', 'cli', 'secrets', 'scaffold-required-keys', 'test-project', '--dry-run'])
 
     expect(sshExec).toHaveBeenCalledWith('1.2.3.4', expect.stringContaining('/opt/test-project/.env'), '/home/test/.ssh/emit-deploy')
-    expect(writeFileSync).not.toHaveBeenCalled()
+    expect(setConfigField).not.toHaveBeenCalled()
   })
 
   it('writes sorted requiredEnvKeys, excluding BUILD_NUMBER', async () => {
@@ -111,10 +111,10 @@ describe('secrets scaffold-required-keys command', () => {
     registerSecretsScaffold(secretsCmd)
     await program.parseAsync(['node', 'cli', 'secrets', 'scaffold-required-keys', 'test-project'])
 
-    expect(writeFileSync).toHaveBeenCalledTimes(1)
-    const [, written] = vi.mocked(writeFileSync).mock.calls[0]!
-    const parsed = JSON.parse(written as string)
-    expect(parsed.requiredEnvKeys).toEqual(['AKEY', 'ZKEY'])
+    expect(setConfigField).toHaveBeenCalledTimes(1)
+    const [, path, value] = vi.mocked(setConfigField).mock.calls[0]!
+    expect(path).toEqual(['requiredEnvKeys'])
+    expect(value).toEqual(['AKEY', 'ZKEY'])
   })
 
   it('refuses to overwrite an existing requiredEnvKeys without --force', async () => {
@@ -132,7 +132,7 @@ describe('secrets scaffold-required-keys command', () => {
       program.parseAsync(['node', 'cli', 'secrets', 'scaffold-required-keys', 'test-project']),
     ).rejects.toThrow('process.exit')
 
-    expect(writeFileSync).not.toHaveBeenCalled()
+    expect(setConfigField).not.toHaveBeenCalled()
     exitSpy.mockRestore()
   })
 
@@ -147,10 +147,10 @@ describe('secrets scaffold-required-keys command', () => {
     registerSecretsScaffold(secretsCmd)
     await program.parseAsync(['node', 'cli', 'secrets', 'scaffold-required-keys', 'test-project', '--force'])
 
-    expect(writeFileSync).toHaveBeenCalledTimes(1)
-    const [, written] = vi.mocked(writeFileSync).mock.calls[0]!
-    const parsed = JSON.parse(written as string)
-    expect(parsed.requiredEnvKeys).toEqual(['AKEY', 'BKEY'])
+    expect(setConfigField).toHaveBeenCalledTimes(1)
+    const [, path, value] = vi.mocked(setConfigField).mock.calls[0]!
+    expect(path).toEqual(['requiredEnvKeys'])
+    expect(value).toEqual(['AKEY', 'BKEY'])
   })
 
   it('fails clearly and writes nothing when the host is unreachable', async () => {
@@ -166,7 +166,7 @@ describe('secrets scaffold-required-keys command', () => {
       program.parseAsync(['node', 'cli', 'secrets', 'scaffold-required-keys', 'test-project']),
     ).rejects.toThrow('process.exit')
 
-    expect(writeFileSync).not.toHaveBeenCalled()
+    expect(setConfigField).not.toHaveBeenCalled()
     exitSpy.mockRestore()
   })
 })

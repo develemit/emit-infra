@@ -1,9 +1,9 @@
 import { Command } from 'commander'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import chalk from 'chalk'
-import { loadConfig, sshExec } from '@emit-infra/core'
+import { loadConfig, setConfigField, sshExec } from '@emit-infra/core'
 
 const EXCLUDED_KEYS = new Set(['BUILD_NUMBER'])
 
@@ -60,8 +60,7 @@ export function registerSecretsScaffold(secretsCmd: Command): void {
         process.exit(1)
       }
 
-      fileConfig.requiredEnvKeys = sorted
-      writeFileSync(configPath, JSON.stringify(fileConfig, null, 2) + '\n')
+      setConfigField(configPath, ['requiredEnvKeys'], sorted)
       console.log(chalk.green(`Wrote ${sorted.length} keys to requiredEnvKeys in ${configPath}`))
     })
 }

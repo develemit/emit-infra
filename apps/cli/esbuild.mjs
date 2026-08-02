@@ -7,6 +7,7 @@ await build({
   format: 'esm',
   outfile: 'apps/cli/dist/index.js',
   external: ['node:*'],
+  mainFields: ['module', 'main'],
   sourcemap: true,
   banner: {
     js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);",
