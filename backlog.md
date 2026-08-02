@@ -88,6 +88,8 @@ file to promote items into proper sprints when the list grows worth addressing.
 
 - (sprint 266, 2026-08-02) emit-vision `apps/extension` still depends on `sharp` but was outside the conversion scope — check whether it ships as a Docker image at all before assuming the native-build pattern applies.
 
+- (sprint 267, 2026-08-02) Hook edge: a failed backgrounded `build_image` exits via `|| exit 1`, which bypasses the ERR trap — `.deploy-status.json` stays `deploying` instead of `failed`. Benign (history fallback + next push overwrite cover it) but `deploy-status` can't be fully trusted after a failed deploy; small fix in `scripts/hooks/pre-push`.
+
 ## ✅ Converted to Sprints
 
 - ~~(sprint 115, 2026-06-29) **[manual ops]** Activate healthchecks.io DMS for emit-vision~~ → sprint-261 (formerly 250) (2026-08-01) — _partially done and worse than it looked: the `dms-ping` container was deployed and reports `Up`, but `HEALTHCHECKS_URL` is empty, so both its success and failure branches `wget` an empty string. It has never pinged anything. Sprint 261 makes it fail loudly and declares the key in `requiredEnvKeys` so the sprint-239 empty-value detector covers it._
