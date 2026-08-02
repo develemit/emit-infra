@@ -76,6 +76,10 @@ file to promote items into proper sprints when the list grows worth addressing.
 
 - (sprint 263, 2026-08-02) `provision-list/summary.md` line 30 in emit-vision still claims `healthchecks.io (DMS) | ✅ Complete | dms-ping live` — contradicted by the rewritten `healthchecks-io.md`; one-line fix next time that file is touched.
 
+- (sprint 264, 2026-08-02) **[needs human call]** develemail's `wonderful_bardeen` container (unlabeled opendkim image, no compose project, ~6 weeks old, shares DKIM volumes with the live opendkim service) — left in place; likely a forgotten one-off predating the compose service. Evidence in `docs/FLEET-SWEEP-2026-08.md`.
+- (sprint 264, 2026-08-02) emit-billing has no server/DNS/deploy config at all — fine if intentional; a gap if it's meant to go live.
+- (sprint 264, 2026-08-02) martialops apex domain doesn't resolve; its one resolving hostname has a mismatched SSH key — check DNS/server records for staleness (not urgent).
+
 ## ✅ Converted to Sprints
 
 - ~~(sprint 115, 2026-06-29) **[manual ops]** Activate healthchecks.io DMS for emit-vision~~ → sprint-261 (formerly 250) (2026-08-01) — _partially done and worse than it looked: the `dms-ping` container was deployed and reports `Up`, but `HEALTHCHECKS_URL` is empty, so both its success and failure branches `wget` an empty string. It has never pinged anything. Sprint 261 makes it fail loudly and declares the key in `requiredEnvKeys` so the sprint-239 empty-value detector covers it._
