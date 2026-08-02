@@ -555,3 +555,23 @@ The residue that proved this happened: emit-vision's `.env.prod` had 9 keys, 4 o
 See `README.md`'s "Production secrets: two files, two destinations" section for the full table and a checklist.
 
 **What to check in a new project:** does `.emit-infra.json` set `ci.envFile`? If yes, that project has the split and both files need every production key kept in sync manually — `secrets sync`'s warning is the safety net, not a substitute for adding the key to both files.
+
+---
+
+## 23. `sites-enabled/*` has no `.conf` filter on any fleet server — any staged file there gets parsed as a vhost
+
+**Symptom:** A backup or scratch file dropped into `/etc/nginx/sites-enabled/` on a fleet server gets loaded by nginx like a real vhost, even though it was never symlinked in on purpose. `nginx -t` then fails on whatever the stray file collides with (a duplicate directive, a bad `server_name`), and the failure looks like a live config problem rather than what it actually is — leftover scratch content sitting in the wrong directory. During sprint 237's tastease reconciliation this produced exactly that false alarm: a dated backup file placed inside `sites-enabled/` broke `nginx -t` on a duplicate `real_ip_header` directive, and it took a careful read to confirm the orphan itself (sitting in `sites-available/`, unsymlinked) was inert and the backup was the actual culprit.
+
+**Cause:** `nginx.conf`'s http block ends with `include /etc/nginx/sites-enabled/*;` — no `*.conf` suffix filter. Checked directly on all five fleet servers (sprint 262, 2026-08-01):
+
+| Host | IP | `sites-enabled` include pattern |
+| --- | --- | --- |
+| tastease | 178.104.195.59 | `sites-enabled/*` (bare) |
+| emit-vision | 178.105.227.175 | `sites-enabled/*` (bare) |
+| diner-decider | 167.233.43.96 | `sites-enabled/*` (bare) |
+| develemail | 178.105.171.1 | `sites-enabled/*` (bare) |
+| emit-social | 167.233.169.206 | `sites-enabled/*` (bare) |
+
+This sprint was scoped assuming the hazard was tastease-specific ("other fleet hosts use `sites-enabled/*.conf` and are not affected") — that assumption was wrong. All five hosts share the same base provisioning and the same bare-glob include. `sites-available/` and `/etc/nginx/conf.d/*.conf` are unaffected (not glob-included, or filtered to `.conf`); only `sites-enabled/` on these five hosts loads anything staged in it regardless of name.
+
+**Fix:** Never stage scratch, backup, or half-written config files inside `sites-enabled/` on any fleet server — use `sites-available/` (not glob-included) or a dedicated archive directory (e.g. `/root/nginx-archive-<date>/`, outside any nginx include path) instead. If you need to disable a vhost temporarily, remove the `sites-enabled` symlink rather than renaming the file in place. The real fix — switching every host's include to `sites-enabled/*.conf` — is a behavior change on live boxes and is intentionally out of scope here; it would need its own sprint per host.

@@ -38,15 +38,45 @@ The files are in `sites-available/`, not `sites-enabled/`, so nothing is loading
 - `apps/api/src/routes/nginx-config.ts` — read-only reference for the drift check
 
 ## Acceptance criteria
-- [ ] Every file removed was first proven unreferenced (not symlinked, not included).
-- [ ] Removed files are archived somewhere recoverable, not destroyed.
-- [ ] `nginx -t` passed before and after; nginx was reloaded, not restarted.
-- [ ] tastease serves correctly after the cleanup.
-- [ ] The include pattern for all five fleet servers is recorded.
-- [ ] `docs/DEPLOYMENT-PITFALLS.md` documents the hazard and names the affected host(s), without renumbering the file.
-- [ ] The drift route reports tastease correctly afterward.
+- [x] Every file removed was first proven unreferenced (not symlinked, not included).
+- [x] Removed files are archived somewhere recoverable, not destroyed.
+- [x] `nginx -t` passed before and after; nginx was reloaded, not restarted.
+- [x] tastease serves correctly after the cleanup.
+- [x] The include pattern for all five fleet servers is recorded.
+- [x] `docs/DEPLOYMENT-PITFALLS.md` documents the hazard and names the affected host(s), without renumbering the file.
+- [x] The drift route reports tastease correctly afterward.
 
 ## Out of scope
 - Changing tastease's `nginx.conf` include pattern to `sites-enabled/*.conf` — arguably the real fix, but a behavior change on a live box that deserves its own sprint.
 - Enabling `nginx.syncOnDeploy` for tastease — sprint 246.
 - Renumbering `docs/DEPLOYMENT-PITFALLS.md` to fix the duplicate "20" entries.
+
+## Completed
+
+**Date:** 2026-08-02
+
+### Summary
+Cleaned up tastease's `sites-available/` orphans and documented the bare-glob hazard — but the documentation ended up materially different from what the sprint assumed, because the assumption was wrong.
+
+On `178.104.195.59`, `sites-available/` held `tastease.conf` (5098 bytes, Jun 22 — the pre-reconciliation orphan) and `tastease.bak-20260724` (4151 bytes — a sprint 237 safety copy). Neither was symlinked from `sites-enabled/` nor referenced by any `include` (confirmed via `grep -rn` across `/etc/nginx/` and `find -xtype l`), so both were moved to a fresh `/root/nginx-archive-20260802/` — outside every nginx include path, recoverable, not deleted. (The third sprint-237 backup, `/root/nginx-backups/tastease.sites-enabled.bak-20260724`, was already outside `sites-available`/`sites-enabled` entirely and needed no further action.) `nginx -t` passed before and after the move, `nginx -s reload` applied cleanly (`systemctl is-active nginx` stayed `active` throughout), and all three tastease hostnames plus `/api/healthz` returned the same codes/payload as sprint 237's baseline (200/301/302, `build:"980"`). The drift route (`GET /projects/tastease/nginx-drift`) still reports `{"status":"ok","diff":[]}`.
+
+The sprint's Context section asserted "other fleet hosts use `sites-enabled/*.conf` and are not affected" — that turned out to be false. I checked `nginx.conf`'s include line on all five fleet servers directly (SSH, `grep -n sites-enabled`) and every one of them uses the same bare `include /etc/nginx/sites-enabled/*;` with no extension filter: tastease, emit-vision, diner-decider, develemail, and emit-social. This isn't a tastease quirk, it's a fleet-wide provisioning fact — all five hosts share the same nginx.conf template. The `docs/DEPLOYMENT-PITFALLS.md` entry (added as #23, the next unambiguous number — the file's pre-existing duplicate "20" at lines 419/526 was left untouched per the sprint's explicit instruction) documents this accurately: a table of all five hosts and their include pattern, rather than a single-host caveat. emit-social's server IP wasn't in its `.emit-infra.json` (no `serverIp` field); it's declared as `SERVER_IP=167.233.169.206` inside the project's own `.env.prod`, which is where I found it to complete the SSH check.
+
+### Files changed
+- `docs/DEPLOYMENT-PITFALLS.md` — new entry #23 documenting the bare-`sites-enabled/*` hazard across all five fleet hosts (not just tastease), with the per-host include-pattern table
+- `178.104.195.59:/etc/nginx/sites-available/tastease.conf` — moved to `/root/nginx-archive-20260802/` (server-side, not in this repo)
+- `178.104.195.59:/etc/nginx/sites-available/tastease.bak-20260724` — moved to `/root/nginx-archive-20260802/` (server-side, not in this repo)
+
+### Verification
+- Pre-move: `grep -rn 'tastease.conf' /etc/nginx/` and `grep -rn 'tastease.bak-20260724' /etc/nginx/` both empty; `find /etc/nginx -xtype l -lname '*tastease.conf*' -o -lname '*tastease.bak-20260724*'` empty — neither file was referenced or symlinked.
+- `nginx -t`: passed before the move and after.
+- `nginx -s reload` (not restart): applied; `systemctl is-active nginx` → `active` before, during, and after.
+- Live check: `tastease.app` 200, `www.tastease.app` 301, `app.tastease.app` 302, `app.tastease.app/api/healthz` → `{"status":"ok","build":"980","service":"api"}` — matches sprint 237's recorded baseline.
+- Include pattern checked on all five hosts via direct SSH: tastease, emit-vision, diner-decider, develemail, emit-social all use bare `sites-enabled/*` (no `.conf` filter).
+- `GET /projects/tastease/nginx-drift` (local API, `:7001`) → `{"status":"ok","diff":[]}`.
+- `docs/DEPLOYMENT-PITFALLS.md` numbering: confirmed the pre-existing duplicate "20" (lines 419, 526) is unchanged; new entry is `## 23.`, appended at end of file.
+
+### Follow-ups
+- `[defer]` `martialops.conf` sits unsymlinked in tastease's `sites-available/` (not referenced, confirmed inert during this sprint's inventory) — out of this sprint's scope (only `tastease.conf`/`tastease.bak-20260724` were named), but it's the same category of stale file and could be archived or confirmed-intentional in a future pass.
+- `[defer]` The real fix for the bare-glob hazard — switching all five hosts' `nginx.conf` to `include /etc/nginx/sites-enabled/*.conf;` — is a behavior change on live boxes, explicitly out of scope here per the sprint, and now known to apply fleet-wide rather than to one host. Worth its own sprint if the hazard bites again.
+- `none` otherwise.
