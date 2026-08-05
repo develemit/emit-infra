@@ -73,7 +73,16 @@ run_ci() {
   for target in $CI_TARGETS; do
     ci_step "$target"
     echo "→ $target"
-    pnpm nx affected -t "$target" --base=origin/main
+    if [[ "$target" == "format" ]]; then
+      # Formatting is a whole-repo prettier check, not a per-project nx
+      # target — `nx affected -t format` finds no matching projects and
+      # silently no-ops (confirmed empirically: exits 0, "No tasks were
+      # run"), including for root-level files like README.md that don't
+      # belong to any nx project. Run the root script directly instead.
+      pnpm format
+    else
+      pnpm nx affected -t "$target" --base=origin/main
+    fi
   done
 
   ci_done success
