@@ -575,3 +575,15 @@ See `README.md`'s "Production secrets: two files, two destinations" section for 
 This sprint was scoped assuming the hazard was tastease-specific ("other fleet hosts use `sites-enabled/*.conf` and are not affected") — that assumption was wrong. All five hosts share the same base provisioning and the same bare-glob include. `sites-available/` and `/etc/nginx/conf.d/*.conf` are unaffected (not glob-included, or filtered to `.conf`); only `sites-enabled/` on these five hosts loads anything staged in it regardless of name.
 
 **Fix:** Never stage scratch, backup, or half-written config files inside `sites-enabled/` on any fleet server — use `sites-available/` (not glob-included) or a dedicated archive directory (e.g. `/root/nginx-archive-<date>/`, outside any nginx include path) instead. If you need to disable a vhost temporarily, remove the `sites-enabled` symlink rather than renaming the file in place. The real fix — switching every host's include to `sites-enabled/*.conf` — is a behavior change on live boxes and is intentionally out of scope here; it would need its own sprint per host.
+
+---
+
+## 24. `PRUNE_STRATEGY="standard"` never reclaims anything — tagged images accumulate until the disk fills
+
+**Symptom:** A fleet server's disk creeps up deploy after deploy (tastease hit 69% with 179 image tags, only 9 active) even though every deploy runs a prune step. `du -sh /var/lib/docker` makes it look like Docker isn't the culprit — the space is actually in `/var/lib/containerd` (containerd image store).
+
+**Cause:** The "standard" strategy runs `docker image prune -f`, which only removes *dangling* (untagged) images. Every image we ship keeps its `:SHA`, `:BUILD_NUMBER`, and `:latest` tags, so nothing is ever dangling and the prune is a no-op. The zero-downtime and standard deploy paths already pruned aggressively; the blue-green path was the outlier.
+
+**Fix (2026-08-13):** The `.deploy-config` template (`deploy-blue-green.yml`) now defaults to `PRUNE_STRATEGY="aggressive"` — prune containers and images older than 24h during each deploy. Images referenced by any container (running or stopped) are never touched, so the live slot is safe regardless of age. Trade-off: rollback to a build older than 24h re-pulls from GHCR (~1–2 min) instead of starting instantly. Opt a project out with `blueGreen.pruneStrategy: "standard"` in `.emit-infra.json`.
+
+**Diagnosis tip:** With the containerd image store, `docker system df` reports image sizes but the bytes live under `/var/lib/containerd`, not `/var/lib/docker`. Reclaim manually with `docker container prune -f --filter "until=24h" && docker image prune -a -f --filter "until=24h"`.

@@ -200,6 +200,22 @@ describe('buildDeployExtraVars — blue-green with separate structure', () => {
     expect(vars.bg_health_checks).toBe('/healthz skip')
   })
 
+  it('passes blueGreen.pruneStrategy through as bg_prune_strategy', () => {
+    const config = {
+      ...bgConfig,
+      blueGreen: { ...bgConfig.blueGreen, pruneStrategy: 'standard' as const },
+    }
+    const vars = buildDeployExtraVars(config, '/cwd', {}, () => true)
+
+    expect(vars.bg_prune_strategy).toBe('standard')
+  })
+
+  it('omits bg_prune_strategy when unset so the ansible default applies', () => {
+    const vars = buildDeployExtraVars(bgConfig, '/cwd', {}, () => true)
+
+    expect(vars.bg_prune_strategy).toBeUndefined()
+  })
+
   it('clears post_deploy_exec and sets bg_post_exec for blue-green', () => {
     const config = {
       ...bgConfig,

@@ -44,7 +44,7 @@ NGINX_CONF_PATH="/etc/nginx/blue-green/${PROJECT}.conf"
 MIGRATE_PRE=""
 MIGRATE_POST=""
 POST_EXEC=""
-PRUNE_STRATEGY="standard"
+PRUNE_STRATEGY="aggressive"
 SLOT_GRACE_SECONDS=0
 VERSION_FILE=""
 

@@ -93,6 +93,7 @@ export const ProjectConfigSchema = z.object({
       migratePre: z.string().optional(),
       migratePost: z.string().optional(),
       composeStructure: z.enum(['profiles', 'separate']).default('separate'),
+      pruneStrategy: z.enum(['standard', 'aggressive']).optional(),
     })
     .optional(),
   ci: z

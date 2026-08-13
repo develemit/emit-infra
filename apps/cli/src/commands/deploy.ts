@@ -209,6 +209,9 @@ export function buildDeployExtraVars(
     if (config.blueGreen.migratePost) {
       extraVars.bg_migrate_post = config.blueGreen.migratePost
     }
+    if (config.blueGreen.pruneStrategy) {
+      extraVars.bg_prune_strategy = config.blueGreen.pruneStrategy
+    }
 
     // Pass postDeployExec as structured data for the blue-green script
     // (generic post_deploy_exec can't target the correct slot compose)

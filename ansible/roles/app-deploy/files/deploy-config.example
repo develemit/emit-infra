@@ -40,9 +40,11 @@ NGINX_CONF_PATH="/etc/nginx/blue-green/myproject.conf"
 # MIGRATE_POST="docker compose exec api node packages/db/src/migrate.cjs"
 
 # Prune strategy:
-#   "standard"   — docker image prune -f
-#   "aggressive"  — prune containers and images older than 24h
-PRUNE_STRATEGY="standard"
+#   "standard"   — docker image prune -f (no-op for tagged :SHA/:BUILD_NUMBER
+#                  images — nothing is ever dangling, disk grows forever)
+#   "aggressive" — prune containers and images older than 24h; the running
+#                  slot is never touched, rollback re-pulls from GHCR
+PRUNE_STRATEGY="aggressive"
 
 # Seconds to wait before stopping old slot (grace period for in-flight requests)
 SLOT_GRACE_SECONDS=0

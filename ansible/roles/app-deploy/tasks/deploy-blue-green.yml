@@ -15,7 +15,10 @@
       MIGRATE_PRE="{{ bg_migrate_pre | default('') }}"
       MIGRATE_POST="{{ bg_migrate_post | default('') }}"
       POST_EXEC="{{ bg_post_exec | default('') }}"
-      PRUNE_STRATEGY="standard"
+      # 'standard' (image prune -f) is a no-op here: every image keeps its
+      # :SHA/:BUILD_NUMBER tags so none is ever dangling — tastease hit 69%
+      # disk from 179 accumulated tags. Override via blueGreen.pruneStrategy.
+      PRUNE_STRATEGY="{{ bg_prune_strategy | default('aggressive') }}"
       SLOT_GRACE_SECONDS=0
     dest: "{{ app_dir }}/.deploy-config"
     owner: "{{ ansible_user }}"
