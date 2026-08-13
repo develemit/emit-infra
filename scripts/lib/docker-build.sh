@@ -59,6 +59,30 @@ cache_flags() {
   printf -- '--cache-from type=registry,ref=%s --cache-to type=inline' "$ref"
 }
 
+# --quiet suppressed buildx's whole progress stream — including the failing
+# step's output — so a dead build left .deploy-logs/<sha>.log ending at the
+# previous digest with no error to read (tastease build 1056: the failure had
+# to be inferred by diffing GHCR tags). Full plain-progress output now streams
+# to a per-service sibling of the deploy log; the terminal stays quiet until a
+# build fails, then shows the log path and its tail. Streaming (not buffering)
+# matters: an OOM-killed build still leaves its partial output on disk.
+_buildx_logged() {
+  local svc="$1"; shift
+  local log=""
+  [[ -n "${_EMIT_DEPLOY_LOG_FILE:-}" ]] && log="${_EMIT_DEPLOY_LOG_FILE%.log}-${svc}.log"
+  if [[ -z "$log" ]]; then
+    docker buildx build --progress=plain "$@"
+    return
+  fi
+  local rc=0
+  docker buildx build --progress=plain "$@" >> "$log" 2>&1 || rc=$?
+  if [[ $rc -ne 0 ]]; then
+    echo "✗ $svc build failed (exit $rc) — full log: $log"
+    tail -n 25 "$log"
+  fi
+  return $rc
+}
+
 build_image() {
   local svc="$1"
   local img
@@ -73,7 +97,7 @@ build_image() {
 
   echo "==> Building $svc..."
   # shellcheck disable=SC2086
-  docker buildx build \
+  _buildx_logged "$svc" \
     --platform linux/amd64 \
     -f "apps/$svc/Dockerfile" \
     $target_flag \
@@ -84,7 +108,6 @@ build_image() {
     -t "$img:$BUILD_NUMBER" \
     -t "$img:latest" \
     --push \
-    --quiet \
     .
 
   get_build_variants "$svc" | while read -r target suffix; do
@@ -92,7 +115,7 @@ build_image() {
     echo "==> Building $svc variant '$target' (tag suffix $suffix)..."
     cache=$(cache_flags "$img:latest${suffix}")
     # shellcheck disable=SC2086
-    docker buildx build \
+    _buildx_logged "$svc" \
       --platform linux/amd64 \
       -f "apps/$svc/Dockerfile" \
       --target "$target" \
@@ -102,7 +125,6 @@ build_image() {
       -t "$img:${BUILD_NUMBER}${suffix}" \
       -t "$img:latest${suffix}" \
       --push \
-      --quiet \
       .
   done
 }
