@@ -1,0 +1,9 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: zeta
+      POSTGRES_USER: zeta
+      POSTGRES_PASSWORD: zeta
+    ports:
+      - '5441:5432'

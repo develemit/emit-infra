@@ -7,3 +7,7 @@ export { deployRecordInit, deployRecordDone, type DeployContext } from './deploy
 export { sshExec, sshMuxArgs } from './ssh.js'
 export { ensureSshKey, ensureHetznerKey, type SshKeyPaths } from './ssh-key.js'
 export { resolveAccountId, resolveZoneId, ensureR2Bucket, createR2Token, revokeR2Token, r2BucketResource, deriveR2Credentials, buildR2TokenPayload, R2_ITEM_READ_PERMISSION_GROUP, R2_ITEM_WRITE_PERMISSION_GROUP } from './r2.js'
+export { findComposeFile, parsePortEntry, extractPostgresService, parseRepoCompose, type PostgresServiceInfo } from './db-scan-compose.js'
+export { classify, scanRepo, scanFleet, type DbClassification, type RepoDbInfo } from './db-scan-fleet.js'
+export { detectPortCollisions, detectCredentialCollisions, detectDefaultPortWarnings, type PortCollision, type CredentialCollision } from './db-scan-collisions.js'
+export { dockerInspectWorkingDir, verifyContainerOwnership, type DockerInspectFn, type OwnershipResult } from './db-scan-ownership.js'

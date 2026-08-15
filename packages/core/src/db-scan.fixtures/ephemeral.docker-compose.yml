@@ -1,0 +1,10 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: alpha-postgres
+    ports:
+      - '127.0.0.1::5432'
+    environment:
+      POSTGRES_USER: alpha
+      POSTGRES_PASSWORD: alpha
+      POSTGRES_DB: alpha

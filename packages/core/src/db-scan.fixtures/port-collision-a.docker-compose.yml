@@ -1,0 +1,9 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: epsilon
+      POSTGRES_USER: epsilon
+      POSTGRES_PASSWORD: epsilon
+    ports:
+      - '5441:5432'

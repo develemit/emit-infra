@@ -110,18 +110,18 @@ then run simultaneously on one machine with zero coordination.
 
 ## Acceptance criteria
 
-- [ ] The command run against the real fleet reproduces the table above:
+- [x] The command run against the real fleet reproduces the table above:
       10 fixed-port repos, `emit-billing` ephemeral, and it finds
       `martialops` (nested `docker/`) and `tastease` (`compose.yaml`)
-- [ ] It reports the 5433 and 5435 collisions, and warns on `martialops`
+- [x] It reports the 5433 and 5435 collisions, and warns on `martialops`
       (default port) and on the `postgres`/`postgres` credential pair shared
       by `martialops` and `garage-sailor-prime`
-- [ ] It exits non-zero when a collision or default-port config is present,
+- [x] It exits non-zero when a collision or default-port config is present,
       and zero on a clean fleet
-- [ ] Compose parsing (all three filename styles + nested `docker/`),
+- [x] Compose parsing (all three filename styles + nested `docker/`),
       collision detection, credential-pair detection and classification are
       covered by unit tests that need neither Docker nor `~/projects`
-- [ ] `pnpm lint`, `pnpm typecheck`, `pnpm test` and `pnpm test:hooks` green
+- [x] `pnpm lint`, `pnpm typecheck`, `pnpm test` and `pnpm test:hooks` green
 
 ## Out of scope
 
@@ -129,3 +129,108 @@ Converting any repo — that is sprints 278–281, and must not start before the
 resolver (276) and the dev-path decision (277) exist. Changing emit-billing or
 the `/init-project` template, both already done. Any production or deploy
 database configuration: this initiative is strictly local dev and test.
+
+## Completed
+
+**Date:** 2026-08-15
+
+### Summary
+
+Added `emit-infra db-doctor`, which scans a roots directory (default
+`~/projects`) and reports each repo's Postgres dev-database configuration:
+compose file location, host port (fixed vs ephemeral), credentials, and
+database name, plus a collision map. The pure logic lives in
+`packages/core` (four new files, no existing file grew) so sprint 276's
+`db-url` resolver can import the same compose-parsing code rather than
+reimplementing it, per that sprint's explicit instruction.
+
+Compose parsing uses the `yaml` package rather than hand-rolled regex —
+given the variety of real formats already in the fleet (ephemeral
+`127.0.0.1::5432`, env-interpolated `${POSTGRES_DB:-easy_living}`, and even
+an env-var-driven host port `${E2E_PG_PORT:-5436}:5432` in immigration-app),
+a real parser was far less brittle than line-oriented regex would have been.
+Port-string parsing resolves `${VAR:-default}` interpolation *before*
+splitting on `:`, because the interpolation syntax itself contains a colon
+that broke a naive split-then-resolve approach.
+
+A repo's Postgres service is matched by service name `postgres` first, else
+by image `postgres:*` — this is what lets tastease's `db:` service and
+immigration-app's `postgres-e2e` get found without hardcoding fleet-specific
+names, and (deliberately) means only the *first* matching service in a repo
+is attributed as "the" dev database, matching the sprint's own hand-audited
+table (which likewise doesn't count immigration-app's second e2e service).
+
+Task 4 (verify container ownership via the compose `working_dir` label
+before attributing a running container to a repo) is implemented as
+`verifyContainerOwnership`, wired into the live CLI path and unit-tested
+with an injected fake inspect function — it degrades to "not-running"
+harmlessly when Docker is unavailable or the container isn't up, so it never
+blocks the static-scan result the rest of the command is built on.
+
+Ran the finished command against the real `~/projects` tree (not just unit
+tests) to verify the acceptance criteria directly — see Verification below.
+
+### Files changed
+- `packages/core/src/db-scan-compose.ts` — (new) compose file discovery
+  (3 filename styles × root/`docker/`) and Postgres service extraction
+- `packages/core/src/db-scan-fleet.ts` — (new) per-repo scan + classification
+  (`ephemeral` / `fixed-port` / `no-database`) + roots-directory scan
+- `packages/core/src/db-scan-collisions.ts` — (new) port collision,
+  credential-pair collision, and default-port (5432) detectors
+- `packages/core/src/db-scan-ownership.ts` — (new) `docker inspect`-based
+  container-ownership check with an injectable seam for unit tests
+- `packages/core/src/index.ts` — exports the four new modules
+- `packages/core/package.json` — added `yaml` dependency
+- `packages/core/src/db-scan.fixtures/` — (new) 8 synthetic compose fixtures
+  covering all three filename styles, the nested `docker/` case, port and
+  credential collisions, an env-var-driven host port, and a no-database repo
+- `apps/cli/src/commands/db-doctor.ts` — (new) the `db-doctor` command:
+  scans, detects collisions, checks live ownership, exits non-zero on issues
+- `apps/cli/src/lib/db-doctor-report.ts` — (new) report formatting, split out
+  to keep the command file focused on wiring
+- `apps/cli/src/index.ts` — registers `registerDbDoctor`
+- `pnpm-lock.yaml` — lockfile update for the new `yaml` dependency
+- (tests) `packages/core/src/db-scan-{compose,fleet,collisions,ownership}.test.ts`,
+  `apps/cli/src/commands/db-doctor.test.ts`
+
+### Verification
+- `pnpm test` (nx run-many, 4 projects incl. core + cli): all green,
+  149/149 cli tests, 89/89 core tests (57 of which are new to this sprint)
+- `pnpm test:hooks`: 47 + 12 passed, 0 failed
+- `pnpm lint`, `pnpm typecheck`: clean across all 5 projects
+- Ran `node apps/cli/dist/index.js db-doctor` against the real
+  `~/projects` tree: reproduced the sprint's table exactly — 10 fixed-port
+  repos + `emit-billing` ephemeral, found `martialops` via nested `docker/`
+  and `tastease` via `compose.yaml`; reported both the 5433
+  (develemail/garage-sailor-prime) and 5435 (diner-decider/emit-social) port
+  collisions, the `postgres`/`postgres` credential collision
+  (garage-sailor-prime/martialops), and the martialops default-port warning;
+  exited 1
+- Ran the same binary against a constructed two-repo clean fleet
+  (`/tmp`, one ephemeral, one fixed-port, no collisions): exited 0
+- Note: `packages/core`'s `dist/` was stale relative to source going into
+  this sprint (the `test` nx target doesn't `dependsOn` `build`, so new
+  exports aren't visible to anything that imports `@emit-infra/core` through
+  its package boundary until `nx build core` runs). Rebuilt both `core` and
+  `cli` before the live-fleet verification above — see Follow-ups.
+
+### Follow-ups
+
+- `[defer]` `packages/core`'s `test` nx target doesn't depend on `build`,
+  so a stale `dist/` silently masks newly-added exports at runtime for
+  anything importing `@emit-infra/core` through the package boundary (its
+  own `src/*.test.ts` files are unaffected — they import relatively).
+  Existing CLI command tests never hit this because they only ever imported
+  exports `dist/` already had; this sprint's new exports were the first to
+  expose it. Missing named exports resolve to `undefined` at this repo's
+  transform layer instead of throwing, so the failure is silent until
+  something actually calls the undefined value. Worth either adding
+  `dependsOn: ["^build"]` to the `test` target or documented as "run
+  `pnpm build` before manually verifying a CLI command that added new
+  `@emit-infra/core` exports."
+- `[defer]` `db-doctor` attributes only the first Postgres-looking service
+  per repo (service named `postgres`, else first `postgres:*` image) to
+  match the sprint's own hand-audited table. immigration-app's second
+  `postgres-e2e` service is invisible to the scan. Fine for now — flag if a
+  future repo's *secondary* database service turns out to matter for
+  collision detection.

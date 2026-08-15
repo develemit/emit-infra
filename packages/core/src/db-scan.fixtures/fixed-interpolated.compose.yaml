@@ -1,0 +1,10 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: beta-postgres
+    ports:
+      - "5440:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-beta}
+      POSTGRES_USER: ${POSTGRES_USER:-beta}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-beta}
