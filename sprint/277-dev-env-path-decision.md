@@ -95,18 +95,18 @@ sweep would cost ten reworks.
 
 ## Acceptance criteria
 
-- [ ] `docs/EPHEMERAL-DEV-DB.md` exists and states the decision, the two
+- [x] `docs/EPHEMERAL-DEV-DB.md` exists and states the decision, the two
       rejected options with reasons, the conversion recipe, and the developer
       migration note
-- [ ] emit-billing runs `pnpm dev` against its ephemeral database with no
+- [x] emit-billing runs `pnpm dev` against its ephemeral database with no
       hardcoded port anywhere in its `.env` or `.env.example`
-- [ ] An explicit `DATABASE_URL` still overrides the mechanism — demonstrated,
+- [x] An explicit `DATABASE_URL` still overrides the mechanism — demonstrated,
       not asserted
-- [ ] The mechanism cannot reach for Docker in production — demonstrated by
+- [x] The mechanism cannot reach for Docker in production — demonstrated by
       the guard that prevents it, and covered by a test naming that guard
-- [ ] Stopping the container produces an actionable error from `pnpm dev`,
+- [x] Stopping the container produces an actionable error from `pnpm dev`,
       not an opaque connection refusal
-- [ ] `pnpm lint`, `pnpm typecheck`, `pnpm test` and `pnpm test:hooks` green
+- [x] `pnpm lint`, `pnpm typecheck`, `pnpm test` and `pnpm test:hooks` green
       in emit-infra; emit-billing's own `pnpm check:all` green
 
 ## Out of scope
@@ -115,3 +115,129 @@ Converting any repo other than the emit-billing pilot — the fleet rollout is
 sprints 278–281 and must not begin until this doc exists. Re-opening the
 ephemeral-vs-port-registry decision: ephemeral is settled, and this sprint
 only decides how developers consume it. Production database configuration.
+
+## Completed
+
+**Date:** 2026-08-15
+
+### Summary
+
+Chose runtime resolution: emit-billing's `loadEnv()` now resolves
+`DATABASE_URL` at call time (via `emit-infra db-url`, shelled out to per
+sprint 276's loader constraint) whenever it's unset and `NODE_ENV !==
+'production'`. Rejected the `predev`-writes-a-fragment option (extra file,
+extra loader wiring, no better than call-time resolution) and the
+documented-manual-edit option (breaks silently on every `docker compose
+down -v`, which is exactly the failure class ephemeral ports exist to kill).
+Full record, including the guarantees section proving each acceptance
+criterion live rather than just by test, is in
+`docs/EPHEMERAL-DEV-DB.md`.
+
+Implemented end-to-end in emit-billing as the pilot:
+`packages/config/src/resolve-dev-database-url.ts` (new) holds
+`maybeResolveDatabaseUrl` (explicit `DATABASE_URL` wins; production never
+calls discovery) and `resolveDevDatabaseUrl` (the actual subprocess call,
+with an actionable error — CLI missing vs. container not running are
+distinguished — rather than a bare stack trace). `env.ts`'s `loadEnv()`
+wires it in, passing `resolveDevDatabaseUrl` explicitly rather than relying
+on its own default parameter, specifically so mocking it at the
+`env.ts`-to-`resolve-dev-database-url.ts` import boundary reliably
+intercepts it in tests (a same-module default-parameter self-reference is
+not reliably mockable across files under Vitest's ESM handling — confirmed
+by hitting it, not by assumption).
+
+Two things surfaced only by actually wiring this into a real app, not
+visible from the schema/CLI layer alone:
+
+1. **`loadEnv()`'s resolved value isn't automatically in `process.env`.**
+   `packages/db/src/client.ts` reads `process.env.DATABASE_URL` directly
+   (as does the existing vitest `globalSetup`, by the same convention) —
+   `apps/api/src/main.ts` and `apps/worker/src/main.ts` now write
+   `process.env.DATABASE_URL = env.DATABASE_URL` right after `loadEnv()`,
+   matching that existing convention rather than inventing a new one. This
+   is very likely a gap in every one of the sprint 278–281 target repos too
+   — the conversion recipe calls it out explicitly.
+2. **The barrel import broke `apps/web`'s build.** `apps/web/src/
+   middleware.ts` imported `resolveDashboardPassword` from the `@org/config`
+   barrel, which now transitively pulls in `resolve-dev-database-url.ts`'s
+   `node:child_process`/`node:fs` — `nx run web:build` failed resolving it
+   inside the Edge/Node middleware bundle. Fixed the same way
+   `@org/shared-types` already solves this class of problem in this repo:
+   moved `resolveDashboardPassword` to its own file
+   (`packages/config/src/dashboard-password.ts`) with a dedicated
+   `@org/config/dashboard-password` package.json export subpath, and
+   pointed `middleware.ts` at that instead of the barrel. `env.ts` still
+   re-exports it for any other barrel consumer.
+
+Verified live end-to-end, not just by test: `emit-infra db-url` against the
+running container printed a correct URL; `loadEnv()` with no `DATABASE_URL`
+resolved the same live port; an explicit `DATABASE_URL` override was
+returned untouched even with the container reachable; production with
+`DATABASE_URL` unset threw the normal zod error with no subprocess call;
+stopping the container produced the actionable
+`DATABASE_URL is unset and dev auto-discovery ... failed: ... Run
+\`pnpm infra:up\`...` message, not `ECONNREFUSED`; restarting the container
+(which reassigned its port, observed live) was picked up by the very next
+`loadEnv()` call with no caching; `apps/api` and `apps/worker`'s dev targets
+both booted clean from an environment with only `OPERATOR_TOKEN` set — no
+`.env` file, no `DATABASE_URL` anywhere.
+
+### Files changed
+
+- (new) `docs/EPHEMERAL-DEV-DB.md` (emit-infra) — the decision record:
+  problem, rejected options, per-repo conversion recipe, developer migration
+  note, `/init-project` template story
+- (emit-billing, separate repo, own commit) `packages/config/src/
+  resolve-dev-database-url.ts` (new), `.test.ts` (new) — discovery +
+  production guard
+- (emit-billing) `packages/config/src/env.ts`, `env.test.ts` — wires
+  discovery into `loadEnv()`
+- (emit-billing) `packages/config/src/dashboard-password.ts` (new),
+  `.test.ts` (new) — extracted from `env.ts` to unblock the web build
+- (emit-billing) `packages/config/package.json` — added the
+  `./dashboard-password` export subpath
+- (emit-billing) `apps/web/src/middleware.ts` — dedicated subpath import
+- (emit-billing) `apps/api/src/main.ts`, `apps/worker/src/main.ts` —
+  `process.env.DATABASE_URL` write-back after `loadEnv()`
+- (emit-billing) `.env.example` (new), `.gitignore` — documents required dev
+  vars without a hardcoded `DATABASE_URL`; ignores `.env`/`.env.local`
+
+### Verification
+
+- emit-infra: `pnpm lint` clean (5 projects), `pnpm typecheck` clean (5
+  projects), `pnpm test` 350/350 (42 test files), `pnpm test:hooks` 47+12+6
+  passed, 0 failed
+- emit-billing: `pnpm check:all` green (format, lint 16/16, typecheck 16/16,
+  test 15/15, build 8/8 — including `web`, which failed before the barrel
+  fix); `pnpm check:all:e2e` green (crosses the api/web boundary, per this
+  repo's own CLAUDE.md convention)
+- emit-billing `packages/config` tests: 26/26 (new dev-discovery +
+  dashboard-password suites included)
+- Live verification of every acceptance criterion, listed in the Summary
+  above
+
+### Follow-ups
+
+- `[address-next]` Every sprint 278–281 target repo should be checked for
+  the same "`loadEnv()`'s resolved `DATABASE_URL` isn't in `process.env`"
+  gap this pilot found — grep each repo's DB client for a direct
+  `process.env.DATABASE_URL` read before assuming a `loadEnv()`-equivalent
+  wire-up alone is sufficient. The conversion recipe in
+  `docs/EPHEMERAL-DEV-DB.md` calls this out; flag it again per-repo since
+  it's easy to skip.
+- `[defer]` `packages/core`'s `test` nx target still doesn't
+  `dependsOn: ["^build"]` (sprint 275/276's open follow-up) — not hit again
+  this sprint since `pnpm build` was run for `core`/`cli` before live
+  verification, but still open.
+- `[defer]` `resolveDevDatabaseUrl`'s `EMIT_INFRA_DIR` default
+  (`$HOME/projects/emit-infra`) assumes the sibling-checkout convention this
+  whole machine already uses (same assumption `scripts/lib/db-url.sh`
+  makes) — fine for this fleet, would need to become configurable if
+  emit-infra is ever checked out somewhere else on a dev machine.
+- `[defer]` emit-billing's `.env.example` documents `OPERATOR_TOKEN` /
+  `BILLING_OPERATOR_TOKEN` / `BILLING_API_URL` / `DASHBOARD_PASSWORD` but
+  nothing in the toolchain actually loads `.env` automatically (no dotenv,
+  no `--env-file`) — a developer has to source it into their shell
+  themselves. Said so explicitly in the file's header comment rather than
+  implying otherwise; wiring real autoloading is a separate DX
+  improvement, not this sprint's decision.
