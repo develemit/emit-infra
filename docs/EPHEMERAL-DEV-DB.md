@@ -188,11 +188,16 @@ For each repo in the sprint 278–281 rollout:
    `process.env`).
 3. Wire in `maybeResolveDatabaseUrl`-equivalent logic at that boundary:
    explicit value wins, production never resolves, otherwise shell out to
-   `emit-infra db-url` (subprocess — see the constraint above) and write the
-   result back to `process.env.DATABASE_URL` at the process entrypoint.
+   `emit-infra db-url --assert-identity` (subprocess — see the constraint
+   above, and the sprint 278 correction below on why `--assert-identity` and
+   not bare `db-url`) and write the result back to `process.env.DATABASE_URL`
+   at the process entrypoint.
 4. Run the repo's own dev boot with **no `DATABASE_URL` anywhere** (not in
    `.env`, not in the shell) and confirm it connects. Stop the container and
-   confirm the failure is actionable, not an opaque refusal.
+   confirm the failure is actionable, not an opaque refusal. If anything in
+   the repo's dev boot path also runs migrations or seeds against the
+   database (a drizzle-kit config, a boot-time migrate call), point it at the
+   resolver the same way — don't leave a second, unconverted read site.
 5. Update the repo's `.env.example` (create one if it doesn't exist) to omit
    `DATABASE_URL` entirely, with a one-line comment pointing here. Add `.env`
    to `.gitignore` if it isn't already.
@@ -200,6 +205,47 @@ For each repo in the sprint 278–281 rollout:
    message.
 7. Run the repo's own verification command (`pnpm check:all` or equivalent)
    clean before considering the repo converted.
+
+## Sprint 278 pilot: what the recipe got right, what it corrected
+
+`garage-sailor` (emit-infra sprint 278) was the first repo converted since
+this doc was written, and the first one where the resulting `DATABASE_URL`
+actually got used to boot the app against a live container — emit-billing
+*is* this pattern's dev boot, so its own conversion couldn't test that. Two
+findings:
+
+**Correction: the dev-path resolver should call `--assert-identity`, not
+bare `db-url`.** The emit-billing reference implementation
+(`resolve-dev-database-url.ts`) doesn't pass it — that gap wasn't caught
+because emit-billing's dev boot has always used this exact port-discovery
+path, so a mismatch would have shown up immediately in the deployment that
+proved the mechanism, not silently. A newly converted repo doesn't have that
+history: dev boot creates a real Postgres pool from whatever URL comes back,
+so an unresolved identity risk (a stale ephemeral port reassigned to a
+different project's container between the `docker compose port` call and the
+connection, or a compose file with a wrong `POSTGRES_DB`) should fail loudly
+there too, not just in the test path's `globalSetup`. Both of garage-sailor's
+call sites (`apps/api/src/resolve-dev-database-url.ts`,
+`drizzle.config.pg.ts`) now pass it; the recipe step above reflects this.
+
+**Not a recipe gap, but worth a repo-specific check before converting: a
+repo may have a working non-Postgres dev fallback that the Postgres path
+was never actually exercised against.** garage-sailor's `apps/api/src/main.ts`
+falls back to an in-memory SQLite client when `DATABASE_URL` is unset —
+before this sprint, no `.env` existed in the piloted checkout, so dev boot
+had *always* run on that fallback, and the pilot's live dev-boot test was
+the first time this checkout ever connected to real Postgres. It surfaced a
+pre-existing, unrelated bug: `apps/api/src/domains/sales/drizzle-repo.ts` is
+written entirely against `better-sqlite3`'s synchronous `.all()`/`.run()`
+API, which doesn't exist on the `drizzle-orm/node-postgres` client
+`createPgDb` returns — so the sales domain throws against Postgres. This
+sprint's job was port/URL discovery, not that repo's persistence layer, so
+it wasn't fixed here (see garage-sailor's sprint 278 follow-ups). The
+transferable lesson: before converting a repo, check whether it has a
+non-Postgres dev fallback and, if so, whether anyone has actually dev-booted
+it against Postgres recently — a clean `check:all` doesn't catch this, since
+unit tests run against their own (often SQLite, in-memory) fixture and never
+exercise the boot-time `DATABASE_URL` branch at all.
 
 ## Developer migration note
 
