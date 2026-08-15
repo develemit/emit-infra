@@ -206,7 +206,7 @@ follow-up rather than silently left for someone to trip over.
 
 ### Follow-ups
 
-- `[blocker]` `apps/api/src/domains/sales/drizzle-repo.ts` in garage-sailor
+- ~~`[blocker]` `apps/api/src/domains/sales/drizzle-repo.ts` in garage-sailor
   is written entirely against `better-sqlite3`'s synchronous `.all()`/`.run()`
   API and throws against the `drizzle-orm/node-postgres` client this
   sprint's `DATABASE_URL` auto-discovery now activates by default whenever
@@ -215,7 +215,20 @@ follow-up rather than silently left for someone to trip over.
   decision: port the sales repo to the async Postgres API, or scope this
   sprint's dev-path wiring so it doesn't silently flip garage-sailor's
   canonical dev database out from under a repo whose Postgres persistence
-  layer was never finished.
+  layer was never finished.~~
+  → **RESOLVED 2026-08-15** (user chose the port option), garage-sailor
+  commit `9e96adb`. Scope was wider than the blocker described: the same
+  synchronous pattern was in all four domains plus `jobs.ts`, 38 call sites.
+  Converted to `await` throughout — drizzle's better-sqlite3 builders are
+  themselves awaitable, verified empirically, so one async codebase serves
+  both drivers (sqlite still backs the tests, Postgres dev/prod).
+  `TokenStore` was the only genuinely synchronous interface and became
+  Promise-returning; every other repo interface was already async, which is
+  what kept the change contained to implementations. `jobs.ts` now reads
+  `changes ?? rowCount` for affected rows instead of the sqlite-only field.
+  Verified live: all four repos exercised against the ephemeral container,
+  API boots and `GET /sales` serves a full sale with tags, windows and float
+  lat/lng. **Sprint 279 is unblocked.**
 - `[address-next]` `packages/db/README.md` in garage-sailor has other stale
   boilerplate from the `/init-project` template beyond the `DATABASE_URL`
   line this sprint fixed — e.g. it references `@garage-sailor/db` and a
