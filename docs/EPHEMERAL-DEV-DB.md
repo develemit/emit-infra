@@ -206,6 +206,35 @@ For each repo in the sprint 278–281 rollout:
 7. Run the repo's own verification command (`pnpm check:all` or equivalent)
    clean before considering the repo converted.
 
+## Sprint 279: a second read site, and a Playwright/`import.meta.url` trap
+
+`tastease` (emit-infra sprint 279) converted cleanly via `packages/db/src/env.ts`
+for dev boot, migrations, and seeding — but its Playwright e2e suite
+(`e2e/support/reset-seed-household.ts`, `stripe-teardown.ts`) connects to
+Postgres directly via `pg`/`Stripe`, bypassing `packages/db` entirely and
+reading `DATABASE_URL` from a dotenv-loaded `e2e/support/test-env.ts`. This is
+exactly the "second, unconverted read site" the recipe's step 4 already warns
+about — worth restating because it's easy to miss: grepping for
+`process.env.DATABASE_URL` is not enough if the repo has a test/e2e harness
+with its own env-loading module separate from the app's.
+
+**New finding: don't put `import.meta.url` in a resolver module that
+Playwright's own TS loader will import.** The first attempt computed a
+default `cwd` inside the shared resolver via
+`dirname(fileURLToPath(import.meta.url))` — works fine under `tsx` (used by
+dev boot, migrations, `db:seed`), but Playwright's TS transform choked on it
+with `ReferenceError: exports is not defined in ES module scope` when the
+same file was reached from `e2e/support/test-env.ts` (which itself uses the
+CJS `__dirname`, not `import.meta.url` — Playwright compiles that subgraph
+as CommonJS, and the ESM-only `import.meta.url` doesn't survive the
+transform). The fix: don't compute a default `cwd` inside the shared
+resolver at all — make it a required parameter and let each caller supply
+its own repo-root path, computed however already works in that caller's own
+module context (`import.meta.url` in an ESM/tsx context,
+`resolve(__dirname, "..")` in whatever context Playwright's loader gives
+you). A shared resolver that tries to be clever about locating its own
+working directory is exactly the part that doesn't port across loaders.
+
 ## Sprint 278 pilot: what the recipe got right, what it corrected
 
 `garage-sailor` (emit-infra sprint 278) was the first repo converted since

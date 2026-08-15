@@ -81,6 +81,21 @@ file to promote items into proper sprints when the list grows worth addressing.
 - (sprint 278, 2026-08-15) `garage-sailor`'s `.env.example` still lists `DATABASE_URL` (commented, documented) even though the recipe's ideal end state is no mention at all — kept the line commented-out rather than deleted since the override escape hatch is worth documenting inline; revisit if sprints 279–281 converge on a cleaner convention.
 - ~~(sprint 278, 2026-08-15) `garage-sailor`'s `packages/db/README.md` has stale `/init-project` template boilerplate — it references `@garage-sailor/db` and a `getDb()` export that don't match the actual `@org/db` package/exports.~~ → resolved in the sprint-278 follow-up cleanup, garage-sailor commit `3b9e993` (2026-08-15)
 
+### Deferred ephemeral-DB conversions (sprint 279, user decision 2026-08-15)
+
+Both repos were dropped from sprint 279's scope. Neither is under active
+development. **Deferring them is safe**: their containers are not running, and
+every collision they participate in is retired from the other side by sprints
+280–281 — after those land, no actively developed repo can collide with
+either, and the two cannot silently reach each other (they share
+`postgres`/`postgres` credentials but sit on *different* ports, and the
+silent-cross-write precondition needs a port match *and* a credential match).
+`db-doctor` will keep exiting non-zero until they're converted; sprint 281's
+fleet-clean criterion was amended to expect exactly these two.
+
+- (sprint 279, 2026-08-15) **Convert `martialops` to ephemeral dev Postgres.** Blocked first by its own tooling: 50 uncommitted files sit behind a failing `pnpm audit --audit-level=high` pre-commit gate (20 high-severity transitive advisories, 0 critical), so no commit can land in the repo at all — resolve that first (`/dep-audit`, or a deliberate `--no-verify`). Conversion itself then needs its 23 hardcoded-URL files classified live-connection vs inert-fixture (fixtures keep a literal on a non-routable host like `db.invalid`; do not blanket find-and-replace). Note its compose lives at `docker/docker-compose.yml`, so its compose *project name* is `docker` and its container is `docker-postgres-1`. **This is still the fleet's riskiest configuration** — default port 5432 with default `postgres`/`postgres` credentials — so any stray default-configured Postgres container is reachable by its tooling. Highest priority once the audit gate clears.
+- (sprint 279, 2026-08-15) **Convert `garage-sailor-prime` to ephemeral dev Postgres — needs a 280/281-shaped sprint, not 279.** It was mis-scoped: `apps/api/src/routes/listings.test.ts` imports `prisma` from `../lib/prisma.js`, so its tests **do** open a database and it needs a test bootstrap (discovery + readiness wait + identity assertion + migrations). It uses **Prisma, not Drizzle**, so the emit-billing `test-db.ts` reference does not transfer literally — preserve the shape, not the file. Its `mobile` Jest config is separately broken (pre-existing `@react-native/js-polyfills` transform failure, unrelated to database work). Shares `postgres`/`postgres` credentials with `martialops`. When promoting this, update the target sprint's own repo table rather than silently appending it.
+
 ## ✅ Converted to Sprints
 
 - ~~(sprint 246, 2026-08-01) diner-decider is next in the rollout order per the sprint-234 audit, but stays blocked on sprint 258's (formerly 247) `/api/*` migration as this sprint's Context section specifies. _Note added during the auto-loop: that migration already landed on 2026-07-24 in commit `4e0f44e`, so the only residual work is enabling `syncOnDeploy` — see the sprint-258 obsolescence note below._~~

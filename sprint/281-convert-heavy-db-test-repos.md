@@ -104,9 +104,16 @@ is a second reason to do them with the recipe fully settled.
       unchanged, and the Postgres-vs-pgbouncer decision is recorded
 - [ ] Exactly one commit per converted repo, each carrying the developer
       migration note
-- [ ] **Sprint 275's doctor reports zero fixed-port repos, zero collisions,
-      and zero default-port configs across the fleet** — the before/after maps
-      recorded side by side
+- [ ] **Sprint 275's doctor reports zero collisions and zero fixed-port repos
+      apart from the two known deferrals** (`martialops`, `garage-sailor-prime`
+      — deferred by user decision in sprint 279, see `backlog.md`) — the
+      before/after maps recorded side by side.
+      _Amended 2026-08-15: originally "zero … across the fleet", which cannot
+      hold while those two are unconverted. Both remaining fixed-port repos
+      must be exactly those two, `martialops` must be the only default-port
+      config, and **no converted repo may appear in any collision** — if a
+      third repo shows up fixed-port, or either deferral gains a port+
+      credential twin, that is a real failure, not an expected deferral._
 - [ ] `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm test:hooks` green in
       emit-infra
 
