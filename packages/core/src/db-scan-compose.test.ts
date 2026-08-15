@@ -3,7 +3,14 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { findComposeFile, parsePortEntry, extractPostgresService, parseRepoCompose } from './db-scan-compose.js'
+import {
+  findComposeFile,
+  parsePortEntry,
+  extractPostgresService,
+  extractServiceByName,
+  parseRepoCompose,
+  parseRepoComposeService,
+} from './db-scan-compose.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const FIXTURES_DIR = join(__dirname, 'db-scan.fixtures')
@@ -79,7 +86,10 @@ describe('parsePortEntry', () => {
   })
 
   it('resolves ${VAR:-default} interpolation in the host port', () => {
-    expect(parsePortEntry('${E2E_PG_PORT:-5436}:5432')).toEqual({ hostPort: 5436, isEphemeral: false })
+    expect(parsePortEntry('${E2E_PG_PORT:-5436}:5432')).toEqual({
+      hostPort: 5436,
+      isEphemeral: false,
+    })
   })
 
   it('treats an unresolvable var with no default as not-ephemeral-but-unknown', () => {
@@ -168,5 +178,43 @@ describe('parseRepoCompose', () => {
     const repo = mkdtempSync(join(tmpdir(), 'db-scan-compose-test-'))
     tmpDirs.push(repo)
     expect(parseRepoCompose(repo)).toEqual({ composeFile: null, postgres: null })
+  })
+})
+
+describe('extractServiceByName', () => {
+  it('finds a service by its exact name, regardless of image', () => {
+    const parsed = { services: { db: { image: 'postgres:16-alpine', ports: ['5440:5432'] } } }
+    expect(extractServiceByName(parsed, 'db')?.serviceName).toBe('db')
+  })
+
+  it('does not fall back to a differently-named postgres image', () => {
+    const parsed = { services: { db: { image: 'postgres:16-alpine' } } }
+    expect(extractServiceByName(parsed, 'postgres')).toBeNull()
+  })
+
+  it('returns null when services is missing entirely', () => {
+    expect(extractServiceByName({}, 'postgres')).toBeNull()
+  })
+})
+
+describe('parseRepoComposeService', () => {
+  it('looks up a non-default service name (tastease-style "db")', () => {
+    const repo = makeRepo({ 'compose.yaml': 'fixed-interpolated.compose.yaml' })
+    const { composeFile, postgres } = parseRepoComposeService(repo, 'db')
+    expect(composeFile).toBe('compose.yaml')
+    expect(postgres?.hostPort).toBe(5440)
+  })
+
+  it('returns null postgres info when the named service does not exist', () => {
+    const repo = makeRepo({ 'docker-compose.yml': 'ephemeral.docker-compose.yml' })
+    const { composeFile, postgres } = parseRepoComposeService(repo, 'nope')
+    expect(composeFile).toBe('docker-compose.yml')
+    expect(postgres).toBeNull()
+  })
+
+  it('returns nulls for a repo with no compose file at all', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'db-scan-compose-test-'))
+    tmpDirs.push(repo)
+    expect(parseRepoComposeService(repo, 'postgres')).toEqual({ composeFile: null, postgres: null })
   })
 })

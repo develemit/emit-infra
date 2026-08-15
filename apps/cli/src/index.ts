@@ -17,6 +17,7 @@ import { registerTerraformInit } from './commands/terraform-init.js'
 import { registerR2RotateToken } from './commands/r2-rotate-token.js'
 import { registerInitDeploy } from './commands/init-deploy.js'
 import { registerDbDoctor } from './commands/db-doctor.js'
+import { registerDbUrl } from './commands/db-url.js'
 
 const program = new Command()
 
@@ -42,6 +43,7 @@ registerTerraformInit(program)
 registerR2RotateToken(program)
 registerInitDeploy(program)
 registerDbDoctor(program)
+registerDbUrl(program)
 
 program.parseAsync(process.argv).catch((err: unknown) => {
   console.error(err instanceof Error ? err.message : String(err))

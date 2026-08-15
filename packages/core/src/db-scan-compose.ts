@@ -86,28 +86,17 @@ function isPostgresImage(image: unknown): boolean {
   return typeof image === 'string' && /^postgres[:@]/i.test(image)
 }
 
-export function extractPostgresService(parsed: unknown): PostgresServiceInfo | null {
-  const services = (parsed as { services?: unknown } | null)?.services
-  if (!services || typeof services !== 'object') return null
-
-  let picked: [string, Record<string, unknown>] | null = null
-  for (const [name, svc] of Object.entries(services as Record<string, unknown>)) {
-    if (!svc || typeof svc !== 'object') continue
-    const service = svc as Record<string, unknown>
-    if (name === 'postgres') { picked = [name, service]; break }
-    if (!picked && isPostgresImage(service['image'])) picked = [name, service]
-  }
-  if (!picked) return null
-  const [serviceName, svc] = picked
-
+function buildServiceInfo(serviceName: string, svc: Record<string, unknown>): PostgresServiceInfo {
   const ports = Array.isArray(svc['ports'])
     ? (svc['ports'] as unknown[]).filter((p): p is string => typeof p === 'string')
     : []
-  const portInfo = ports[0] !== undefined ? parsePortEntry(ports[0]) : { hostPort: null, isEphemeral: true }
+  const portInfo =
+    ports[0] !== undefined ? parsePortEntry(ports[0]) : { hostPort: null, isEphemeral: true }
 
   return {
     serviceName,
-    containerName: typeof svc['container_name'] === 'string' ? svc['container_name'] as string : null,
+    containerName:
+      typeof svc['container_name'] === 'string' ? (svc['container_name'] as string) : null,
     hostPort: portInfo.hostPort,
     isEphemeral: portInfo.isEphemeral,
     user: extractEnvValue(svc['environment'], 'POSTGRES_USER'),
@@ -116,10 +105,64 @@ export function extractPostgresService(parsed: unknown): PostgresServiceInfo | n
   }
 }
 
-export function parseRepoCompose(repoPath: string): { composeFile: string | null; postgres: PostgresServiceInfo | null } {
+function getServices(parsed: unknown): Record<string, unknown> | null {
+  const services = (parsed as { services?: unknown } | null)?.services
+  return services && typeof services === 'object' ? (services as Record<string, unknown>) : null
+}
+
+export function extractPostgresService(parsed: unknown): PostgresServiceInfo | null {
+  const services = getServices(parsed)
+  if (!services) return null
+
+  let picked: [string, Record<string, unknown>] | null = null
+  for (const [name, svc] of Object.entries(services)) {
+    if (!svc || typeof svc !== 'object') continue
+    const service = svc as Record<string, unknown>
+    if (name === 'postgres') {
+      picked = [name, service]
+      break
+    }
+    if (!picked && isPostgresImage(service['image'])) picked = [name, service]
+  }
+  if (!picked) return null
+  return buildServiceInfo(picked[0], picked[1])
+}
+
+// Unlike extractPostgresService's "postgres" name / postgres:* image auto-detect
+// (built for db-doctor's arbitrary-repo scan), this looks up one exact service
+// name — what db-url needs when a repo names its service something else (e.g.
+// tastease's `db`) and the caller already knows which one it wants.
+export function extractServiceByName(
+  parsed: unknown,
+  serviceName: string,
+): PostgresServiceInfo | null {
+  const services = getServices(parsed)
+  const svc = services?.[serviceName]
+  if (!svc || typeof svc !== 'object') return null
+  return buildServiceInfo(serviceName, svc as Record<string, unknown>)
+}
+
+function readAndParseCompose(repoPath: string): { relative: string; parsed: unknown } | null {
   const relative = findComposeFile(repoPath)
-  if (!relative) return { composeFile: null, postgres: null }
+  if (!relative) return null
   const content = readFileSync(join(repoPath, relative), 'utf-8')
-  const parsed = parseYaml(content)
-  return { composeFile: relative, postgres: extractPostgresService(parsed) }
+  return { relative, parsed: parseYaml(content) }
+}
+
+export function parseRepoCompose(repoPath: string): {
+  composeFile: string | null
+  postgres: PostgresServiceInfo | null
+} {
+  const found = readAndParseCompose(repoPath)
+  if (!found) return { composeFile: null, postgres: null }
+  return { composeFile: found.relative, postgres: extractPostgresService(found.parsed) }
+}
+
+export function parseRepoComposeService(
+  repoPath: string,
+  serviceName: string,
+): { composeFile: string | null; postgres: PostgresServiceInfo | null } {
+  const found = readAndParseCompose(repoPath)
+  if (!found) return { composeFile: null, postgres: null }
+  return { composeFile: found.relative, postgres: extractServiceByName(found.parsed, serviceName) }
 }
