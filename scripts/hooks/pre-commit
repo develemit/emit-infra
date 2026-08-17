@@ -27,6 +27,17 @@ except Exception as e:
 ")
 
 echo "pre-commit: running $TARGETS on affected projects..."
-pnpm nx affected -t $TARGETS --base=HEAD
+
+for target in $TARGETS; do
+  echo "→ $target"
+  if [[ "$target" == "format" ]]; then
+    # Formatting is a whole-repo prettier check, not a per-project nx target
+    # — `nx affected -t format` finds no matching projects and silently
+    # no-ops (see pre-push for the same fix). Run the root script directly.
+    pnpm format
+  else
+    pnpm nx affected -t "$target" --base=HEAD
+  fi
+done
 
 echo "pre-commit: all checks passed."
