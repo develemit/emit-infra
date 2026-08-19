@@ -105,6 +105,8 @@ fleet-clean criterion was amended to expect exactly these two.
 - (sprint 281, 2026-08-15) **`develemail`'s `docker-compose.override.yml` is tracked in git** despite `.gitignore` listing it and `CLAUDE.md` documenting it as "gitignored; customize locally" — committed before the ignore rule was added and never untracked, so someone's local customizations are effectively shared. `git rm --cached` + confirm the `.example` counterpart still covers onboarding.
 - (sprint 281, 2026-08-15) `develemail`'s `packages/db/scripts/baseline-migrations.ts` now gets the same discovery fallback as the app boot paths, but it's a production-reconciliation tool normally run with an explicit `DATABASE_URL` — worth confirming this is desired rather than leaving it error-only-when-unset.
 
+- (sprint 282, 2026-08-19) Live-push verification of the new trap wiring against a real production deploy is still outstanding; do it the next time a wired project's `main` gets a natural push, per the Out of scope note.
+
 ## ✅ Converted to Sprints
 
 - ~~(sprint 246, 2026-08-01) diner-decider is next in the rollout order per the sprint-234 audit, but stays blocked on sprint 258's (formerly 247) `/api/*` migration as this sprint's Context section specifies. _Note added during the auto-loop: that migration already landed on 2026-07-24 in commit `4e0f44e`, so the only residual work is enabling `syncOnDeploy` — see the sprint-258 obsolescence note below._~~
