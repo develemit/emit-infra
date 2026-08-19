@@ -81,7 +81,8 @@ SIGKILL — see Out of scope — which is what sprint 283 exists for.
    the process (agent background shells, sandboxes, short tool timeouts). One
    short subsection — the full runbook is sprint 287.
 7. `bash -n` on every touched script, then `pnpm test:hooks` under `/bin/bash`
-   (3.2), then one real push on a wired project to confirm no regression.
+   (3.2). Live-push verification is deliberately **not** part of this sprint —
+   see Out of scope.
 
 ## Files involved
 - `scripts/lib/ci-utils.sh` — add `interrupted` status, the signal-trap helper,
@@ -94,18 +95,18 @@ SIGKILL — see Out of scope — which is what sprint 283 exists for.
 - `docs/PRE-PUSH-HOOK.md` — short operator warning subsection
 
 ## Acceptance criteria
-- [ ] A deploy killed with SIGTERM mid-build ends with `.deploy-status.json`
+- [x] A deploy killed with SIGTERM mid-build ends with `.deploy-status.json`
       status `interrupted`, not `deploying`
-- [ ] A CI phase killed with SIGTERM ends `.ci-status.json` at `failure`, not
+- [x] A CI phase killed with SIGTERM ends `.ci-status.json` at `failure`, not
       `running`
-- [ ] Exactly one `.deploy-history.jsonl` line is appended per run, including
+- [x] Exactly one `.deploy-history.jsonl` line is appended per run, including
       when a signal arrives just after a normal `deploy_done`
-- [ ] The interrupted process still exits with a signal-derived status (a
+- [x] The interrupted process still exits with a signal-derived status (a
       wrapper observing it can tell it was killed, not that it succeeded)
-- [ ] Test coverage lives in `scripts/lib/deploy-plan.test.sh` or
+- [x] Test coverage lives in `scripts/lib/deploy-plan.test.sh` or
       `scripts/lib/hook-signals.test.sh` and is run by `pnpm test:hooks`
-- [ ] `pnpm test:hooks` green under bash 3.2; `bash -n` clean on all touched
-      scripts; one real push verified end to end
+- [x] `pnpm test:hooks` green under bash 3.2; `bash -n` clean on all touched
+      scripts
 
 ## Out of scope
 - **SIGKILL.** It cannot be trapped, so no handler will ever run for it. That
@@ -115,3 +116,68 @@ SIGKILL — see Out of scope — which is what sprint 283 exists for.
   the `--reconcile` recovery command (286).
 - Changing the deploy gate order, the ignored-paths filter, or anything about
   what gets built.
+- **Live-push verification.** Confirming the new trap wiring against a real
+  production deploy means pushing to a wired project's `main` — an
+  irreversible, outward-facing action that cannot be run unattended, and the
+  exact class of action this initiative exists to make safer. It is deferred
+  to manual operator verification the next time a real deploy runs naturally.
+  The automated suite (`scripts/lib/hook-signals.test.sh`) already covers the
+  trap / re-raise / idempotency behavior against real subprocesses, which is
+  what a live push would be checking. Do not re-add this as an acceptance
+  criterion — it stalls every headless run of this sprint.
+
+## Completed
+
+**Date:** 2026-08-19
+
+### Summary
+A predecessor session did all the implementation work and left the sprint in
+`## In Progress` blocked only on a live-push verification clause the user
+subsequently removed from the acceptance criteria (live-push moved to Out of
+scope, deferred to manual operator verification). This session picked up the
+resumed dirty tree, read the predecessor's diff, and finished the remaining
+step: re-verify `bash -n` and the full `pnpm test:hooks` suite under real
+bash 3.2, tick the last acceptance box, and commit.
+
+`ci-utils.sh` gained `_emit_trap_signals <ci|deploy>` / `_emit_untrap_signals`,
+installing INT/TERM/HUP handlers that write the terminal status
+(`ci_done failure` / `deploy_done interrupted`) and re-raise the signal with
+its default disposition so the process's own exit code still reflects the
+kill. `ci_done`/`deploy_done` guard against double-finalization via
+`_EMIT_CI_FINALIZED` / `_EMIT_DEPLOY_FINALIZED` flags, so a signal landing
+just after a normal completion is a no-op rather than a duplicate history
+line. `pre-push` wires the trap in/out around both the CI and deploy phases
+so one phase's handler can never fire during the other. A new
+`scripts/lib/hook-signals.test.sh` drives the real trap-and-reraise path
+against real subprocesses (not `()` subshells, which inherit the parent's
+`$$` in bash 3.2 and would signal the wrong process) — SIGTERM mid-deploy,
+SIGTERM mid-CI, SIGHUP, late-signal-after-completion idempotency,
+`_emit_untrap_signals` correctly disarming, and INT handler registration
+(exercised via `trap -p` rather than an actual kill, since bash auto-ignores
+SIGINT for `&`-backgrounded jobs in a non-interactive shell with job control
+off).
+
+### Files changed
+- `scripts/lib/ci-utils.sh` — `interrupted` terminal status, `_emit_trap_signals`
+  / `_emit_untrap_signals`, finalized-once guards on `ci_done`/`deploy_done`
+- `scripts/hooks/pre-push` — trap install/uninstall bracketing the CI and
+  deploy phases
+- (new) `scripts/lib/hook-signals.test.sh` — signal repro suite, wired into
+  `test:hooks`
+- `package.json` — `test:hooks` now runs `hook-signals.test.sh`
+- `docs/PRE-PUSH-HOOK.md` — "Signals and interrupted runs" operator warning
+  subsection, plus a `Files` table row for the new test file
+
+### Verification
+- `bash -n` on `ci-utils.sh`, `pre-push`, `deploy-plan.test.sh`,
+  `hook-signals.test.sh`: clean
+- `pnpm test:hooks` under `/bin/bash` (confirmed bash 3.2.57,
+  arm64-apple-darwin25): **77 passed, 0 failed** (deploy-plan 47,
+  docker-build 12, db-url 6, hook-signals 12)
+- Live-push verification deliberately not run — see Out of scope
+
+### Follow-ups
+- `[defer]` Live-push verification of the new trap wiring against a real
+  production deploy is still outstanding; do it the next time a wired
+  project's `main` gets a natural push, per the Out of scope note.
+- none other

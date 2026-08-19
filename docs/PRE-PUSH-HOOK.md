@@ -13,6 +13,7 @@ from each project's `.emit-infra.json`.
 | `scripts/lib/docker-build.sh` | Image naming + buildx invocation |
 | `scripts/lib/ci-utils.sh` | Status files, history, per-phase timing |
 | `scripts/lib/deploy-plan.test.sh` | Tests — `bash scripts/lib/deploy-plan.test.sh` |
+| `scripts/lib/hook-signals.test.sh` | Tests — signal traps (`bash scripts/lib/hook-signals.test.sh`) |
 
 ## How projects get the hook
 
@@ -109,6 +110,21 @@ root-level markdown only, while `docs/**` is recursive.
 
 Note the skip leaves the last-deployed sha where it was, so the next real
 deploy still picks up the skipped commits.
+
+### Signals and interrupted runs
+
+**Pushing to `main` is a real production deploy.** Don't run it from an
+environment that might kill the process mid-flight — an agent's background
+shell, a sandbox that tears down on timeout, a CI runner with a short step
+timeout. If the hook is killed by `SIGINT`, `SIGTERM`, or `SIGHUP`, it traps
+the signal, writes `interrupted` (deploy phase) or `failure` (CI phase) to the
+status file, and re-raises the signal so the process's own exit code still
+shows it was killed. That closes the *dashboard shows a stale "66%" forever*
+symptom, but the deploy itself is still cut off wherever it was — a partial
+build, a partial rollout — and that requires the same operator attention a
+`failed` deploy would. `SIGKILL` can't be trapped at all; that gap is closed
+separately by liveness metadata on the status file (sprint 283). A full
+recovery runbook is forthcoming (sprint 287).
 
 ## Smart build
 

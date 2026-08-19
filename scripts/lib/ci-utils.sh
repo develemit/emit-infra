@@ -14,7 +14,7 @@
 #   deploy_step "label"
 #   deploy_phase <name>                 # start timing a phase (closes the previous one)
 #   deploy_record_phase <name> <sec>    # record a phase timed elsewhere (e.g. ci)
-#   deploy_done deployed|failed         # write final status + append to history
+#   deploy_done deployed|failed|interrupted  # write final status + append to history
 #
 # Phase durations land in .deploy-history.jsonl as {"phases":{"build":312,...}}
 # so slow deploys can be diagnosed from data instead of scrollback.
@@ -40,6 +40,8 @@ _EMIT_PHASES=""
 _EMIT_PHASE_NAME=""
 _EMIT_PHASE_EPOCH=0
 _EMIT_CI_DURATION=0
+_EMIT_CI_FINALIZED=0
+_EMIT_DEPLOY_FINALIZED=0
 
 # Mirror stdout/stderr to a log file via a background tee we can wait on.
 # A plain `exec > >(tee ...)` loses buffered output when the script exits
@@ -116,6 +118,51 @@ _emit_write_atomic() {
   printf '%s\n' "$content" > "$tmp" && mv "$tmp" "$dest"
 }
 
+# ── signal handling (sprint 282) ────────────────────────────────────────────
+# INT/TERM/HUP can arrive mid-build — e.g. an agent's background shell torn
+# down mid-deploy. Neither fires the ERR trap `_fail_deploy` installs in
+# pre-push, and the process is simply gone before any `on_fail` callback can
+# run, so without this the status file freezes at "running"/"deploying"
+# forever (2026-08-19 emit-social incident). SIGKILL can't be trapped at all;
+# that gap is closed separately by sprint 283's liveness metadata, not here.
+#
+# `ci_done`/`deploy_done` guard themselves against a second call via the
+# `_EMIT_*_FINALIZED` flags below, so a signal that lands just after a normal
+# completion is a harmless no-op instead of a duplicate history line.
+_emit_reraise() {
+  trap - INT TERM HUP
+  kill -s "$1" "$$"
+}
+
+_emit_ci_signal_handler() {
+  ci_done failure
+  _emit_reraise "$1"
+}
+
+_emit_deploy_signal_handler() {
+  deploy_done interrupted
+  _emit_reraise "$1"
+}
+
+# Install INT/TERM/HUP handlers for the given phase ("ci" or "deploy"). Call
+# _emit_untrap_signals when the phase ends normally so a signal during the
+# *next* phase doesn't fire this phase's writer.
+_emit_trap_signals() {
+  local kind="$1" fn sig
+  case "$kind" in
+    ci) fn=_emit_ci_signal_handler ;;
+    deploy) fn=_emit_deploy_signal_handler ;;
+    *) echo "_emit_trap_signals: unknown kind '$kind'" >&2; return 1 ;;
+  esac
+  for sig in INT TERM HUP; do
+    trap "$fn $sig" "$sig"
+  done
+}
+
+_emit_untrap_signals() {
+  trap - INT TERM HUP
+}
+
 ci_init() {
   _EMIT_CI_TOTAL=$1
   _EMIT_CI_STEP=0
@@ -146,6 +193,9 @@ ci_step() {
 }
 
 ci_done() {
+  [[ "$_EMIT_CI_FINALIZED" == "1" ]] && return 0
+  _EMIT_CI_FINALIZED=1
+
   local completed_at
   completed_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
   local duration=$(( $(date +%s) - _EMIT_STARTED_EPOCH ))
@@ -194,6 +244,9 @@ deploy_step() {
 }
 
 deploy_done() {
+  [[ "$_EMIT_DEPLOY_FINALIZED" == "1" ]] && return 0
+  _EMIT_DEPLOY_FINALIZED=1
+
   _emit_close_phase
   local completed_at
   completed_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")

@@ -69,6 +69,7 @@ run_ci() {
   local target_count
   target_count=$(echo "$CI_TARGETS" | wc -w | tr -d ' ')
   ci_init "$target_count"
+  _emit_trap_signals ci
 
   for target in $CI_TARGETS; do
     ci_step "$target"
@@ -88,6 +89,7 @@ run_ci() {
   ci_done success
   echo "✓ CI passed ($SHA)"
   trap - ERR
+  _emit_untrap_signals
 }
 
 run_ci
@@ -213,6 +215,7 @@ PRE_DEPLOY_COUNT=$(python3 -c "import json; print(len(json.loads('$PRE_DEPLOY_JS
 STEPS=$((STEPS + PRE_DEPLOY_COUNT))
 
 deploy_init "$STEPS"
+_emit_trap_signals deploy
 deploy_record_phase ci "$_EMIT_CI_DURATION"
 
 # ── GHCR auth (isolated config to avoid docker-credential-desktop hangs) ──────
@@ -271,4 +274,5 @@ export BUILD_NUMBER
 node "$EMIT_INFRA_DIR/apps/cli/dist/index.js" deploy
 
 deploy_done deployed
+_emit_untrap_signals
 echo "✓ deployed $SHA (build $BUILD_NUMBER)"
