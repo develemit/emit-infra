@@ -55,8 +55,12 @@ describe('useOpsChat', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     const { result } = renderHook(() => useOpsChat(null))
-    // wait for session
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    // Readiness wait, not a count assertion. `toHaveBeenCalledTimes(1)` can be
+    // overshot — under load the session effect may fire more than once, and
+    // once the count passes 1 that assertion can never become true again, so
+    // waitFor spins to its timeout and fails. Observed 2026-08-19 as a 1-in-9
+    // failure under a parallel `nx run-many -t test --skip-nx-cache`.
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled())
 
     await act(async () => {
       await result.current.submit('Hello')
