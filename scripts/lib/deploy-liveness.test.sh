@@ -12,6 +12,23 @@ ok() { PASS=$((PASS + 1)); echo "  ok   $1"; }
 no() { FAIL=$((FAIL + 1)); echo "  FAIL $1"; }
 check() { if [[ "$2" == "$3" ]]; then ok "$1"; else no "$1 (want '$3', got '$2')"; fi; }
 
+# Poll until a predicate succeeds, up to <timeout-deciseconds>. Fixed sleeps
+# that are "long enough" on an idle machine become races under load — see the
+# same helper in hook-signals.test.sh. Where a real timer interval is genuinely
+# under test the ceiling is set well above it, so the wait stays honest while
+# finishing as soon as the condition actually holds.
+_wait_until() {
+  local desc="$1" timeout_ds="$2"; shift 2
+  local i=0
+  while [ "$i" -lt "$timeout_ds" ]; do
+    if "$@"; then return 0; fi
+    sleep 0.1
+    i=$((i + 1))
+  done
+  no "timed out after $((timeout_ds / 10))s waiting for $desc"
+  return 1
+}
+
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 cd "$WORK"
@@ -92,10 +109,16 @@ deploy_init 1
 BEFORE=$(python3 -c "import json; print(json.load(open('.deploy-status.json'))['writer']['heartbeatAt'])")
 # The refresher's 6x(kill -0 + sleep 5) polling loop before its first refresh
 # is a 30s floor, not a ceiling — process-spawn overhead per iteration and
-# system scheduling jitter can push the real first firing a couple seconds
-# past that under load, so give it real margin rather than sleeping exactly
-# 30s and flaking on slow machines/CI.
-sleep 36
+# system scheduling jitter can push the real first firing well past that under
+# load. Poll for the actual advance with a 90s ceiling rather than sleeping a
+# fixed 36s: a fixed sleep is simultaneously too slow on an idle machine and
+# too short on a loaded one.
+_heartbeat_advanced() {
+  local now
+  now=$(python3 -c "import json; print(json.load(open('.deploy-status.json'))['writer']['heartbeatAt'])" 2>/dev/null) || return 1
+  [[ "$now" > "$BEFORE" ]]
+}
+_wait_until "the background heartbeat to advance heartbeatAt" 900 _heartbeat_advanced
 AFTER=$(python3 -c "import json; print(json.load(open('.deploy-status.json'))['writer']['heartbeatAt'])")
 STEP_FIELD=$(python3 -c "import json; print(json.load(open('.deploy-status.json'))['progress']['step'])")
 _emit_stop_heartbeat deploy
@@ -117,7 +140,8 @@ bash -c "
   sleep 30
 " &
 CHILD=$!
-sleep 0.5
+_hb_pid_recorded() { [ -s hb_pid.txt ]; }
+_wait_until "the child to record its heartbeat pid" 150 _hb_pid_recorded
 HB_PID=$(cat hb_pid.txt 2>/dev/null || echo "")
 if [[ -z "$HB_PID" ]]; then
   no "captured a heartbeat pid to track (got empty)"
@@ -125,7 +149,10 @@ else
   ok "captured a heartbeat pid to track"
   kill -9 "$CHILD" 2>/dev/null
   wait "$CHILD" 2>/dev/null
-  sleep 8 # heartbeat's own parent-liveness check runs every 5s
+  # The heartbeat's own parent-liveness check runs every 5s; poll for the
+  # exit with a 30s ceiling instead of assuming 8s is always enough.
+  _hb_gone() { ! kill -0 "$HB_PID" 2>/dev/null; }
+  _wait_until "the orphaned heartbeat to exit" 300 _hb_gone
   if kill -0 "$HB_PID" 2>/dev/null; then
     no "heartbeat process exited after its parent was kill -9'd"
   else
