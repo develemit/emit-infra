@@ -141,19 +141,19 @@ push. Run `pnpm test:hooks` before committing.
 - `docs/PRE-PUSH-HOOK.md` — document the gate, the markers, and the opt-out
 
 ## Acceptance criteria
-- [ ] A push to `main` from a shell with `CLAUDECODE=1` set exits non-zero with
+- [x] A push to `main` from a shell with `CLAUDECODE=1` set exits non-zero with
       an explanatory message naming `EMIT_ALLOW_UNATTENDED_DEPLOY`
-- [ ] After that blocked push, `.deploy-status.json` is byte-identical to its
+- [x] After that blocked push, `.deploy-status.json` is byte-identical to its
       pre-push contents and no `.deploy-history.jsonl` line was appended
-- [ ] `EMIT_ALLOW_UNATTENDED_DEPLOY=1` allows the deploy to proceed normally
-- [ ] `EMIT_FORCE_DEPLOY=1` alone does **not** bypass the gate
-- [ ] The CI phase runs to completion in a blocked push (the gate is deploy-only)
-- [ ] A push with no controlling terminal but no env marker warns and proceeds
-- [ ] Dry-run and ignored-paths-only pushes still `exit 0` before reaching the
+- [x] `EMIT_ALLOW_UNATTENDED_DEPLOY=1` allows the deploy to proceed normally
+- [x] `EMIT_FORCE_DEPLOY=1` alone does **not** bypass the gate
+- [x] The CI phase runs to completion in a blocked push (the gate is deploy-only)
+- [x] A push with no controlling terminal but no env marker warns and proceeds
+- [x] Dry-run and ignored-paths-only pushes still `exit 0` before reaching the
       gate, even with `CLAUDECODE=1` set
-- [ ] Test coverage in `scripts/lib/deploy-plan.test.sh` for all five gate cases
+- [x] Test coverage in `scripts/lib/deploy-plan.test.sh` for all five gate cases
       in task 7 plus the ordering regression in task 8
-- [ ] `pnpm test:hooks` green under bash 3.2; `bash -n` clean on all touched
+- [x] `pnpm test:hooks` green under bash 3.2; `bash -n` clean on all touched
       scripts; one real push verified end to end on a wired project
 
 ## Out of scope
@@ -171,3 +171,89 @@ push. Run `pnpm test:hooks` before committing.
   that no one in the fleet pushes that way.
 - Any change to `apps/cli`'s `emit-infra deploy` path. This gate is hook-only;
   a direct CLI deploy is an explicit operator action.
+
+## Completed
+
+**Date:** 2026-08-19
+
+### Summary
+Added `detect_unattended_shell` and `has_controlling_terminal` to
+`scripts/lib/deploy-plan.sh`, and installed the gate in
+`scripts/hooks/pre-push` right after the ignored-paths filter and before
+`_fail_deploy`/`deploy_init` — matching the load-bearing placement the sprint
+called out (a later placement would fire the `ERR` trap with
+`_EMIT_STARTED_EPOCH` unset, writing a status record and throwing a bash
+arithmetic error). Blocking is env-marker based (`CLAUDECODE`,
+`CLAUDE_CODE_ENTRYPOINT`, `CI`); absence of a controlling terminal is
+warn-only, using `( : < /dev/tty )` rather than `-e /dev/tty` (verified
+empirically in this exact session — `-e /dev/tty` is true even with no
+controlling terminal, which would have made the gate a silent no-op).
+`EMIT_ALLOW_UNATTENDED_DEPLOY=1` is the opt-out; `EMIT_FORCE_DEPLOY` does not
+also bypass it, confirmed by a dedicated test case.
+
+One deviation from the task list: task 7 said to extend
+`scripts/lib/deploy-plan.test.sh`, but that file was already 268 lines and
+the new gate cases (function-level checks plus a real end-to-end
+`git push` harness) would have pushed it to ~390 — over this project's
+300-line file-size guideline. Followed the project's own existing precedent
+(`hook-signals.test.sh`, `deploy-liveness.test.sh` are already separate
+per-concern files chained in `pnpm test:hooks`) and put the new cases in
+`scripts/lib/deploy-unattended-gate.test.sh` instead, wired into
+`test:hooks` and documented in `docs/PRE-PUSH-HOOK.md`'s file table. All
+acceptance-criteria coverage is intact, just not literally inside
+`deploy-plan.test.sh`.
+
+The end-to-end tests drive the *real* `scripts/hooks/pre-push` (symlinked
+into a scratch repo, the same way `emit-infra hooks install` wires it into
+every project) rather than a fake stub, so the gate's placement is actually
+under test. Every scratch-repo case either short-circuits before GHCR/docker
+(dry-run, ignored-paths) or is blocked by the new gate itself — none reaches
+real deploy machinery. Two fixture bugs surfaced and were fixed while getting
+the ignored-paths regression case green: an untracked `.githooks/pre-push`
+symlink and machine-written CI log files (`.ci-logs/`, `.ci-history.jsonl`)
+were riding along in the test's second commit via `git add -A`, making the
+diff-since-last-deploy look non-ignorable. Fixed by committing the hook
+symlink as part of the base commit and gitignoring every machine-written
+status/log path in the fixture, same as a real wired project does.
+
+Verified against the actual incident: emit-social's `main` still had the
+2026-08-19 incident's commit (`6423d5d`) sitting unpushed locally, ahead of
+`origin/main` (`42faf27`). Ran a real `git push origin main` against it from
+this session (which genuinely has `CLAUDECODE=1` set) — CI ran to completion
+(format/lint/typecheck/test/build, all green), then the deploy phase was
+refused with the expected message, `git push` failed, `origin/main` and
+`.deploy-status.json` were untouched. That's exactly the scenario this
+sprint exists to prevent, reproduced and blocked for real.
+
+### Files changed
+- `scripts/lib/deploy-plan.sh` — added `detect_unattended_shell` and
+  `has_controlling_terminal`, plus the header function-list entries
+- `scripts/hooks/pre-push` — installed the gate between the ignored-paths
+  filter and the `_fail_deploy` definition
+- `docs/PRE-PUSH-HOOK.md` — documented the gate (env markers, opt-out, why
+  `-e /dev/tty` isn't used, why `EMIT_FORCE_DEPLOY` doesn't bypass it),
+  added it to the deploy-gates list, escape hatches, config reference, and
+  the test-file table
+- `package.json` — added the new test file to the `test:hooks` chain
+- (new) `scripts/lib/deploy-unattended-gate.test.sh` — function-level checks
+  for `detect_unattended_shell`/`has_controlling_terminal` plus a real
+  pre-push-hook end-to-end harness in a scratch repo
+
+### Verification
+- `bash scripts/lib/deploy-unattended-gate.test.sh` under `/bin/bash` (3.2.57):
+  20/20 pass
+- `pnpm test:hooks` (all five suites, `/bin/bash` 3.2.57): 98/98 pass, 0 failed
+- `bash -n` clean on `scripts/lib/deploy-plan.sh`, `scripts/hooks/pre-push`,
+  both test files
+- Real push verified end to end against emit-social's actual stuck incident
+  commit (see Summary) — blocked correctly, zero side effects
+
+### Follow-ups
+- `[defer]` `docs/PRE-PUSH-HOOK.md` was already 492 lines before this sprint
+  (over the project's 300-line guideline) and is now ~545; this sprint only
+  added to it per task 9, didn't restructure it. Worth splitting by section
+  (gates / signals-and-liveness / build internals / cross-platform-build
+  pattern) in a future sprint.
+- `[defer]` The marker list (`CLAUDECODE`, `CLAUDE_CODE_ENTRYPOINT`, `CI`) is
+  deliberately small per the sprint's stated scope; widen it only when a real
+  ephemeral-runner miss is observed (e.g. other agent harnesses' env vars).

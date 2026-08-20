@@ -153,6 +153,23 @@ fi
 echo "→ pushing to main — running deploy"
 push_payload_summary "$REMOTE_SHA" "$LOCAL_SHA"
 
+# ── unattended-shell gate ─────────────────────────────────────────────────────
+# Must land here: after every gate that exits 0 (dry-run, ignored-paths), and
+# before _fail_deploy/deploy_init below — exiting non-zero after deploy_init
+# runs would fire the ERR trap with _EMIT_STARTED_EPOCH unset, writing a status
+# record this gate promises not to write. See docs/PRE-PUSH-HOOK.md.
+if [[ "${EMIT_ALLOW_UNATTENDED_DEPLOY:-0}" != "1" ]]; then
+  if MARKER=$(detect_unattended_shell); then
+    echo "✗ pre-push: refusing to deploy $PROJECT_NAME from a teardown-prone shell (\$$MARKER set)" >&2
+    echo "  A killed shell leaves a deploy half-finished — see docs/PRE-PUSH-HOOK.md." >&2
+    echo "  If this is legitimate headless use, override with:" >&2
+    echo "    EMIT_ALLOW_UNATTENDED_DEPLOY=1 git push" >&2
+    exit 1
+  elif ! has_controlling_terminal; then
+    echo "⚠ pre-push: no controlling terminal and no unattended-shell marker set; proceeding" >&2
+  fi
+fi
+
 # source env file for deploy phase (after CI so tests use local env)
 if [[ -n "$ENV_FILE" && -f "$ROOT/$ENV_FILE" ]]; then
   set -a; source "$ROOT/$ENV_FILE"; set +a

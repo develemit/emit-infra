@@ -14,6 +14,7 @@ from each project's `.emit-infra.json`.
 | `scripts/lib/ci-utils.sh` | Status files, history, per-phase timing |
 | `scripts/lib/deploy-plan.test.sh` | Tests — `bash scripts/lib/deploy-plan.test.sh` |
 | `scripts/lib/hook-signals.test.sh` | Tests — signal traps (`bash scripts/lib/hook-signals.test.sh`) |
+| `scripts/lib/deploy-unattended-gate.test.sh` | Tests — unattended-shell gate (`bash scripts/lib/deploy-unattended-gate.test.sh`) |
 
 ## How projects get the hook
 
@@ -66,9 +67,12 @@ The deploy phase is skipped, in this order:
 2. **`ci.ghcrOrg` unset** — nothing to push images to.
 3. **Dry run** — see below.
 4. **Only ignored paths changed** — see below.
+5. **Unattended shell** — refuses (not skips: exits non-zero) — see below.
 
 `EMIT_FORCE_DEPLOY=1` overrides gates 3 and 4. Use it after an env-only change,
-since `.env` files are gitignored and invisible to the path diff.
+since `.env` files are gitignored and invisible to the path diff. It does
+**not** override gate 5 — see [Unattended-shell gate](#unattended-shell-gate)
+for why that's deliberate.
 
 ### `git push --dry-run`
 
@@ -125,6 +129,49 @@ root-level markdown only, while `docs/**` is recursive.
 Note the skip leaves the last-deployed sha where it was, so the next real
 deploy still picks up the skipped commits.
 
+### Unattended-shell gate
+
+2026-08-19 incident: an emit-social deploy launched from an agent session's
+background shell got killed mid-build (`.deploy-status.json` froze at
+`deploying` / 66%). See [Signals and interrupted runs](#signals-and-interrupted-runs)
+below for what those killed-run status writes look like and how to recover
+from one — this gate is the *prevention* half: it stops the deploy from
+starting in that kind of shell at all.
+
+**Blocking signal: env markers.** The deploy phase refuses to start (prints
+why, exits 1, no status write) when any of `CLAUDECODE`,
+`CLAUDE_CODE_ENTRYPOINT`, or `CI` is set in the environment —
+`detect_unattended_shell` in `scripts/lib/deploy-plan.sh`, checked against one
+clearly-commented marker list (`EMIT_UNATTENDED_SHELL_MARKERS`) so it's easy
+to extend as new ephemeral-shell markers are identified.
+
+**Why not detect "no controlling terminal" as the blocking signal instead:**
+empirically, inside the exact kind of agent shell that caused the incident,
+`-e /dev/tty` is **true** — the device node exists even with no controlling
+terminal, so a gate built on it would be a silent no-op. `[ -t 0 ]` is
+meaningless here too: git feeds the ref list to every pre-push hook on stdin,
+so stdin is never a tty. `has_controlling_terminal` instead actually *opens*
+the controlling terminal (`( : < /dev/tty ) 2>/dev/null`), which is the
+correct POSIX check — but absence of a controlling terminal is only a
+**warning**, not a block, because GUI git clients (VSCode's Source Control
+panel, Tower, GitHub Desktop) have no controlling terminal either and
+blocking them would break a normal workflow. That warning path prints to
+stderr and the deploy proceeds.
+
+**Opt-out:** `EMIT_ALLOW_UNATTENDED_DEPLOY=1 git push` bypasses both the
+block and the warning, for legitimate headless use. This is a separate
+variable from `EMIT_FORCE_DEPLOY` on purpose — `EMIT_FORCE_DEPLOY` forces a
+deploy past the *path* filters (gates 3/4), and conflating it with "I accept
+a killable shell" would have silently re-opened this exact incident for
+anyone already exporting it for unrelated reasons.
+
+Gate placement in `scripts/hooks/pre-push` is load-bearing: it runs after
+every gate that exits 0 (dry-run, ignored-paths) but before `_fail_deploy` is
+installed as the `ERR` trap and before `deploy_init` writes the first
+in-flight status record. Exiting non-zero after either of those would fire
+`deploy_done failed` with the run's start time unset, both writing a status
+record this gate promises not to write and throwing a bash arithmetic error.
+
 ### Signals and interrupted runs
 
 **Pushing to `main` is a real production deploy**, not a CI-only push: CI
@@ -159,6 +206,9 @@ stuck record.
   to the path diff.
 - `EMIT_DEPLOY_CONFIRM=1` — adds an interactive confirm prompt on `/dev/tty`
   before the deploy phase runs (defaults to *no*).
+- `EMIT_ALLOW_UNATTENDED_DEPLOY=1` — bypasses the
+  [unattended-shell gate](#unattended-shell-gate) for legitimate headless use.
+  `EMIT_FORCE_DEPLOY` does **not** also do this — see that section for why.
 - `git push --dry-run` — CI only, no deploy phase at all (see
   [`git push --dry-run`](#git-push---dry-run) above).
 
@@ -489,4 +539,5 @@ for l in sys.stdin:
 ```
 
 Env overrides: `EMIT_FORCE_DEPLOY=1`, `EMIT_DEPLOY_CONFIRM=1`,
-`EMIT_BUILD_PARALLEL=<n>`, `EMIT_INFRA_DIR=<path>`.
+`EMIT_ALLOW_UNATTENDED_DEPLOY=1`, `EMIT_BUILD_PARALLEL=<n>`,
+`EMIT_INFRA_DIR=<path>`.

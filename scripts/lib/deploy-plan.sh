@@ -11,6 +11,8 @@
 #   nx_projects [--affected --base=<sha>]   -> echoes project names, one per line
 #   service_needs_build <svc> <base> <all_projects> <affected_projects> <extra_globs>
 #   detect_dry_run_push                     -> 0 if the invoking `git push` used --dry-run
+#   detect_unattended_shell                 -> 0 if a teardown-prone shell env marker is set
+#   has_controlling_terminal                -> 0 if this process can open /dev/tty
 
 [[ -n "${_EMIT_DEPLOY_PLAN_LOADED:-}" ]] && return 0
 _EMIT_DEPLOY_PLAN_LOADED=1
@@ -196,6 +198,34 @@ detect_dry_run_push() {
     depth=$((depth + 1))
   done
   return 1
+}
+
+# ── fix 7: refuse to deploy from a shell that can be torn down mid-build ─────
+# 2026-08-19 incident: an emit-social deploy launched from an agent session's
+# background shell got killed mid-build, leaving .deploy-status.json frozen at
+# "deploying" while prod was never touched. Env markers are the reliable
+# signal — see docs/PRE-PUSH-HOOK.md for why `-e /dev/tty` was rejected as a
+# detector (it's true even with no controlling terminal).
+#
+# Keep this list in one place so it's easy to extend as new ephemeral-shell
+# markers are identified.
+EMIT_UNATTENDED_SHELL_MARKERS=(CLAUDECODE CLAUDE_CODE_ENTRYPOINT CI)
+
+detect_unattended_shell() {
+  local var
+  for var in "${EMIT_UNATTENDED_SHELL_MARKERS[@]}"; do
+    [[ -n "${!var:-}" ]] && { echo "$var"; return 0; }
+  done
+  return 1
+}
+
+# Actually *opening* the controlling terminal, not just checking the device
+# node exists (`-e /dev/tty` is true even with no controlling terminal — see
+# docs/PRE-PUSH-HOOK.md). Warning-only signal: absence alone never blocks,
+# since GUI git clients (VSCode, Tower, GitHub Desktop) have no controlling
+# terminal either and are a normal, safe workflow.
+has_controlling_terminal() {
+  ( : < /dev/tty ) 2>/dev/null
 }
 
 # ── fix 5: build-fan-out failures must always reach on_fail ──────────────────
