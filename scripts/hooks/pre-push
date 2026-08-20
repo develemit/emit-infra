@@ -212,7 +212,10 @@ fi
 IFS=' ' read -r -a ALL_SVCS <<< "$BG_SERVICES"
 TO_BUILD=()
 TO_RETAG=()
-for svc in "${ALL_SVCS[@]}"; do
+# ${arr[@]+"${arr[@]}"} — bash 3.2 errors on "${arr[@]}" for an EMPTY array
+# under `set -u` (line 6). Reachable for any project whose .emit-infra.json
+# omits blueGreen.services or sets it to []. Same idiom as TO_BUILD below.
+for svc in ${ALL_SVCS[@]+"${ALL_SVCS[@]}"}; do
   if service_needs_build "$svc" "$LAST_SHA" "$NX_ALL_PROJECTS" "$NX_AFFECTED_PROJECTS" "$BUILD_TRIGGER_PATHS"; then
     TO_BUILD+=("$svc")
   else
