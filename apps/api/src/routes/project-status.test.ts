@@ -14,6 +14,13 @@ vi.mock('../lib/discover-projects.js', () => ({
 vi.mock('@emit-infra/core', () => ({
   sshExec: vi.fn(),
   ProjectConfigSchema: { safeParse: vi.fn() },
+  classifyRunState: vi.fn().mockReturnValue({
+    state: 'unknown',
+    reason: 'stub',
+    heartbeatAgeSec: null,
+    pidAlive: null,
+    sameHost: null,
+  }),
 }))
 
 vi.mock('node:fs/promises', () => ({
@@ -21,7 +28,8 @@ vi.mock('node:fs/promises', () => ({
 }))
 
 import { discoverProjects } from '../lib/discover-projects.js'
-import { sshExec } from '@emit-infra/core'
+import { sshExec, classifyRunState } from '@emit-infra/core'
+import { readFile } from 'node:fs/promises'
 import { projectStatusRoutes } from './project-status.js'
 
 const mockProject = {
@@ -120,5 +128,69 @@ describe('GET /projects/:name/status', () => {
     expect(data.containerCount).toBeUndefined()
     expect(data.containerTotal).toBeUndefined()
     expect(data.containerUnhealthy).toBeUndefined()
+  })
+})
+
+describe.each([
+  ['ci-status', '.ci-status.json'],
+  ['deploy-status', '.deploy-status.json'],
+])('GET /projects/:name/%s', (route) => {
+  let app: FastifyInstance
+
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    app = Fastify({ logger: false })
+    await app.register(projectStatusRoutes)
+    await app.ready()
+  })
+
+  afterEach(async () => {
+    await app.close()
+  })
+
+  it('returns 404 when the status file is missing', async () => {
+    vi.mocked(readFile).mockRejectedValue(new Error('ENOENT'))
+
+    const res = await app.inject({ method: 'GET', url: `/projects/myapp/${route}` })
+
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('returns 500 without calling the classifier when the file is unparseable', async () => {
+    vi.mocked(readFile).mockResolvedValue('not json')
+
+    const res = await app.inject({ method: 'GET', url: `/projects/myapp/${route}` })
+
+    expect(res.statusCode).toBe(500)
+    expect(classifyRunState).not.toHaveBeenCalled()
+  })
+
+  it('enriches the raw record with runState, keeping the original fields intact', async () => {
+    const record = { status: 'deploying', sha: 'abc123', branch: 'main', startedAt: '2026-08-20T00:00:00Z' }
+    vi.mocked(readFile).mockResolvedValue(JSON.stringify(record))
+    vi.mocked(classifyRunState).mockReturnValue({
+      state: 'running',
+      reason: 'stub',
+      heartbeatAgeSec: 5,
+      pidAlive: true,
+      sameHost: true,
+    })
+
+    const res = await app.inject({ method: 'GET', url: `/projects/myapp/${route}` })
+
+    expect(res.statusCode).toBe(200)
+    const data = res.json()
+    expect(data.status).toBe('deploying')
+    expect(data.sha).toBe('abc123')
+    expect(data.branch).toBe('main')
+    expect(data.startedAt).toBe('2026-08-20T00:00:00Z')
+    expect(data.runState).toEqual({
+      state: 'running',
+      reason: 'stub',
+      heartbeatAgeSec: 5,
+      pidAlive: true,
+      sameHost: true,
+    })
+    expect(classifyRunState).toHaveBeenCalledWith(record)
   })
 })

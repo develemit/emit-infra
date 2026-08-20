@@ -4,6 +4,17 @@ export { createConfigFile, setConfigField } from './config-writer.js'
 export { runTerraform, getTerraformOutput } from './terraform.js'
 export { runAnsible } from './ansible.js'
 export { deployRecordInit, deployRecordDone, type DeployContext } from './deploy-records.js'
+export {
+  classifyRunState,
+  HEARTBEAT_INTERVAL_SEC,
+  ORPHAN_HEARTBEAT_THRESHOLD_SEC,
+  UNKNOWN_RECORD_ORPHAN_AGE_SEC,
+  type DeployStatusRecord,
+  type DeployWriterInfo,
+  type RunState,
+  type RunStateResult,
+  type ClassifyRunStateOptions,
+} from './deploy-status.js'
 export { sshExec, sshMuxArgs } from './ssh.js'
 export { ensureSshKey, ensureHetznerKey, type SshKeyPaths } from './ssh-key.js'
 export { resolveAccountId, resolveZoneId, ensureR2Bucket, createR2Token, revokeR2Token, r2BucketResource, deriveR2Credentials, buildR2TokenPayload, R2_ITEM_READ_PERMISSION_GROUP, R2_ITEM_WRITE_PERMISSION_GROUP } from './r2.js'

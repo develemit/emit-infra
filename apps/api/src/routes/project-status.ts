@@ -3,7 +3,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { readFile } from 'node:fs/promises'
 import { z } from 'zod'
-import { sshExec } from '@emit-infra/core'
+import { sshExec, classifyRunState, type DeployStatusRecord } from '@emit-infra/core'
 import { findProject, sshKeyPath, SAFE_NAME_RE } from '../lib/project-helpers.js'
 import { createTtlCache } from '../lib/ttl-cache.js'
 import { buildStatusCommand, parseStatusLines } from '../lib/status-command.js'
@@ -74,6 +74,13 @@ async function lastDeployEpoch(name: string): Promise<string | null> {
 
 const statusCache = createTtlCache<StatusData | null>(STATUS_TTL)
 const nameSchema = z.object({ name: z.string().min(1).max(100).regex(SAFE_NAME_RE, 'invalid project name') })
+
+// Additive-only: enriches whatever the status file already contains with the
+// shared runState classification (sprint 284) — the raw fields the dashboard
+// already reads are passed through untouched.
+function withRunState(parsed: Record<string, unknown>): Record<string, unknown> {
+  return { ...parsed, runState: classifyRunState(parsed as DeployStatusRecord) }
+}
 
 export async function projectStatusRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Params: { name: string } }>('/projects/:name/status', async (req, reply): Promise<void> => {
@@ -147,7 +154,7 @@ export async function projectStatusRoutes(app: FastifyInstance): Promise<void> {
     try {
       const raw = await readFile(filePath, 'utf8')
       try {
-        return void reply.send(JSON.parse(raw) as unknown)
+        return void reply.send(withRunState(JSON.parse(raw) as Record<string, unknown>))
       } catch {
         console.warn(`[ci-status] JSON parse error for ${req.params.name}: ${raw.slice(0, 100)}`)
         return void reply.status(500).send({ error: 'invalid status file' })
@@ -162,7 +169,7 @@ export async function projectStatusRoutes(app: FastifyInstance): Promise<void> {
     try {
       const raw = await readFile(filePath, 'utf8')
       try {
-        return void reply.send(JSON.parse(raw) as unknown)
+        return void reply.send(withRunState(JSON.parse(raw) as Record<string, unknown>))
       } catch {
         console.warn(`[deploy-status] JSON parse error for ${req.params.name}: ${raw.slice(0, 100)}`)
         return void reply.status(500).send({ error: 'invalid status file' })
