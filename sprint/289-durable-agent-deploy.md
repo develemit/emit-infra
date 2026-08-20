@@ -119,19 +119,122 @@ calls it. Keep the skill under ~60 lines.
   Context)
 
 ## Acceptance criteria
-- [ ] A deploy launched via `scripts/deploy-detached.sh` completes even after the
+- [x] A deploy launched via `scripts/deploy-detached.sh` completes even after the
       launching shell is killed
-- [ ] The script prints the log path immediately, before the deploy finishes, so
+- [x] The script prints the log path immediately, before the deploy finishes, so
       a torn-down session can be resumed with `--watch`
-- [ ] Polling ends on a terminal status; a timeout reports "still running" and
+- [x] Polling ends on a terminal status; a timeout reports "still running" and
       leaves the deploy alive rather than killing it
-- [ ] Preflight refuses a dirty tree, a non-`main` HEAD, nothing-to-push, and an
+- [x] Preflight refuses a dirty tree, a non-`main` HEAD, nothing-to-push, and an
       already-`running` deploy; an `orphaned` record points at
       `emit-infra reconcile --write`
-- [ ] Test coverage in `scripts/lib/deploy-detached.test.sh`, including the
+- [x] Test coverage in `scripts/lib/deploy-detached.test.sh`, including the
       kill-the-launcher survival case from task 7, run by `pnpm test:hooks`
-- [ ] `pnpm test:hooks` green under bash 3.2; `bash -n` clean on all touched
+- [x] `pnpm test:hooks` green under bash 3.2; `bash -n` clean on all touched
       scripts
+
+## Completed
+
+**Date:** 2026-08-20
+
+### Summary
+Added `scripts/deploy-detached.sh`: preflight (dirty tree / non-main HEAD /
+nothing-to-push / already-`running` or `orphaned` via `classifyRunState`),
+then a detached launch (`nohup bash -c '... git push origin main; echo $? >
+rc' &`), then bounded polling. Two deliberate deviations from the task list's
+literal wording, both explained inline in the script:
+
+1. **Polling waits on the push's own exit code, not directly on
+   `.deploy-status.json`.** A `.deploy-status.json` record alone can't
+   distinguish "still in CI" from "push rejected before deploy ever started"
+   from "deploy skipped because only ignored paths changed" — all three
+   leave no new record for the launched sha. The nohup'd wrapper writes its
+   exit code to a sibling `.rc` file when the whole push finishes, which is
+   the actual terminal signal `poll_for_result` waits on; `.deploy-status.json`
+   and `.deploy-history.jsonl` are then read only to build the summary
+   (final status, services built).
+2. **`classifyRunState` is reused via a small Node CLI wrapper**
+   (`scripts/lib/classify-run-state.mjs`) rather than reimplemented in the
+   inline-python style the rest of `deploy-plan.sh` uses. The sprint file
+   was explicit that this is the one place that must not duplicate the
+   heartbeat/pid staleness rule (sprint 284's doc comment), and the classifier
+   only exists as TS in `packages/core`.
+
+`scripts/deploy-detached.sh` sources `deploy-plan.sh` but doesn't run `main()`
+when sourced (guarded on `BASH_SOURCE[0] == $0`), specifically so
+`deploy-detached.test.sh` can source it and unit-test `preflight`,
+`print_summary`, `poll_for_result`, and `watch_main` directly against
+fabricated fixtures instead of paying for a real git-hook round trip per
+case. Found and fixed a real bug this way before it shipped: the script
+originally had `PROJECT_DIR="$(pwd)"` as an unconditional top-level
+assignment, which silently clobbered a caller-set `PROJECT_DIR` on `source`
+— changed to `: "${PROJECT_DIR:=}"` with `main()` applying the cwd default
+itself.
+
+Task 7's kill-the-launcher case is the one true end-to-end integration test:
+a scratch repo + bare remote + the real `scripts/hooks/pre-push` symlinked
+in (same harness as `deploy-unattended-gate.test.sh`), with a `git` shim on
+`PATH` that sleeps a few seconds before an actual `push` so there's a real
+in-flight window to kill mid-poll, without needing real GHCR/docker (the
+fixture's `ci.ghcrOrg` is empty, so the deploy phase skips instantly once the
+push itself completes — CI still runs for real and its terminal record is
+what the test asserts on). First attempt at this test was flaky: a fixed
+`sleep 1.5` before killing the launcher sometimes fired before preflight's
+Node cold-start (`classify-run-state.mjs`'s dynamic import) finished, killing
+the launcher before it ever backgrounded the push — fixed by polling
+`launcher.out` for the "launched detached deploy" marker instead of a fixed
+sleep.
+
+`~/.claude/commands/deploy.md` is written but **not tracked by git** —
+`~/.claude/commands/` isn't a git repo, so it can't be committed and won't
+survive a machine rebuild (per the sprint's own Context section). All real
+logic lives in the tracked, tested `scripts/deploy-detached.sh`; the skill
+file is a ~40-line wrapper.
+
+### Files changed
+- (new) `scripts/deploy-detached.sh` — preflight, detached launch, bounded
+  poll, terminal summary; sourceable for unit testing
+- (new) `scripts/lib/classify-run-state.mjs` — thin Node CLI wrapper around
+  `@emit-infra/core`'s `classifyRunState`, so bash callers get the same
+  running/orphaned/idle/unknown verdict as the dashboard and `emit-infra
+  status` without a second heuristic
+- (new) `scripts/lib/deploy-detached.test.sh` — unit cases (sourced) plus
+  the real end-to-end kill-the-launcher survival case
+- `package.json` — chained the new suite into `test:hooks`
+- (untracked, not committed) `~/.claude/commands/deploy.md` — thin `/deploy`
+  skill wrapper
+
+### Verification
+- `bash scripts/lib/deploy-detached.test.sh` under `/bin/bash` (3.2.57):
+  24/24 pass, run 3x back-to-back with no flakes after the marker-sync fix
+- `pnpm test:hooks` (all seven suites, `/bin/bash` 3.2.57): 134/134 pass
+  total (47 deploy-plan + 12 docker-build + 6 db-url + 12 hook-signals + 13
+  deploy-liveness + 20 deploy-unattended-gate + 24 new deploy-detached
+  suite), 0 failed
+- `bash -n` clean on `scripts/deploy-detached.sh`,
+  `scripts/lib/deploy-detached.test.sh`, `scripts/lib/deploy-plan.sh`,
+  `scripts/hooks/pre-push`
+- Manual smoke test against a real scratch repo/remote/hook: preflight
+  refusals (dirty, non-main, nothing-to-push, already-running, orphaned),
+  `--no-wait`, `--watch` reattachment, and a full launch-to-completion run
+  all behaved as expected before being folded into the automated suite
+
+### Follow-ups
+- `[defer]` Default `--timeout` is 3600s (1 hour), chosen as "generous" per
+  the sprint's own guidance but not validated against a real multi-service
+  emulated build's actual wall-clock time. Worth revisiting once a real
+  detached deploy has run end to end (sprint 291's verification checklist
+  is a natural place to record that number).
+- `[defer]` `poll_for_result`'s loop granularity is a flat `sleep 10` between
+  checks (matching the heartbeat interval's order of magnitude), so a
+  deploy that finishes just after a check can take up to ~10s longer than
+  necessary to report. Fine at production timeout scales; not worth tuning
+  further absent a complaint.
+- `[defer]` `deploy.md`'s untracked status means it doesn't show up in `git
+  log` or code review — if it drifts from `deploy-detached.sh`'s actual
+  flags/behavior there's no CI to catch it. Sprint 291 is already documenting
+  the detached workflow end to end in tracked docs, which gives a second
+  place to notice drift.
 
 ## Out of scope
 - **Changing the gate or its env var.** This sprint uses the existing
