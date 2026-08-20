@@ -57,6 +57,29 @@ check "terminal record has no writer key" "$(_has_key .deploy-status.json writer
 
 rm -f .deploy-status.json .deploy-history.jsonl
 
+echo "deploy_init/deploy_done stamp launch mode (sprint 290)"
+
+_launch_field() { python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['launch'][sys.argv[2]])" "$1" "$2" 2>/dev/null || echo MISSING; }
+
+# deploy_done from the previous section already set _EMIT_DEPLOY_FINALIZED=1;
+# reset it before this section's own deploy_init/deploy_done pair, same as
+# the later heartbeat sections do (see their comment for why).
+_EMIT_DEPLOY_FINALIZED=0
+deploy_init 1 detached CLAUDECODE
+check "in-flight record carries launch.mode" "$(_launch_field .deploy-status.json mode)" "detached"
+check "in-flight record carries launch.marker" "$(_launch_field .deploy-status.json marker)" "CLAUDECODE"
+deploy_done deployed
+check "terminal record still carries launch.mode" "$(_launch_field .deploy-status.json mode)" "detached"
+
+rm -f .deploy-status.json .deploy-history.jsonl
+
+echo "deploy_init defaults to interactive when no launch args are given"
+
+deploy_init 1
+check "in-flight record defaults launch.mode to interactive" "$(_launch_field .deploy-status.json mode)" "interactive"
+
+rm -f .deploy-status.json .deploy-history.jsonl
+
 echo "ci_init/ci_done mirror the same writer shape"
 
 ci_init 1

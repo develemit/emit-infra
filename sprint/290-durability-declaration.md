@@ -131,23 +131,23 @@ adding a field must not change any existing classification.
 - `scripts/lib/deploy-unattended-gate.test.sh` — the five gate cases in task 7
 
 ## Acceptance criteria
-- [ ] `EMIT_DEPLOY_DETACHED=1` (or the chosen name) allows a deploy from a shell
+- [x] `EMIT_DEPLOY_DETACHED=1` (or the chosen name) allows a deploy from a shell
       carrying an unattended marker
-- [ ] `EMIT_ALLOW_UNATTENDED_DEPLOY=1` still works and prints a deprecation
+- [x] `EMIT_ALLOW_UNATTENDED_DEPLOY=1` still works and prints a deprecation
       notice — no wired project breaks on its next push
-- [ ] With neither set, an agent-marked push is still refused and still writes no
+- [x] With neither set, an agent-marked push is still refused and still writes no
       status record
-- [ ] `EMIT_FORCE_DEPLOY=1` alone still does not bypass the gate
-- [ ] The refusal message names `scripts/deploy-detached.sh` as the supported
+- [x] `EMIT_FORCE_DEPLOY=1` alone still does not bypass the gate
+- [x] The refusal message names `scripts/deploy-detached.sh` as the supported
       path, not just the env var
-- [ ] In-flight records from both the bash and TS writers carry the launch mode
+- [x] In-flight records from both the bash and TS writers carry the launch mode
       with identical field names and JSON types
-- [ ] `classifyRunState` is unchanged in behavior for records with and without
+- [x] `classifyRunState` is unchanged in behavior for records with and without
       the new field
-- [ ] Test coverage in `scripts/lib/deploy-unattended-gate.test.sh`,
+- [x] Test coverage in `scripts/lib/deploy-unattended-gate.test.sh`,
       `packages/core/src/deploy-records.test.ts`, and
       `packages/core/src/deploy-status.test.ts`
-- [ ] `pnpm test:hooks` green under bash 3.2; `pnpm test`, `pnpm lint`,
+- [x] `pnpm test:hooks` green under bash 3.2; `pnpm test`, `pnpm lint`,
       `pnpm typecheck` green; `bash -n` clean on all touched scripts
 
 ## Out of scope
@@ -159,3 +159,137 @@ adding a field must not change any existing classification.
   kept it small; changing it is driven by a real observed miss.
 - Docs. Sprint 291 documents the finished vocabulary — follow the code, not a
   plan written before it.
+
+## Completed
+
+**Date:** 2026-08-20
+
+### Summary
+`EMIT_DEPLOY_DETACHED=1` is now the gate's honest declaration name; the old
+`EMIT_ALLOW_UNATTENDED_DEPLOY=1` keeps working as a deprecated alias (warns to
+stderr, still bypasses). Both live in `scripts/hooks/pre-push`'s gate, which
+also now names `scripts/deploy-detached.sh` / the `/deploy` skill in its
+refusal message instead of just the raw override. `scripts/deploy-detached.sh`
+(sprint 289) was switched to set the new variable in the same commit so the
+script and the gate never disagree.
+
+Two new pure-ish helpers landed in `scripts/lib/deploy-plan.sh`:
+`deploy_launch_mode` (echoes `"<mode> <marker>"`, called once per push right
+after the gate decision) and `deploy_warn_deprecated_override` (the
+deprecation-notice side effect, split out specifically so it's unit-testable
+without spawning the real hook). Both are explicit that this is a
+*declaration*, not a proof — the Context section's finding that macOS bash 3.2
+has no reliable way to verify detachment (no inherited ignored `SIGHUP`, no
+`setsid`, `nohup` doesn't change `pgid`) is restated in the code comment so a
+later sprint doesn't rediscover it.
+
+Both status-record writers (`scripts/lib/ci-utils.sh`'s `deploy_init`/
+`deploy_step`/`deploy_done` and `packages/core/src/deploy-records.ts`'s
+`deployRecordInit`/`deployRecordDone`) now stamp a `"launch":{"mode","marker"}`
+block, deliberately present on both in-flight *and* terminal records (unlike
+`"writer"`, which is in-flight-only) — it's a fact about how the deploy
+started, not a liveness signal, so it stays useful after the deploy finishes.
+The bash writer receives launch mode/marker as arguments threaded from the
+hook's own gate decision; the TS writer has no gate to thread through (the CLI
+`deploy` command isn't reached by `scripts/hooks/pre-push`'s gate — it runs
+either as that hook's own final subprocess, after the gate already decided, or
+as a direct standalone operator action), so `deployRecordInit` self-detects
+launch mode from `process.env` via the new exported `deployLaunchMode()`,
+mirroring the bash gate's exact three-value/marker-list logic by hand. Kept
+deliberately in sync rather than sharing code, since one side is bash and the
+other TypeScript. `classifyRunState` was extended with an optional `launch`
+field on `DeployStatusRecord` but never reads it — confirmed unchanged
+classification behavior with and without the field via new test cases.
+
+One real (pre-existing, unrelated) bug surfaced while writing the new
+past-the-gate end-to-end test cases: on bash 3.2.57, `pre-push`'s
+`for svc in "${ALL_SVCS[@]}"` throws "unbound variable" under `set -u` when
+`BG_SERVICES` is empty and `ALL_SVCS` is a zero-element array — a known bash
+<4.4 empty-array/`set -u` interaction. Sprint 289's own end-to-end test never
+hit this because its fixture used an empty `ci.ghcrOrg` to skip the deploy
+phase entirely before reaching that line. This sprint's new "the gate accepts
+the declaration" tests need to actually reach the deploy phase, so they hit it
+directly. Fixed by giving the test fixture a one-service `blueGreen.services`
+entry (not by touching `pre-push` itself, which is out of this sprint's
+scope) — logged as a follow-up below since it's a real crash waiting for any
+project whose `.emit-infra.json` has `blueGreen.services` unset or empty and
+gets far enough to reach that line.
+
+### Files changed
+- `scripts/hooks/pre-push` — gate accepts `EMIT_DEPLOY_DETACHED=1`, keeps the
+  deprecated alias working with a warning, rewrites the refusal message to
+  point at `scripts/deploy-detached.sh`, stamps `LAUNCH_MODE`/`LAUNCH_MARKER`
+  into `deploy_init`
+- `scripts/lib/deploy-plan.sh` — added `deploy_launch_mode` and
+  `deploy_warn_deprecated_override`, plus the no-auto-detection comment
+- `scripts/lib/ci-utils.sh` — `deploy_init`/`deploy_step`/`deploy_done` accept
+  and stamp launch mode/marker on in-flight and terminal deploy records
+- `scripts/deploy-detached.sh` — launches with `EMIT_DEPLOY_DETACHED=1`
+  instead of the deprecated alias
+- `packages/core/src/deploy-records.ts` — added `deployLaunchMode()` and
+  `DeployLaunch`, `DeployContext.launch`; both writers stamp it
+- `packages/core/src/deploy-status.ts` — added optional `DeployLaunchInfo`/
+  `launch` to `DeployStatusRecord` (read but not acted on)
+- `packages/core/src/index.ts` — exported the new symbols
+- `scripts/lib/deploy-unattended-gate.test.sh` — extended with
+  `deploy_launch_mode`/`deploy_warn_deprecated_override` unit cases, renamed
+  var references in existing mirror/end-to-end cases, and two new real
+  end-to-end cases proving the gate accepts and stamps both the new var and
+  the deprecated alias (via a `gh` shim so no real GHCR/docker network call
+  happens)
+- `scripts/lib/deploy-liveness.test.sh` — bash-side assertion that
+  `deploy_init`/`deploy_done` carry `launch.mode`/`launch.marker`, and that it
+  defaults to `interactive` with no args
+- `packages/core/src/deploy-records.test.ts` — TS assertions for
+  `deployLaunchMode()` and the stamped field on both writers
+- `packages/core/src/deploy-status.test.ts` — `classifyRunState` unchanged
+  with/without the `launch` field
+
+### Verification
+- `bash scripts/lib/deploy-unattended-gate.test.sh` under `/bin/bash` (3.2.57):
+  34/34 pass, run 3x back-to-back with no flakes
+- `bash scripts/lib/deploy-liveness.test.sh`: 17/17 pass
+- `pnpm test:hooks` (all seven suites, `/bin/bash` 3.2.57): 152/152 pass, 0
+  failed
+- `bash -n` clean on `scripts/hooks/pre-push`, `scripts/lib/deploy-plan.sh`,
+  `scripts/lib/ci-utils.sh`, `scripts/deploy-detached.sh`,
+  `scripts/lib/deploy-unattended-gate.test.sh`,
+  `scripts/lib/deploy-liveness.test.sh`
+- `pnpm test`: 17 test files, 165 tests pass (includes the CLI's own
+  `deploy.test.ts`, unaffected by the new `launch` field on the TS writer)
+- `pnpm lint`: clean across all 5 projects
+- `pnpm typecheck`: clean across all 5 projects
+- Manually verified no strict/exact-key schema in `apps/api` or `apps/cli`
+  parses `.deploy-status.json`/`.deploy-history.jsonl` in a way that would
+  reject the new `launch` key (grepped for `.strict()`/`additionalProperties`
+  usage against the status-record readers; none found)
+
+### Follow-ups
+- `[address-next]` `scripts/hooks/pre-push`'s `for svc in "${ALL_SVCS[@]}"`
+  (~line 221) throws "unbound variable" under bash 3.2's `set -u` when
+  `BG_SERVICES` is empty — i.e. any project whose `.emit-infra.json` omits
+  `blueGreen.services` or sets it to `[]` and reaches that line (gate passed,
+  `ci.ghcrOrg` set) will crash instead of cleanly skipping the build/retag
+  loop. Pre-existing, not introduced by this sprint; worth a one-line
+  `${ALL_SVCS[@]+"${ALL_SVCS[@]}"}` fix (same idiom already used for
+  `TO_BUILD`/`TO_RETAG` a few lines below it) at the start of whichever sprint
+  next touches this file.
+- `[defer]` `scripts/hooks/pre-push` is now 302 lines and
+  `scripts/lib/ci-utils.sh` is now 368 — both over the project's 300-line
+  guideline (`ci-utils.sh` was already at 354 before this sprint). Neither
+  splits cleanly without real restructuring: `pre-push` is a single git hook
+  entry point with load-bearing line-ordering constraints documented inline,
+  and `ci-utils.sh`'s ci/deploy functions are tightly coupled to shared
+  writer-liveness/signal-handling state. Worth a dedicated sprint if either
+  keeps growing.
+- `[defer]` `deployLaunchMode()` (TS) and `deploy_launch_mode()` (bash)
+  duplicate the same three-value/marker-list logic by hand across two
+  languages, same as `EMIT_UNATTENDED_SHELL_MARKERS` already does for
+  `detect_unattended_shell`. No shared source of truth exists for either;
+  acceptable today since the marker list rarely changes, but a third
+  implementation (e.g. a future dashboard-side check) would be a good trigger
+  to extract one.
+- `[defer]` `~/.claude/commands/deploy.md` (sprint 289, untracked) didn't need
+  changes since it never references the env var directly — it wraps
+  `scripts/deploy-detached.sh`, which already picked up the new name in this
+  commit. Confirmed by grep; no drift introduced.

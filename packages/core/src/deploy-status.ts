@@ -16,10 +16,19 @@ export interface DeployWriterInfo {
   heartbeatAt: string
 }
 
+// sprint 290: how a deploy record was launched. Deploy-only (CI records never
+// carry it) and, unlike "writer", present on both in-flight and terminal
+// records — see deploy-records.ts's module doc comment for why.
+export interface DeployLaunchInfo {
+  mode: 'detached' | 'interactive' | 'unattended-override'
+  marker: string
+}
+
 // The union of what .ci-status.json and .deploy-status.json can hold, across
 // both the in-flight shape (status/progress/writer) and the terminal shape
 // (status/completedAt, no writer). Fields are optional because a malformed
-// or partial file must classify to 'unknown' rather than throw.
+// or partial file must classify to 'unknown' rather than throw. "launch" is
+// likewise optional so a pre-290 record still classifies cleanly.
 export interface DeployStatusRecord {
   status?: string
   sha?: string
@@ -28,6 +37,7 @@ export interface DeployStatusRecord {
   completedAt?: string
   progress?: { step: number; total: number; pct: number; label: string }
   writer?: DeployWriterInfo
+  launch?: DeployLaunchInfo
 }
 
 export type RunState = 'idle' | 'running' | 'orphaned' | 'unknown'

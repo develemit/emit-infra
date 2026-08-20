@@ -158,17 +158,24 @@ push_payload_summary "$REMOTE_SHA" "$LOCAL_SHA"
 # before _fail_deploy/deploy_init below — exiting non-zero after deploy_init
 # runs would fire the ERR trap with _EMIT_STARTED_EPOCH unset, writing a status
 # record this gate promises not to write. See docs/PRE-PUSH-HOOK.md.
-if [[ "${EMIT_ALLOW_UNATTENDED_DEPLOY:-0}" != "1" ]]; then
+# EMIT_DEPLOY_DETACHED=1 is a declaration the caller makes, not something this
+# gate can verify (see deploy_launch_mode in deploy-plan.sh). The deprecated
+# EMIT_ALLOW_UNATTENDED_DEPLOY alias still works so the fleet doesn't break
+# mid-transition.
+if [[ "${EMIT_DEPLOY_DETACHED:-0}" != "1" && "${EMIT_ALLOW_UNATTENDED_DEPLOY:-0}" != "1" ]]; then
   if MARKER=$(detect_unattended_shell); then
     echo "✗ pre-push: refusing to deploy $PROJECT_NAME from a teardown-prone shell (\$$MARKER set)" >&2
     echo "  A killed shell leaves a deploy half-finished — see docs/PRE-PUSH-HOOK.md." >&2
-    echo "  If this is legitimate headless use, override with:" >&2
-    echo "    EMIT_ALLOW_UNATTENDED_DEPLOY=1 git push" >&2
+    echo "  Use the detached deploy path instead: scripts/deploy-detached.sh (or the /deploy skill)." >&2
+    echo "  Certain this shell will survive? Override with: EMIT_DEPLOY_DETACHED=1 git push" >&2
     exit 1
   elif ! has_controlling_terminal; then
     echo "⚠ pre-push: no controlling terminal and no unattended-shell marker set; proceeding" >&2
   fi
+else
+  deploy_warn_deprecated_override
 fi
+read -r LAUNCH_MODE LAUNCH_MARKER <<< "$(deploy_launch_mode)"
 
 # source env file for deploy phase (after CI so tests use local env)
 if [[ -n "$ENV_FILE" && -f "$ROOT/$ENV_FILE" ]]; then
@@ -231,7 +238,7 @@ STEPS=2
 PRE_DEPLOY_COUNT=$(python3 -c "import json; print(len(json.loads('$PRE_DEPLOY_JSON')))" 2>/dev/null || echo 0)
 STEPS=$((STEPS + PRE_DEPLOY_COUNT))
 
-deploy_init "$STEPS"
+deploy_init "$STEPS" "$LAUNCH_MODE" "$LAUNCH_MARKER"
 _emit_trap_signals deploy
 deploy_record_phase ci "$_EMIT_CI_DURATION"
 

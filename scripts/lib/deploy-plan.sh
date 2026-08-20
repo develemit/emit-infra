@@ -13,6 +13,8 @@
 #   detect_dry_run_push                     -> 0 if the invoking `git push` used --dry-run
 #   detect_unattended_shell                 -> 0 if a teardown-prone shell env marker is set
 #   has_controlling_terminal                -> 0 if this process can open /dev/tty
+#   deploy_launch_mode                      -> echoes "<mode> <marker>" for the status record
+#   deploy_warn_deprecated_override         -> warns on stderr if only the old override name is set
 
 [[ -n "${_EMIT_DEPLOY_PLAN_LOADED:-}" ]] && return 0
 _EMIT_DEPLOY_PLAN_LOADED=1
@@ -226,6 +228,33 @@ detect_unattended_shell() {
 # terminal either and are a normal, safe workflow.
 has_controlling_terminal() {
   ( : < /dev/tty ) 2>/dev/null
+}
+
+# ── fix 8: stamp how a deploy was launched onto the status record (sprint 290) ─
+# Not auto-detectable (macOS bash 3.2: no inherited ignored SIGHUP visible to
+# the child, no setsid, nohup leaves pgid unchanged) — a declaration, not a
+# proof. EMIT_DEPLOY_DETACHED=1 asserts a property the caller owns ("this
+# will outlive me"); the deprecated EMIT_ALLOW_UNATTENDED_DEPLOY alias stamps
+# "unattended-override" instead of "detached" so a post-mortem grepping
+# .deploy-history.jsonl can tell which path a deploy actually took.
+deploy_launch_mode() {
+  local marker
+  marker=$(detect_unattended_shell) || true
+  if [[ "${EMIT_DEPLOY_DETACHED:-0}" == "1" ]]; then
+    echo "detached ${marker}"
+  elif [[ "${EMIT_ALLOW_UNATTENDED_DEPLOY:-0}" == "1" ]]; then
+    echo "unattended-override ${marker}"
+  else
+    echo "interactive ${marker}"
+  fi
+}
+
+# Only the deprecated alias reads as "skip the check" — warn when it's the
+# only thing set, nudging muscle memory toward the honest name.
+deploy_warn_deprecated_override() {
+  if [[ "${EMIT_DEPLOY_DETACHED:-0}" != "1" && "${EMIT_ALLOW_UNATTENDED_DEPLOY:-0}" == "1" ]]; then
+    echo "⚠ pre-push: EMIT_ALLOW_UNATTENDED_DEPLOY is deprecated; set EMIT_DEPLOY_DETACHED=1 instead (scripts/deploy-detached.sh already does)" >&2
+  fi
 }
 
 # ── fix 5: build-fan-out failures must always reach on_fail ──────────────────

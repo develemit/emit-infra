@@ -15,9 +15,35 @@ import { hostname } from 'node:os'
 // intermediate progress path (a single init → runAnsible → done bracket), so
 // unlike the bash writer's deploy_step, there's no periodic refresh here —
 // heartbeatAt is only ever the init timestamp.
+//
+// It also carries a "launch" block (sprint 290) — {mode, marker} — mirroring
+// scripts/lib/deploy-plan.sh's deploy_launch_mode. Unlike "writer", "launch"
+// survives onto terminal records: it's a fact about how the deploy started,
+// not a liveness signal, so keeping it after completion is what makes it
+// useful for a post-mortem.
 
 const HISTORY_MAX_LINES = 1000
 const HISTORY_KEEP_LINES = 500
+
+// Same three values and marker list as scripts/lib/deploy-plan.sh's
+// deploy_launch_mode / EMIT_UNATTENDED_SHELL_MARKERS — kept in sync by hand
+// since one side is bash and the other TS. This CLI deploy path isn't gated
+// by scripts/hooks/pre-push at all (it's invoked either directly by an
+// operator or as a subprocess of the hook, which already ran its own gate),
+// so this is purely a record-keeping stamp, not an enforcement point.
+const UNATTENDED_SHELL_MARKERS = ['CLAUDECODE', 'CLAUDE_CODE_ENTRYPOINT', 'CI'] as const
+
+export interface DeployLaunch {
+  mode: 'detached' | 'interactive' | 'unattended-override'
+  marker: string
+}
+
+export function deployLaunchMode(env: NodeJS.ProcessEnv = process.env): DeployLaunch {
+  const marker = UNATTENDED_SHELL_MARKERS.find((m) => Boolean(env[m])) ?? ''
+  if (env.EMIT_DEPLOY_DETACHED === '1') return { mode: 'detached', marker }
+  if (env.EMIT_ALLOW_UNATTENDED_DEPLOY === '1') return { mode: 'unattended-override', marker }
+  return { mode: 'interactive', marker }
+}
 
 export interface DeployContext {
   sha: string
@@ -25,6 +51,7 @@ export interface DeployContext {
   message: string
   startedAt: string
   startedEpochMs: number
+  launch: DeployLaunch
 }
 
 // Exported so deploy-reconcile.ts (sprint 286) can reuse the same atomic
@@ -68,7 +95,8 @@ export async function deployRecordInit(cwd: string): Promise<DeployContext> {
     gitField(cwd, ['log', '-1', '--format=%s', 'HEAD']),
   ])
   const startedEpochMs = Date.now()
-  const ctx: DeployContext = { sha, branch, message, startedAt: isoSeconds(startedEpochMs), startedEpochMs }
+  const launch = deployLaunchMode()
+  const ctx: DeployContext = { sha, branch, message, startedAt: isoSeconds(startedEpochMs), startedEpochMs, launch }
 
   await writeAtomic(
     join(cwd, '.deploy-status.json'),
@@ -78,6 +106,7 @@ export async function deployRecordInit(cwd: string): Promise<DeployContext> {
       branch: ctx.branch,
       startedAt: ctx.startedAt,
       progress: { step: 0, total: 1, pct: 0, label: 'starting' },
+      launch: ctx.launch,
       writer: { pid: process.pid, host: hostname(), heartbeatAt: ctx.startedAt },
     }) + '\n',
   )
@@ -96,7 +125,7 @@ export async function deployRecordDone(
 
   await writeAtomic(
     join(cwd, '.deploy-status.json'),
-    JSON.stringify({ status, sha: ctx.sha, branch: ctx.branch, completedAt }) + '\n',
+    JSON.stringify({ status, sha: ctx.sha, branch: ctx.branch, completedAt, launch: ctx.launch }) + '\n',
   )
 
   const historyPath = join(cwd, '.deploy-history.jsonl')
@@ -109,6 +138,7 @@ export async function deployRecordDone(
     durationSec,
     servicesBuilt: [],
     phases,
+    launch: ctx.launch,
     message: ctx.message,
   })
   await appendFile(historyPath, line + '\n')

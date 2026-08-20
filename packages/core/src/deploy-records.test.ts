@@ -9,7 +9,7 @@ vi.mock('execa', () => ({
 }))
 
 import { execa } from 'execa'
-import { deployRecordInit, deployRecordDone } from './deploy-records.js'
+import { deployRecordInit, deployRecordDone, deployLaunchMode } from './deploy-records.js'
 
 const mockedExeca = vi.mocked(execa)
 
@@ -22,15 +22,24 @@ function mockGit(sha: string, branch: string, message: string) {
   }) as any)
 }
 
+// deployLaunchMode reads the running process's own env (same limitation as
+// the bash gate — see its doc comment), and this suite may itself be running
+// under an agent shell with CLAUDECODE already set. Stub every var it reads
+// so each test's launch mode is deterministic instead of leaking the ambient
+// environment, mirroring deploy-unattended-gate.test.sh's `unset` pattern.
+const LAUNCH_ENV_VARS = ['CLAUDECODE', 'CLAUDE_CODE_ENTRYPOINT', 'CI', 'EMIT_DEPLOY_DETACHED', 'EMIT_ALLOW_UNATTENDED_DEPLOY']
+
 let dir: string
 
 beforeEach(async () => {
   mockedExeca.mockReset()
   dir = await mkdtemp(join(tmpdir(), 'emit-deploy-records-'))
+  for (const v of LAUNCH_ENV_VARS) vi.stubEnv(v, '')
 })
 
 afterEach(async () => {
   await rm(dir, { recursive: true, force: true })
+  vi.unstubAllEnvs()
 })
 
 describe('deployRecordInit', () => {
@@ -51,6 +60,7 @@ describe('deployRecordInit', () => {
       branch: 'main',
       startedAt: ctx.startedAt,
       progress: { step: 0, total: 1, pct: 0, label: 'starting' },
+      launch: { mode: 'interactive', marker: '' },
       writer: { pid: process.pid, host: parsed.writer.host, heartbeatAt: ctx.startedAt },
     })
   })
@@ -76,6 +86,48 @@ describe('deployRecordInit', () => {
     expect(ctx.branch).toBe('')
     expect(ctx.message).toBe('')
   })
+
+  it('stamps launch.mode detached when EMIT_DEPLOY_DETACHED=1 is set', async () => {
+    mockGit('abc123', 'main', 'a commit')
+    vi.stubEnv('EMIT_DEPLOY_DETACHED', '1')
+    vi.stubEnv('CLAUDECODE', '1')
+
+    const ctx = await deployRecordInit(dir)
+
+    expect(ctx.launch).toEqual({ mode: 'detached', marker: 'CLAUDECODE' })
+    const parsed = JSON.parse(await readFile(join(dir, '.deploy-status.json'), 'utf8'))
+    expect(parsed.launch).toEqual({ mode: 'detached', marker: 'CLAUDECODE' })
+  })
+})
+
+describe('deployLaunchMode', () => {
+  it('is interactive with no markers and no override set', () => {
+    expect(deployLaunchMode({})).toEqual({ mode: 'interactive', marker: '' })
+  })
+
+  it('reports the marker even when no override is set', () => {
+    expect(deployLaunchMode({ CI: '1' })).toEqual({ mode: 'interactive', marker: 'CI' })
+  })
+
+  it('is detached when EMIT_DEPLOY_DETACHED=1', () => {
+    expect(deployLaunchMode({ CLAUDECODE: '1', EMIT_DEPLOY_DETACHED: '1' })).toEqual({
+      mode: 'detached',
+      marker: 'CLAUDECODE',
+    })
+  })
+
+  it('is unattended-override when only the deprecated alias is set', () => {
+    expect(deployLaunchMode({ CLAUDECODE: '1', EMIT_ALLOW_UNATTENDED_DEPLOY: '1' })).toEqual({
+      mode: 'unattended-override',
+      marker: 'CLAUDECODE',
+    })
+  })
+
+  it('prefers EMIT_DEPLOY_DETACHED when both are set', () => {
+    expect(
+      deployLaunchMode({ CLAUDECODE: '1', EMIT_DEPLOY_DETACHED: '1', EMIT_ALLOW_UNATTENDED_DEPLOY: '1' }),
+    ).toEqual({ mode: 'detached', marker: 'CLAUDECODE' })
+  })
 })
 
 describe('deployRecordDone', () => {
@@ -87,11 +139,12 @@ describe('deployRecordDone', () => {
 
     const statusRaw = await readFile(join(dir, '.deploy-status.json'), 'utf8')
     const status = JSON.parse(statusRaw)
-    expect(Object.keys(status)).toEqual(['status', 'sha', 'branch', 'completedAt'])
+    expect(Object.keys(status)).toEqual(['status', 'sha', 'branch', 'completedAt', 'launch'])
     expect(status.status).toBe('deployed')
     expect(status.sha).toBe('abc123')
     expect(status.branch).toBe('main')
     expect(status.writer).toBeUndefined()
+    expect(status.launch).toEqual({ mode: 'interactive', marker: '' })
 
     const historyRaw = await readFile(join(dir, '.deploy-history.jsonl'), 'utf8')
     const lines = historyRaw.trim().split('\n')
@@ -103,13 +156,14 @@ describe('deployRecordDone', () => {
     // a CLI-written record apart from a hook-written one.
     expect(Object.keys(entry)).toEqual([
       'status', 'sha', 'branch', 'startedAt', 'completedAt',
-      'durationSec', 'servicesBuilt', 'phases', 'message',
+      'durationSec', 'servicesBuilt', 'phases', 'launch', 'message',
     ])
     expect(entry.status).toBe('deployed')
     expect(entry.sha).toBe('abc123')
     expect(entry.branch).toBe('main')
     expect(entry.servicesBuilt).toEqual([])
     expect(entry.phases).toEqual({ deploy: 12 })
+    expect(entry.launch).toEqual({ mode: 'interactive', marker: '' })
     expect(entry.message).toBe('a commit')
     expect(typeof entry.durationSec).toBe('number')
   })

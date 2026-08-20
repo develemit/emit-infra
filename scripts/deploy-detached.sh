@@ -104,7 +104,7 @@ launch() {
   : > "${base}.log"
   nohup bash -c '
     cd "$1" || exit 1
-    env EMIT_ALLOW_UNATTENDED_DEPLOY=1 git push origin main
+    env EMIT_DEPLOY_DETACHED=1 git push origin main
     echo $? > "$2"
   ' -- "$PROJECT_DIR" "${base}.rc" > "${base}.log" 2>&1 &
   disown $! 2>/dev/null || true

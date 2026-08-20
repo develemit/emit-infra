@@ -9,7 +9,7 @@
 #   ci_done success|failure   # write final status + append to history
 #
 # Deploy usage:
-#   deploy_init <total_steps>
+#   deploy_init <total_steps> [launch_mode] [launch_marker]
 #   deploy_set_services web api worker  # record which services are being built
 #   deploy_step "label"
 #   deploy_phase <name>                 # start timing a phase (closes the previous one)
@@ -22,7 +22,15 @@
 # In-flight status files (running/deploying) also carry a "writer" block —
 # {"pid":12345,"host":"studio","heartbeatAt":"..."} — so a reader can tell a
 # live run from an orphaned one (sprint 283). Terminal records omit it.
-# packages/core/src/deploy-records.ts mirrors this shape deliberately; keep
+#
+# Deploy records (not CI) also carry a "launch" block —
+# {"mode":"detached|interactive|unattended-override","marker":"CLAUDECODE"} —
+# stamped from scripts/hooks/pre-push's gate decision (sprint 290's
+# deploy_launch_mode in deploy-plan.sh). Unlike "writer", "launch" survives
+# onto terminal records: it's a fact about how the deploy started, not a
+# liveness signal, so it stays useful after the deploy finishes.
+#
+# packages/core/src/deploy-records.ts mirrors both shapes deliberately; keep
 # field names/types identical if either side changes.
 
 # Guard against double-sourcing without resetting in-flight state
@@ -38,6 +46,8 @@ _EMIT_CI_STEP=0
 _EMIT_CI_TOTAL=0
 _EMIT_DEPLOY_STEP=0
 _EMIT_DEPLOY_TOTAL=0
+_EMIT_LAUNCH_MODE="interactive"
+_EMIT_LAUNCH_MARKER=""
 _EMIT_SERVICES_BUILT=""
 _EMIT_LOG_FILE=""
 _EMIT_DEPLOY_LOG_FILE=""
@@ -300,6 +310,8 @@ ci_done() {
 
 deploy_init() {
   _EMIT_DEPLOY_TOTAL=$1
+  _EMIT_LAUNCH_MODE="${2:-interactive}"
+  _EMIT_LAUNCH_MARKER="${3:-}"
   _EMIT_DEPLOY_STEP=0
   _EMIT_SHA=$(git rev-parse HEAD)
   _EMIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
@@ -312,8 +324,9 @@ deploy_init() {
     _emit_start_log "$_EMIT_DEPLOY_LOG_FILE"
   fi
   _emit_write_atomic \
-    "$(printf '{"status":"deploying","sha":"%s","branch":"%s","startedAt":"%s","progress":{"step":0,"total":%d,"pct":0,"label":"starting"},"writer":{"pid":%d,"host":"%s","heartbeatAt":"%s"}}' \
+    "$(printf '{"status":"deploying","sha":"%s","branch":"%s","startedAt":"%s","progress":{"step":0,"total":%d,"pct":0,"label":"starting"},"launch":{"mode":"%s","marker":"%s"},"writer":{"pid":%d,"host":"%s","heartbeatAt":"%s"}}' \
       "$_EMIT_SHA" "$_EMIT_BRANCH" "$_EMIT_STARTED" "$_EMIT_DEPLOY_TOTAL" \
+      "$_EMIT_LAUNCH_MODE" "$_EMIT_LAUNCH_MARKER" \
       "$_EMIT_WRITER_PID" "$_EMIT_WRITER_HOST" "$_EMIT_STARTED")" \
     .deploy-status.json
   _emit_start_heartbeat deploy
@@ -323,9 +336,10 @@ deploy_step() {
   _EMIT_DEPLOY_STEP=$((_EMIT_DEPLOY_STEP + 1))
   local pct=$((_EMIT_DEPLOY_STEP * 100 / _EMIT_DEPLOY_TOTAL))
   _emit_write_atomic \
-    "$(printf '{"status":"deploying","sha":"%s","branch":"%s","startedAt":"%s","progress":{"step":%d,"total":%d,"pct":%d,"label":"%s"},"writer":{"pid":%d,"host":"%s","heartbeatAt":"%s"}}' \
+    "$(printf '{"status":"deploying","sha":"%s","branch":"%s","startedAt":"%s","progress":{"step":%d,"total":%d,"pct":%d,"label":"%s"},"launch":{"mode":"%s","marker":"%s"},"writer":{"pid":%d,"host":"%s","heartbeatAt":"%s"}}' \
       "$_EMIT_SHA" "$_EMIT_BRANCH" "$_EMIT_STARTED" \
       "$_EMIT_DEPLOY_STEP" "$_EMIT_DEPLOY_TOTAL" "$pct" "$1" \
+      "$_EMIT_LAUNCH_MODE" "$_EMIT_LAUNCH_MARKER" \
       "$_EMIT_WRITER_PID" "$_EMIT_WRITER_HOST" "$(date -u +"%Y-%m-%dT%H:%M:%SZ")")" \
     .deploy-status.json
 }
@@ -341,12 +355,12 @@ deploy_done() {
   local duration=$(( $(date +%s) - _EMIT_STARTED_EPOCH ))
 
   _emit_write_atomic \
-    "$(printf '{"status":"%s","sha":"%s","branch":"%s","completedAt":"%s"}' \
-      "$1" "$_EMIT_SHA" "$_EMIT_BRANCH" "$completed_at")" \
+    "$(printf '{"status":"%s","sha":"%s","branch":"%s","completedAt":"%s","launch":{"mode":"%s","marker":"%s"}}' \
+      "$1" "$_EMIT_SHA" "$_EMIT_BRANCH" "$completed_at" "$_EMIT_LAUNCH_MODE" "$_EMIT_LAUNCH_MARKER")" \
     .deploy-status.json
 
-  printf '{"status":"%s","sha":"%s","branch":"%s","startedAt":"%s","completedAt":"%s","durationSec":%d,"servicesBuilt":%s,"phases":%s,"message":"%s"}\n' \
-    "$1" "$_EMIT_SHA" "$_EMIT_BRANCH" "$_EMIT_STARTED" "$completed_at" "$duration" "$(_emit_services_json)" "$(_emit_phases_json)" "$_EMIT_MSG" >> .deploy-history.jsonl
+  printf '{"status":"%s","sha":"%s","branch":"%s","startedAt":"%s","completedAt":"%s","durationSec":%d,"servicesBuilt":%s,"phases":%s,"launch":{"mode":"%s","marker":"%s"},"message":"%s"}\n' \
+    "$1" "$_EMIT_SHA" "$_EMIT_BRANCH" "$_EMIT_STARTED" "$completed_at" "$duration" "$(_emit_services_json)" "$(_emit_phases_json)" "$_EMIT_LAUNCH_MODE" "$_EMIT_LAUNCH_MARKER" "$_EMIT_MSG" >> .deploy-history.jsonl
 
   _emit_truncate_history .deploy-history.jsonl
   [[ -d ".deploy-logs" ]] && _emit_rotate_logs .deploy-logs

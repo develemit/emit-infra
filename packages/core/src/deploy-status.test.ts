@@ -133,6 +133,28 @@ describe('classifyRunState', () => {
     expect(result.state).toBe('idle')
   })
 
+  it('sprint 290: a "launch" block does not change the classification of an otherwise-identical record', () => {
+    const withoutLaunch = inFlight({ writer: { pid: 4242, host: HOST, heartbeatAt: iso(5) } })
+    const withLaunch = inFlight({
+      writer: { pid: 4242, host: HOST, heartbeatAt: iso(5) },
+      launch: { mode: 'detached', marker: 'CLAUDECODE' },
+    })
+
+    const a = classifyRunState(withoutLaunch, { now: NOW, currentHost: HOST, isPidAlive: () => true })
+    const b = classifyRunState(withLaunch, { now: NOW, currentHost: HOST, isPidAlive: () => true })
+
+    expect(b).toEqual(a)
+  })
+
+  it('sprint 290: a pre-290 record with no "launch" field still classifies normally', () => {
+    const record = inFlight({ writer: { pid: 4242, host: HOST, heartbeatAt: iso(5) } })
+    expect(record.launch).toBeUndefined()
+
+    const result = classifyRunState(record, { now: NOW, currentHost: HOST, isPidAlive: () => true })
+
+    expect(result.state).toBe('running')
+  })
+
   it('never crashes on a malformed or partial record', () => {
     expect(classifyRunState(null).state).toBe('unknown')
     expect(classifyRunState(undefined).state).toBe('unknown')
