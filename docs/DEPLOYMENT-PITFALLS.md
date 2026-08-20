@@ -636,9 +636,43 @@ this was a stuck local artifact, not a bad deploy or a broken server.
 - **286** — `emit-infra reconcile [--write]` clears an orphaned record with a
   correct terminal status and history line, so `resolve_last_deployed_sha`
   stops being hidden behind a stuck record.
-- **287** (this doc) — writes down the status vocabulary, the liveness rule,
-  the operator warning, the recovery runbook, and the discoverability trap,
-  so the next person doesn't have to reverse-engineer the hook under
-  pressure. See `docs/PRE-PUSH-HOOK.md`'s "Status files and liveness" and
-  "Recovery runbook" sections, and the "How projects get the hook" section
-  for the `core.hooksPath` check.
+- **287** — writes down the status vocabulary, the liveness rule, the
+  operator warning, the recovery runbook, and the discoverability trap, so
+  the next person doesn't have to reverse-engineer the hook under pressure.
+  See `docs/PRE-PUSH-HOOK.md`'s "Status files and liveness" and "Recovery
+  runbook" sections, and the "How projects get the hook" section for the
+  `core.hooksPath` check.
+- **288** — turned the operator warning into an enforced gate: the deploy
+  phase now refuses to start (exits 1, no status write) when a
+  teardown-prone shell marker (`CLAUDECODE`/`CLAUDE_CODE_ENTRYPOINT`/`CI`) is
+  set, closing off the exact incident shell from ever repeating it silently.
+  Necessary, but it also blocked every *legitimate* agent-driven deploy —
+  the same markers are present whether the shell will survive or not, and
+  the gate had no way to tell the difference.
+- **289** — rather than loosen the gate (which would have silently
+  re-opened this incident for anyone else's agent shell), added
+  `scripts/deploy-detached.sh`: it backgrounds the **entire** `git push`
+  with `nohup`/`disown` — not just the deploy phase, because the hook
+  deploys *before* `git push` itself returns, so detaching only the deploy
+  phase would let prod get ahead of `origin/main` — and polls for a
+  terminal result. Proven against a real kill: a scratch-repo end-to-end
+  test kills the launching process mid-push and confirms the backgrounded
+  push still completes and the terminal status record lands correctly.
+- **290** — 289's script still had to set 288's gate bypass
+  (`EMIT_ALLOW_UNATTENDED_DEPLOY=1`) to get through, which reads as "turn the
+  safety check off" rather than "this specific launch is durable." Renamed
+  it to `EMIT_DEPLOY_DETACHED=1` — an honest declaration, not a bare
+  override — kept the old name working as a deprecated, warned alias, and
+  stamped a `"launch":{"mode","marker"}` block onto every deploy-status
+  record (in-flight and terminal) so a post-mortem can tell which path a
+  deploy actually took. The declaration can't be verified: macOS bash 3.2
+  exposes no inherited ignored `SIGHUP`, has no `setsid`, and `nohup`
+  doesn't change `pgid` — it's a contract with the caller, not a proof.
+- **291** (this doc) — by this point `docs/PRE-PUSH-HOOK.md` actively told
+  operators not to do the thing 289/290 now support, which is worse than no
+  documentation since it's trusted under pressure. Corrected it and
+  documented the detached workflow end to end: launch, resume a deploy
+  whose launching session went away, read the launch-mode field in a
+  post-mortem, and recover an orphaned record. See
+  `docs/PRE-PUSH-HOOK.md`'s "Detached deploys" and "Recovery runbook"
+  sections.

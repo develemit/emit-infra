@@ -9,12 +9,14 @@ from each project's `.emit-infra.json`.
 | File | Role |
 | --- | --- |
 | `scripts/hooks/pre-push` | Orchestration: CI, gates, phases |
-| `scripts/lib/deploy-plan.sh` | Decision logic (what to deploy, what to rebuild) |
+| `scripts/lib/deploy-plan.sh` | Decision logic (what to deploy, what to rebuild), the unattended-shell gate, and the launch-mode declaration |
 | `scripts/lib/docker-build.sh` | Image naming + buildx invocation |
 | `scripts/lib/ci-utils.sh` | Status files, history, per-phase timing |
+| `scripts/deploy-detached.sh` | The supported detached-deploy launcher — see [Detached deploys](#detached-deploys-the-supported-agent-shell-path) |
 | `scripts/lib/deploy-plan.test.sh` | Tests — `bash scripts/lib/deploy-plan.test.sh` |
 | `scripts/lib/hook-signals.test.sh` | Tests — signal traps (`bash scripts/lib/hook-signals.test.sh`) |
-| `scripts/lib/deploy-unattended-gate.test.sh` | Tests — unattended-shell gate (`bash scripts/lib/deploy-unattended-gate.test.sh`) |
+| `scripts/lib/deploy-unattended-gate.test.sh` | Tests — unattended-shell gate + launch-mode declaration (`bash scripts/lib/deploy-unattended-gate.test.sh`) |
+| `scripts/lib/deploy-detached.test.sh` | Tests — detached launch, polling, and a real kill-the-launcher survival case (`bash scripts/lib/deploy-detached.test.sh`) |
 
 ## How projects get the hook
 
@@ -158,12 +160,28 @@ panel, Tower, GitHub Desktop) have no controlling terminal either and
 blocking them would break a normal workflow. That warning path prints to
 stderr and the deploy proceeds.
 
-**Opt-out:** `EMIT_ALLOW_UNATTENDED_DEPLOY=1 git push` bypasses both the
-block and the warning, for legitimate headless use. This is a separate
-variable from `EMIT_FORCE_DEPLOY` on purpose — `EMIT_FORCE_DEPLOY` forces a
-deploy past the *path* filters (gates 3/4), and conflating it with "I accept
-a killable shell" would have silently re-opened this exact incident for
-anyone already exporting it for unrelated reasons.
+**Supported path: the durability declaration.** `EMIT_DEPLOY_DETACHED=1 git
+push` bypasses both the block and the warning. It's set automatically by
+`scripts/deploy-detached.sh` / the `/deploy` skill — see
+[Detached deploys](#detached-deploys-the-supported-agent-shell-path) below —
+so you don't write it by hand for the normal case. It's a **declaration the
+caller makes, not something this gate can verify**: macOS bash 3.2 exposes no
+inherited ignored `SIGHUP`, has no `setsid`, and `nohup` doesn't change
+`pgid`, so there's no reliable way to detect "will this process actually
+survive" from inside the gate. `EMIT_DEPLOY_DETACHED=1` is a contract — set
+it only from a launch mechanism that has actually made the push durable.
+
+This is a separate variable from `EMIT_FORCE_DEPLOY` on purpose —
+`EMIT_FORCE_DEPLOY` forces a deploy past the *path* filters (gates 3/4), and
+conflating it with "I accept a killable shell" would have silently re-opened
+this exact incident for anyone already exporting it for unrelated reasons.
+
+The deprecated `EMIT_ALLOW_UNATTENDED_DEPLOY=1` alias still works — it warns
+to stderr and still bypasses the gate, stamped as `unattended-override`
+rather than `detached` on the resulting status record so a post-mortem can
+tell the two paths apart. Replace it with `EMIT_DEPLOY_DETACHED=1` wherever
+you find it; it has no advantage over the new name and will eventually be
+removed.
 
 Gate placement in `scripts/hooks/pre-push` is load-bearing: it runs after
 every gate that exits 0 (dry-run, ignored-paths) but before `_fail_deploy` is
@@ -178,17 +196,24 @@ record this gate promises not to write and throwing a bash arithmetic error.
 runs, then Docker images build per changed service, then GHCR push, then
 `emit-infra deploy`. It's slow — emulated `linux/amd64` builds, sequential by
 default (`EMIT_BUILD_PARALLEL` raises the cap) — which makes it tempting to
-kick off from somewhere that won't sit and wait. Don't. **Never push to
-`main`, or otherwise trigger a deploy, from an environment that can tear the
-process down before it finishes** — an agent's background shell, a sandbox
-that tears down on timeout, a CI runner with a short step timeout. Sprint
-282's signal traps and sprint 283's liveness metadata (below) stop the
-dashboard and CLI from *lying* about a killed run still being in progress,
-but they don't undo the kill: the deploy itself is still cut off wherever it
-was — a partial build, a partial rollout — and that needs the same operator
-attention a `failed` deploy would. The 2026-08-19 incident (written up in
+kick off from somewhere that won't sit and wait.
+
+The rule is **not** "never deploy from an agent shell" — it's **never launch
+a deploy directly in a shell whose lifetime is tied to a single tool call;
+use the detached path, which survives it.** Running a bare
+`git push origin main` straight inside an agent's background shell, a
+sandbox that tears down on timeout, or a CI runner with a short step timeout
+is still exactly the 2026-08-19 failure mode — the fix is
+`scripts/deploy-detached.sh` (or the `/deploy` skill), documented in
+[Detached deploys](#detached-deploys-the-supported-agent-shell-path) below,
+not avoiding the push altogether. Sprint 282's signal traps and sprint 283's
+liveness metadata (below) stop the dashboard and CLI from *lying* about a
+killed run still being in progress, but they don't undo a kill that does
+happen: the deploy itself is still cut off wherever it was — a partial
+build, a partial rollout — and that needs the same operator attention a
+`failed` deploy would. The 2026-08-19 incident (written up in
 `docs/DEPLOYMENT-PITFALLS.md`) is exactly this: a teardown-prone environment
-killed the hook mid-build.
+killed the hook mid-build, back when a direct push was the only option.
 
 If the hook is killed by `SIGINT`, `SIGTERM`, or `SIGHUP`, it traps the
 signal, writes `interrupted` (deploy phase) or `failure` (CI phase) to the
@@ -206,11 +231,99 @@ stuck record.
   to the path diff.
 - `EMIT_DEPLOY_CONFIRM=1` — adds an interactive confirm prompt on `/dev/tty`
   before the deploy phase runs (defaults to *no*).
-- `EMIT_ALLOW_UNATTENDED_DEPLOY=1` — bypasses the
-  [unattended-shell gate](#unattended-shell-gate) for legitimate headless use.
-  `EMIT_FORCE_DEPLOY` does **not** also do this — see that section for why.
+- `EMIT_DEPLOY_DETACHED=1` — the durability declaration; bypasses the
+  [unattended-shell gate](#unattended-shell-gate) by asserting the push will
+  survive its launching shell. Set automatically by `scripts/deploy-detached.sh`
+  / the `/deploy` skill — write it by hand only if you have your own durable
+  launch mechanism. `EMIT_FORCE_DEPLOY` does **not** also do this — see that
+  section for why. The deprecated `EMIT_ALLOW_UNATTENDED_DEPLOY=1` alias still
+  works (warns to stderr) — replace it wherever found.
 - `git push --dry-run` — CI only, no deploy phase at all (see
   [`git push --dry-run`](#git-push---dry-run) above).
+
+## Detached deploys (the supported agent-shell path)
+
+`scripts/deploy-detached.sh` is the supported way to deploy from a shell that
+might not outlive the push — an agent's background shell, a dashboard-driven
+session, anything whose lifetime is tied to a single tool call. It backgrounds
+the **whole push** (not just the deploy phase — the hook deploys before
+`git push` itself returns, so detaching only the deploy phase would let prod
+get ahead of `origin/main`) with `nohup`/`disown`, sets the durability
+declaration (`EMIT_DEPLOY_DETACHED=1`), and polls for a terminal result.
+
+**Launch:**
+
+```bash
+scripts/deploy-detached.sh --dir <project-dir>            # blocks and polls (default)
+scripts/deploy-detached.sh --dir <project-dir> --no-wait   # launch and return immediately
+```
+
+The `/deploy` skill is a thin wrapper over the same script — use whichever is
+convenient. Preflight refuses to launch (prints why, no status write) when the
+tree is dirty, `HEAD` isn't `main`, there's nothing to push, a deploy is
+already `running` for the project, or the last record is `orphaned` (run
+`emit-infra reconcile --write` first in that case).
+
+**The durability declaration.** `EMIT_DEPLOY_DETACHED=1` asserts "this launch
+will survive its caller" — the gate cannot verify that claim (see
+[Unattended-shell gate](#unattended-shell-gate) above for why), so the
+responsibility sits with whatever sets the variable. `scripts/deploy-detached.sh`
+earns the claim honestly: `nohup bash -c '...' & disown`. Don't set
+`EMIT_DEPLOY_DETACHED=1` by hand around a plain `git push` — that's the
+declaration without the mechanism, and a killed shell will still cut the
+deploy off mid-build exactly like the 2026-08-19 incident.
+
+**Resuming a deploy whose launching session went away.** The push keeps
+running on the machine regardless of whether the session that launched it is
+still around. To reattach:
+
+```bash
+scripts/deploy-detached.sh --dir <project-dir> --watch
+```
+
+`--watch` never relaunches — it only reads `.deploy-status.json` for the
+in-flight sha and resumes polling. Other ways to check on it without
+relaunching or watching:
+
+- **Log path** is predictable: `/tmp/emit-deploy-<project-name>-<shortsha>.log`
+  (`tail -f` it directly), with the push's exit code landing in the sibling
+  `.rc` file once it finishes.
+- **`emit-infra status`**'s "Local pipeline (this machine)" section reads
+  `.ci-status.json`/`.deploy-status.json` from `cwd` and prints each file's
+  classified `running`/`orphaned`/`unknown`/`idle` state (see
+  [Status files and liveness](#status-files-and-liveness) below) before it
+  even attempts the SSH health check — this works from any shell, not just
+  the one that launched the deploy.
+- **`emit-infra reconcile --write`** — reach for this only once
+  `classifyRunState` actually says `orphaned` (a same-host pid that's no
+  longer running, or a stale cross-host heartbeat), not merely because the
+  session that launched it is gone. A detached deploy with no session behind
+  it and a live heartbeat is still `running`, correctly.
+
+**Reading the launch-mode field in a post-mortem.** Every deploy record —
+in-flight and terminal — carries `"launch":{"mode","marker"}`
+(`packages/core/src/deploy-records.ts` / `scripts/lib/ci-utils.sh`'s
+`deploy_init`/`deploy_done`, sprint 290). `mode` is one of:
+
+| `launch.mode` | Meaning |
+| --- | --- |
+| `detached` | Launched via `EMIT_DEPLOY_DETACHED=1` — the durability declaration was made |
+| `unattended-override` | Launched via the deprecated `EMIT_ALLOW_UNATTENDED_DEPLOY=1` alias |
+| `interactive` | Launched from a shell the gate didn't need to challenge (had a controlling terminal, or no unattended-shell marker was set) |
+
+`marker` names which of `CLAUDECODE`/`CLAUDE_CODE_ENTRYPOINT`/`CI` was set, if
+any. Neither field is currently printed by `emit-infra status` or the
+dashboard — read it straight out of `.deploy-status.json` or
+`.deploy-history.jsonl`:
+
+```bash
+python3 -c "import json;print(json.load(open('.deploy-status.json')).get('launch'))"
+```
+
+A `deploying` record with `launch.mode: "detached"` that later shows up
+`orphaned` is a real durability-mechanism failure worth its own investigation
+(the declaration was made and didn't hold) — different from an `interactive`
+record going orphaned, which is ordinary "someone's laptop closed."
 
 ## Status files and liveness
 
@@ -318,7 +431,34 @@ deploy or CI run as `orphaned` or `unknown` instead of progressing normally.
    `deployed` sha in history — the stuck record no longer hides it.
 4. **Retry**, once you know what actually shipped and the record is clear —
    push again, or re-run whatever triggered the original push, this time
-   from an environment that won't tear the process down mid-flight.
+   from an environment that won't tear the process down mid-flight, or via
+   `scripts/deploy-detached.sh` if you're not sure the shell will survive.
+
+### Verifying a detached deploy actually landed
+
+Sprint 289's kill-the-launcher test (a scratch repo + bare remote, killing
+the launching process mid-push) proves the mechanism survives a kill in
+principle. It has not yet been confirmed against a real production deploy —
+that confirmation happens naturally, at whatever project's next ordinary
+detached deploy, using this checklist:
+
+- [ ] `origin/main` moved to the pushed sha:
+      `git ls-remote origin refs/heads/main` matches the local sha that was
+      pushed.
+- [ ] The terminal `.deploy-status.json` / `.deploy-history.jsonl` record for
+      that sha has `status: "deployed"` and `launch.mode: "detached"`.
+- [ ] No stray process survives: nothing matching the pushed sha's `nohup`
+      wrapper is still running (`ps aux | grep deploy-detached` from the host
+      that launched it, if reachable — the process is gone once `.rc` is
+      written) and no zombie heartbeat is refreshing a status file that's
+      already terminal.
+- [ ] The deployed build is healthy: `emit-infra status` (or `/verify-deploy`)
+      against the server shows the expected build number and a passing
+      health check.
+- [ ] Note the actual wall-clock duration
+      (`.deploy-history.jsonl`'s `durationSec`) against
+      `scripts/deploy-detached.sh`'s default `--timeout 3600` — flag it if a
+      real deploy runs anywhere close to that ceiling.
 
 ## Smart build
 
@@ -539,5 +679,6 @@ for l in sys.stdin:
 ```
 
 Env overrides: `EMIT_FORCE_DEPLOY=1`, `EMIT_DEPLOY_CONFIRM=1`,
-`EMIT_ALLOW_UNATTENDED_DEPLOY=1`, `EMIT_BUILD_PARALLEL=<n>`,
-`EMIT_INFRA_DIR=<path>`.
+`EMIT_DEPLOY_DETACHED=1` (durability declaration — set automatically by
+`scripts/deploy-detached.sh`; deprecated alias `EMIT_ALLOW_UNATTENDED_DEPLOY=1`
+still works), `EMIT_BUILD_PARALLEL=<n>`, `EMIT_INFRA_DIR=<path>`.

@@ -92,19 +92,19 @@ operator.
 - `docs/DEPLOYMENT-PITFALLS.md` — the agent-deploy addendum
 
 ## Acceptance criteria
-- [ ] No remaining statement in either doc tells the operator not to deploy from
+- [x] No remaining statement in either doc tells the operator not to deploy from
       an agent shell without naming the supported detached path
-- [ ] The detached workflow is documented end to end: launch, resume a deploy
+- [x] The detached workflow is documented end to end: launch, resume a deploy
       whose session went away, and recover an orphaned record
-- [ ] The "cannot auto-detect durability" finding is recorded with its evidence,
+- [x] The "cannot auto-detect durability" finding is recorded with its evidence,
       so a later sprint doesn't retry `SIGHUP` / `setsid` / `pgid` heuristics
-- [ ] `EMIT_ALLOW_UNATTENDED_DEPLOY` is described as deprecated wherever it
+- [x] `EMIT_ALLOW_UNATTENDED_DEPLOY` is described as deprecated wherever it
       appears, pointing at sprint 290's replacement
-- [ ] Every command, flag, and env var in the new docs is verified against the
+- [x] Every command, flag, and env var in the new docs is verified against the
       code as it exists after sprints 289–290
-- [ ] A verification checklist for the next natural detached deploy is written
+- [x] A verification checklist for the next natural detached deploy is written
       into the runbook (remote sha, terminal record, launch mode, health)
-- [ ] Markdown lints clean if the repo lints markdown
+- [x] Markdown lints clean if the repo lints markdown
 
 ## Out of scope
 - **Any code change.** If writing the docs exposes behavior that is wrong rather
@@ -121,3 +121,105 @@ operator.
 - Documenting the wider deploy architecture (terraform, ansible, blue-green
   mechanics) beyond what this runbook needs.
 - Any develemit-hq dashboard change to surface the new launch-mode field.
+
+## Completed
+
+**Date:** 2026-08-20
+
+### Summary
+`docs/PRE-PUSH-HOOK.md` no longer tells operators to avoid agent shells
+outright. The three statements that were correct in sprint 282/287 and wrong
+after 289/290 — the unattended-shell gate's "opt-out" framing, the "never
+push to main from an environment that can tear the process down" line, and
+every bare mention of `EMIT_ALLOW_UNATTENDED_DEPLOY` — are rewritten around
+the actual rule: never launch a deploy directly in a shell tied to a single
+tool call, use `scripts/deploy-detached.sh` (or the `/deploy` skill) instead,
+which does survive it.
+
+A new "Detached deploys (the supported agent-shell path)" section documents
+the workflow end to end: launching, what the `EMIT_DEPLOY_DETACHED=1`
+durability declaration asserts and why the gate can't verify it (macOS bash
+3.2 has no inherited ignored `SIGHUP`, no `setsid`, and `nohup` doesn't
+change `pgid` — restated here so a later sprint doesn't rediscover it),
+resuming via the predictable `/tmp/emit-deploy-<project>-<shortsha>.log` path
+or `--watch`, and reading the new `launch.mode`/`launch.marker` fields in a
+post-mortem (confirmed against the actual JSON shape `ci-utils.sh` and
+`deploy-records.ts` write — neither field is currently surfaced by
+`emit-infra status` text output or the dashboard, so the doc says to read the
+JSON directly rather than overclaiming a CLI feature that doesn't exist). The
+Recovery runbook gained a "Verifying a detached deploy actually landed"
+checklist per task 6, deliberately not triggering a real deploy to satisfy it
+— per Out of scope, that's an irreversible outward-facing action a headless
+sprint run can't authorize for itself.
+
+`docs/DEPLOYMENT-PITFALLS.md`'s incident writeup (entry #25) already told the
+282–287 half of this story; extended its "Fix, across sprints" list with
+288–291 so the whole arc — gate closes the incident, gate then blocks the
+primary workflow, detached script fixes that without reopening the incident,
+the bypass gets an honest name, the docs catch up — reads in one place rather
+than being split across two files with no connective tissue.
+
+Every command, flag, and JSON field named in the new docs was checked
+directly against the code as it exists after sprints 289–290 (not assumed
+from the sprint files' own prose): `scripts/deploy-detached.sh`'s flags and
+log/`.rc` path format, `deploy_launch_mode`/`deploy_warn_deprecated_override`
+in `scripts/lib/deploy-plan.sh`, the `"launch":{"mode","marker"}` shape in
+both `ci-utils.sh`'s printf-built JSON and `deploy-records.ts`, `classifyRunState`'s
+four-state priority order in `deploy-status.ts`, and `emit-infra status`'s /
+`reconcile`'s actual CLI surface in `apps/cli/src/commands/`.
+
+`docs/PRE-PUSH-HOOK.md` grew from ~544 to ~684 lines doing this — already over
+the project's 300-line guideline before this sprint, and further over it now.
+Per this sprint's own Context section, splitting it is an already-filed
+backlog item and explicitly out of scope here; noted again below so it isn't
+lost.
+
+### Files changed
+- `docs/PRE-PUSH-HOOK.md` — corrected the stale unattended-shell-gate,
+  escape-hatches, and "signals and interrupted runs" guidance; added a
+  "Detached deploys" section (launch, durability declaration, resuming,
+  launch-mode field) and a "Verifying a detached deploy actually landed"
+  checklist under Recovery runbook; updated the Files table and Config
+  reference's env-override list
+- `docs/DEPLOYMENT-PITFALLS.md` — extended entry #25's sprint-by-sprint fix
+  list with 288–291, explaining why the gate then blocked the primary
+  workflow and why detaching the whole push (not just the deploy phase) was
+  the fix
+
+### Verification
+- Read every doc claim against source: `scripts/hooks/pre-push`,
+  `scripts/deploy-detached.sh`, `scripts/lib/deploy-plan.sh`,
+  `scripts/lib/ci-utils.sh`, `packages/core/src/deploy-records.ts`,
+  `packages/core/src/deploy-status.ts`, `apps/cli/src/commands/status.ts`,
+  `apps/cli/src/commands/reconcile.ts`, and `~/.claude/commands/deploy.md`
+- `grep -n "EMIT_ALLOW_UNATTENDED_DEPLOY\|agent" docs/PRE-PUSH-HOOK.md`: every
+  remaining mention is paired with the detached-path pointer or explicitly
+  marked deprecated
+- `pnpm test:hooks`'s `deploy-detached` suite: 24/24 pass (confirms the
+  behavior the new docs describe is what the code actually does; this sprint
+  made no code changes, so this is a sanity check, not new coverage)
+- No markdown linter is configured in this repo (`grep -i lint package.json`
+  turns up only `nx run-many -t lint`, no markdown target;
+  `.markdownlint*` doesn't exist) — the "markdown lints clean" criterion is
+  vacuously satisfied
+- Anchor links (`#detached-deploys-the-supported-agent-shell-path`,
+  `#unattended-shell-gate`, `#status-files-and-liveness`) hand-verified
+  against GitHub's heading-slug rules (lowercase, strip punctuation, spaces
+  to hyphens) against the actual heading text
+
+### Follow-ups
+- `[defer]` `docs/PRE-PUSH-HOOK.md` is now ~684 lines, further over the
+  project's 300-line guideline than it already was. A backlog item already
+  proposes splitting it by section; this sprint made it worse in service of
+  documenting a real workflow rather than silently ignoring the growth, per
+  its own Context section's instruction not to split it here.
+- `[defer]` Neither `launch.mode` nor `launch.marker` is currently printed by
+  `emit-infra status`'s text output or surfaced on the dashboard — the docs
+  say to read the raw JSON. Sprint 289's own follow-ups already noted the
+  dashboard side as a natural next step if the field turns out to matter in
+  practice; this sprint's Out of scope explicitly excludes any dashboard
+  change.
+- `[defer]` The verification checklist this sprint wrote is unexercised
+  against a real production deploy — sprint 289's kill-the-launcher test is
+  the automated proof; the checklist itself only gets run at whatever
+  project's next ordinary detached deploy, per Out of scope.
