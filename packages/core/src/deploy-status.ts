@@ -48,6 +48,14 @@ export interface ClassifyRunStateOptions {
 
 const IN_FLIGHT_STATUSES = new Set(['running', 'deploying'])
 
+// The terminal status sprint 286's `emit-infra reconcile --write` writes for
+// a record this classifier found orphaned. Not `'failed'` — a deploy killed
+// mid-build may have already pushed images, so "failed" (clean unsuccessful
+// outcome) and "deployed" (success) are both misleading; "orphaned" says what
+// is actually known. It's deliberately absent from IN_FLIGHT_STATUSES, so a
+// reconciled record classifies as 'idle' with no changes needed here.
+export const ORPHANED_STATUS = 'orphaned'
+
 // The bash refresher ticks every 30s (see _emit_start_heartbeat). Two missed
 // ticks would already be suspicious; 4x gives scheduling jitter and a slow
 // disk write room without flagging a merely-busy build as orphaned, while

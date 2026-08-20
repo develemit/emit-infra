@@ -123,10 +123,8 @@ function StalledCard({ phase, status, href, state }: { phase: Phase; status: Pip
   const detail = orphaned
     ? `No heartbeat for ${staleFor(status)} — the process that started this run is gone.`
     : `Started ${elapsed(status.startedAt)} ago — no liveness data to confirm it's still running.`
-  // TODO(sprint 286): once a --reconcile command exists, name it in this hint
-  // instead of pointing at manual server investigation.
   const hint = orphaned
-    ? 'Stuck — needs to be cleared manually on the server.'
+    ? "Stuck — run `emit-infra reconcile --write` on this project to clear it."
     : "Predates liveness tracking — check the server if it looks stuck."
 
   return (

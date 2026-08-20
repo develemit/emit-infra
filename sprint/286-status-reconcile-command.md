@@ -97,19 +97,19 @@ re-introduce a performance argument for it.
   writer rather than duplicating its shape
 
 ## Acceptance criteria
-- [ ] Running the command against an orphaned record writes a terminal record
+- [x] Running the command against an orphaned record writes a terminal record
       and appends exactly one `.deploy-history.jsonl` line
-- [ ] A live, heartbeating record is never touched
-- [ ] Dry-run reports the intended change and mutates nothing
-- [ ] Reconciled records satisfy `resolve_last_deployed_sha` — the smart-build
+- [x] A live, heartbeating record is never touched
+- [x] Dry-run reports the intended change and mutates nothing
+- [x] Reconciled records satisfy `resolve_last_deployed_sha` — the smart-build
       path works normally afterward
-- [ ] Works against an arbitrary project directory, not just the cwd
-- [ ] Missing or malformed status files produce a clear message, not a stack
+- [x] Works against an arbitrary project directory, not just the cwd
+- [x] Missing or malformed status files produce a clear message, not a stack
       trace
-- [ ] Test coverage in `apps/cli/src/commands/reconcile.test.ts` for all of the
+- [x] Test coverage in `apps/cli/src/commands/reconcile.test.ts` for all of the
       above
-- [ ] Verified against emit-social's real stuck record
-- [ ] `pnpm test`, `pnpm lint`, `pnpm typecheck` green
+- [x] Verified against emit-social's real stuck record
+- [x] `pnpm test`, `pnpm lint`, `pnpm typecheck` green
 
 ## Out of scope
 - Automatically reconciling on some schedule or on hook startup. Detection is
@@ -120,3 +120,106 @@ re-introduce a performance argument for it.
   build. That's a separate concern and deserves its own sprint if it turns out
   to matter.
 - A dashboard button for reconcile.
+
+## Completed
+
+**Date:** 2026-08-20
+
+### Summary
+`emit-infra reconcile [--dir <path>] [--write]` closes the loop this incident
+opened: it detects an orphaned `.deploy-status.json` / `.ci-status.json`
+record (via sprint 284's `classifyRunState` — no second heuristic) and writes
+a terminal record plus exactly one matching history line, shape-identical to
+what `ci_done`/`deploy_done` (`scripts/lib/ci-utils.sh`) and `deployRecordDone`
+already produce. Dry-run is the default, matching `db-doctor`'s look-only
+precedent and the sprint's stated preference; `--write` applies it. That
+default-safe/opt-in-mutate split is now the precedent for future repair
+commands in this CLI.
+
+The terminal status is a new `'orphaned'` value (`ORPHANED_STATUS`, exported
+from `packages/core/src/deploy-status.ts`) rather than reusing `'failed'` or
+`'deployed'` — neither honestly describes a run killed mid-flight. It needed
+no change to `classifyRunState` itself: `IN_FLIGHT_STATUSES` never included
+it, so a reconciled record already classifies as `'idle'` for free.
+
+The detect/build logic lives in a new core module,
+`packages/core/src/deploy-reconcile.ts` (`planReconcile` / `applyReconcile`),
+generalized over both status-file kinds (`ci` vs `deploy` — different
+filenames and slightly different history-line shape: deploy's line carries
+`servicesBuilt`/`phases`, CI's doesn't, matching `ci_done`'s narrower printf).
+`planReconcile` is pure detection — it never touches disk — so the CLI's
+dry-run default falls directly out of "don't call `applyReconcile`" rather
+than needing a separate no-op code path. It reuses `deploy-records.ts`'s
+`writeAtomic`/`truncateHistory`/`isoSeconds`/`gitField` helpers (now exported)
+instead of re-implementing atomic-write and history-rotation logic a third
+time.
+
+The CLI command (`apps/cli/src/commands/reconcile.ts`) is a thin wrapper:
+`reconcileProject(dir, write)` runs both kinds and is the exported, directly
+testable surface (no need to drive commander in tests), and the command
+action just prints each plan and a summary line. `--dir` defaults to
+`process.cwd()` but accepts any path, satisfying "operable on another project
+directory" without inventing a `~/projects/<name>` name-resolution
+convention this CLI doesn't have elsewhere.
+
+Ran the command against emit-social's real stuck record (the incident's own
+artifact — `.deploy-status.json` frozen at `deploying`/66% for
+`6423d5d`, `.ci-status.json` frozen at `running`/100%, both pre-283 records
+with no `writer` block). Dry-run correctly reported both as orphaned by age
+(started ~4.5h / ~4.4h before now, past the 30-minute no-evidence threshold);
+`--write` cleared both to `status: "orphaned"`, appended exactly one history
+line to each of `.deploy-history.jsonl` / `.ci-history.jsonl`, and
+`resolve_last_deployed_sha ~/projects/emit-social` afterward correctly fell
+through to the last genuine `deployed` sha (`42faf27b`) from history —
+confirming the smart-build path is unaffected, per the sprint's explicit
+"not a performance fix" framing.
+
+### Files changed
+- (new) `packages/core/src/deploy-reconcile.ts` — `planReconcile` (pure
+  detection) and `applyReconcile` (the only mutating half)
+- (new) `packages/core/src/deploy-reconcile.test.ts` — 9 tests: orphaned
+  deploy/CI, live record untouched, terminal record skipped, missing file,
+  malformed JSON, apply writes exactly one history line, dry-run plan never
+  mutates
+- `packages/core/src/deploy-status.ts` — exported `ORPHANED_STATUS` constant
+  with reasoning comment
+- `packages/core/src/deploy-records.ts` — exported `gitField`/`isoSeconds`/
+  `writeAtomic`/`truncateHistory` (previously private) for reuse
+- `packages/core/src/index.ts` — exports `planReconcile`, `applyReconcile`,
+  `ORPHANED_STATUS`, and the new types
+- (new) `apps/cli/src/commands/reconcile.ts` — `registerReconcile` command
+  (`--dir`, `--write`) and the testable `reconcileProject` helper
+- (new) `apps/cli/src/commands/reconcile.test.ts` — 4 tests covering dry-run,
+  `--write` apply, live-record-untouched, missing/malformed handling
+- `apps/cli/src/index.ts` — registers the command
+- `apps/dashboard/src/components/detail/pipeline-progress-card.tsx` — closed
+  sprint 285's `TODO(sprint 286)`: the orphaned-card hint now names
+  `emit-infra reconcile --write` instead of "clear manually on the server"
+
+### Verification
+- `pnpm nx run core:test --skip-nx-cache`: 135/135 pass (includes the new
+  9 `deploy-reconcile.test.ts` cases)
+- `pnpm nx run cli:test --skip-nx-cache`: 165/165 pass (includes the new 4
+  `reconcile.test.ts` cases)
+- `pnpm test` (nx run-many, all 4 test-bearing projects,
+  `--skip-nx-cache`): core 135/135, dashboard 215/215, api 356/356,
+  cli 165/165 — 871/871, all green (re-verified after the dashboard hint edit)
+- `pnpm lint` (nx run-many, all 5 projects): clean
+- `pnpm typecheck` (nx run-many, all 5 projects): clean
+- Manual: `emit-infra reconcile --dir <tmp>` with no status files → "not
+  found" for both, no stack trace; with malformed JSON → "not valid JSON",
+  no stack trace
+- Manual, real artifact: `emit-infra reconcile --dir ~/projects/emit-social`
+  (dry-run) correctly identified both files as orphaned and changed nothing;
+  `--write` cleared both to `orphaned`, appended exactly one history line
+  each; `resolve_last_deployed_sha` afterward returned the correct prior
+  `deployed` sha from history, confirming the smart-build path (fix from
+  sprint 285's referenced `deploy-plan.sh:35` comment) is unaffected
+
+### Follow-ups
+- `[address-next]` `docs/PRE-PUSH-HOOK.md` doesn't yet document the
+  `orphaned` status or the `reconcile` command — sprint 286's own Context
+  section deferred that to sprint 287 ("add it to the docs in 287"). Sprint
+  287 should reference `emit-infra reconcile` and the `orphaned` status by
+  name when it lands.
+- none other

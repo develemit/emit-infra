@@ -27,7 +27,10 @@ export interface DeployContext {
   startedEpochMs: number
 }
 
-async function gitField(cwd: string, args: string[]): Promise<string> {
+// Exported so deploy-reconcile.ts (sprint 286) can reuse the same atomic
+// write / history truncation / iso-format shape rather than duplicating it —
+// a reconciled record must be byte-shape-identical to one this module wrote.
+export async function gitField(cwd: string, args: string[]): Promise<string> {
   try {
     const { stdout } = await execa('git', args, { cwd })
     return stdout.trim()
@@ -36,17 +39,17 @@ async function gitField(cwd: string, args: string[]): Promise<string> {
   }
 }
 
-function isoSeconds(epochMs: number): string {
+export function isoSeconds(epochMs: number): string {
   return new Date(epochMs).toISOString().replace(/\.\d{3}Z$/, 'Z')
 }
 
-async function writeAtomic(dest: string, content: string): Promise<void> {
+export async function writeAtomic(dest: string, content: string): Promise<void> {
   const tmp = `${dest}.tmp`
   await writeFile(tmp, content)
   await rename(tmp, dest)
 }
 
-async function truncateHistory(path: string): Promise<void> {
+export async function truncateHistory(path: string): Promise<void> {
   let content: string
   try {
     content = await readFile(path, 'utf8')
