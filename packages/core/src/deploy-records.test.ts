@@ -51,7 +51,20 @@ describe('deployRecordInit', () => {
       branch: 'main',
       startedAt: ctx.startedAt,
       progress: { step: 0, total: 1, pct: 0, label: 'starting' },
+      writer: { pid: process.pid, host: parsed.writer.host, heartbeatAt: ctx.startedAt },
     })
+  })
+
+  it('writes a writer block with this process\'s pid/host on init', async () => {
+    mockGit('abc123', 'main', 'a commit')
+
+    await deployRecordInit(dir)
+
+    const parsed = JSON.parse(await readFile(join(dir, '.deploy-status.json'), 'utf8'))
+    expect(parsed.writer.pid).toBe(process.pid)
+    expect(typeof parsed.writer.host).toBe('string')
+    expect(parsed.writer.host.length).toBeGreaterThan(0)
+    expect(typeof parsed.writer.heartbeatAt).toBe('string')
   })
 
   it('falls back to empty strings when git commands fail (non-git cwd)', async () => {
@@ -78,6 +91,7 @@ describe('deployRecordDone', () => {
     expect(status.status).toBe('deployed')
     expect(status.sha).toBe('abc123')
     expect(status.branch).toBe('main')
+    expect(status.writer).toBeUndefined()
 
     const historyRaw = await readFile(join(dir, '.deploy-history.jsonl'), 'utf8')
     const lines = historyRaw.trim().split('\n')

@@ -1,12 +1,20 @@
 import { execa } from 'execa'
 import { readFile, writeFile, rename, appendFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { hostname } from 'node:os'
 
 // Mirrors scripts/lib/ci-utils.sh's deploy_init/deploy_done so a CLI-side
 // deploy (apps/cli/src/commands/deploy.ts) writes the same .deploy-status.json
 // / .deploy-history.jsonl shape the pre-push hook writes — dashboards and
 // resolve_last_deployed_sha (scripts/lib/deploy-plan.sh) don't care which
 // path produced a record, only that the shape matches.
+//
+// The in-flight record also carries a "writer" block — pid/host/heartbeatAt
+// (sprint 283) — so a reader can tell a live run from an orphaned one.
+// Terminal records omit it, matching ci-utils.sh. The CLI deploy has no
+// intermediate progress path (a single init → runAnsible → done bracket), so
+// unlike the bash writer's deploy_step, there's no periodic refresh here —
+// heartbeatAt is only ever the init timestamp.
 
 const HISTORY_MAX_LINES = 1000
 const HISTORY_KEEP_LINES = 500
@@ -67,6 +75,7 @@ export async function deployRecordInit(cwd: string): Promise<DeployContext> {
       branch: ctx.branch,
       startedAt: ctx.startedAt,
       progress: { step: 0, total: 1, pct: 0, label: 'starting' },
+      writer: { pid: process.pid, host: hostname(), heartbeatAt: ctx.startedAt },
     }) + '\n',
   )
 

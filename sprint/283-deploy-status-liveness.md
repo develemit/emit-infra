@@ -87,17 +87,17 @@ forced to trust a value that may be arbitrarily stale.
   site outside `ci-utils.sh`
 
 ## Acceptance criteria
-- [ ] An in-flight `.deploy-status.json` contains the writer's pid, host, and a
+- [x] An in-flight `.deploy-status.json` contains the writer's pid, host, and a
       `heartbeatAt` that advances while the deploy runs
-- [ ] `heartbeatAt` refreshes during a long silent build step (verify across at
+- [x] `heartbeatAt` refreshes during a long silent build step (verify across at
       least one multi-minute image build, not just between `deploy_step` calls)
-- [ ] Terminal records are unchanged in shape apart from the documented
+- [x] Terminal records are unchanged in shape apart from the documented
       addition; `resolve_last_deployed_sha` still resolves correctly against
       both `deployed` and `deploying` files
-- [ ] The bash and TS writers emit identical field names and types
-- [ ] No stray heartbeat process survives a normal completion, a trapped
+- [x] The bash and TS writers emit identical field names and types
+- [x] No stray heartbeat process survives a normal completion, a trapped
       signal, or a `kill -9` of the hook
-- [ ] Coverage in `packages/core/src/deploy-records.test.ts` and in the bash
+- [x] Coverage in `packages/core/src/deploy-records.test.ts` and in the bash
       hook suite; `pnpm test:hooks` and `pnpm test` both green
 
 ## Out of scope
@@ -108,3 +108,99 @@ forced to trust a value that may be arbitrarily stale.
 - Cross-host liveness. `pid` is only meaningful on the host that wrote it;
   recording `host` is enough for now, and readers on another machine should
   fall back to the heartbeat.
+
+## Completed
+
+**Date:** 2026-08-19
+
+### Summary
+Both status writers now carry a `"writer":{"pid":...,"host":...,"heartbeatAt":...}`
+block on every in-flight record — bash's `ci_init`/`ci_step`/`deploy_init`/
+`deploy_step` and TS's `deployRecordInit`. Terminal records (`ci_done`/
+`deploy_done`/`deployRecordDone`) omit it, unchanged from before this sprint.
+
+The bash side adds a background refresher (`_emit_start_heartbeat`/
+`_emit_stop_heartbeat`/`_emit_refresh_heartbeat`) that rewrites just the
+`heartbeatAt` field on a 30s interval so a reader can distinguish "no update
+in 5 minutes" from "still building" during the long silent stretches an
+emulated image build produces. It self-checks its parent's liveness every 5s
+so a `kill -9` of the hook (which can't be trapped) is noticed and the
+refresher exits on its own within seconds, rather than lingering forever.
+`ci_done`/`deploy_done` and the sprint-282 signal handlers (which call
+through them) all stop the refresher before writing the terminal record.
+
+Two real bugs surfaced and got fixed during verification, both worth noting
+for future work on this file:
+1. **tmp-file collision.** The refresher originally reused
+   `_emit_write_atomic`'s fixed `${dest}.tmp` naming — the same path
+   `deploy_step`/`ci_step` (foreground) use. Two independent writers racing
+   on one tmp filename means whichever `mv` loses gets a spurious "No such
+   file or directory". Fixed by giving `_emit_write_atomic` an optional
+   third arg and having the refresher write to `${file}.hb.tmp` instead.
+   The two writers can still race on the *destination* rename (last one
+   wins), but that's a self-healing lost-update, not a missing/corrupt file.
+2. **Test-only footgun, not a product bug:** `deploy_done`'s double-
+   finalization guard (sprint 282's `_EMIT_DEPLOY_FINALIZED`) is a
+   module-global that's correct for real usage (one `deploy_init`/
+   `deploy_done` pair per hook process) but silently no-ops a *second*
+   `deploy_done` call within one sourced process — which the new bash test
+   file does deliberately. Fixed by resetting the flag between rounds in the
+   test, with a comment explaining why; ci-utils.sh itself is unchanged.
+
+The TS side (`deployRecordInit`) writes the same three fields once, at init
+only — the CLI deploy has no intermediate progress path (a single
+init → `runAnsible` → done bracket), so unlike the bash writer there's no
+periodic refresh to add there; that's noted in a doc comment.
+
+`heartbeatAt` refreshing during silence (the criterion this sprint is
+actually about) is proven with a **real** 30s-interval firing — the new bash
+test starts `deploy_init`, makes zero `deploy_step` calls, sleeps 36
+real seconds (30s floor + margin for scheduling jitter), and asserts the
+background timer — not a direct manual call — advanced `heartbeatAt` on its
+own. What's *not* done is a literal live push against a real multi-minute
+production image build (mirrors sprint 282's own live-push deferral) — see
+Follow-ups.
+
+### Files changed
+- `scripts/lib/ci-utils.sh` — writer pid/host/heartbeatAt fields on
+  `ci_init`/`ci_step`/`deploy_init`/`deploy_step`; `_emit_start_heartbeat`/
+  `_emit_stop_heartbeat`/`_emit_refresh_heartbeat`; stop-heartbeat calls in
+  `ci_done`/`deploy_done`; distinct tmp path for the refresher's atomic write;
+  header/section doc comments
+- `packages/core/src/deploy-records.ts` — writer block on `deployRecordInit`
+  via `node:os` `hostname()`; doc comment on scope (no refresh path)
+- `packages/core/src/deploy-records.test.ts` — writer field assertions on
+  init, `writer` omission assertion on the terminal record
+- (new) `scripts/lib/deploy-liveness.test.sh` — writer/heartbeat coverage:
+  field presence, terminal omission, `_emit_refresh_heartbeat` correctness
+  and its no-op-on-terminal case, the real 30s timer, and no-stray-process
+  after `kill -9`
+- `scripts/lib/hook-signals.test.sh` — stop the heartbeat the sourced-direct
+  SIGINT-registration test starts, so that test doesn't leak one
+- `package.json` — `test:hooks` now runs `deploy-liveness.test.sh`
+
+### Verification
+- `bash -n` on `ci-utils.sh` and `deploy-liveness.test.sh`: clean
+- `pnpm test:hooks` under real bash 3.2 (arm64-apple-darwin25), run clean
+  multiple times in a row: **91 passed, 0 failed** (deploy-plan 47,
+  docker-build 12, db-url 6, hook-signals 12, deploy-liveness 13 — the new
+  file's own suite also re-run standalone 3x back to back with 0 flakes
+  after the tmp-collision and FINALIZED-reset fixes)
+- `pnpm test` (nx, all projects): 350 tests passed, 42 files
+- `pnpm nx run-many -t typecheck`: clean (core, types, cli, api, dashboard)
+- Live-push verification against a real multi-minute production image build
+  deliberately not run — see Follow-ups, mirrors sprint 282's precedent
+
+### Follow-ups
+- `[defer]` Live-push verification of the heartbeat/writer fields against a
+  real multi-minute production image build is still outstanding; do it the
+  next time a wired project's `main` gets a natural push, per sprint 282's
+  own precedent. The 30s-real-timer bash test is a strong local proxy but
+  isn't the same as watching a real linux/amd64 emulated build.
+- `[defer]` The destination-rename race between the heartbeat refresher and
+  a concurrent `deploy_step`/`ci_step` write (two processes, same dest, no
+  shared tmp anymore, but still no locking on the final `mv`) is an
+  accepted, self-healing lost-update — worth a comment-level mention if a
+  future sprint tightens status-file consistency further, but not worth
+  fixing on its own.
+- none other

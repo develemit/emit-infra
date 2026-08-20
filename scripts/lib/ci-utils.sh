@@ -18,6 +18,12 @@
 #
 # Phase durations land in .deploy-history.jsonl as {"phases":{"build":312,...}}
 # so slow deploys can be diagnosed from data instead of scrollback.
+#
+# In-flight status files (running/deploying) also carry a "writer" block —
+# {"pid":12345,"host":"studio","heartbeatAt":"..."} — so a reader can tell a
+# live run from an orphaned one (sprint 283). Terminal records omit it.
+# packages/core/src/deploy-records.ts mirrors this shape deliberately; keep
+# field names/types identical if either side changes.
 
 # Guard against double-sourcing without resetting in-flight state
 [[ -n "${_EMIT_CI_UTILS_LOADED:-}" ]] && return 0
@@ -42,6 +48,14 @@ _EMIT_PHASE_EPOCH=0
 _EMIT_CI_DURATION=0
 _EMIT_CI_FINALIZED=0
 _EMIT_DEPLOY_FINALIZED=0
+
+# ── writer liveness metadata (sprint 283) ───────────────────────────────────
+# pid/host are constant for this process's whole lifetime, so compute them
+# once at source time rather than per write.
+_EMIT_WRITER_PID=$$
+_EMIT_WRITER_HOST=$(hostname -s 2>/dev/null || true)
+_EMIT_CI_HEARTBEAT_PID=""
+_EMIT_DEPLOY_HEARTBEAT_PID=""
 
 # Mirror stdout/stderr to a log file via a background tee we can wait on.
 # A plain `exec > >(tee ...)` loses buffered output when the script exits
@@ -114,8 +128,74 @@ deploy_phase() {
 _emit_phases_json() { printf '{%s}\n' "$_EMIT_PHASES"; }
 
 _emit_write_atomic() {
-  local content="$1" dest="$2" tmp="${2}.tmp"
+  local content="$1" dest="$2" tmp="${3:-${2}.tmp}"
   printf '%s\n' "$content" > "$tmp" && mv "$tmp" "$dest"
+}
+
+# ── writer liveness heartbeat (sprint 283) ──────────────────────────────────
+# A deploy has long silent stretches (an emulated linux/amd64 image build can
+# run minutes between deploy_step calls), so "last write time" alone would
+# misreport an active build as orphaned. A background refresher rewrites just
+# the "heartbeatAt" field on an interval so a reader can tell "no update in
+# 5 minutes" from "still building." It reads the file rather than rebuilding
+# it from in-process state, since it runs in a forked subshell that only has
+# a frozen snapshot of variables from the moment _emit_start_heartbeat ran —
+# reading the file picks up whatever the latest deploy_step/ci_step wrote.
+_emit_refresh_heartbeat() {
+  local file="$1" content ts
+  [[ -f "$file" ]] || return 0
+  content=$(cat "$file") || return 0
+  case "$content" in
+    *'"writer":'*) ;;
+    *) return 0 ;; # terminal record already written — nothing to refresh
+  esac
+  ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  content=$(printf '%s' "$content" | sed -E 's/"heartbeatAt":"[^"]*"/"heartbeatAt":"'"$ts"'"/')
+  # A distinct tmp name from the main writer's "${file}.tmp" — deploy_step/
+  # ci_step run in the foreground process while this runs in a background
+  # subshell, so sharing one tmp path would let the two racily stomp each
+  # other's in-flight write (last mv wins, the other fails with "No such
+  # file or directory"). Different tmp names mean at worst the *destination*
+  # write race is a lost update, self-healing at the next tick — never a
+  # missing/corrupt file.
+  _emit_write_atomic "$content" "$file" "${file}.hb.tmp"
+}
+
+# Start a background refresher for the given phase's status file. Checks its
+# parent is still alive every 5s (so a `kill -9` of the hook is noticed
+# quickly even though SIGKILL can't be trapped) and refreshes the heartbeat
+# every 30s. Stores the refresher's pid in the phase-specific global so
+# _emit_stop_heartbeat can reap it.
+_emit_start_heartbeat() {
+  local kind="$1" file parent=$$
+  case "$kind" in
+    ci) file=.ci-status.json ;;
+    deploy) file=.deploy-status.json ;;
+    *) echo "_emit_start_heartbeat: unknown kind '$kind'" >&2; return 1 ;;
+  esac
+  (
+    while :; do
+      for _ in 1 2 3 4 5 6; do
+        kill -0 "$parent" 2>/dev/null || exit 0
+        sleep 5
+      done
+      kill -0 "$parent" 2>/dev/null || exit 0
+      _emit_refresh_heartbeat "$file"
+    done
+  ) &
+  if [[ "$kind" == "ci" ]]; then _EMIT_CI_HEARTBEAT_PID=$!; else _EMIT_DEPLOY_HEARTBEAT_PID=$!; fi
+}
+
+# Stop the refresher for the given phase, if one is running. Safe to call
+# even when none was started (e.g. a phase that never got past _init).
+_emit_stop_heartbeat() {
+  local kind="$1" pid
+  if [[ "$kind" == "ci" ]]; then pid="$_EMIT_CI_HEARTBEAT_PID"; _EMIT_CI_HEARTBEAT_PID=""
+  else pid="$_EMIT_DEPLOY_HEARTBEAT_PID"; _EMIT_DEPLOY_HEARTBEAT_PID=""
+  fi
+  [[ -n "$pid" ]] || return 0
+  kill "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
 }
 
 # ── signal handling (sprint 282) ────────────────────────────────────────────
@@ -177,24 +257,28 @@ ci_init() {
     _emit_start_log "$_EMIT_LOG_FILE"
   fi
   _emit_write_atomic \
-    "$(printf '{"status":"running","sha":"%s","branch":"%s","startedAt":"%s","progress":{"step":0,"total":%d,"pct":0,"label":"starting"}}' \
-      "$_EMIT_SHA" "$_EMIT_BRANCH" "$_EMIT_STARTED" "$_EMIT_CI_TOTAL")" \
+    "$(printf '{"status":"running","sha":"%s","branch":"%s","startedAt":"%s","progress":{"step":0,"total":%d,"pct":0,"label":"starting"},"writer":{"pid":%d,"host":"%s","heartbeatAt":"%s"}}' \
+      "$_EMIT_SHA" "$_EMIT_BRANCH" "$_EMIT_STARTED" "$_EMIT_CI_TOTAL" \
+      "$_EMIT_WRITER_PID" "$_EMIT_WRITER_HOST" "$_EMIT_STARTED")" \
     .ci-status.json
+  _emit_start_heartbeat ci
 }
 
 ci_step() {
   _EMIT_CI_STEP=$((_EMIT_CI_STEP + 1))
   local pct=$((_EMIT_CI_STEP * 100 / _EMIT_CI_TOTAL))
   _emit_write_atomic \
-    "$(printf '{"status":"running","sha":"%s","branch":"%s","startedAt":"%s","progress":{"step":%d,"total":%d,"pct":%d,"label":"%s"}}' \
+    "$(printf '{"status":"running","sha":"%s","branch":"%s","startedAt":"%s","progress":{"step":%d,"total":%d,"pct":%d,"label":"%s"},"writer":{"pid":%d,"host":"%s","heartbeatAt":"%s"}}' \
       "$_EMIT_SHA" "$_EMIT_BRANCH" "$_EMIT_STARTED" \
-      "$_EMIT_CI_STEP" "$_EMIT_CI_TOTAL" "$pct" "$1")" \
+      "$_EMIT_CI_STEP" "$_EMIT_CI_TOTAL" "$pct" "$1" \
+      "$_EMIT_WRITER_PID" "$_EMIT_WRITER_HOST" "$(date -u +"%Y-%m-%dT%H:%M:%SZ")")" \
     .ci-status.json
 }
 
 ci_done() {
   [[ "$_EMIT_CI_FINALIZED" == "1" ]] && return 0
   _EMIT_CI_FINALIZED=1
+  _emit_stop_heartbeat ci
 
   local completed_at
   completed_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -228,24 +312,28 @@ deploy_init() {
     _emit_start_log "$_EMIT_DEPLOY_LOG_FILE"
   fi
   _emit_write_atomic \
-    "$(printf '{"status":"deploying","sha":"%s","branch":"%s","startedAt":"%s","progress":{"step":0,"total":%d,"pct":0,"label":"starting"}}' \
-      "$_EMIT_SHA" "$_EMIT_BRANCH" "$_EMIT_STARTED" "$_EMIT_DEPLOY_TOTAL")" \
+    "$(printf '{"status":"deploying","sha":"%s","branch":"%s","startedAt":"%s","progress":{"step":0,"total":%d,"pct":0,"label":"starting"},"writer":{"pid":%d,"host":"%s","heartbeatAt":"%s"}}' \
+      "$_EMIT_SHA" "$_EMIT_BRANCH" "$_EMIT_STARTED" "$_EMIT_DEPLOY_TOTAL" \
+      "$_EMIT_WRITER_PID" "$_EMIT_WRITER_HOST" "$_EMIT_STARTED")" \
     .deploy-status.json
+  _emit_start_heartbeat deploy
 }
 
 deploy_step() {
   _EMIT_DEPLOY_STEP=$((_EMIT_DEPLOY_STEP + 1))
   local pct=$((_EMIT_DEPLOY_STEP * 100 / _EMIT_DEPLOY_TOTAL))
   _emit_write_atomic \
-    "$(printf '{"status":"deploying","sha":"%s","branch":"%s","startedAt":"%s","progress":{"step":%d,"total":%d,"pct":%d,"label":"%s"}}' \
+    "$(printf '{"status":"deploying","sha":"%s","branch":"%s","startedAt":"%s","progress":{"step":%d,"total":%d,"pct":%d,"label":"%s"},"writer":{"pid":%d,"host":"%s","heartbeatAt":"%s"}}' \
       "$_EMIT_SHA" "$_EMIT_BRANCH" "$_EMIT_STARTED" \
-      "$_EMIT_DEPLOY_STEP" "$_EMIT_DEPLOY_TOTAL" "$pct" "$1")" \
+      "$_EMIT_DEPLOY_STEP" "$_EMIT_DEPLOY_TOTAL" "$pct" "$1" \
+      "$_EMIT_WRITER_PID" "$_EMIT_WRITER_HOST" "$(date -u +"%Y-%m-%dT%H:%M:%SZ")")" \
     .deploy-status.json
 }
 
 deploy_done() {
   [[ "$_EMIT_DEPLOY_FINALIZED" == "1" ]] && return 0
   _EMIT_DEPLOY_FINALIZED=1
+  _emit_stop_heartbeat deploy
 
   _emit_close_phase
   local completed_at

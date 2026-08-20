@@ -110,6 +110,7 @@ deploy_init 1
 _emit_trap_signals deploy
 INT_TRAP=$(trap -p INT)
 _emit_untrap_signals
+_emit_stop_heartbeat deploy
 case "$INT_TRAP" in
   *_emit_deploy_signal_handler*) ok "_emit_trap_signals registers an INT handler" ;;
   *) no "_emit_trap_signals registers an INT handler (got: '$INT_TRAP')" ;;
