@@ -107,6 +107,9 @@ fleet-clean criterion was amended to expect exactly these two.
 
 - (sprint 282, 2026-08-19) Live-push verification of the new trap wiring against a real production deploy is still outstanding; do it the next time a wired project's `main` gets a natural push, per the Out of scope note.
 
+- (sprint 283, 2026-08-19) Live-push verification of the heartbeat/writer fields against a real multi-minute production image build is still outstanding; do it the next time a wired project's `main` gets a natural push, per sprint 282's own precedent. The 30s-real-timer bash test is a strong local proxy but isn't the same as watching a real linux/amd64 emulated build.
+- (sprint 283, 2026-08-19) The destination-rename race between the heartbeat refresher and a concurrent `deploy_step`/`ci_step` write (two processes, same dest, no shared tmp anymore, but still no locking on the final `mv`) is an accepted, self-healing lost-update — worth a comment-level mention if a future sprint tightens status-file consistency further, but not worth fixing on its own.
+
 ## ✅ Converted to Sprints
 
 - ~~(sprint 246, 2026-08-01) diner-decider is next in the rollout order per the sprint-234 audit, but stays blocked on sprint 258's (formerly 247) `/api/*` migration as this sprint's Context section specifies. _Note added during the auto-loop: that migration already landed on 2026-07-24 in commit `4e0f44e`, so the only residual work is enabling `syncOnDeploy` — see the sprint-258 obsolescence note below._~~
