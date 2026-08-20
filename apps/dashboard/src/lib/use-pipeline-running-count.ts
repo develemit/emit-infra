@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { getCiStatus, getDeployStatus, type ProjectSummary } from './api'
+import { runStateOf } from './use-pipeline-status'
 
 export function usePipelineRunningCount(projects: ProjectSummary[] | null) {
   const [ciRunning, setCiRunning] = useState(0)
@@ -17,11 +18,13 @@ export function usePipelineRunningCount(projects: ProjectSummary[] | null) {
         ]))
       )
       if (cancelled) return
+      // Only records the classifier confirms are actually running count —
+      // an orphaned or unknown record isn't "N deploys in progress."
       let ci = 0, deploy = 0
       for (const r of results) {
         if (r.status === 'fulfilled') {
-          if (r.value[0]?.status === 'running') ci++
-          if (r.value[1]?.status === 'deploying') deploy++
+          if (runStateOf(r.value[0]) === 'running') ci++
+          if (runStateOf(r.value[1]) === 'running') deploy++
         }
       }
       setCiRunning(ci)

@@ -1,7 +1,6 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
-import { getCiStatus, getDeployStatus, type CiStatus, type DeployStatus } from '@/lib/api-containers'
 import type { ProjectSummary, ProjectStatus } from '@/lib/api-projects'
 import { Icon } from '@/components/icon'
 import { Badge } from '@/components/ui/badge'
@@ -11,29 +10,34 @@ import { deriveHealth } from '@/lib/health'
 import { useUptimePct } from '@/lib/use-uptime-pct'
 import { useDiskTrend } from '@/lib/use-disk-trend'
 import { sslDaysLeft, deployedAgo } from '@/lib/date-helpers'
-
-function usePipelineStatus(name: string): { ciStatus: CiStatus | null; deployStatus: DeployStatus | null } {
-  const [ciStatus, setCiStatus] = useState<CiStatus | null>(null)
-  const [deployStatus, setDeployStatus] = useState<DeployStatus | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    async function poll() {
-      const [ci, deploy] = await Promise.all([getCiStatus(name), getDeployStatus(name)])
-      if (!cancelled) { setCiStatus(ci); setDeployStatus(deploy) }
-    }
-    void poll()
-    const id = setInterval(() => void poll(), 15_000)
-    return () => { cancelled = true; clearInterval(id) }
-  }, [name])
-
-  return { ciStatus, deployStatus }
-}
+import { usePipelineStatus, runStateOf } from '@/lib/use-pipeline-status'
+import type { CiProgress, RunState } from '@/lib/api-containers'
 
 interface Props {
   project: ProjectSummary
   status: ProjectStatus | null
   onRetry?: () => Promise<void>
+}
+
+interface PipelineChip {
+  text: string
+  color: string
+}
+
+// `verb`/`phase` differ only in wording ("running"/"deploying" while live vs
+// "ci"/"deploy" once orphaned or unknown) — the live case keeps today's exact
+// copy, the other two states borrow pipeline-progress-card's wording.
+function pipelineChip(phase: 'ci' | 'deploy', verb: string, state: RunState, progress?: CiProgress | null): PipelineChip | null {
+  switch (state) {
+    case 'running':
+      return { text: progress != null ? `${verb} · ${progress.pct}%` : verb, color: 'var(--accent)' }
+    case 'orphaned':
+      return { text: `${phase} orphaned`, color: 'var(--err)' }
+    case 'unknown':
+      return { text: `${phase} unknown`, color: 'var(--fg-muted)' }
+    default:
+      return null
+  }
 }
 
 export function ProjectCard({ project, status, onRetry }: Props) {
@@ -46,9 +50,9 @@ export function ProjectCard({ project, status, onRetry }: Props) {
     && diskTrend.projectedDaysUntilFull !== null
     && diskTrend.projectedDaysUntilFull <= 30
     && diskTrend.disk > 75
-  const { ciStatus, deployStatus } = usePipelineStatus(name)
-  const ciProgress = ciStatus?.status === 'running' ? ciStatus.progress : null
-  const deployProgress = deployStatus?.status === 'deploying' ? deployStatus.progress : null
+  const { ci, deploy } = usePipelineStatus(name)
+  const ciChip = pipelineChip('ci', 'running', runStateOf(ci), ci?.progress)
+  const deployChip = pipelineChip('deploy', 'deploying', runStateOf(deploy), deploy?.progress)
   const reachable = status !== null && !status.error
   const loading = status === null
   const disk = status?.disk ?? 0
@@ -107,14 +111,14 @@ export function ProjectCard({ project, status, onRetry }: Props) {
             disk full ~{Math.round(diskTrend!.projectedDaysUntilFull!)}d
           </span>
         )}
-        {ciProgress != null && (
-          <span className="text-[11px] font-mono px-1.5 py-0.5 rounded" style={{ color: 'var(--accent)', background: 'var(--card-2)', border: '1px solid var(--border)' }}>
-            running · {ciProgress.pct}%
+        {ciChip && (
+          <span className="text-[11px] font-mono px-1.5 py-0.5 rounded" style={{ color: ciChip.color, background: 'var(--card-2)', border: '1px solid var(--border)' }}>
+            {ciChip.text}
           </span>
         )}
-        {deployProgress != null && (
-          <span className="text-[11px] font-mono px-1.5 py-0.5 rounded" style={{ color: 'var(--accent)', background: 'var(--card-2)', border: '1px solid var(--border)' }}>
-            deploying · {deployProgress.pct}%
+        {deployChip && (
+          <span className="text-[11px] font-mono px-1.5 py-0.5 rounded" style={{ color: deployChip.color, background: 'var(--card-2)', border: '1px solid var(--border)' }}>
+            {deployChip.text}
           </span>
         )}
       </div>

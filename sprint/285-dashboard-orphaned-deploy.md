@@ -93,19 +93,19 @@ what turns that into something a human notices.
   — render coverage for the three states
 
 ## Acceptance criteria
-- [ ] An orphaned deploy record renders visibly differently from a live one and
+- [x] An orphaned deploy record renders visibly differently from a live one and
       does not show a progress bar that implies work is happening
-- [ ] The stale duration is shown, so "stuck at 66%" becomes "orphaned, no
+- [x] The stale duration is shown, so "stuck at 66%" becomes "orphaned, no
       heartbeat for 16m"
-- [ ] A live deploy renders exactly as it does today (no regression in the happy
+- [x] A live deploy renders exactly as it does today (no regression in the happy
       path)
-- [ ] `unknown` (pre-283, no liveness metadata) renders as indeterminate rather
+- [x] `unknown` (pre-283, no liveness metadata) renders as indeterminate rather
       than as running
-- [ ] The pipeline running-count badge excludes orphaned runs
-- [ ] Test coverage in
+- [x] The pipeline running-count badge excludes orphaned runs
+- [x] Test coverage in
       `apps/dashboard/src/components/detail/pipeline-progress-card.test.tsx`
       for live / orphaned / unknown, plus a running-count test
-- [ ] `pnpm lint`, `pnpm typecheck`, `pnpm test` green
+- [x] `pnpm lint`, `pnpm typecheck`, `pnpm test` green
 
 ## Out of scope
 - Any change to the staleness rule itself — consume sprint 284's classifier, and
@@ -114,3 +114,86 @@ what turns that into something a human notices.
   286 and is CLI-first; a dashboard button can be proposed as a follow-up.
 - Redesigning the pipeline card generally, or touching the CI-status rendering
   beyond what the classification change requires.
+
+## Completed
+
+**Date:** 2026-08-19
+
+### Summary
+Extracted the three duplicated fetch/derive sites into one shared hook,
+`apps/dashboard/src/lib/use-pipeline-status.ts` (`usePipelineStatus` for the
+poll, `runStateOf` to read a record's classification with a safe `'unknown'`
+fallback if `runState` is ever missing). All three consumers —
+`pipeline-progress-card.tsx`, `project-card.tsx`, and
+`use-pipeline-running-count.ts` — now derive "is this active" from
+`runStateOf(...) !== 'idle'` instead of comparing `status` strings, per the
+sprint's stated preference for consolidation over three patched copies.
+
+`PipelineProgressCard` now branches on the classified state rather than just
+whether a card should render at all: `running` keeps the exact pre-sprint
+markup (progress bar, pct, counting-up elapsed timer — verified byte-for-byte
+unchanged behavior, not just visually similar). `orphaned` and `unknown` route
+to a new `StalledCard` that drops the progress bar and elapsed timer entirely
+and instead states the stale duration (heartbeat age when available, else
+elapsed-since-start for pre-283 records) and a plain-language hint. Since
+sprint 286 (the `--reconcile` command) hasn't landed yet, the orphaned hint
+says to clear the record manually on the server, with a `TODO(sprint 286)`
+comment marking where to swap in the real command name once it exists —
+per the sprint's explicit instruction not to invent that reference early.
+
+`project-card.tsx`'s pipeline chip (the "running · 66%" badge) now shows
+"ci orphaned" / "deploy orphaned" and "ci unknown" / "deploy unknown" variants
+in `--err` / `--fg-muted` instead of silently keeping the accent-colored
+"running" chip forever. `use-pipeline-running-count.ts`'s fleet-wide badge
+now only counts records the classifier confirms are `running`, so an orphaned
+or unknown record no longer inflates "N deploying" on the project list page.
+
+One scope note: `use-pipeline-running-count.ts` had zero existing consumers
+findable by direct JSX grep from inside `apps/dashboard/src`, because it's
+wired from `apps/dashboard/app/page.tsx` (the Next.js `app/` router directory
+lives outside `src/`) — confirmed it's live, not dead code, before changing
+it.
+
+### Files changed
+- `apps/dashboard/src/lib/api-containers.ts` — added `RunState`/`RunStateResult`
+  types and an optional `runState` field on `CiStatus`, mirroring the API's
+  sprint-284 enrichment
+- (new) `apps/dashboard/src/lib/use-pipeline-status.ts` — shared
+  `usePipelineStatus` poll hook and `runStateOf` classification reader,
+  replacing three separate local implementations
+- `apps/dashboard/src/components/detail/pipeline-progress-card.tsx` — branches
+  on classified state; live path unchanged, new `StalledCard` for
+  orphaned/unknown
+- `apps/dashboard/src/components/project-card.tsx` — removed the local
+  `usePipelineStatus`; pipeline chip now reflects orphaned/unknown, not just
+  running
+- `apps/dashboard/src/lib/use-pipeline-running-count.ts` — counts only
+  classifier-confirmed `running` records
+- (new) `apps/dashboard/src/components/detail/pipeline-progress-card.test.tsx`
+  — live (unchanged happy path) / orphaned (no bar, stale duration shown) /
+  unknown (indeterminate, not running) / deploy-over-ci precedence
+- (new) `apps/dashboard/src/lib/use-pipeline-running-count.test.ts` — counts
+  running records, excludes orphaned records
+
+### Verification
+- `pnpm nx run dashboard:lint`, `pnpm nx run dashboard:typecheck`: clean
+- New tests: `pipeline-progress-card.test.tsx` 5/5, `use-pipeline-running-count.test.ts` 3/3
+- `pnpm test` (nx run-many, all 4 test-bearing projects): dashboard 215/215,
+  api 356/356, cli 161/161, core 126/126 — all green. Core's suite flagged one
+  transient flake by nx on the first run (unrelated file, not touched by this
+  sprint); a clean rerun of `core:test` alone passed 126/126, and a full
+  `pnpm test` rerun afterward was clean across all four projects.
+- `pnpm lint`, `pnpm typecheck` (nx run-many, all 5 projects): clean
+
+### Follow-ups
+- `[defer]` The orphaned-card hint currently says "clear manually on the
+  server" since sprint 286's `--reconcile` command doesn't exist yet. There's
+  a `TODO(sprint 286)` comment in `pipeline-progress-card.tsx` marking the
+  spot to update once it lands — worth doing as part of 286 itself so the
+  hint and the command ship together.
+- `[defer]` `project-card.tsx` and `pipeline-progress-card.tsx` have no prior
+  test coverage baseline to compare against (neither had a test file before
+  this sprint); `project-card.tsx` still has none after this sprint since it
+  wasn't in the sprint's required test list — worth a follow-up sprint if the
+  project wants broader component coverage there.
+- none other

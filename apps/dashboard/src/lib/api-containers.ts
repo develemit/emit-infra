@@ -25,6 +25,19 @@ export interface CiProgress {
   label: string
 }
 
+// Mirrors packages/core's classifyRunState output (sprint 284). The API's
+// ci-status/deploy-status routes enrich every response with this field —
+// consume it here rather than re-deriving liveness from `status` strings.
+export type RunState = 'idle' | 'running' | 'orphaned' | 'unknown'
+
+export interface RunStateResult {
+  state: RunState
+  reason: string
+  heartbeatAgeSec: number | null
+  pidAlive: boolean | null
+  sameHost: boolean | null
+}
+
 export interface CiStatus {
   status: string
   sha?: string
@@ -32,6 +45,7 @@ export interface CiStatus {
   startedAt?: string
   completedAt?: string
   progress?: CiProgress | null
+  runState?: RunStateResult
 }
 
 export type DeployStatus = CiStatus
