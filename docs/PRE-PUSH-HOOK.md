@@ -35,6 +35,20 @@ CI-only (`ci.ghcrOrg` unset — it has no deploy infrastructure yet). A project
 with no symlink gets nothing until someone runs `emit-infra hooks install`
 there. `martialops` is deliberately unwired for now.
 
+**This is invisible from inside the wired project.** A project's own
+`.github/` may hold nothing but skills and prompts, and `ls .git/hooks` shows
+only `.sample` files whenever `core.hooksPath` points elsewhere (as it does
+here — at `.husky/` or `.githooks/`). Neither absence means "no CD" the way
+it would in a project that uses GitHub Actions for deploy. Confirm with:
+
+```bash
+git config --get core.hooksPath && \
+  ls -l "$(git rev-parse --show-toplevel)/$(git config --get core.hooksPath)"
+```
+
+If that prints a `pre-push` symlink resolving into `emit-infra`, this hook —
+and everything in this doc — is live for that project.
+
 `emit-billing`'s Dockerfiles are deliberately **not** converted to the
 [cross-platform build pattern](#cross-platform-build-pattern) below (sprint
 268): CI-only means Docker builds never run, so native conversion buys
@@ -113,18 +127,148 @@ deploy still picks up the skipped commits.
 
 ### Signals and interrupted runs
 
-**Pushing to `main` is a real production deploy.** Don't run it from an
-environment that might kill the process mid-flight — an agent's background
-shell, a sandbox that tears down on timeout, a CI runner with a short step
-timeout. If the hook is killed by `SIGINT`, `SIGTERM`, or `SIGHUP`, it traps
-the signal, writes `interrupted` (deploy phase) or `failure` (CI phase) to the
+**Pushing to `main` is a real production deploy**, not a CI-only push: CI
+runs, then Docker images build per changed service, then GHCR push, then
+`emit-infra deploy`. It's slow — emulated `linux/amd64` builds, sequential by
+default (`EMIT_BUILD_PARALLEL` raises the cap) — which makes it tempting to
+kick off from somewhere that won't sit and wait. Don't. **Never push to
+`main`, or otherwise trigger a deploy, from an environment that can tear the
+process down before it finishes** — an agent's background shell, a sandbox
+that tears down on timeout, a CI runner with a short step timeout. Sprint
+282's signal traps and sprint 283's liveness metadata (below) stop the
+dashboard and CLI from *lying* about a killed run still being in progress,
+but they don't undo the kill: the deploy itself is still cut off wherever it
+was — a partial build, a partial rollout — and that needs the same operator
+attention a `failed` deploy would. The 2026-08-19 incident (written up in
+`docs/DEPLOYMENT-PITFALLS.md`) is exactly this: a teardown-prone environment
+killed the hook mid-build.
+
+If the hook is killed by `SIGINT`, `SIGTERM`, or `SIGHUP`, it traps the
+signal, writes `interrupted` (deploy phase) or `failure` (CI phase) to the
 status file, and re-raises the signal so the process's own exit code still
-shows it was killed. That closes the *dashboard shows a stale "66%" forever*
-symptom, but the deploy itself is still cut off wherever it was — a partial
-build, a partial rollout — and that requires the same operator attention a
-`failed` deploy would. `SIGKILL` can't be trapped at all; that gap is closed
-separately by liveness metadata on the status file (sprint 283). A full
-recovery runbook is forthcoming (sprint 287).
+shows it was killed. `SIGKILL` can't be trapped at all; that gap is closed by
+the liveness metadata below (sprint 283) instead — a reader infers "the
+writer is gone" rather than being told directly. See
+[Recovery runbook](#recovery-runbook) below for what to do once you land on a
+stuck record.
+
+**Escape hatches**, for when you need to deploy without a natural push:
+
+- `EMIT_FORCE_DEPLOY=1` — bypasses the dry-run and ignored-paths gates. Use
+  after an env-only change, since `.env` files are gitignored and invisible
+  to the path diff.
+- `EMIT_DEPLOY_CONFIRM=1` — adds an interactive confirm prompt on `/dev/tty`
+  before the deploy phase runs (defaults to *no*).
+- `git push --dry-run` — CI only, no deploy phase at all (see
+  [`git push --dry-run`](#git-push---dry-run) above).
+
+## Status files and liveness
+
+Every status value that can appear in `.ci-status.json` / `.deploy-status.json`,
+with what writes it:
+
+| File | Status | Meaning | Writer |
+| --- | --- | --- | --- |
+| `.ci-status.json` | `running` | CI in flight | `ci_init`/`ci_step` (`scripts/lib/ci-utils.sh`) |
+| `.ci-status.json` | `success` | CI passed | `ci_done success` |
+| `.ci-status.json` | `failure` | CI failed, or was interrupted mid-run (`SIGINT`/`SIGTERM`/`SIGHUP`) | `ci_done failure`, or the sprint 282 signal handler calling it on the hook's behalf |
+| `.deploy-status.json` | `deploying` | Deploy in flight | `deploy_init`/`deploy_step` (bash, pre-push hook), or `deployRecordInit` (`packages/core/src/deploy-records.ts`, `emit-infra deploy`) |
+| `.deploy-status.json` | `deployed` | Deploy succeeded | `deploy_done deployed` (bash) or `deployRecordDone(..., 'deployed')` (TS) |
+| `.deploy-status.json` | `failed` | Deploy failed | `deploy_done failed` (bash) or `deployRecordDone(..., 'failed')` (TS) |
+| `.deploy-status.json` | `interrupted` | Deploy was killed by `SIGINT`/`SIGTERM`/`SIGHUP` mid-run | The sprint 282 signal handler, bash only — `emit-infra deploy`'s TS path has no signal trap |
+| `.deploy-status.json` | `orphaned` | A deploy or CI record died with no terminal write at all (typically `SIGKILL`, or the machine going away) and was cleared after the fact | `emit-infra reconcile --write` (sprint 286), for either status file |
+
+`running`/`deploying` are the only **in-flight** statuses — anything else is
+terminal, meaning nothing is actively writing to that file. `orphaned` is
+deliberately its own status, not a reuse of `failed` or `deployed`: neither
+honestly describes a run killed mid-flight (images may already be pushed;
+the deploy may or may not have applied).
+
+### Liveness fields and staleness
+
+Every in-flight record (`running`/`deploying`) also carries a `writer` block;
+terminal records omit it:
+
+```jsonc
+"writer": { "pid": 12345, "host": "studio", "heartbeatAt": "2026-08-19T14:03:21Z" }
+```
+
+- `pid` / `host` are captured once when the run starts (`$$` and
+  `hostname -s` on the bash side; `process.pid` and Node's `os.hostname()` on
+  the TS side — these can differ in *form* on a host where the short name and
+  `os.hostname()`'s result diverge, which only costs classification precision,
+  not correctness; see the cross-host fallback below).
+- `heartbeatAt` refreshes every **30 seconds** on the bash side (a background
+  refresher started by `_emit_start_heartbeat`, so a long silent build step —
+  the emulated-build case this whole mechanism exists for — still proves
+  liveness) or is written once at start on the TS side (`emit-infra deploy`
+  has no intermediate progress steps to refresh from).
+
+`packages/core/src/deploy-status.ts`'s `classifyRunState` is the **one and
+only** place that turns this into a verdict — the API, the CLI, and the
+dashboard all call it rather than inventing their own staleness heuristic.
+It returns one of four states, in this priority order:
+
+1. Terminal `status` → always `idle`, no liveness check needed.
+2. A same-host writer `pid` that's still alive → `running`. This is the
+   strongest signal and wins even over a stale heartbeat (a busy build can
+   miss a tick without being wrongly flagged).
+3. A same-host writer `pid` that's no longer running → `orphaned`, conclusive.
+4. Cross-host records, or same-host records where the pid can't be checked →
+   fall back to heartbeat age alone: `orphaned` past
+   **120 seconds** (4× the 30s refresh interval — two missed ticks would
+   already be suspicious; 4× gives scheduling jitter and a slow disk write
+   room without flagging a merely-busy build), `running` otherwise.
+5. No `writer` block at all (a pre-283 record) → there's no heartbeat to
+   judge, only "how long has this claimed to be running." `unknown` if
+   younger than **30 minutes**, `orphaned` past that — a real deploy or CI
+   run doesn't take that long, so an in-flight record that old with zero
+   liveness evidence is treated as orphaned rather than left `unknown`
+   forever.
+
+Consumers: `apps/api`'s `ci-status`/`deploy-status` routes add a `runState`
+field to their existing response (additive only); `apps/cli`'s
+`emit-infra status` prints it for both local status files before attempting
+any SSH connection; the dashboard's pipeline card and project list read it to
+distinguish a live progress bar from a stalled one (sprint 285).
+
+## Recovery runbook
+
+You've landed here because a dashboard card or `emit-infra status` shows a
+deploy or CI run as `orphaned` or `unknown` instead of progressing normally.
+
+1. **Recognize it.** On the dashboard, an orphaned/unknown run renders as a
+   stalled card with a stale duration instead of a moving progress bar
+   (sprint 285) — "stuck at 66%" becomes "orphaned, no heartbeat for 47m."
+   From a shell, `cd` into the project directory and run `emit-infra status`
+   (it reads `.ci-status.json`/`.deploy-status.json` from `cwd`, not a `--dir`
+   flag) — its "Local pipeline (this machine)" section prints each status
+   file's classified state and the reason (sprint 284), before it even
+   attempts the SSH health check.
+2. **Confirm what actually shipped**, before touching anything:
+   - `git rev-parse HEAD` (local) vs `git ls-remote origin refs/heads/main`
+     (remote) — if they differ, the push that started this run never landed
+     on `origin/main`, so the deploy that follows a push never had a
+     legitimate commit to build from either.
+   - Whether images reached GHCR:
+     `docker manifest inspect ghcr.io/<ci.ghcrOrg>/<service>:<sha>` (the sha
+     from the stuck `.deploy-status.json`) — succeeds only if that service's
+     build-and-push phase completed.
+   - The server itself is the ground truth for what's actually running; a
+     stuck local status file says nothing about server state one way or the
+     other.
+3. **Clear the record.** `emit-infra reconcile --dir <project-dir>` (dry-run
+   by default — prints what it would change, touches nothing).
+   `emit-infra reconcile --dir <project-dir> --write` applies it. It only
+   acts on records `classifyRunState` calls `orphaned`; a live, heartbeating
+   record is left untouched no matter how long it's been running. Reconciling
+   writes a terminal `orphaned` status plus exactly one history line, so
+   `resolve_last_deployed_sha` (the smart-build base-sha lookup in
+   `scripts/lib/deploy-plan.sh`) correctly falls through to the last real
+   `deployed` sha in history — the stuck record no longer hides it.
+4. **Retry**, once you know what actually shipped and the record is clear —
+   push again, or re-run whatever triggered the original push, this time
+   from an environment that won't tear the process down mid-flight.
 
 ## Smart build
 

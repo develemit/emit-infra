@@ -459,6 +459,7 @@ reply.header(
 15. Session cookie not sent after OAuth redirect to app subdomain? → Set `Domain` to parent domain on the cookie (see #20)
 16. OAuth callback 500 with `42P01` (undefined table)? → Migrations never ran in production — copy migrations into the Docker image and remove the `NODE_ENV === 'production'` guard (see #21)
 17. New production secret works in CI but not on the server (or vice versa)? → `secrets sync` and `deploy` read different files when `ci.envFile` is set — add the key to both, run `secrets sync --dry-run` to check (see #22)
+18. Dashboard shows a deploy/CI run frozen mid-progress and you can't tell if it's still running? → check `.deploy-status.json`/`.ci-status.json`'s `writer.heartbeatAt`, or just run `emit-infra status` — see `docs/PRE-PUSH-HOOK.md`'s recovery runbook, and #25 below for why this happens
 
 ---
 
@@ -587,3 +588,57 @@ This sprint was scoped assuming the hazard was tastease-specific ("other fleet h
 **Fix (2026-08-13):** The `.deploy-config` template (`deploy-blue-green.yml`) now defaults to `PRUNE_STRATEGY="aggressive"` — prune containers and images older than 24h during each deploy. Images referenced by any container (running or stopped) are never touched, so the live slot is safe regardless of age. Trade-off: rollback to a build older than 24h re-pulls from GHCR (~1–2 min) instead of starting instantly. Opt a project out with `blueGreen.pruneStrategy: "standard"` in `.emit-infra.json`.
 
 **Diagnosis tip:** With the containerd image store, `docker system df` reports image sizes but the bytes live under `/var/lib/containerd`, not `/var/lib/docker`. Reclaim manually with `docker container prune -f --filter "until=24h" && docker image prune -a -f --filter "until=24h"`.
+
+---
+
+## 25. A killed pre-push hook freezes `.deploy-status.json` forever — and the deploy mechanism itself is invisible from inside the project
+
+**Symptom (2026-08-19, emit-social):** The dashboard showed a deploy stuck at
+`deploying` / 66% indefinitely. Diagnosis took longer than the actual repair
+because two independent local signals both pointed the wrong way.
+
+**Cause — two misleading signals:**
+
+1. **Nothing in the project said "this pushes to production."** emit-social's
+   `.github/` holds only skills and prompts, no `.github/workflows/`, and
+   `ls .git/hooks` showed only `.sample` files. Both are the normal signature
+   of "no CD here" — except `core.hooksPath` was set to `.githooks`, whose
+   `pre-push` is a symlink *out of the repo* into `emit-infra`
+   (`scripts/hooks/pre-push`, shared across every wired project). The deploy
+   trigger for a push to `main` was real, and invisible from every place a
+   reasonable person would look first.
+2. **The `deploying` status carried no liveness information.** There was no
+   way to tell, from the status file alone, whether it reflected a real
+   in-progress deploy or a run that had died. A frozen `deploying` at 66%
+   looked identical either way.
+
+**What actually happened:** the process running the pre-push hook was killed
+mid-build (a teardown-prone environment — an agent's background shell —
+running a push to `main`, which the hook doesn't and can't distinguish from
+any other push). `deploy_done` never ran, so `.deploy-status.json` stayed
+frozen at `deploying`. `origin/main` never moved and prod was never touched —
+this was a stuck local artifact, not a bad deploy or a broken server.
+
+**Fix, across sprints 282–287:**
+
+- **282** — trap `SIGINT`/`SIGTERM`/`SIGHUP` in the hook and write a terminal
+  status (`interrupted` for deploy, `failure` for CI) before re-raising the
+  signal, so a killed run stops lying about being in progress.
+- **283** — add a `writer` block (`pid`/`host`/`heartbeatAt`, refreshed every
+  30s) to every in-flight record, closing the `SIGKILL`-can't-be-trapped gap:
+  a reader can now infer liveness even when no terminal write ever happens.
+- **284** — one shared classifier (`classifyRunState`) turns that metadata
+  into `idle`/`running`/`orphaned`/`unknown`, used by the API, the CLI, and
+  the dashboard instead of three separate heuristics.
+- **285** — the dashboard renders `orphaned`/`unknown` visibly differently
+  from a live run (a stalled card with a stale duration, not a frozen
+  progress bar) and excludes them from the "N running" count.
+- **286** — `emit-infra reconcile [--write]` clears an orphaned record with a
+  correct terminal status and history line, so `resolve_last_deployed_sha`
+  stops being hidden behind a stuck record.
+- **287** (this doc) — writes down the status vocabulary, the liveness rule,
+  the operator warning, the recovery runbook, and the discoverability trap,
+  so the next person doesn't have to reverse-engineer the hook under
+  pressure. See `docs/PRE-PUSH-HOOK.md`'s "Status files and liveness" and
+  "Recovery runbook" sections, and the "How projects get the hook" section
+  for the `core.hooksPath` check.
