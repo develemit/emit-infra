@@ -110,6 +110,18 @@ check "print_summary: no record, push exit 0 -> treated as a clean skip, exit 0"
 ( source "$SCRIPT"; PROJECT_DIR="$PROJECT_DIR"; print_summary deadbee "$PS_WORK/x" 1 >/dev/null; )
 check "print_summary: no record, push exit 1 -> exit 3" "$?" "3"
 
+# sprint 292: a skip must be reported as a definite, reasoned outcome — read
+# back from the hook's own skip message in the log, not "likely"/"unknown".
+printf '⚠ deploy SKIPPED: every file changed since abc1234 matches an ignored pattern (sprint/**) — no deploy will run for def5678 (EMIT_FORCE_DEPLOY=1 to override)\n' \
+  > "$PS_WORK/x.log"
+SKIP_OUT=$( ( source "$SCRIPT"; PROJECT_DIR="$PROJECT_DIR"; print_summary deadbee "$PS_WORK/x" 0; ) )
+case "$SKIP_OUT" in
+  *"likely"*|*": unknown"*) no "print_summary: recognized skip reads the hook's own reason, no 'likely'/'unknown' (got: $SKIP_OUT)" ;;
+  *"deploy SKIPPED"*) ok "print_summary: recognized skip reads the hook's own reason, no 'likely'/'unknown'" ;;
+  *) no "print_summary: recognized skip reads the hook's own reason, no 'likely'/'unknown' (got: $SKIP_OUT)" ;;
+esac
+rm -f "$PS_WORK/x.log"
+
 POLL_BASE="$PS_WORK/poll"
 echo 0 > "${POLL_BASE}.rc"
 ( source "$SCRIPT"; PROJECT_DIR="$PROJECT_DIR"; poll_for_result deadbee "$POLL_BASE" 30 >/dev/null; )

@@ -131,6 +131,25 @@ root-level markdown only, while `docs/**` is recursive.
 Note the skip leaves the last-deployed sha where it was, so the next real
 deploy still picks up the skipped commits.
 
+A skip prints `⚠ deploy SKIPPED: ...`, naming the base sha, the ignore
+patterns applied, and that no deploy will run for this push — never a routine
+`→` line, so it can't read as "shipped." `scripts/deploy-detached.sh` reports
+the same outcome by reading that line back out of its log rather than
+inferring "likely skipped" from a missing deploy record.
+
+**Sprint 292 (2026-08-21 incident):** the filter used to be
+`! git diff --name-only "$base"..HEAD -- . "${specs[@]}" | grep -q .`. Piping
+into `grep -q` meant `git diff` could be killed by `SIGPIPE` (grep closes the
+pipe on its first match, while `git diff` was still writing); under
+`set -o pipefail` that read as "only ignored paths changed" and skipped for
+real. This broke exactly on **large** diffs — output past the OS pipe buffer
+(~16KB on macOS) — so the bigger the push, the more likely it silently didn't
+ship. A 34-commit, 662-file push went undeployed for days this way. The fix
+captures `git diff`'s output and exit status into separate variables (no
+pipe), matching `nx_projects` in `deploy-plan.sh`; a `git diff` failure now
+deploys rather than skips. See `scripts/lib/deploy-path-filter.test.sh` for
+the regression test.
+
 ### Unattended-shell gate
 
 2026-08-19 incident: an emit-social deploy launched from an agent session's

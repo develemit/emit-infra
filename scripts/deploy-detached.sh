@@ -135,14 +135,23 @@ poll_for_result() {
   print_summary "$sha" "$base" "$rc"
 }
 
-# The deploy-status record alone can't tell "skipped, all good" apart from
-# "CI failed before deploy ever started" — both leave no record for this sha
-# — so the push's own exit code (rc) is the tie-breaker for that case.
+# The deploy-status record alone can't tell "skipped, all good" apart from a
+# push that failed before ever reaching the deploy gates — both leave no
+# record for this sha. rc==0 (git push succeeded) rules the latter out, since
+# a failing pre-push hook fails the push itself; every exit-0 gate the hook
+# can take (ignored paths, dry run, ci.ghcrOrg unset) prints its own reason on
+# its way out, so read that back from the log instead of guessing (sprint
+# 292: "likely skipped" is exactly the phrasing that let a real stuck
+# backlog read as routine).
+_skip_reason_from_log() {
+  grep -m1 -E '^(⚠ deploy SKIPPED|→ git push --dry-run detected|→ deploy declined|pre-push: ci\.ghcrOrg not set)' "$1" 2>/dev/null || true
+}
+
 print_summary() {
   local sha="$1" base="$2" rc="$3"
   local status_file="$PROJECT_DIR/.deploy-status.json"
   local history_file="$PROJECT_DIR/.deploy-history.jsonl"
-  local record_sha="" record_status="" services="unknown" ok=1
+  local record_sha="" record_status="" services="(none — no deploy ran)" ok=1
 
   [[ -f "$status_file" ]] && record_sha=$(record_field "$status_file" sha)
   [[ "$record_sha" == "$sha" ]] && record_status=$(record_field "$status_file" status)
@@ -162,8 +171,8 @@ if line:
     built = json.loads(line).get('servicesBuilt', [])
     print(', '.join(built) if built else '(none — re-tag only)')
 else:
-    print('unknown')
-" 2>/dev/null || echo "unknown")
+    print('(none — no deploy ran)')
+" 2>/dev/null || echo "(none — no deploy ran)")
   fi
 
   echo
@@ -171,7 +180,13 @@ else:
     echo "→ deploy finished: $record_status"
     [[ "$record_status" == "deployed" ]] || ok=0
   elif [[ "$rc" == "0" ]]; then
-    echo "→ push completed (exit 0); no deploy record for ${sha:0:7} — deploy was likely skipped (ignored paths / nothing to build)"
+    local reason
+    reason=$(_skip_reason_from_log "${base}.log")
+    if [[ -n "$reason" ]]; then
+      echo "→ deploy SKIPPED (push succeeded, this was intentional): $reason"
+    else
+      echo "→ push completed (exit 0) but no deploy record for ${sha:0:7} and no recognized skip message in the log — read ${base}.log directly"
+    fi
   else
     echo "→ push failed (exit $rc); no deploy reached this sha — check CI"
     ok=0

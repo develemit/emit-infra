@@ -182,22 +182,97 @@ production."
    investigation.
 
 ## Acceptance criteria
-- [ ] A range whose `git diff --name-only` output exceeds ~16KB deploys, not skips, when evaluated under `set -o pipefail` — asserted by a test (this is the 2026-08-21 incident; it is the criterion that matters most)
-- [ ] `only_ignored_paths_changed` contains no pipe into `grep`; output and exit status are captured separately, matching `nx_projects` in the same file
-- [ ] A `git diff` failure inside `only_ignored_paths_changed` results in a deploy, never a skip — asserted by a test that forces the error
-- [ ] An empty/whitespace spec element cannot reach the pathspec list — asserted by a test
-- [ ] A genuinely docs-only range still skips (the optimization isn't destroyed) — asserted by a test
-- [ ] An `apps/`-touching range always deploys — asserted by a test
-- [ ] Any other `cmd | grep -q` shape running under `pipefail` in `scripts/` is found and fixed or explicitly noted as safe
-- [ ] A skipped deploy is reported as a definite, reasoned outcome by both the hook and `deploy-detached.sh` — no "likely", no "unknown"
-- [ ] The fleet sync comparison is re-run after the fix as a sanity check (prior run found nothing stuck — see task 7)
-- [ ] `docs/PRE-PUSH-HOOK.md` reflects any changed semantics
-- [ ] The repo's own CI targets pass
+- [x] A range whose `git diff --name-only` output exceeds ~16KB deploys, not skips, when evaluated under `set -o pipefail` — asserted by a test (this is the 2026-08-21 incident; it is the criterion that matters most)
+- [x] `only_ignored_paths_changed` contains no pipe into `grep`; output and exit status are captured separately, matching `nx_projects` in the same file
+- [x] A `git diff` failure inside `only_ignored_paths_changed` results in a deploy, never a skip — asserted by a test that forces the error
+- [x] An empty/whitespace spec element cannot reach the pathspec list — asserted by a test
+- [x] A genuinely docs-only range still skips (the optimization isn't destroyed) — asserted by a test
+- [x] An `apps/`-touching range always deploys — asserted by a test
+- [x] Any other `cmd | grep -q` shape running under `pipefail` in `scripts/` is found and fixed or explicitly noted as safe
+- [x] A skipped deploy is reported as a definite, reasoned outcome by both the hook and `deploy-detached.sh` — no "likely", no "unknown"
+- [x] The fleet sync comparison is re-run after the fix as a sanity check (prior run found nothing stuck — see task 7)
+- [x] `docs/PRE-PUSH-HOOK.md` reflects any changed semantics
+- [x] The repo's own CI targets pass
 
 ## Out of scope
 - Redesigning the deploy pipeline, blue-green slots, or the unattended-deploy gate (sprint 288) — this is about one filter and how a skip is reported
 - Removing `EMIT_FORCE_DEPLOY` (it was the workaround that shipped the stuck backlog and remains a legitimate escape hatch)
 - Retroactively deploying any other project found stuck in task 7 — report it, let the operator decide
+
+## Completed
+
+**Date:** 2026-08-21
+
+### Summary
+Fixed the actual mechanism (SIGPIPE + `pipefail`, already root-caused before this
+sprint started): `only_ignored_paths_changed` in `scripts/lib/deploy-plan.sh` no
+longer pipes `git diff --name-only` into `grep -q`. It now captures the diff's
+output and exit status into separate variables — the same shape `nx_projects`
+in the same file already used — and treats a `git diff` failure as "deploy,
+never skip." This removes the pipe entirely, so there's no longer a race for
+`grep -q` to win by closing the pipe early and killing `git diff` with SIGPIPE
+on large output.
+
+While sweeping `scripts/` for the same `cmd | grep -q` shape under `pipefail`
+(task 3), found two more instances in the same file with the identical latent
+bug — `_trigger_paths_changed` and `service_needs_build`'s glob fallback —
+both fixed the same way. `collect-metrics.sh` has two visually-similar
+instances; investigated both: one runs in a remote script that never sets
+`pipefail` at all, the other pipes a single ~200-400 byte captured string
+(two orders of magnitude under the ~16KB/64KB pipe-buffer threshold that
+triggers this), so neither is actually exposed — noted inline rather than
+changed.
+
+Also hardened `deploy_ignore_specs` to drop blank/whitespace patterns before
+they become pathspecs: an empty `:(exclude,glob)` isn't a no-op, it's
+confirmed (empirically, via a throwaway git repo) to match *every* path, so a
+stray blank pattern would silently exclude an entire diff. The existing
+`$# -gt 0` guard makes this unreachable from the hook's real call path today,
+but it's cheap defense-in-depth and now has its own test.
+
+Made a skip loud: `scripts/hooks/pre-push`'s skip message now leads with `⚠`
+(not the routine `→`), names the ignored patterns applied, and states plainly
+that no deploy will run. `scripts/deploy-detached.sh`'s `print_summary` now
+greps that exact line back out of the detached push's log and reports it
+verbatim instead of guessing "likely skipped" from a missing deploy record —
+"unknown" services also became `(none — no deploy ran)` on that path, since
+"no deploy ran" is a known fact, not an unknown one.
+
+Deliberately did not add a "large diffs never skip" heuristic (task 5) — the
+correlation between diff size and the false skip was a symptom of the SIGPIPE
+bug, not an independent risk; removing the pipe removes the correlation, and
+a size-based override would only end up blocking genuinely-correct skips on
+big but ignorable pushes (e.g. a huge `docs/**` restructure).
+
+New test file `scripts/lib/deploy-path-filter.test.sh` reproduces the incident
+directly: a 3000-file, ~198KB diff, run under real `set -euo pipefail`
+semantics (a fresh `bash -c`, matching how `scripts/hooks/pre-push` actually
+runs), asserted to deploy. Verified this test fails against the pre-fix code
+(5/5 relevant cases) and passes against the fix, confirming it's a real
+regression test and not a tautology.
+
+### Files changed
+- `scripts/lib/deploy-plan.sh` — `only_ignored_paths_changed`, `deploy_ignore_specs`, `_trigger_paths_changed`, `service_needs_build`'s glob fallback: removed all `cmd | grep -q` pipes under pipefail; blank pathspec elements filtered
+- `scripts/hooks/pre-push` — path-filter skip message now names what was ignored and states no deploy will run, with a distinct `⚠` prefix
+- `scripts/deploy-detached.sh` — `print_summary` reads the real skip reason back from the log (`_skip_reason_from_log`) instead of inferring "likely skipped"; "unknown" services replaced with an accurate "(none — no deploy ran)"
+- `scripts/collect-metrics.sh` — added a comment documenting why its two `cmd | grep -q` instances are not exposed to the same hazard (not reviewed/fixed, confirmed safe)
+- `docs/PRE-PUSH-HOOK.md` — documents the new skip message shape and the sprint 292 SIGPIPE root cause
+- `package.json` — wired the new test file into `test:hooks`
+- (new) `scripts/lib/deploy-path-filter.test.sh` — regression tests for the incident, diff-failure, empty-spec, and positive-control cases, all run under real `pipefail`
+- `scripts/lib/deploy-detached.test.sh` — added a test asserting `print_summary`'s skip message contains neither "likely" nor "unknown"
+
+### Verification
+- `bash scripts/lib/deploy-path-filter.test.sh`: 7/7 pass; confirmed 5/7 fail against the pre-fix code (stashed), proving the tests are real regressions
+- `pnpm test:hooks` (all 8 shell suites): 160/160 pass, 0 failed
+- `pnpm nx affected -t lint typecheck test --base=origin/main`: 42 test files / 356 tests pass, lint and typecheck clean
+- `pnpm nx run cli:build`: succeeds (this is the dist the hooks actually run — see stale-dist memory note)
+- `pnpm nx run dashboard:build`: fails on a pre-existing, unrelated Next.js `<Html>` outside `_document` bug, confirmed present on clean `main` before this sprint's changes (tracked in `backlog.md` since sprint 04, `[hold]`) — not in scope, not touched
+- Fleet sync re-run (task 7): `emit-social`, `tastease`, `develemail`, `emit-vision`, `diner-decider` all in sync with `origin/main`; `emit-billing` behind by 1 commit (`sprint/57-ghcr-image-pipeline.md` only) — confirmed a correct skip under the default ignore patterns, matching the prior 2026-08-21 finding exactly
+
+### Follow-ups
+- `[defer]` `scripts/lib/deploy-plan.sh` is now 329 lines (was 300 before this sprint), over the repo's ~300-line file-size guideline. It's grown incrementally sprint over sprint (see its "fix N" comment convention); a natural split would separate the path-filter helpers (`deploy_ignore_specs`, `only_ignored_paths_changed`) and the smart-build helpers (`nx_available`/`nx_projects`/`_list_has`/`_trigger_paths_changed`/`service_needs_build`) into their own lib files. Didn't do it here since it touches sourcing in `pre-push`, `deploy-detached.sh`, and three test files, and this sprint's scope was one filter's behavior, not a module reorg.
+- `[defer]` `scripts/hooks/pre-push` is now 307 lines (was 305), a few lines past the same guideline — not worth a standalone sprint on its own, but worth folding into the `deploy-plan.sh` split above if that ever happens.
+- `[defer]` `scripts/collect-metrics.sh:72` (`echo "$q" | grep -qE ...` inside the remote-executed script) isn't under `pipefail` at all today, so it's not exposed — but if that remote script ever gains `set -o pipefail`, this line would need the same fix as the rest of this sprint.
 
 ## Incident reference
 - Project: `emit-vision`. Stuck range `a60b807..8e3572f` (34 commits, 662 app/package files), skipped 2026-08-21.

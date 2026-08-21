@@ -143,10 +143,12 @@ LAST_SHA=$(resolve_last_deployed_sha "$ROOT")
 # Ignore-list semantics: deploy is skipped only if EVERY file changed since the
 # last deploy matches an ignore pattern. Unknown paths always deploy (safe
 # default). Override with EMIT_FORCE_DEPLOY=1 (e.g. after env-only changes,
-# which are gitignored and invisible to this diff).
+# which are gitignored and invisible to this diff). The skip message names
+# what was ignored and states plainly that nothing will ship — a stuck
+# 34-commit backlog went unnoticed for days reading as routine (sprint 292).
 if [[ "${EMIT_FORCE_DEPLOY:-0}" != "1" ]] && \
    only_ignored_paths_changed "$LAST_SHA" "${DEPLOY_IGNORE_PATHS[@]}"; then
-  echo "→ only non-deploy paths changed since last deploy (${LAST_SHA:0:7}); skipping deploy (EMIT_FORCE_DEPLOY=1 to override)"
+  echo "⚠ deploy SKIPPED: every file changed since ${LAST_SHA:0:7} matches an ignored pattern (${DEPLOY_IGNORE_PATHS[*]}) — no deploy will run for ${SHA:0:7} (EMIT_FORCE_DEPLOY=1 to override)"
   exit 0
 fi
 

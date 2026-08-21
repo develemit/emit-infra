@@ -79,9 +79,16 @@ PY
 # ── fix 3: path filter ────────────────────────────────────────────────────────
 # 'glob' magic makes '*' stop at '/', so '*.md' means root-level markdown only
 # while 'docs/**' still matches recursively — which is what the defaults mean.
+#
+# A blank/whitespace pattern is dropped, not turned into a spec: an empty
+# ':(exclude,glob)' isn't a no-op, git treats it as matching every path, so
+# one blank pattern would silently exclude everything (confirmed
+# empirically). Unreachable today via only_ignored_paths_changed's `$# -gt 0`
+# guard, but cheap to close (sprint 292).
 deploy_ignore_specs() {
   local p
   for p in "$@"; do
+    [[ -n "${p//[[:space:]]/}" ]] || continue
     printf ':(exclude,glob)%s\n' "$p"
   done
 }
@@ -96,12 +103,27 @@ only_ignored_paths_changed() {
 
   # husky's hook wrapper runs this under `sh -e`, ignoring the bash shebang;
   # macOS's /bin/sh is bash in POSIX mode, which disables `<()` process
-  # substitution. A captured-variable + here-string avoids it.
-  local specs=() spec_list
+  # substitution. A captured-variable + here-string avoids it. A here-string
+  # of an empty spec_list is a single newline, so the read loop would append
+  # one empty-string element — filtered here too, on top of
+  # deploy_ignore_specs's own filtering above.
+  local specs=() spec_list spec
   spec_list=$(deploy_ignore_specs "$@")
-  while IFS= read -r spec; do specs+=("$spec"); done <<< "$spec_list"
+  while IFS= read -r spec; do
+    [[ -n "$spec" ]] && specs+=("$spec")
+  done <<< "$spec_list"
 
-  ! git diff --name-only "$base"..HEAD -- . "${specs[@]}" | grep -q .
+  # No pipe into grep: `grep -q` closes the pipe the instant it sees a match,
+  # which killed `git diff` with SIGPIPE (exit 141) on large output. Under
+  # `set -o pipefail` (pre-push line 6) that promoted to the pipeline's
+  # status and `!` read it as "only ignored paths changed" — a skip that got
+  # *more* likely the bigger the diff was (sprint 292; ~16KB pipe-buffer
+  # threshold, reproduced 5/5). Same capture-then-check shape as nx_projects
+  # above; also closes the errored-diff hole for free.
+  local out rc
+  out=$(git diff --name-only "$base"..HEAD -- . "${specs[@]}" 2>/dev/null); rc=$?
+  [[ $rc -eq 0 ]] || return 1   # diff failed => deploy, never skip
+  [[ -z "$out" ]]               # empty => genuinely only ignored paths changed
 }
 
 # ── fix 2: dependency-aware rebuilds ──────────────────────────────────────────
@@ -145,14 +167,17 @@ _list_has() {
 
 _trigger_paths_changed() {
   local svc="$1" base="$2" extra="$3"
-  local paths=() p
+  local paths=() p out rc
   for p in "${EMIT_DEFAULT_BUILD_TRIGGER_PATHS[@]}"; do
     paths+=("${p//%s/$svc}")
   done
   for p in $extra; do
     paths+=("${p//%s/$svc}")
   done
-  git diff --name-only "$base"..HEAD -- "${paths[@]}" 2>/dev/null | grep -q .
+  # Same pipe-into-grep SIGPIPE shape as only_ignored_paths_changed above (sprint 292).
+  out=$(git diff --name-only "$base"..HEAD -- "${paths[@]}" 2>/dev/null); rc=$?
+  [[ $rc -eq 0 ]] || return 0   # diff failed => trigger a build, never skip one
+  [[ -n "$out" ]]
 }
 
 # Decide whether one service must be rebuilt.
@@ -178,8 +203,12 @@ service_needs_build() {
   fi
 
   # Non-Nx project, or a service whose name isn't an Nx project: original
-  # behavior — any change under the app or any package rebuilds it.
-  git diff --name-only "$base"..HEAD -- "apps/$svc/" packages/ | grep -q .
+  # behavior — any change under the app or any package rebuilds it. Same
+  # pipe-into-grep SIGPIPE hazard as only_ignored_paths_changed (sprint 292).
+  local out rc
+  out=$(git diff --name-only "$base"..HEAD -- "apps/$svc/" packages/ 2>/dev/null); rc=$?
+  [[ $rc -eq 0 ]] || return 0   # diff failed => build, never skip one
+  [[ -n "$out" ]]
 }
 
 # ── fix 4: `git push --dry-run` must not deploy ───────────────────────────────

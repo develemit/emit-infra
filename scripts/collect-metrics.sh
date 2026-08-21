@@ -102,6 +102,12 @@ collect_one() {
     return 0
   fi
 
+  # Same pipe-into-grep shape as the SIGPIPE hazard sprint 292 fixed in
+  # deploy-plan.sh, but not exposed to it: this runs under pipefail (line 5)
+  # like that one did, but $ssh_out is a single ~200-400 byte metrics line, an
+  # order of magnitude under the pipe buffer that triggers it (~16KB) — the
+  # whole write lands in the pipe atomically before grep can read and close
+  # early. Reviewed as part of that sprint's scripts/ sweep; left as-is.
   if [[ -z "$ssh_out" ]] || ! echo "$ssh_out" | grep -q '^CPU:'; then
     printf '{"t":%d,"project":"%s","error":"bad response"}\n' "$ts" "$name" >> "$metrics_file"
     echo "  ✗ $name ($host): bad response"
