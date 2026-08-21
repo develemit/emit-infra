@@ -25,7 +25,11 @@ reasonably believes they shipped, and prod quietly stays behind. Here it hid a
 34-commit backlog including two database migrations. It was only caught because
 someone checked `/healthz` and noticed the build number hadn't moved.
 
-Every project using this hook is exposed to the same failure mode.
+**And it scales the wrong way.** The root cause (SIGPIPE under `pipefail` — see
+Context) means the filter breaks precisely when the diff is *large*: the more
+code a push contains, the likelier it is silently dropped. Small pushes deploy
+fine, which is why this went unnoticed for so long. Every project using this
+hook is exposed, and the exposure grows with the size of the push.
 
 ## Context
 
@@ -37,36 +41,63 @@ Every project using this hook is exposed to the same failure mode.
   was genuinely the last deployed commit (build 1081, deployed 2026-08-16).
 - **Not a cwd problem.** `deploy-detached.sh`'s `launch()` does `cd "$1"` into
   `PROJECT_DIR` before pushing, so the `-- .` pathspec is anchored correctly.
-- **Not reproducible after the fact.** Re-running
-  `only_ignored_paths_changed a60b807 "${EMIT_DEFAULT_DEPLOY_IGNORE_PATHS[@]}"`
-  against the identical range and ignore list returns *deploy* (false) — in both
-  `bash` and the `sh` POSIX mode husky's wrapper uses. **So the same inputs do
-  not reproduce it.** Treat "find the exact trigger" as a real possibility but
-  not a precondition for fixing the structural bug below.
+- **It IS reproducible — the earlier attempt was missing one shell option.**
+  Re-running `only_ignored_paths_changed` in a bare shell returns *deploy*,
+  which is what made this look non-deterministic. But `scripts/hooks/pre-push`
+  sets `set -euo pipefail` on line 6, and sourcing the lib into a plain shell
+  does not. With `pipefail` set, the real range + real ignore list reproduces
+  the skip **5 times out of 5**. The trigger is identified — see below. Do not
+  spend a session re-investigating it.
 
-### The structural bug (confirmed, reproducible, fix this regardless)
+### The actual mechanism: SIGPIPE + pipefail (confirmed, reproduced 5/5)
 `scripts/lib/deploy-plan.sh:104`:
 
 ```bash
 ! git diff --name-only "$base"..HEAD -- . "${specs[@]}" | grep -q .
 ```
 
-This conflates **"git diff produced no output because nothing changed"** with
-**"git diff produced no output because it errored."** Any failure of that command
-— bad pathspec, unreadable object, anything on stderr — yields empty stdout,
-`grep -q .` fails, `!` inverts it to *true*, and the caller skips the deploy.
+**The failure is the inverse of "an error looks like no changes".** `grep -q`
+exits as soon as it sees the **first** match — that is, the moment it learns
+files *did* change. That closes the pipe while `git diff` is still writing, so
+git dies of `SIGPIPE` (exit 141). `pre-push` runs under `set -euo pipefail`
+(line 6), so `pipefail` promotes 141 to the pipeline's status; `!` inverts
+non-zero to *true*; the caller reads that as "only ignored paths changed" and
+skips the deploy.
 
-The function's own documented intent is the opposite. `scripts/hooks/pre-push:143-146`
-says: *"Unknown paths always deploy (safe default)."* The implementation does not
-honour that when the diff itself fails.
+So the filter fails **precisely when a lot of files changed** — the bigger the
+push, the likelier it silently refuses to ship it. Small pushes are fine because
+git finishes writing before grep exits.
 
-Demonstrated concretely — one empty-string pathspec element is enough:
+**The threshold is diff *output size*, not commit count** — it's the OS pipe
+buffer (~16KB on macOS). Measured on this machine:
+
+| `git diff --name-only` output | pipeline status |
+|---|---|
+| 8,893 bytes | 0 — deploys correctly |
+| 23,893 bytes | **141 — silently skips** |
+
+The 2026-08-21 incident's range produced **29,002 bytes** with the exclude specs
+applied. Any push touching roughly 350–400+ files is exposed, in any project.
+
+Reproduction (real range, real ignore list, real function):
 
 ```console
-$ git diff --name-only a60b807..HEAD -- . ""
-fatal: empty string is not a valid pathspec. please use . instead if you meant to match all paths
-# → empty stdout → filter reports "only ignored paths changed" → SKIP
+$ bash -c 'set -euo pipefail
+  source scripts/lib/deploy-plan.sh
+  only_ignored_paths_changed a60b807 "sprint/**" "docs/**" "backlog.md" "*.md"'
+# → returns true (SKIP) — 5/5 runs. Without `set -o pipefail`: returns false (deploy).
 ```
+
+### The codebase already learned this lesson four lines below
+`nx_projects` (same file, ~line 117) carries this comment:
+
+> *"Distinguishing 'nx failed' from 'nx says nothing is affected' matters:
+> swallowing an error would look like an empty affected set and silently skip
+> every rebuild."*
+
+It captures output and exit status into separate variables specifically to avoid
+this. `only_ignored_paths_changed` never got the same treatment. **Follow that
+existing shape** — it is the in-repo precedent for the correct fix.
 
 ### A specific way an empty element can get in
 `deploy-plan.sh:100-102`:
@@ -105,40 +136,61 @@ production."
 - `docs/PRE-PUSH-HOOK.md` — documents the filter's contract; update if the semantics change
 
 ## Tasks
-1. Make the filter fail toward deploying: capture `git diff`'s exit status
-   separately from its output, and on any non-zero status **deploy** (never skip).
-   This alone closes the silent-skip hole even if the original trigger is never
-   identified.
-2. Harden spec construction so an empty or whitespace-only element can never reach
-   the pathspec list.
-3. Attempt to identify the actual 2026-08-21 trigger — check whether anything
-   about a 34-commit / 662-file / ~14-day-old range behaves differently (argument
-   length limits, `.deploy-status.json` state mid-write, husky's `sh -e` wrapper).
-   **A clean "could not determine, here's what was excluded" is an acceptable
-   outcome** — the fix in task 1 does not depend on it.
+1. Rewrite `only_ignored_paths_changed` to **remove the pipe entirely** —
+   checking the exit status alone is not sufficient, because the pipe is what
+   creates the SIGPIPE in the first place. Capture output and status into
+   separate variables, mirroring `nx_projects` in the same file:
+
+   ```bash
+   local out rc
+   out=$(git diff --name-only "$base"..HEAD -- . "${specs[@]}" 2>/dev/null); rc=$?
+   [[ $rc -eq 0 ]] || return 1   # diff failed => deploy, never skip
+   [[ -z "$out" ]]               # empty => genuinely only ignored paths changed
+   ```
+
+   This closes both the SIGPIPE hole and the errored-diff hole at once.
+2. Harden spec construction so an empty or whitespace-only element can never
+   reach the pathspec list. **This is unrelated to the 2026-08-21 incident** —
+   the `[[ $# -gt 0 ]] || return 1` guard at line 93 makes it unreachable from
+   the hook's call path (verified). Keep it as cheap defence-in-depth; do not
+   mistake it for the fix.
+3. The trigger is already identified (SIGPIPE + `pipefail`, see Context) — do
+   **not** re-investigate it. Instead, grep the rest of `scripts/` for the same
+   `cmd | grep -q` shape running under `pipefail`, since any other instance has
+   the identical latent bug, and fix or note what you find.
 4. Make a skip loud and specific: the hook should state which paths it considered
    ignorable and that **no deploy will happen**, and `deploy-detached.sh` should
    report a skip as a distinct, definite outcome rather than inferring "likely
    skipped" from a missing record.
-5. Consider whether a *large* diff should ever be skippable at all — e.g. refuse
-   to skip when the range exceeds N commits or touches `apps/`/`packages/` at all,
-   on the grounds that the optimization's value (avoiding a docs-only rebuild) is
-   small and its failure cost is an un-deployed backlog.
-6. Add shell tests following `deploy-unattended-gate.test.sh`'s pattern: diff
-   error → deploys; genuinely docs-only range → skips; app-code range → deploys;
-   empty spec element → deploys (not skips).
-7. Audit the other projects using this hook for evidence of the same silent skip
-   (compare each project's last deployed SHA against its `origin/main`), and
-   report any found — this may have happened elsewhere unnoticed.
+5. **Do not add a "large diffs are never skippable" heuristic.** That was
+   proposed before the mechanism was known, and it treats a symptom: large
+   diffs are not inherently riskier to skip, they are simply the ones that
+   *broke the filter*. Once task 1 lands, the correlation disappears and such a
+   rule would only skip deploys that should have been skipped.
+6. Add shell tests following `deploy-unattended-gate.test.sh`'s pattern. The
+   **regression test that actually matters** is a range whose
+   `git diff --name-only` output exceeds ~16KB, asserted under
+   `set -o pipefail` — that is the incident. Plus: diff error → deploys;
+   genuinely docs-only range → skips; app-code range → deploys; empty spec
+   element → deploys.
+7. The fleet audit was already run on 2026-08-21: `emit-social`, `tastease`,
+   `develemail`, `emit-vision`, and `diner-decider` were all in sync;
+   `emit-billing` was behind by one commit containing only
+   `sprint/57-ghcr-image-pipeline.md`, which is a correct skip under the default
+   ignore patterns. **Nothing else was silently stuck.** Re-run the comparison
+   as a sanity check after the fix lands, but do not treat it as open
+   investigation.
 
 ## Acceptance criteria
+- [ ] A range whose `git diff --name-only` output exceeds ~16KB deploys, not skips, when evaluated under `set -o pipefail` — asserted by a test (this is the 2026-08-21 incident; it is the criterion that matters most)
+- [ ] `only_ignored_paths_changed` contains no pipe into `grep`; output and exit status are captured separately, matching `nx_projects` in the same file
 - [ ] A `git diff` failure inside `only_ignored_paths_changed` results in a deploy, never a skip — asserted by a test that forces the error
 - [ ] An empty/whitespace spec element cannot reach the pathspec list — asserted by a test
 - [ ] A genuinely docs-only range still skips (the optimization isn't destroyed) — asserted by a test
 - [ ] An `apps/`-touching range always deploys — asserted by a test
-- [ ] The 2026-08-21 trigger is either identified with evidence, or explicitly documented as not-reproducible with the hypotheses that were excluded
+- [ ] Any other `cmd | grep -q` shape running under `pipefail` in `scripts/` is found and fixed or explicitly noted as safe
 - [ ] A skipped deploy is reported as a definite, reasoned outcome by both the hook and `deploy-detached.sh` — no "likely", no "unknown"
-- [ ] Other fleet projects are checked for the same silent skip and findings reported
+- [ ] The fleet sync comparison is re-run after the fix as a sanity check (prior run found nothing stuck — see task 7)
 - [ ] `docs/PRE-PUSH-HOOK.md` reflects any changed semantics
 - [ ] The repo's own CI targets pass
 
