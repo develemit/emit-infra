@@ -128,6 +128,11 @@ fleet-clean criterion was amended to expect exactly these two.
 
 - (sprint 294, 2026-08-22) `scripts/hooks/pre-push`'s refusal message and `scripts/lib/deploy-plan.sh`'s comments point to `docs/PRE-PUSH-HOOK.md` generically rather than to the specific split doc (e.g. `DEPLOY-GATES.md#unattended-shell-gate`) that now holds the detail. Not dangling — the entry point links onward — but a future touch of those files could tighten the pointer.
 
+- (sprint 295, 2026-08-22) **INCOMPLETE FIX — dashboard build still fails in the ambient environment.** Sprint 295 made the build target immune to a leaked `NODE_ENV=development` (`env -u NODE_ENV next build`), but `TURBOPACK=1` — set by default on this machine — independently causes the same `<Html> should not be imported outside of pages/_document` prerender failure. Verified 2026-08-22: with `TURBOPACK=1` the build exits 1; with it unset, exit 0. Fix is the same one-line shape: `env -u NODE_ENV -u TURBOPACK next build`. The sprint's acceptance criterion was too weak — it specified `env -u TURBOPACK pnpm nx build dashboard`, baking the workaround into the check instead of requiring the target to be self-sufficient.
+- (sprint 295, 2026-08-22) `env -u NODE_ENV` on the dashboard `build` target is targeted at one symptom; other Next-based build targets would benefit from the same treatment — grep `"command": ".*next build"` across `project.json` files when one is added.
+- (sprint 295, 2026-08-22) ESLint warns "The Next.js plugin was not detected in your ESLint configuration" on every dashboard lint/build run. Unrelated to the build bug; cheap to fix if someone is touching `apps/dashboard/eslint.config.*`.
+- (infra, 2026-08-22) `packages/core/src/db-url-connect.test.ts > waitUntilReady > retries until the timeout, then throws with the last error` is load-sensitive: it failed once under a parallel `nx run-many -t test --skip-nx-cache` and passed 4/4 uncached in isolation. Same class as the fixed-timing flakes repaired in `hook-signals.test.sh` (f69168b) and `use-ops-chat.test.ts` (d90a11e) — a fixed timeout raced under load. Last touched by sprint 276.
+
 ## ✅ Converted to Sprints
 
 - ~~(sprint 124, 2026-07-01) `getTerraformOutput` is duplicated in `status.ts` and `logs.ts` — extract to a shared helper when a third consumer appears~~ → sprint-293 (2026-08-21)
