@@ -147,6 +147,8 @@ fleet-clean criterion was amended to expect exactly these two.
 
 - (sprint 301, 2026-08-23) `scripts/lib/ci-heartbeat.sh` at 77 lines is the largest extract from the ci-utils split, almost entirely the block comment explaining the distinct-tmp-name race-avoidance rationale carried over from the original. Fine as-is; noted only because the other four landed in the 30-60 line range.
 
+- (infra, 2026-08-23) **Fourth fixed-timing test flake this month — worth a systemic pass.** `scripts/lib/deploy-detached.test.sh:213` asserts `[[ $NOWAIT_ELAPSED -lt 4 ]]` against a 4s push: 1-second granularity with zero margin, so under the full `test:hooks` chain's load `--no-wait`'s own node startup (classify-run-state.mjs, sprint 289) pushes elapsed to exactly 4 and it fails. Observed once during sprint 302's spot-check; 4/4 passes in isolation. Same class as the already-fixed `hook-signals.test.sh` (f69168b) and `use-ops-chat.test.ts` (d90a11e), and the still-open `db-url-connect.test.ts > waitUntilReady` flake. A sweep for fixed-timing assertions across the repo's suites would likely be cheaper than fixing them one incident at a time.
+
 ## ✅ Converted to Sprints
 
 - ~~(sprint 124, 2026-07-01) `getTerraformOutput` is duplicated in `status.ts` and `logs.ts` — extract to a shared helper when a third consumer appears~~ → sprint-293 (2026-08-21)
