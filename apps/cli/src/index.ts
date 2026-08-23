@@ -19,6 +19,7 @@ import { registerInitDeploy } from './commands/init-deploy.js'
 import { registerDbDoctor } from './commands/db-doctor.js'
 import { registerDbUrl } from './commands/db-url.js'
 import { registerReconcile } from './commands/reconcile.js'
+import { registerGateDoctor } from './commands/gate-doctor.js'
 
 const program = new Command()
 
@@ -46,6 +47,7 @@ registerInitDeploy(program)
 registerDbDoctor(program)
 registerDbUrl(program)
 registerReconcile(program)
+registerGateDoctor(program)
 
 program.parseAsync(process.argv).catch((err: unknown) => {
   console.error(err instanceof Error ? err.message : String(err))

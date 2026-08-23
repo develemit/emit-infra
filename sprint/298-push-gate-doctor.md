@@ -131,23 +131,120 @@ that is the convention this sprint documents.
 - `docs/PRE-PUSH-HOOK.md` — the self-sufficiency convention (task 6)
 
 ## Acceptance criteria
-- [ ] The static layer flags a `FOO=1 pnpm nx ...` prefix in a project's
+- [x] The static layer flags a `FOO=1 pnpm nx ...` prefix in a project's
       `ci.sh` — asserted by a test using a fixture reproducing tastease's
       removed `SKIP_ENV_VALIDATION=1 pnpm nx affected -t build` line
-- [ ] The dynamic layer runs the hook's exact invocation
+- [x] The dynamic layer runs the hook's exact invocation
       (`pnpm nx affected -t <target> --base=origin/main`, `format` special-cased
       to `pnpm format`) in a scrubbed environment
-- [ ] A project whose target fails only because a container isn't running is
+- [x] A project whose target fails only because a container isn't running is
       reported as failing — this is the emit-billing/diner-decider case and the
       static layer cannot catch it
-- [ ] Per-target results are reported, not a single per-project verdict
-- [ ] The command exits non-zero when any declared target fails
-- [ ] A target that reads stdin cannot hang the run — bounded by a timeout
-- [ ] Test coverage in `apps/cli/src/commands/gate-doctor.test.ts` for the
+- [x] Per-target results are reported, not a single per-project verdict
+- [x] The command exits non-zero when any declared target fails
+- [x] A target that reads stdin cannot hang the run — bounded by a timeout
+- [x] Test coverage in `apps/cli/src/commands/gate-doctor.test.ts` for the
       static parser, the scrubbing, and the report shape
-- [ ] `docs/PRE-PUSH-HOOK.md` documents the self-sufficiency convention and
+- [x] `docs/PRE-PUSH-HOOK.md` documents the self-sufficiency convention and
       `ci.buildArgs`
-- [ ] `pnpm test`, `pnpm lint`, `pnpm typecheck` green; `apps/cli/dist` rebuilt
+- [x] `pnpm test`, `pnpm lint`, `pnpm typecheck` green; `apps/cli/dist` rebuilt
+
+## Completed
+
+**Date:** 2026-08-23
+
+### Summary
+Added `emit-infra gate-doctor`, following `db-doctor.ts`'s scan → report →
+exit-1 shape. It has two independent layers, matching the sprint's own
+diagnosis that tastease's bug and the diner-decider/emit-billing bug are two
+different failure classes that need two different checks:
+
+**Static layer** (`gate-doctor-static.ts`) parses each project's
+`scripts/ci.sh` for a literal env var prefixed directly onto a command (e.g.
+`SKIP_ENV_VALIDATION=1 pnpm nx affected -t build`). The regex deliberately
+restricts the assigned value to a simple literal — no quotes, `$`, or
+parens — which is what actually separates tastease's bug from ordinary shell
+plumbing. A first draft used a looser regex and, run live against the real
+fleet, produced false positives on every project's `ROOT="$(cd ...)"` /
+`SHA=$(git rev-parse HEAD)` lines and on diner-decider's legitimate
+`DATABASE_URL="$CI_DB_URL" pnpm nx run-many -t test` (self-computed from a
+container ci.sh itself starts — explicitly called out as legitimate in this
+sprint's Out of scope). Running the doctor against the real fleet during
+implementation is what caught this; it's now a regression test.
+
+**Dynamic layer** (`gate-doctor-run.ts`, opt-in via `--dynamic`) runs each
+declared target through `execa` with `extendEnv: false` and an **allowlisted**
+environment (`gate-doctor-env.ts`) — PATH/HOME/USER/SHELL/LANG/TERM/TMPDIR and
+nothing else — rather than unsetting a hand-picked list of known-bad names.
+The sprint's own history is the argument for allowlisting over denylisting:
+sprint 295's dashboard build fix first unset only `NODE_ENV`, missed
+`TURBOPACK`, and its own acceptance criterion ran under `env -u TURBOPACK`,
+hiding the very leak it needed to prove immune to. An allowlist drops an
+unknown future leak by construction. `stdin: 'ignore'` plus a `timeout` option
+(default 600s, `--timeout` to override) bound a hung target.
+
+Both `diner-decider` and `emit-billing` — the two repos this sprint's
+investigation found failing their `test` target under hook conditions — now
+pass under `gate-doctor --dynamic`. Both were fixed independently the same
+day this sprint ran (diner-decider `6568408`, "provision an isolated test
+database so the push gate can run tests"; emit-billing `a6df8f0`, cited
+directly in the sprint's Reason section). The doctor can no longer reproduce
+the historical case live, so the dynamic layer's failure-detection path was
+instead verified with a synthetic fixture repo with no `package.json` —
+`gate-doctor --dynamic` against it reports `✖ test — ERR_PNPM_NO_IMPORTER_...`
+and exits 1, proving the mechanism (real subprocess, scrubbed env, exit-code
+capture, first-error-line extraction) end-to-end.
+
+`docs/PRE-PUSH-HOOK.md` gained a "CI targets must be self-sufficient" section
+documenting the convention, citing both reference fixes, describing
+`ci.buildArgs`, and pointing at `gate-doctor`.
+
+### Files changed
+- (new) `apps/cli/src/lib/gate-doctor-scan.ts` — fleet walk reading each
+  repo's `.emit-infra.json` for `ci.prePush` (leniently — not the strict
+  `ProjectConfigSchema`, since the doctor must still scan repos whose config
+  is otherwise incomplete)
+- (new) `apps/cli/src/lib/gate-doctor-static.ts` — the static env-prefix parser
+- (new) `apps/cli/src/lib/gate-doctor-env.ts` — the allowlisted scrubbed env
+- (new) `apps/cli/src/lib/gate-doctor-run.ts` — the dynamic per-target runner
+- (new) `apps/cli/src/lib/gate-doctor-report.ts` — report shape + printing,
+  mirroring `db-doctor-report.ts`'s split
+- (new) `apps/cli/src/commands/gate-doctor.ts` — command wiring + per-project
+  orchestration
+- (new) `apps/cli/src/commands/gate-doctor.test.ts` — 21 tests: static parser
+  (including the false-positive regression cases), env scrubbing, dynamic
+  runner (mocked `execa`), report shape
+- `apps/cli/src/index.ts` — registers `gate-doctor`
+- `docs/PRE-PUSH-HOOK.md` — new self-sufficiency section + `gate-doctor` row
+  in the Files table
+
+### Verification
+- `pnpm nx run cli:test`: 181/181 pass (18 new test files unaffected, 21 new
+  gate-doctor tests)
+- `pnpm test` (repo-wide): 356/356 pass
+- `pnpm lint`, `pnpm typecheck` (repo-wide): clean
+- `apps/cli/dist` rebuilt via `node apps/cli/esbuild.mjs`
+- Live fleet run (`gate-doctor` against `~/projects`, static only): 0 findings
+  after the regex fix (previously false-positived on 5 of 8 fleet repos)
+- Live fixture run: reintroducing tastease's exact removed line into a
+  scratch repo's `ci.sh` — flagged, exit 1
+- Live fixture run: `--dynamic` against a package.json-less scratch repo —
+  target reported failing with the real pnpm error line, exit 1
+- Live run: `--dynamic` against `diner-decider` and `emit-billing` — both
+  pass (fixed independently same-day; see Summary)
+
+### Follow-ups
+- `[defer]` The static layer only inspects `scripts/ci.sh`; a project could
+  equally leak an env-var prefix from a `Makefile` or a root `package.json`
+  script. Not observed in the current fleet — extend if one turns up.
+- `[defer]` `--dynamic`'s default 600s per-target timeout is a guess; revisit
+  once real build/test durations across the fleet are on hand (some Docker
+  builds under emulation are documented elsewhere as multi-minute).
+- `[defer]` `gate-doctor` reads `.emit-infra.json`'s raw `ci.prePush` array
+  and falls back to the hook's Python-side default list if absent/malformed;
+  it does not warn when the file exists but fails that shape check the way
+  `loadConfig`'s zod validation would for other commands. Not a correctness
+  issue for this sprint's scope, just a silent leniency worth noting.
 
 ## Out of scope
 - **Owning a canonical local-CI runner.** diner-decider's `ci.sh` legitimately
