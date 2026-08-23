@@ -81,21 +81,21 @@ itself.
 - `apps/cli/src/commands/status.test.ts` — cover the new output
 
 ## Acceptance criteria
-- [ ] A project with unpushed commits and a recent successful gate run produces
+- [x] A project with unpushed commits and a recent successful gate run produces
       **no** warning — asserted by a test using develemail's shape (51 unpushed,
       healthy)
-- [ ] A project with unpushed commits and a stale or failed gate record warns —
+- [x] A project with unpushed commits and a stale or failed gate record warns —
       asserted by a test using diner-decider's shape
-- [ ] A project with unpushed commits and **no** `.ci-status.json` warns
+- [x] A project with unpushed commits and **no** `.ci-status.json` warns
       distinctly from the merely-stale case
-- [ ] A project with no unpushed commits produces no output
-- [ ] The staleness rule lives in one place in `packages/core` and reuses
+- [x] A project with no unpushed commits produces no output
+- [x] The staleness rule lives in one place in `packages/core` and reuses
       sprint 284's `classifyRunState` rather than reimplementing staleness
-- [ ] `emit-infra status` states whether the comparison used a fetched or a
+- [x] `emit-infra status` states whether the comparison used a fetched or a
       cached `origin/main`
-- [ ] Test coverage in `packages/core/src/gate-staleness.test.ts` for all four
+- [x] Test coverage in `packages/core/src/gate-staleness.test.ts` for all four
       fleet shapes in task 6
-- [ ] `pnpm test`, `pnpm lint`, `pnpm typecheck` green; `apps/cli/dist` rebuilt
+- [x] `pnpm test`, `pnpm lint`, `pnpm typecheck` green; `apps/cli/dist` rebuilt
 
 ## Out of scope
 - **Running the gate.** This sprint reports on records that already exist;
@@ -105,3 +105,58 @@ itself.
 - Dashboard rendering of the signal. CLI first; a dashboard surface can be
   proposed once the rule has proven itself non-noisy.
 - Auto-fetching on a schedule, or any background process.
+
+## Completed
+
+**Date:** 2026-08-23
+
+### Summary
+Added `evaluateGateStaleness` in `packages/core`, a pure function that turns
+`{unpushedCount, newestUnpushedCommitAt, ciRecord}` into a warn/quiet verdict.
+It reuses `classifyRunState` (sprint 284) rather than reimplementing
+staleness: a terminal record's `state` is `idle` regardless of success or
+failure, so the actual outcome is read off `record.status`; an in-flight
+record that `classifyRunState` calls `orphaned` or `unknown` is treated the
+same as a failed run (it never demonstrably completed), while a genuinely
+`running` record is quiet — the gate is being exercised right now. A missing
+record (`never-run`) is kept as a reason distinct from `stale` per the
+sprint's edge-case requirement, since "never run" is a stronger signal than
+"ran once, a while ago."
+
+`apps/cli/src/commands/status.ts`'s existing "Local pipeline" section now
+runs `git log origin/main..HEAD --format=%cI` to get both the unpushed count
+and the newest unpushed commit's timestamp in one shell-out, feeds that plus
+the already-read `.ci-status.json` record into `evaluateGateStaleness`, and
+prints a `Push gate:` line — colored yellow when `warn` is true, dim
+otherwise — only when there are unpushed commits (silence when there are
+none, per the sprint's explicit edge case). The line always states it
+compared against a cached `origin/main`, never fetching: `status` is meant to
+stay a fast, no-network local check, and fetching would add latency to every
+invocation for a comparison that's advisory, not authoritative. That decision
+is documented in a comment at the call site.
+
+### Files changed
+- (new) `packages/core/src/gate-staleness.ts` — `evaluateGateStaleness`, the staleness rule
+- (new) `packages/core/src/gate-staleness.test.ts` — 7 tests covering the four fleet shapes plus running/orphaned-in-flight edges
+- `packages/core/src/index.ts` — export `evaluateGateStaleness` and its types
+- `apps/cli/src/commands/status.ts` — gather unpushed-commit git info, surface the verdict as a `Push gate:` line in the Local pipeline section
+- `apps/cli/src/commands/status.test.ts` — 3 tests for `formatGateStalenessLine`
+
+### Verification
+- `pnpm test`: 356/356 pass (api), plus core (15 files incl. the new 7 gate-staleness tests) and cli (18 files incl. the new 9 status tests) all green — full `nx run-many -t test` reports success across all 4 test projects
+- `pnpm lint`: clean across all 5 projects
+- `pnpm typecheck`: clean across all 5 projects
+- `pnpm nx run cli:build`: rebuilt `apps/cli/dist` after the source changes
+- Manual check: ran the real git-info + `evaluateGateStaleness` wiring against this repo's own 174 unpushed commits (emit-infra has no `.ci-status.json`) — correctly produced `reason: 'never-run'`
+
+### Follow-ups
+- `[defer]` `emit-infra status` requires a `.emit-infra.json` in cwd, so the
+  new Push gate line can't be smoke-tested against this repo (emit-infra
+  itself has no config file — it's a local-only tool, not a managed project)
+  — verified via direct function call against the built dist instead; worth
+  keeping in mind if a future sprint wants an end-to-end CLI test fixture for
+  `status`.
+- `[defer]` The rule doesn't special-case a project whose default branch
+  isn't `main` (matches existing convention — `deploy-detached.sh` and
+  `gate-doctor-run.ts` both hardcode `origin/main` too), so this isn't a new
+  gap, just an inherited one.

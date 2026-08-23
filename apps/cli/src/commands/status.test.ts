@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { readLocalStatusRecord, formatPipelineLine } from './status.js'
+import { evaluateGateStaleness } from '@emit-infra/core'
+import { readLocalStatusRecord, formatPipelineLine, formatGateStalenessLine } from './status.js'
 
 describe('readLocalStatusRecord', () => {
   let dir: string
@@ -50,5 +51,37 @@ describe('formatPipelineLine', () => {
 
     expect(line).toContain('building')
     expect(line).toContain('33%')
+  })
+})
+
+describe('formatGateStalenessLine', () => {
+  it('produces no output when there are no unpushed commits', () => {
+    const verdict = evaluateGateStaleness({ unpushedCount: 0, newestUnpushedCommitAt: null, ciRecord: null })
+
+    expect(formatGateStalenessLine(verdict)).toBeNull()
+  })
+
+  it('warns and names the never-run case when there is no ci-status record', () => {
+    const verdict = evaluateGateStaleness({
+      unpushedCount: 15,
+      newestUnpushedCommitAt: '2026-08-13T00:00:00Z',
+      ciRecord: null,
+    })
+    const line = formatGateStalenessLine(verdict)
+
+    expect(line).toContain('never run')
+    expect(line).toContain('cached origin/main')
+  })
+
+  it('stays quiet for a stale-commit-backlog with a recent success', () => {
+    const verdict = evaluateGateStaleness({
+      unpushedCount: 51,
+      newestUnpushedCommitAt: '2026-08-01T00:00:00Z',
+      ciRecord: { status: 'success', startedAt: '2026-08-20T00:00:00Z', completedAt: '2026-08-20T00:05:00Z' },
+    })
+    const line = formatGateStalenessLine(verdict)
+
+    expect(line).not.toBeNull()
+    expect(line).toContain('successfully')
   })
 })

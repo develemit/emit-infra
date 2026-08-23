@@ -2,8 +2,18 @@ import { Command } from 'commander'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { readFile } from 'node:fs/promises'
+import { execa } from 'execa'
 import chalk from 'chalk'
-import { loadConfig, sshExec, classifyRunState, getTerraformOutput, type DeployStatusRecord, type RunState } from '@emit-infra/core'
+import {
+  loadConfig,
+  sshExec,
+  classifyRunState,
+  getTerraformOutput,
+  evaluateGateStaleness,
+  type DeployStatusRecord,
+  type RunState,
+  type GateStalenessResult,
+} from '@emit-infra/core'
 
 function buildStatusScript(appPort: string): string {
   return [
@@ -43,6 +53,29 @@ export function formatPipelineLine(label: string, record: DeployStatusRecord | n
   return `  ${label}: ${color(result.state)}${progress} ${chalk.dim(`(${result.reason})`)}`
 }
 
+interface UnpushedGitInfo {
+  count: number
+  newestCommitAt: string | null
+}
+
+// Sprint 299: deliberately reads the local `origin/main` ref rather than
+// fetching first. `status` is meant to be a fast, no-network local check —
+// pairing it with an implicit `git fetch` would slow every invocation down
+// for a comparison that's only ever advisory. formatGateStalenessLine always
+// says which ref it used so a stale local ref can't masquerade as a live one.
+async function getUnpushedGitInfo(cwd: string): Promise<UnpushedGitInfo | null> {
+  const result = await execa('git', ['log', 'origin/main..HEAD', '--format=%cI'], { cwd, reject: false })
+  if (result.exitCode !== 0) return null
+  const commitDates = result.stdout.split('\n').map((line) => line.trim()).filter(Boolean)
+  return { count: commitDates.length, newestCommitAt: commitDates[0] ?? null }
+}
+
+export function formatGateStalenessLine(verdict: GateStalenessResult): string | null {
+  if (verdict.reason === 'no-unpushed') return null
+  const color = verdict.warn ? chalk.yellow : chalk.dim
+  return `  Push gate: ${color(verdict.detail)} ${chalk.dim(`(${verdict.unpushedCount} unpushed, vs cached origin/main — no fetch)`)}`
+}
+
 async function printLocalPipelineState(cwd: string): Promise<void> {
   const [ci, deploy] = await Promise.all([
     readLocalStatusRecord(cwd, '.ci-status.json'),
@@ -51,6 +84,14 @@ async function printLocalPipelineState(cwd: string): Promise<void> {
   console.log(chalk.cyan('Local pipeline (this machine):'))
   console.log(formatPipelineLine('CI    ', ci))
   console.log(formatPipelineLine('Deploy', deploy))
+
+  const gitInfo = await getUnpushedGitInfo(cwd)
+  if (gitInfo) {
+    const verdict = evaluateGateStaleness({ unpushedCount: gitInfo.count, newestUnpushedCommitAt: gitInfo.newestCommitAt, ciRecord: ci })
+    const line = formatGateStalenessLine(verdict)
+    if (line) console.log(line)
+  }
+
   console.log()
 }
 

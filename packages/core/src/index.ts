@@ -18,6 +18,7 @@ export {
   type ClassifyRunStateOptions,
 } from './deploy-status.js'
 export { planReconcile, applyReconcile, type ReconcileKind, type ReconcilePlan } from './deploy-reconcile.js'
+export { evaluateGateStaleness, type GateStalenessReason, type GateStalenessInput, type GateStalenessResult } from './gate-staleness.js'
 export { sshExec, sshMuxArgs } from './ssh.js'
 export { ensureSshKey, ensureHetznerKey, type SshKeyPaths } from './ssh-key.js'
 export { resolveAccountId, resolveZoneId, ensureR2Bucket, createR2Token, revokeR2Token, r2BucketResource, deriveR2Credentials, buildR2TokenPayload, R2_ITEM_READ_PERMISSION_GROUP, R2_ITEM_WRITE_PERMISSION_GROUP } from './r2.js'
