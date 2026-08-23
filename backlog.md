@@ -135,6 +135,10 @@ fleet-clean criterion was amended to expect exactly these two.
 
 - (sprint 296, 2026-08-22) Nx flagged `core:test` as a "flaky task" in two separate `pnpm test` runs during sprint 296's verification — independently corroborating the `db-url-connect.test.ts > waitUntilReady` flake filed from sprint 295's spot-check. Two independent observations now; worth fixing with the same capture-then-poll treatment as `hook-signals.test.sh` (f69168b) and `use-ops-chat.test.ts` (d90a11e).
 
+- (sprint 298, 2026-08-23) `gate-doctor`'s static layer only inspects `scripts/ci.sh`; a project could equally leak an env-var prefix from a `Makefile` or a root `package.json` script. Not observed in the current fleet — extend if one turns up.
+- (sprint 298, 2026-08-23) `gate-doctor --dynamic`'s default 600s per-target timeout is a guess; revisit once real build/test durations across the fleet are on hand (emulated Docker builds are documented elsewhere as multi-minute).
+- (sprint 298, 2026-08-23) `gate-doctor` reads `.emit-infra.json`'s raw `ci.prePush` array and falls back to the hook's default list if absent/malformed, without warning the way `loadConfig`'s zod validation would. Silent leniency worth noting, not a correctness issue.
+
 ## ✅ Converted to Sprints
 
 - ~~(sprint 124, 2026-07-01) `getTerraformOutput` is duplicated in `status.ts` and `logs.ts` — extract to a shared helper when a third consumer appears~~ → sprint-293 (2026-08-21)
