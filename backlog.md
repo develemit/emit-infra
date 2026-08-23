@@ -126,6 +126,8 @@ fleet-clean criterion was amended to expect exactly these two.
 
 - (sprint 293, 2026-08-22) `apps/api/src/routes/operations.ts`'s inventory-write failure now throws a more specific error message ("terraform output \"server_ip\" is empty after apply") — worth confirming the SSE error surface in the dashboard renders it usefully.
 
+- (sprint 294, 2026-08-22) `scripts/hooks/pre-push`'s refusal message and `scripts/lib/deploy-plan.sh`'s comments point to `docs/PRE-PUSH-HOOK.md` generically rather than to the specific split doc (e.g. `DEPLOY-GATES.md#unattended-shell-gate`) that now holds the detail. Not dangling — the entry point links onward — but a future touch of those files could tighten the pointer.
+
 ## ✅ Converted to Sprints
 
 - ~~(sprint 124, 2026-07-01) `getTerraformOutput` is duplicated in `status.ts` and `logs.ts` — extract to a shared helper when a third consumer appears~~ → sprint-293 (2026-08-21)
