@@ -60,18 +60,89 @@ guideline violation.
   references only if they name a section that moved
 
 ## Acceptance criteria
-- [ ] Every resulting doc is under ~300 lines, or the exception is justified in
+- [x] Every resulting doc is under ~300 lines, or the exception is justified in
       the file itself
-- [ ] `docs/PRE-PUSH-HOOK.md` still answers "what happens when I push to main?"
+- [x] `docs/PRE-PUSH-HOOK.md` still answers "what happens when I push to main?"
       without following a link
-- [ ] The recovery runbook is at most one hop from the entry point
-- [ ] No in-repo reference to a moved section is left dangling — verified by grep
-- [ ] The diff is a pure move: no factual content changed (anything wrong found
+- [x] The recovery runbook is at most one hop from the entry point
+- [x] No in-repo reference to a moved section is left dangling — verified by grep
+- [x] The diff is a pure move: no factual content changed (anything wrong found
       while moving is filed as a follow-up instead)
-- [ ] Markdown lints clean if the repo lints markdown
+- [x] Markdown lints clean if the repo lints markdown
 
 ## Out of scope
 - **Any code change.** Docs only.
 - Rewriting or correcting content. Move it; file follow-ups for anything wrong.
 - `docs/DEPLOY-FLOOR.md`, which the backlog explicitly holds as a deliberate
   chronological log that splitting would damage.
+
+## Completed
+
+**Date:** 2026-08-22
+
+### Summary
+Split `docs/PRE-PUSH-HOOK.md` (703 lines) along its existing heading seams
+into four focused documents, matching the backlog's own suggested clusters:
+`docs/DEPLOY-GATES.md` (dry-run, ignored paths, unattended-shell gate),
+`docs/DEPLOY-SIGNALS-AND-LIVENESS.md` (signal traps, detached deploys, status
+vocabulary, liveness/staleness rules, and the recovery runbook),
+`docs/DEPLOY-BUILD-INTERNALS.md` (smart build, build cache, diagnosing slow
+deploys), and `docs/CROSS-PLATFORM-BUILD-PATTERN.md` (the Dockerfile
+technique and its native-module trap). `docs/PRE-PUSH-HOOK.md` now stays as
+the entry point: the files/wiring background, plus a new "What happens on
+push" overview that walks the four-stage lifecycle (CI → gates → build →
+deploy/liveness) and links out to each doc, plus the config reference kept
+here as the fast lookup.
+
+The move is verified pure: `diff` between the original file and the
+concatenation of the five new files shows only added headings, added
+navigation lines (a back-link + related-doc link at the top of each new
+file), the new "What happens on push" overview, and link-target rewrites
+where an anchor moved from same-file (`#section`) to cross-file
+(`OTHER-FILE.md#section`) — no prose was reworded or reordered. Every
+cross-file link was checked against the actual heading in its target file.
+`docs/DEPLOYMENT-PITFALLS.md`'s three prose references naming "Status files
+and liveness"/"Recovery runbook"/"Detached deploys" were repointed to
+`docs/DEPLOY-SIGNALS-AND-LIVENESS.md`; its "How projects get the hook"
+reference stayed on `docs/PRE-PUSH-HOOK.md`. `scripts/hooks/pre-push`'s
+refusal message and `scripts/lib/deploy-plan.sh`'s comments reference
+`docs/PRE-PUSH-HOOK.md` generically (no section name), so they were left
+alone — the entry point still routes a reader to the right doc in one hop.
+The repo has no markdown linter configured, so that criterion is vacuously
+satisfied.
+
+### Files changed
+- `docs/PRE-PUSH-HOOK.md` — trimmed to entry point: files table, "How
+  projects get the hook", a new "What happens on push" overview linking to
+  the four split docs, and the config reference
+- (new) `docs/DEPLOY-GATES.md` — dry-run detection, ignored-paths filter,
+  unattended-shell gate
+- (new) `docs/DEPLOY-SIGNALS-AND-LIVENESS.md` — signal traps, detached
+  deploys, status-file vocabulary, liveness/staleness classification, and
+  the recovery runbook
+- (new) `docs/DEPLOY-BUILD-INTERNALS.md` — smart build, build cache,
+  diagnosing slow deploys
+- (new) `docs/CROSS-PLATFORM-BUILD-PATTERN.md` — the `$BUILDPLATFORM`
+  Dockerfile pattern and native-module trap
+- `docs/DEPLOYMENT-PITFALLS.md` — repointed three section references to
+  `docs/DEPLOY-SIGNALS-AND-LIVENESS.md`
+
+### Verification
+- `bash scripts/lib/deploy-plan.test.sh`: 47/47 pass (docs-only change;
+  ran the hook's shell test suite as a sanity check that nothing was
+  touched outside docs)
+- `wc -l` on all five docs: 98 / 149 / 275 / 74 / 137 lines — all under 300
+- `grep -rn "PRE-PUSH-HOOK.md#"` and per-anchor greps across `docs/`,
+  `scripts/`, `README.md`: no dangling references found
+- Manual: every `](FILE.md#anchor)` link in the five docs checked against
+  `grep -n '^#'` output of its target file — all resolve
+- Markdown lint: none configured in this repo (`package.json`'s `lint`
+  script runs `nx run-many -t lint`, no markdownlint config found)
+
+### Follow-ups
+- `[defer]` `scripts/hooks/pre-push`'s refusal message and
+  `scripts/lib/deploy-plan.sh`'s comments point to `docs/PRE-PUSH-HOOK.md`
+  generically rather than to the specific split doc (e.g.
+  `DEPLOY-GATES.md#unattended-shell-gate`) that now holds the relevant
+  detail. Not dangling — the entry point links onward — but a future touch
+  of those files could tighten the pointer while already in there.

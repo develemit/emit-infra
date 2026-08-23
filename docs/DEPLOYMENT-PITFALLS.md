@@ -459,7 +459,7 @@ reply.header(
 15. Session cookie not sent after OAuth redirect to app subdomain? → Set `Domain` to parent domain on the cookie (see #20)
 16. OAuth callback 500 with `42P01` (undefined table)? → Migrations never ran in production — copy migrations into the Docker image and remove the `NODE_ENV === 'production'` guard (see #21)
 17. New production secret works in CI but not on the server (or vice versa)? → `secrets sync` and `deploy` read different files when `ci.envFile` is set — add the key to both, run `secrets sync --dry-run` to check (see #22)
-18. Dashboard shows a deploy/CI run frozen mid-progress and you can't tell if it's still running? → check `.deploy-status.json`/`.ci-status.json`'s `writer.heartbeatAt`, or just run `emit-infra status` — see `docs/PRE-PUSH-HOOK.md`'s recovery runbook, and #25 below for why this happens
+18. Dashboard shows a deploy/CI run frozen mid-progress and you can't tell if it's still running? → check `.deploy-status.json`/`.ci-status.json`'s `writer.heartbeatAt`, or just run `emit-infra status` — see `docs/DEPLOY-SIGNALS-AND-LIVENESS.md`'s recovery runbook, and #25 below for why this happens
 
 ---
 
@@ -639,9 +639,9 @@ this was a stuck local artifact, not a bad deploy or a broken server.
 - **287** — writes down the status vocabulary, the liveness rule, the
   operator warning, the recovery runbook, and the discoverability trap, so
   the next person doesn't have to reverse-engineer the hook under pressure.
-  See `docs/PRE-PUSH-HOOK.md`'s "Status files and liveness" and "Recovery
-  runbook" sections, and the "How projects get the hook" section for the
-  `core.hooksPath` check.
+  See `docs/DEPLOY-SIGNALS-AND-LIVENESS.md`'s "Status files and liveness" and
+  "Recovery runbook" sections, and `docs/PRE-PUSH-HOOK.md`'s "How projects get
+  the hook" section for the `core.hooksPath` check.
 - **288** — turned the operator warning into an enforced gate: the deploy
   phase now refuses to start (exits 1, no status write) when a
   teardown-prone shell marker (`CLAUDECODE`/`CLAUDE_CODE_ENTRYPOINT`/`CI`) is
@@ -674,5 +674,5 @@ this was a stuck local artifact, not a bad deploy or a broken server.
   documented the detached workflow end to end: launch, resume a deploy
   whose launching session went away, read the launch-mode field in a
   post-mortem, and recover an orphaned record. See
-  `docs/PRE-PUSH-HOOK.md`'s "Detached deploys" and "Recovery runbook"
-  sections.
+  `docs/DEPLOY-SIGNALS-AND-LIVENESS.md`'s "Detached deploys" and "Recovery
+  runbook" sections.
