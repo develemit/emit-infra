@@ -124,6 +124,8 @@ fleet-clean criterion was amended to expect exactly these two.
 
 - (sprint 292, 2026-08-21) `scripts/collect-metrics.sh:72` (`echo "$q" | grep -qE ...` inside the remote-executed script) isn't under `pipefail` today so it isn't exposed to the SIGPIPE bug — but if that remote script ever gains `set -o pipefail`, it needs the same capture-then-check fix sprint 292 applied.
 
+- (sprint 293, 2026-08-22) `apps/api/src/routes/operations.ts`'s inventory-write failure now throws a more specific error message ("terraform output \"server_ip\" is empty after apply") — worth confirming the SSE error surface in the dashboard renders it usefully.
+
 ## ✅ Converted to Sprints
 
 - ~~(sprint 124, 2026-07-01) `getTerraformOutput` is duplicated in `status.ts` and `logs.ts` — extract to a shared helper when a third consumer appears~~ → sprint-293 (2026-08-21)
