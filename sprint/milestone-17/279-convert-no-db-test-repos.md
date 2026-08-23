@@ -227,6 +227,12 @@ touched, tree is clean.
 than carried as blockers. Neither is under active development; both are
 filed in `backlog.md` with full context.
 
+**Update 2026-08-23:** both deferrals have since been promoted out of the
+backlog and converted — `martialops` in sprint 308, `garage-sailor-prime` in
+sprint 309. The repo-state table above and the collision analysis below are
+left as originally written (a record of what was true at the time); see
+those sprints' own `## Completed` sections for the converted state.
+
 - **`martialops`** — 50 uncommitted files sit behind a failing
   `pnpm audit --audit-level=high` pre-commit gate, so no commit can land
   there at all. Converting it would also mean classifying its 23

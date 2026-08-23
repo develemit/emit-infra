@@ -292,6 +292,53 @@ Paste this into each conversion commit message (sprints 278–281):
 > Requires `~/projects/emit-infra` built (`pnpm build`) — if `pnpm dev` fails
 > naming `emit-infra CLI not found`, that's the fix.
 
+## Sprint 309: Prisma + node's built-in test runner, and a glob trap
+
+`garage-sailor-prime` (emit-infra sprint 309) was the first repo in the fleet
+built on Prisma rather than drizzle, and the first using node's built-in
+`node --test` rather than vitest — two findings worth recording since neither
+was covered by the reference recipe above.
+
+**node:test has no vitest-style `globalSetup`, but `--import` does the same
+job.** `node --test --import <module> <files...>` loads `<module>` once, in a
+single process, strictly before any of `<files>` are loaded — an async
+top-level body in that module (discover the port, run `prisma migrate
+deploy`, set `process.env.DATABASE_URL`) fully resolves before the test
+files' own import statements execute. This matters specifically because
+Prisma's generated client is usually a module-level singleton
+(`export const prisma = new PrismaClient(...)`) constructed at
+import-evaluation time — by the time any `before()` hook in the test file
+could run, that client already exists with whatever `DATABASE_URL` was set
+(or missing) at that point. Confirmed empirically: node's test runner spawns
+one subprocess per test file, and `--import` modules are re-loaded in each
+subprocess, so the pattern holds across multiple test files, not just one.
+
+**The same "eager singleton at import time" problem shows up in the dev-boot
+path, with a different fix.** `main.ts`'s own static `import buildApp from
+'./app.js'` pulls in the whole route → service → Prisma-client chain during
+module *load*, before any of `main.ts`'s own top-level statements run — so
+resolving and writing back `DATABASE_URL` as the first line of `main.ts`
+doesn't help; the client is already built by then. Converting that one
+import into `const { default: buildApp } = await import('./app.js')`, placed
+after the resolution, defers loading the whole chain until `DATABASE_URL` is
+already set. No change to `prisma.ts` or `env.ts` themselves was needed —
+only to the order in which `main.ts` reaches them.
+
+**A pre-existing, unrelated glob trap: `src/**/*.test.ts` in a package.json
+script is not recursive under `sh`.** npm runs scripts via `sh -c`, and
+POSIX `sh`'s `**` behaves like a single `*` — it does not match files that
+sit directly inside `src/` itself, only ones nested inside exactly one
+subdirectory. A repo whose only test file happened to live one level deep
+(`src/routes/listings.test.ts`) never surfaced this; adding a sibling test
+file directly under `src/` (`src/resolve-dev-database-url.test.ts`, testing
+the new resolver) silently vanished from `npm test`'s actual output — 8
+tests became 2 with no error, because the un-globbed pattern just never
+named the file. The fix is to quote the glob in the script string
+(`"src/**/*.test.ts"`) so the shell passes it through unexpanded — node's own
+test runner has its own glob matcher that does the recursive match
+correctly. Worth checking in any repo using a bare (unquoted) `**` glob in an
+npm/pnpm script, Prisma or not.
+
 ## `/init-project` template story
 
 The template's scaffolded `apps/api-template/src/main.ts` reads `PORT` and
