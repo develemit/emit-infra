@@ -142,6 +142,9 @@ fleet-clean criterion was amended to expect exactly these two.
 - (sprint 299, 2026-08-23) `emit-infra status` requires a `.emit-infra.json` in cwd, so the new Push-gate line can't be smoke-tested against emit-infra itself (local-only tool, no config file). Verified via direct function call against the built dist instead — worth an end-to-end CLI test fixture for `status` if a future sprint wants one.
 - (sprint 299, 2026-08-23) The gate-staleness rule doesn't special-case a project whose default branch isn't `main`. Matches existing convention (`deploy-detached.sh` and `gate-doctor-run.ts` both hardcode `origin/main`), so an inherited gap rather than a new one.
 
+- (sprint 300, 2026-08-23) A few doc comments still point readers to `deploy-plan.sh` for functions that now live in `deploy-launch.sh`/`deploy-smart-build.sh` (`scripts/lib/ci-utils.sh:29`, `scripts/collect-metrics.sh:106`, `docs/DEPLOY-GATES.md:88,104`). Functionally correct — sourcing `deploy-plan.sh` still resolves them — but the pointer names the wrong file. Worth a pass next time one of those is touched.
+- (sprint 300, 2026-08-23) `docs/PRE-PUSH-HOOK.md`'s file-responsibility table (~line 12) describes `deploy-plan.sh` as owning decision logic, the unattended-shell gate, and launch-mode declaration in one row — could be split into rows matching the new four-file layout.
+
 ## ✅ Converted to Sprints
 
 - ~~(sprint 124, 2026-07-01) `getTerraformOutput` is duplicated in `status.ts` and `logs.ts` — extract to a shared helper when a third consumer appears~~ → sprint-293 (2026-08-21)
