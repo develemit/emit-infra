@@ -13,11 +13,24 @@ describe('waitUntilReady', () => {
   })
 
   it('retries until the timeout, then throws with the last error', async () => {
-    const query = vi.fn().mockRejectedValue(new Error('connection refused'))
-    await expect(waitUntilReady(fakePool(query), 30, 10)).rejects.toThrow(
-      /not ready within 30ms.*connection refused/s,
-    )
-    expect(query.mock.calls.length).toBeGreaterThan(1)
+    // Fake timers instead of a real 30ms budget: at 30ms/10ms-interval scale,
+    // a single scheduler stall under a loaded `nx run-many -t test` can eat
+    // the whole budget in one turn, collapsing "several retries" into one and
+    // failing the calls-count assertion below for reasons that have nothing
+    // to do with the function under test. Faking the clock makes every tick
+    // deterministic regardless of what else the machine is doing.
+    vi.useFakeTimers()
+    try {
+      const query = vi.fn().mockRejectedValue(new Error('connection refused'))
+      const result = expect(waitUntilReady(fakePool(query), 30, 10)).rejects.toThrow(
+        /not ready within 30ms.*connection refused/s,
+      )
+      await vi.advanceTimersByTimeAsync(30)
+      await result
+      expect(query.mock.calls.length).toBeGreaterThan(1)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('succeeds after transient failures', async () => {

@@ -150,3 +150,102 @@ faking timers would require mocking something load-bearing.
 - No CPU burners left running after verification.
 - `pnpm test` and the shell suites are green repo-wide; assertion counts are
   unchanged or higher, never lower.
+
+## Completed
+
+**Date:** 2026-08-23
+
+### Summary
+Swept every shell suite (`scripts/lib/*.test.sh`) and every vitest suite
+(`packages/*`, `apps/*`) for `sleep`, `date +%s`, `Date.now`, `setTimeout`,
+`toHaveBeenCalledTimes`, `-lt`/`-gt` against elapsed values, and literal
+timeout/interval pairs. Found exactly the two `race` sites the sprint named
+— no additional races turned up — plus a long tail of `ceiling` and
+`contract` sites that were already sound or already fixed by prior sprints.
+
+**`db-url-connect.test.ts > waitUntilReady`** (race → fixed): switched the
+"retries until the timeout" case to `vi.useFakeTimers()` +
+`vi.advanceTimersByTimeAsync(30)`. The function under test is pure polling
+logic against an injected `Queryable`, so nothing real needs to elapse —
+faking the clock makes every tick deterministic regardless of what else the
+machine is doing, rather than hoping a 30ms/10ms budget survives a scheduler
+stall. Wrapped in try/finally so a timers leak can't survive an assertion
+failure. Runtime dropped from a real 30ms (previously racy) to ~instant.
+
+**`deploy-detached.test.sh`'s `--no-wait` case** (race → fixed): two
+independent fixes, per the sprint's guidance not to just relax the bound.
+(1) Replaced `date +%s` (whole-second truncation) with
+`python3 -c 'import time; print(time.time())'` for millisecond resolution —
+python3 is already a hard dependency of these suites for JSON parsing, so no
+new tool. (2) Widened the fake push from 4s to 8s and the pass/fail line from
+`-lt 4` (seconds) to `-lt 4000` (milliseconds), so the comparison sits
+multiple seconds away from realistic launcher overhead (preflight's node
+cold-start) instead of immediately adjacent to it. Real observed elapsed
+across verification runs: 700–900ms, comfortably inside the new margin.
+
+Both fixes and the sweep's reasoning are also recorded in
+`docs/TEST-TIMING-PATTERNS.md` (new) so the next sweep starts from a
+documented baseline instead of rediscovering the same two patterns.
+
+### Sweep table
+
+| Site | Verdict | Note |
+|---|---|---|
+| `packages/core/src/db-url-connect.test.ts` — `waitUntilReady` "retries until the timeout" (30ms/10ms) | **race → fixed** | `vi.useFakeTimers()` + `advanceTimersByTimeAsync`; see Summary |
+| `scripts/lib/deploy-detached.test.sh` — `--no-wait` returns before fake push finishes | **race → fixed** | sub-second clock + widened margin; see Summary |
+| `packages/core/src/db-url-connect.test.ts` — "succeeds after transient failures" (1000ms budget/5ms poll, `calls === 3`) | contract | ~990ms of real slack around ~10ms of actual work; not a realistic race, left as-is |
+| `apps/dashboard/src/lib/use-sse-stream.test.ts` — `toHaveBeenCalledTimes(1\|2)` | contract | delivered-event count *is* the assertion (documented counter-example, out of scope) |
+| `apps/dashboard/src/lib/use-ops-chat.test.ts` — `toHaveBeenCalled()` | contract, already fixed | pattern-2 fix from `d90a11e`; confirmed still intact |
+| `apps/cli/src/commands/{gate-doctor,secrets-sync,rollback,provision,secrets-scaffold}.test.ts`, `apps/dashboard/src/lib/use-project-detail.test.ts` — various `toHaveBeenCalledTimes(N)` | contract | counts against synchronously-mocked deps (`execa`, `sshExec`, `runTerraform`, `setConfigField`, `getStatus`); no real clock or retry loop involved, count is exact by construction |
+| `scripts/lib/hook-signals.test.sh:61`, `scripts/lib/deploy-liveness.test.sh:163` — `sleep 30` in fake background phases | ceiling | placeholder process killed well before 30s; process lifetime, not a deadline |
+| `scripts/lib/deploy-liveness.test.sh:97` — `sleep 2.1` before comparing second-resolution heartbeat timestamps | ceiling | 2.1s sleep guarantees crossing ≥2 whole-second boundaries no matter the jitter — real margin, not zero-margin despite reading like one |
+| `scripts/lib/deploy-liveness.test.sh:133-152` — real 30s heartbeat timer, polled via `_wait_until` with a 90s ceiling | ceiling | already the sentinel-poll pattern; comment explicitly documents why a fixed sleep would be wrong |
+| `scripts/lib/deploy-detached.test.sh:220-224, 241-245, 249-254` — `NOWAIT_DEADLINE`/`READY_DEADLINE`/`DEADLINE` poll loops (20s/15s/25s) | ceiling | bounded polls for an eventual condition (remote head lands, marker file appears), not tight deadlines |
+| `apps/dashboard/src/lib/use-backup-polling.test.ts`, `apps/dashboard/src/lib/date-helpers.test.ts`, `apps/api/src/lib/claude-session.test.ts` | deterministic (fake timers) | `vi.useFakeTimers()` mocks `Date` too; `Date.now()` calls inside these tests read the frozen fake clock, not the real one — already correct |
+| `apps/dashboard/src/components/detail/{backup-panel,container-row,pipeline-progress-card,incident-panel,health-card}.test.tsx`, `apps/api/src/routes/{incidents-export,fleet}.test.ts` — `Date.now()`-based fixture timestamps (offsets of minutes to a day) | not a race | single `Date.now()` read used to build a static fixture value, no polling loop or comparison against elapsed *test-execution* time; margins are minutes-to-hours, immune to scheduler jitter |
+
+No `race` sites were found beyond the two named in the sprint. No sites were
+deferred.
+
+### Files changed
+- `packages/core/src/db-url-connect.test.ts` — `waitUntilReady` retry-until-timeout
+  case now uses fake timers instead of a real 30ms budget
+- `scripts/lib/deploy-detached.test.sh` — `--no-wait` case uses a sub-second
+  python3 clock and an 8s fake push with a 4000ms bound instead of `date +%s`
+  against a 4s push
+- (new) `docs/TEST-TIMING-PATTERNS.md` — the two repair patterns, the
+  counter-example, and this sweep's scope/date, for the next sweep to build on
+
+### Verification
+- `packages/core/src/db-url-connect.test.ts` under 12 self-terminating CPU
+  burners pinning all 16 cores (`bash -c 'end=$(($(date +%s)+N)); while
+  [ "$(date +%s)" -lt "$end" ]; do :; done'`, invoked directly via `npx
+  vitest run`, no nx cache in the path): 10/10 runs, 8/8 tests passing each
+  time
+- `scripts/lib/deploy-detached.test.sh` under the same load (invoked directly
+  via `bash`, no nx cache in the path): 10/10 runs, 25/25 assertions passing
+  each time; `--no-wait` elapsed observed at 700–900ms per run, well inside
+  the new 4000ms bound
+- All CPU burners self-terminated on their own budget and were also
+  explicitly `kill`ed after each batch; `ps aux | grep "date +%s"` empty
+  after verification
+- `pnpm test:hooks`: 59 assertions passed, 0 failed (34 in the unattended
+  gate + 25 in deploy-detached — unchanged from before this sprint)
+- `pnpm test --skip-nx-cache`: 42 test files, 356 tests, all passing
+  (`db-url-connect.test.ts` 8/8 in 20ms, down from a real ~30ms race)
+- `pnpm typecheck`: clean across all 5 projects
+- `pnpm lint`: clean across all 5 projects
+
+### Follow-ups
+- `[defer]` `scripts/lib/deploy-detached.test.sh`'s `--no-wait` case now
+  takes ~8s of wall time (up from ~4s) because of the widened fake push.
+  `test:hooks` overall runtime grew accordingly. Worth revisiting if the
+  suite's total runtime becomes a nuisance, but correctness over speed was
+  the right tradeoff here per the sprint's own guidance.
+- `[defer]` sprint 296 saw Nx flag `core:test` as a "flaky task" twice during
+  its verification and deferred it. This sprint's `pnpm test --skip-nx-cache`
+  run did not reproduce that flag, and `db-url-connect.test.ts` (the file
+  most likely to have been the source, given this sprint's fix) passed 10/10
+  under induced load. Not fully ruled out, but no evidence of it recurring —
+  leaving the sprint-296 follow-up as the tracking item rather than opening a
+  new one.

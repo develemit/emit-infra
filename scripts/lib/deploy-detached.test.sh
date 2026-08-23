@@ -201,19 +201,27 @@ echo
 echo "integration: --no-wait launches and returns immediately"
 ( cd "$IT_REPO" && echo change-nowait >> f.txt && git add -A && git commit -qm change-nowait ) >/dev/null
 NOWAIT_SHA=$(cd "$IT_REPO" && git rev-parse HEAD)
-NOWAIT_START=$(date +%s)
-NOWAIT_OUT=$(PATH="$SHIM_DIR:$PATH" EMIT_TEST_SLOW_PUSH=4 bash "$SCRIPT" --dir "$IT_REPO" --no-wait --timeout 30 2>&1)
+# `date +%s` truncates to whole seconds, so a 4s fake push left this comparison
+# with zero real margin: preflight's own node startup (classify-run-state.mjs)
+# pushes wall time past the second boundary under load and fails a case that
+# is otherwise a correctness non-issue. Two independent fixes: measure with a
+# sub-second clock (python3, already a hard dependency of this suite for JSON
+# parsing) instead of second-granularity `date`, and widen the fake push to 8s
+# so the pass/fail line sits seconds away from realistic launcher overhead
+# rather than immediately adjacent to it.
+NOWAIT_START=$(python3 -c 'import time; print(time.time())')
+NOWAIT_OUT=$(PATH="$SHIM_DIR:$PATH" EMIT_TEST_SLOW_PUSH=8 bash "$SCRIPT" --dir "$IT_REPO" --no-wait --timeout 30 2>&1)
 NOWAIT_RC=$?
-NOWAIT_ELAPSED=$(( $(date +%s) - NOWAIT_START ))
+NOWAIT_ELAPSED_MS=$(python3 -c "import time; print(round((time.time() - $NOWAIT_START) * 1000))")
 check "--no-wait: exits 0 immediately" "$NOWAIT_RC" "0"
 case "$NOWAIT_OUT" in
   *"log:"*) ok "--no-wait: prints the log path" ;;
   *) no "--no-wait: prints the log path (got: $NOWAIT_OUT)" ;;
 esac
-if [[ $NOWAIT_ELAPSED -lt 4 ]]; then
-  ok "--no-wait: returns before the 4s push finishes (${NOWAIT_ELAPSED}s)"
+if [[ $NOWAIT_ELAPSED_MS -lt 4000 ]]; then
+  ok "--no-wait: returns before the 8s push finishes (${NOWAIT_ELAPSED_MS}ms)"
 else
-  no "--no-wait: returns before the 4s push finishes (took ${NOWAIT_ELAPSED}s)"
+  no "--no-wait: returns before the 8s push finishes (took ${NOWAIT_ELAPSED_MS}ms)"
 fi
 
 # Let the detached push actually land before the next case reuses IT_REPO.
