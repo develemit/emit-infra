@@ -26,7 +26,7 @@
 # Deploy records (not CI) also carry a "launch" block —
 # {"mode":"detached|interactive|unattended-override","marker":"CLAUDECODE"} —
 # stamped from scripts/hooks/pre-push's gate decision (sprint 290's
-# deploy_launch_mode in deploy-plan.sh). Unlike "writer", "launch" survives
+# deploy_launch_mode in deploy-launch.sh). Unlike "writer", "launch" survives
 # onto terminal records: it's a fact about how the deploy started, not a
 # liveness signal, so it stays useful after the deploy finishes.
 #

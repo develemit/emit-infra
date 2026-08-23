@@ -85,7 +85,7 @@ real. This broke exactly on **large** diffs — output past the OS pipe buffer
 (~16KB on macOS) — so the bigger the push, the more likely it silently didn't
 ship. A 34-commit, 662-file push went undeployed for days this way. The fix
 captures `git diff`'s output and exit status into separate variables (no
-pipe), matching `nx_projects` in `deploy-plan.sh`; a `git diff` failure now
+pipe), matching `nx_projects` in `deploy-smart-build.sh`; a `git diff` failure now
 deploys rather than skips. See `scripts/lib/deploy-path-filter.test.sh` for
 the regression test.
 
@@ -101,7 +101,7 @@ starting in that kind of shell at all.
 **Blocking signal: env markers.** The deploy phase refuses to start (prints
 why, exits 1, no status write) when any of `CLAUDECODE`,
 `CLAUDE_CODE_ENTRYPOINT`, or `CI` is set in the environment —
-`detect_unattended_shell` in `scripts/lib/deploy-plan.sh`, checked against one
+`detect_unattended_shell` in `scripts/lib/deploy-launch.sh`, checked against one
 clearly-commented marker list (`EMIT_UNATTENDED_SHELL_MARKERS`) so it's easy
 to extend as new ephemeral-shell markers are identified.
 

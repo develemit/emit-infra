@@ -6,7 +6,7 @@ import { hostname } from 'node:os'
 // Mirrors scripts/lib/ci-utils.sh's deploy_init/deploy_done so a CLI-side
 // deploy (apps/cli/src/commands/deploy.ts) writes the same .deploy-status.json
 // / .deploy-history.jsonl shape the pre-push hook writes — dashboards and
-// resolve_last_deployed_sha (scripts/lib/deploy-plan.sh) don't care which
+// resolve_last_deployed_sha (scripts/lib/deploy-launch.sh) don't care which
 // path produced a record, only that the shape matches.
 //
 // The in-flight record also carries a "writer" block — pid/host/heartbeatAt
@@ -17,7 +17,7 @@ import { hostname } from 'node:os'
 // heartbeatAt is only ever the init timestamp.
 //
 // It also carries a "launch" block (sprint 290) — {mode, marker} — mirroring
-// scripts/lib/deploy-plan.sh's deploy_launch_mode. Unlike "writer", "launch"
+// scripts/lib/deploy-launch.sh's deploy_launch_mode. Unlike "writer", "launch"
 // survives onto terminal records: it's a fact about how the deploy started,
 // not a liveness signal, so keeping it after completion is what makes it
 // useful for a post-mortem.
@@ -25,7 +25,7 @@ import { hostname } from 'node:os'
 const HISTORY_MAX_LINES = 1000
 const HISTORY_KEEP_LINES = 500
 
-// Same three values and marker list as scripts/lib/deploy-plan.sh's
+// Same three values and marker list as scripts/lib/deploy-launch.sh's
 // deploy_launch_mode / EMIT_UNATTENDED_SHELL_MARKERS — kept in sync by hand
 // since one side is bash and the other TS. This CLI deploy path isn't gated
 // by scripts/hooks/pre-push at all (it's invoked either directly by an

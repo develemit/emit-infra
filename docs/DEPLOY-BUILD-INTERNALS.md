@@ -53,6 +53,32 @@ two concurrent native builds on a 16-core / 7.75GB-VM host without an OOM in
 testing (develemail, sprint 255). Still opt-in; the default stays `1` until
 more projects have converted and it's been proven safe more broadly.
 
+## Build fan-out and status integrity
+
+`run_build_fanout` (`scripts/lib/deploy-plan.sh`) backgrounds `build_image`
+for each service needing a rebuild, batching `max_parallel` at a time
+(`EMIT_BUILD_PARALLEL`) and `wait`-ing each batch before starting the next.
+
+**Sprint 270:** the loop used to be `build_image "$svc" & ...; wait "$pid" ||
+exit 1`, relying on the `ERR` trap to run `deploy_done failed` on the way
+out. It doesn't: `wait`'s failure is consumed by `||`, and the `exit` that
+follows doesn't fire `ERR` either — a failed backgrounded build left
+`.deploy-status.json` stuck at `deploying` forever. `run_build_fanout` takes
+an `on_fail` callback and calls it directly on any failed `wait`, for every
+batch, removing the dependency on trap semantics entirely.
+`scripts/hooks/pre-push` passes `_fail_deploy` (the same named function
+installed as the `ERR` trap) as that callback, so a build failure and a
+trapped error both end the run the same way: `deploy_done failed`, then exit
+non-zero.
+
+The same sprint added `push_payload_summary` (also in `deploy-plan.sh`):
+before the build starts, it prints the commit count and oldest commit's
+age/subject for what's about to ship (`git log <remote-sha>..<local-sha>`,
+from the refs the hook already reads off stdin) — informational only, no
+prompt, no gate. It exists because a month-old local commit once rode along
+silently in a routine test push; the summary makes that visible before the
+deploy runs, without blocking anyone from proceeding.
+
 ## Diagnosing slow deploys
 
 Each `.deploy-history.jsonl` entry records per-phase seconds:

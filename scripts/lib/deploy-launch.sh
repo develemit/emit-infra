@@ -78,8 +78,9 @@ detect_dry_run_push() {
 # 2026-08-19 incident: an emit-social deploy launched from an agent session's
 # background shell got killed mid-build, leaving .deploy-status.json frozen at
 # "deploying" while prod was never touched. Env markers are the reliable
-# signal — see docs/PRE-PUSH-HOOK.md for why `-e /dev/tty` was rejected as a
-# detector (it's true even with no controlling terminal).
+# signal — see docs/DEPLOY-GATES.md#unattended-shell-gate for why
+# `-e /dev/tty` was rejected as a detector (it's true even with no
+# controlling terminal).
 #
 # Keep this list in one place so it's easy to extend as new ephemeral-shell
 # markers are identified.
@@ -95,7 +96,7 @@ detect_unattended_shell() {
 
 # Actually *opening* the controlling terminal, not just checking the device
 # node exists (`-e /dev/tty` is true even with no controlling terminal — see
-# docs/PRE-PUSH-HOOK.md). Warning-only signal: absence alone never blocks,
+# docs/DEPLOY-GATES.md#unattended-shell-gate). Warning-only signal: absence alone never blocks,
 # since GUI git clients (VSCode, Tower, GitHub Desktop) have no controlling
 # terminal either and are a normal, safe workflow.
 has_controlling_terminal() {

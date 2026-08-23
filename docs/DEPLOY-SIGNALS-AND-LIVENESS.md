@@ -241,7 +241,7 @@ deploy or CI run as `orphaned` or `unknown` instead of progressing normally.
    record is left untouched no matter how long it's been running. Reconciling
    writes a terminal `orphaned` status plus exactly one history line, so
    `resolve_last_deployed_sha` (the smart-build base-sha lookup in
-   `scripts/lib/deploy-plan.sh`) correctly falls through to the last real
+   `scripts/lib/deploy-launch.sh`) correctly falls through to the last real
    `deployed` sha in history — the stuck record no longer hides it.
 4. **Retry**, once you know what actually shipped and the record is clear —
    push again, or re-run whatever triggered the original push, this time

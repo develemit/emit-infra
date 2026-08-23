@@ -6,18 +6,57 @@ from each project's `.emit-infra.json`.
 
 ## Files
 
+Milestone 18 split the four files this table used to name into thirteen —
+each cluster below still has one entry-point file consumers source (or that
+sources the whole hook), so nothing outside this doc needed to change.
+
+### Hook orchestration
+
 | File | Role |
 | --- | --- |
-| `scripts/hooks/pre-push` | Orchestration: CI, gates, phases |
-| `scripts/lib/deploy-plan.sh` | Decision logic (what to deploy, what to rebuild), the unattended-shell gate, and the launch-mode declaration |
+| `scripts/hooks/pre-push` | Orchestration: sources every lib below, runs CI then the deploy gates in order |
+| `scripts/lib/pre-push-config.sh` | Reads `.emit-infra.json` into the hook's shell scope, resolves the ignored-paths list |
+| `scripts/lib/pre-push-ci-phase.sh` | `run_ci` — the self-contained CI phase (its own `ERR` trap, un-trapped on success) |
+
+### Deploy decision (`deploy-plan.sh` cluster)
+
+| File | Role |
+| --- | --- |
+| `scripts/lib/deploy-plan.sh` | Entry point: sources the three files below, plus `run_build_fanout` and `push_payload_summary` — see [Build fan-out and status integrity](DEPLOY-BUILD-INTERNALS.md#build-fan-out-and-status-integrity) |
+| `scripts/lib/deploy-path-filter.sh` | The ignored-paths filter — see [Ignored paths](DEPLOY-GATES.md#ignored-paths) |
+| `scripts/lib/deploy-smart-build.sh` | Nx-aware rebuild-vs-retag decision per service — see [Smart build](DEPLOY-BUILD-INTERNALS.md#smart-build) |
+| `scripts/lib/deploy-launch.sh` | Last-deployed-sha lookup, dry-run detection, the unattended-shell gate, and the launch-mode declaration — see [Deploy gates](DEPLOY-GATES.md) |
 | `scripts/lib/docker-build.sh` | Image naming + buildx invocation |
-| `scripts/lib/ci-utils.sh` | Status files, history, per-phase timing |
+
+### Status & history (`ci-utils.sh` cluster)
+
+| File | Role |
+| --- | --- |
+| `scripts/lib/ci-utils.sh` | Entry point: module state, sources the five files below, plus the six `ci_*`/`deploy_*` writers |
+| `scripts/lib/ci-log-capture.sh` | Mirrors stdout/stderr to a log file, rotates old logs |
+| `scripts/lib/ci-atomic-write.sh` | Atomic status-file writes, history-file trimming |
+| `scripts/lib/ci-phase-tracking.sh` | Per-phase timing for `deploy_done`'s `phases` JSON |
+| `scripts/lib/ci-heartbeat.sh` | Writer-liveness heartbeat — see [Liveness fields and staleness](DEPLOY-SIGNALS-AND-LIVENESS.md#liveness-fields-and-staleness) |
+| `scripts/lib/ci-signals.sh` | `INT`/`TERM`/`HUP` traps so a killed run doesn't freeze mid-status |
+
+### Detached launch & gate-doctor
+
+| File | Role |
+| --- | --- |
 | `scripts/deploy-detached.sh` | The supported detached-deploy launcher — see [Detached deploys](DEPLOY-SIGNALS-AND-LIVENESS.md#detached-deploys-the-supported-agent-shell-path) |
-| `scripts/lib/deploy-plan.test.sh` | Tests — `bash scripts/lib/deploy-plan.test.sh` |
+| `apps/cli/src/commands/gate-doctor.ts` | `emit-infra gate-doctor` — proves a project's gate is actually runnable, see below |
+
+### Tests
+
+| File | Role |
+| --- | --- |
+| `scripts/lib/deploy-plan.test.sh` | Tests — decision-logic cluster, `run_build_fanout`, `push_payload_summary` (`bash scripts/lib/deploy-plan.test.sh`) |
+| `scripts/lib/deploy-path-filter.test.sh` | Tests — ignored-paths filter, incl. the sprint-292 SIGPIPE regression (`bash scripts/lib/deploy-path-filter.test.sh`) |
+| `scripts/lib/docker-build.test.sh` | Tests — image naming + buildx arg construction (`bash scripts/lib/docker-build.test.sh`) |
 | `scripts/lib/hook-signals.test.sh` | Tests — signal traps (`bash scripts/lib/hook-signals.test.sh`) |
+| `scripts/lib/deploy-liveness.test.sh` | Tests — writer/heartbeat liveness metadata (`bash scripts/lib/deploy-liveness.test.sh`) |
 | `scripts/lib/deploy-unattended-gate.test.sh` | Tests — unattended-shell gate + launch-mode declaration (`bash scripts/lib/deploy-unattended-gate.test.sh`) |
 | `scripts/lib/deploy-detached.test.sh` | Tests — detached launch, polling, and a real kill-the-launcher survival case (`bash scripts/lib/deploy-detached.test.sh`) |
-| `apps/cli/src/commands/gate-doctor.ts` | `emit-infra gate-doctor` — proves a project's gate is actually runnable, see below |
 
 ## How projects get the hook
 

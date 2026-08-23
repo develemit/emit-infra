@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tests for the unattended-shell deploy gate (sprint 288): detect_unattended_shell
-# / has_controlling_terminal in deploy-plan.sh, and the gate installed in
+# / has_controlling_terminal in deploy-launch.sh, and the gate installed in
 # scripts/hooks/pre-push between the ignored-paths filter and _fail_deploy.
 # Run: bash scripts/lib/deploy-unattended-gate.test.sh
 set -uo pipefail

@@ -45,7 +45,7 @@ out('BUILD_CACHE', ci.get('buildCache', 'inline'))
 ")"
 
   # ci.deployIgnorePaths replaces the built-in defaults; deployIgnorePathsExtra
-  # appends to them. See docs/PRE-PUSH-HOOK.md.
+  # appends to them. See docs/DEPLOY-GATES.md#ignored-paths.
   if [[ -n "$DEPLOY_IGNORE_PATHS_OVERRIDE" ]]; then
     IFS=' ' read -r -a DEPLOY_IGNORE_PATHS <<< "$DEPLOY_IGNORE_PATHS_OVERRIDE"
   else

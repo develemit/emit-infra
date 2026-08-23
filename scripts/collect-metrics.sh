@@ -103,7 +103,7 @@ collect_one() {
   fi
 
   # Same pipe-into-grep shape as the SIGPIPE hazard sprint 292 fixed in
-  # deploy-plan.sh, but not exposed to it: this runs under pipefail (line 5)
+  # deploy-path-filter.sh, but not exposed to it: this runs under pipefail (line 5)
   # like that one did, but $ssh_out is a single ~200-400 byte metrics line, an
   # order of magnitude under the pipe buffer that triggers it (~16KB) — the
   # whole write lands in the pipe atomically before grep can read and close
