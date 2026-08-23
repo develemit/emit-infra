@@ -134,6 +134,9 @@ fleet-clean criterion was amended to expect exactly these two.
 - (sprint 301, 2026-08-23) `scripts/lib/ci-heartbeat.sh` at 77 lines is the largest extract from the ci-utils split, almost entirely the block comment explaining the distinct-tmp-name race-avoidance rationale carried over from the original. Fine as-is; noted only because the other four landed in the 30-60 line range.
 
 
+- (sprint 303, 2026-08-22) `scripts/lib/deploy-detached.test.sh`'s `--no-wait` case now takes ~8s of wall time (up from ~4s) because of the widened fake push, so `test:hooks` overall runtime grew accordingly. Worth revisiting if the suite's total runtime becomes a nuisance — correctness over speed was the right tradeoff here.
+- (sprint 303, 2026-08-22) The `core:test` "flaky task" flag Nx raised twice during sprint 296's verification did **not** reproduce under sprint 303's `pnpm test --skip-nx-cache` run, and `db-url-connect.test.ts` (the likeliest source, now fixed with fake timers) passed 10/10 under induced load. Not fully ruled out; re-open if Nx flags it again.
+
 ## ✅ Converted to Sprints
 
 - ~~(infra, 2026-08-23) **Fourth fixed-timing test flake this month — worth a systemic pass.** `scripts/lib/deploy-detached.test.sh:213` asserts `[[ $NOWAIT_ELAPSED -lt 4 ]]` against a 4s push: 1-second granularity with zero margin, so under the full `test:hooks` chain's load `--no-wait`'s own node startup (classify-run-state.mjs, sprint 289) pushes elapsed to exactly 4 and it fails. Observed once during sprint 302's spot-check; 4/4 passes in isolation. Same class as the already-fixed `hook-signals.test.sh` (f69168b) and `use-ops-chat.test.ts` (d90a11e), and the still-open `db-url-connect.test.ts > waitUntilReady` flake. A sweep for fixed-timing assertions across the repo's suites would likely be cheaper than fixing them one incident at a time.~~ → sprint-303 (2026-08-22)
