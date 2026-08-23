@@ -108,19 +108,19 @@ prefix, or they verify nothing. The criteria below are rewritten accordingly.
   incomplete-fix entries (task 7)
 
 ## Acceptance criteria
-- [ ] `pnpm nx build dashboard --skip-nx-cache` exits 0 with **no `env -u`
+- [x] `pnpm nx build dashboard --skip-nx-cache` exits 0 with **no `env -u`
       prefix**, in a shell where `TURBOPACK=1` and `NODE_ENV=development` are
       set — the ambient state of this machine
-- [ ] `TURBOPACK=1 NODE_ENV=development pnpm nx build dashboard --skip-nx-cache`
+- [x] `TURBOPACK=1 NODE_ENV=development pnpm nx build dashboard --skip-nx-cache`
       exits 0, proving the target is immune to the caller's environment
-- [ ] The 404 page still renders in `pnpm nx dev dashboard` — the dev target is
+- [x] The 404 page still renders in `pnpm nx dev dashboard` — the dev target is
       not collateral damage
-- [ ] Any other `next build` target in the repo is either given the same
+- [x] Any other `next build` target in the repo is either given the same
       treatment or explicitly named as not needing it
-- [ ] `pnpm typecheck`, `pnpm test`, `pnpm lint` green
-- [ ] Static generation for `/404` is still enabled — the fix must not disable
+- [x] `pnpm typecheck`, `pnpm test`, `pnpm lint` green
+- [x] Static generation for `/404` is still enabled — the fix must not disable
       prerendering to make the error go away
-- [ ] The sprint's Completed section states the real cause (two leaked env
+- [x] The sprint's Completed section states the real cause (two leaked env
       vars), so sprint 04's "upstream Next bug" framing is not repeated
 
 ## Out of scope
@@ -129,14 +129,67 @@ prefix, or they verify nothing. The criteria below are rewritten accordingly.
 - The develemit-hq Turbopack crash — a different project and a different bug.
 - Upgrading Next across a major version.
 
-## In Progress (reopened 2026-08-22)
+## Completed
+
+**Date:** 2026-08-23
+
+### Summary (second pass — closes the sprint)
+The real cause, in full: **two independent leaked ambient environment
+variables**, either of which alone reproduces the `/404` prerender failure.
+The first pass (below, committed in `3965bfc`) found and fixed `NODE_ENV`, but
+verified success only under `env -u TURBOPACK` — an acceptance criterion that
+baked the second leak's workaround into the check, so it read green while the
+build was still broken for any caller (including this machine's default shell)
+that leaves `TURBOPACK=1` set.
+
+Confirmed both leaks present on this machine (`TURBOPACK=1`,
+`NODE_ENV=development`) and reproduced the failure with no scrubbing prefix.
+Extended the existing fix by one flag: `apps/dashboard/project.json`'s `build`
+target now runs `env -u NODE_ENV -u TURBOPACK next build`. Re-ran with no
+prefix (ambient leaks present) and again with both variables explicitly set —
+both exit 0 with all 12 routes generated, `/404` included, still statically
+prerendered (`○ /_not-found`). Grepped every `project.json` in the repo for
+other `next build` targets — the dashboard's is the only one, so there's
+nothing else to treat. `pnpm nx dev dashboard` still serves the styled 404 page
+from the first pass unaffected.
+
+Updated the two backlog entries this sprint's `## Reason` section named: the
+struck-through sprint-04 `[hold]` entry now carries a correction that it was
+never an upstream bug, and the "INCOMPLETE FIX" entry filed after the first
+pass is now marked resolved with the real two-variable cause spelled out.
+
+### Files changed (second pass)
+- `apps/dashboard/project.json` — `build` target extended from
+  `env -u NODE_ENV next build` to `env -u NODE_ENV -u TURBOPACK next build`
+- `backlog.md` — corrected the sprint-04 `[hold]` entry and resolved the
+  "INCOMPLETE FIX" entry filed after the first pass
+
+### Verification (second pass — no scrubbing prefix anywhere)
+- `pnpm nx build dashboard --skip-nx-cache`, ambient `TURBOPACK=1
+  NODE_ENV=development`, no `env -u` prefix: exit 0, 12/12 routes generated
+- `TURBOPACK=1 NODE_ENV=development pnpm nx build dashboard --skip-nx-cache`
+  (both leaks explicit): exit 0, identical output
+- `pnpm nx dev dashboard` + `curl localhost:7013/this-page-does-not-exist`:
+  `404`, styled page renders ("Page not found" / "Back to dashboard")
+- Grep `"command": ".*next build"` across all `project.json`: one match
+  (dashboard's, already fixed)
+- `pnpm typecheck`: clean (5/5 projects)
+- `pnpm lint`: clean (5/5 projects)
+- `pnpm test`: 215/215 pass (23 test files)
+- Build output shows `○ /_not-found` (Static) — prerendering not disabled
+
+### Follow-ups
+- `none`
+
+---
+
+## First pass (reopened 2026-08-22, superseded by the above)
 
 **Reopened:** the first pass fixed only one of two env leaks; the build still
 fails in the ambient environment. The record below is that pass's report — its
 `env -u NODE_ENV` change and `not-found.tsx` are committed in `3965bfc` and
 should be kept. Everything it claims about the build passing was true only
 under `env -u TURBOPACK`, which the old acceptance criterion wrongly specified.
-
 
 **Date:** 2026-08-23
 

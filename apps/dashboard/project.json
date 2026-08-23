@@ -14,7 +14,7 @@
     "build": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "env -u NODE_ENV next build",
+        "command": "env -u NODE_ENV -u TURBOPACK next build",
         "cwd": "apps/dashboard"
       }
     },
