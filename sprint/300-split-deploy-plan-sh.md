@@ -73,15 +73,84 @@ split lower-risk than `ci-utils.sh`.
   `scripts/lib/deploy-unattended-gate.test.sh` — sourcing updates
 
 ## Acceptance criteria
-- [ ] `scripts/lib/deploy-plan.sh` and every new extracted file are under
+- [x] `scripts/lib/deploy-plan.sh` and every new extracted file are under
       ~200 lines (target) or ~300 (hard guideline)
-- [ ] `pnpm test:hooks` passes under bash 3.2 with the same or higher
+- [x] `pnpm test:hooks` passes under bash 3.2 with the same or higher
       assertion count as the pre-split baseline
-- [ ] `bash -n` is clean on every touched script
-- [ ] Every consumer (`pre-push`, `deploy-detached.sh`, the three test
+- [x] `bash -n` is clean on every touched script
+- [x] Every consumer (`pre-push`, `deploy-detached.sh`, the three test
       suites named above) sources the correct new file(s) and no longer
       references a moved function via a stale path
 
 ## Out of scope
 - `scripts/lib/ci-utils.sh` and `scripts/hooks/pre-push` — sprints 301 and 302
 - Any behavior change. This is a pure module reorganization.
+
+## Completed
+
+**Date:** 2026-08-22
+
+### Summary
+Split `scripts/lib/deploy-plan.sh` (329 lines) into four files along the
+clusters the sprint identified, choosing the "thin remainder" option for the
+fourth cluster rather than inventing a `deploy-exec.sh`:
+
+- `scripts/lib/deploy-path-filter.sh` (70 lines) — `deploy_ignore_specs`,
+  `only_ignored_paths_changed`, `EMIT_DEFAULT_DEPLOY_IGNORE_PATHS`.
+- `scripts/lib/deploy-smart-build.sh` (107 lines) — `nx_available`,
+  `nx_projects`, `_list_has`, `_trigger_paths_changed`, `service_needs_build`,
+  `EMIT_DEFAULT_BUILD_TRIGGER_PATHS`.
+- `scripts/lib/deploy-launch.sh` (130 lines) — `resolve_last_deployed_sha`,
+  `detect_dry_run_push`, `detect_unattended_shell`, `has_controlling_terminal`,
+  `deploy_launch_mode`, `deploy_warn_deprecated_override`,
+  `EMIT_UNATTENDED_SHELL_MARKERS`.
+- `scripts/lib/deploy-plan.sh` (61 lines, was 329) — kept its
+  `_EMIT_DEPLOY_PLAN_LOADED` guard, now sources the three files above (path
+  resolved via its own `BASH_SOURCE`, so it works regardless of who sources
+  it) and retains `run_build_fanout` + `push_payload_summary`, the two
+  build-execution helpers that didn't fit any cluster.
+
+Every incident-context comment (sprint 292 SIGPIPE hazards, sprint 267/290/282
+fix-N markers) moved verbatim with its function — none were reworded.
+
+Because `deploy-plan.sh` still transitively provides every function it used
+to define directly, **no consumer needed a sourcing change**: `pre-push`,
+`deploy-detached.sh`, and all three test files (`deploy-plan.test.sh`,
+`deploy-path-filter.test.sh`, `deploy-unattended-gate.test.sh`) already
+`source .../deploy-plan.sh` and continue to get everything through it. This
+was a deliberate design choice over updating every consumer to source the
+specific new file — same pattern `ci-utils.sh`/`docker-build.sh` consumers
+already use (source one entry point, don't care how it's internally
+organized), and it keeps this sprint's diff strictly additive-plus-one-file
+edit rather than four-file sourcing churn across the repo.
+
+### Files changed
+- `scripts/lib/deploy-plan.sh` — reduced to a thin entry point: guard, sourcing
+  of the three new libs, `run_build_fanout`, `push_payload_summary`
+- (new) `scripts/lib/deploy-path-filter.sh` — path-filter cluster
+- (new) `scripts/lib/deploy-smart-build.sh` — smart-build cluster
+- (new) `scripts/lib/deploy-launch.sh` — launch-detection cluster
+
+### Verification
+- Baseline (`pnpm test:hooks` under `/bin/bash`, pre-split): 47+7+12+6+12+17+34+25
+  = 160 assertions, 0 failed, exit 0.
+- Post-split (`pnpm test:hooks` under `/bin/bash`): identical per-suite counts
+  (47/7/12/6/12/17/34/25), 0 failed, exit 0 — no regression, no drop.
+- `bash -n`: clean on `deploy-plan.sh`, `deploy-path-filter.sh`,
+  `deploy-smart-build.sh`, `deploy-launch.sh`, `pre-push`,
+  `deploy-detached.sh`, and all three affected test files.
+- Line counts: `deploy-plan.sh` 61, `deploy-path-filter.sh` 70,
+  `deploy-smart-build.sh` 107, `deploy-launch.sh` 130 — all well under the
+  ~200-line target.
+
+### Follow-ups
+- `[defer]` A few doc comments still point readers to "`deploy-plan.sh`" for
+  functions that now live in `deploy-launch.sh`/`deploy-smart-build.sh`
+  (`scripts/lib/ci-utils.sh:29`, `scripts/collect-metrics.sh:106`,
+  `docs/DEPLOY-GATES.md:88,104`). Still functionally correct (sourcing
+  `deploy-plan.sh` gets you the function either way) but the pointer names the
+  wrong file now. Worth a pass next time one of those docs is touched anyway.
+- `[defer]` `docs/PRE-PUSH-HOOK.md`'s file-responsibility table (line ~12)
+  describes `deploy-plan.sh` as owning the decision logic, the unattended-shell
+  gate, and the launch-mode declaration in one row — could be split into rows
+  matching the new four-file layout for readers navigating by that table.
