@@ -1,3 +1,5 @@
+import { dirname, join } from 'node:path'
+
 import { Command } from 'commander'
 import {
   parseRepoComposeService,
@@ -22,7 +24,11 @@ export async function resolveDbUrl(cwd: string, opts: DbUrlOptions): Promise<str
   if (!composeFile) throw new Error(`No docker-compose file found in ${cwd}`)
   if (!postgres) throw new Error(`No "${opts.service}" service found in ${composeFile}`)
 
-  const hostPort = await resolveHostPort(cwd, opts.service)
+  // `docker compose` only looks for a compose file in its own cwd — repos
+  // that keep theirs in a subdirectory (martialops: `docker/`) need `docker
+  // compose port` invoked from that subdirectory, not the repo root.
+  const composeDir = join(cwd, dirname(composeFile))
+  const hostPort = await resolveHostPort(composeDir, opts.service)
   const url = buildDatabaseUrl(postgres, hostPort)
 
   if (opts.assertIdentity) {

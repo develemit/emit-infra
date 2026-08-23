@@ -50,6 +50,19 @@ describe('resolveDbUrl', () => {
     expect(createPool).not.toHaveBeenCalled()
   })
 
+  it('runs "docker compose port" from the compose file\'s own directory, not the repo root', async () => {
+    vi.mocked(parseRepoComposeService).mockReturnValue({
+      composeFile: 'docker/docker-compose.yml',
+      postgres: POSTGRES,
+    })
+    vi.mocked(resolveHostPort).mockResolvedValue(54321)
+    vi.mocked(buildDatabaseUrl).mockReturnValue('postgres://app:secret@localhost:54321/app_dev')
+
+    await resolveDbUrl('/repo', { service: 'postgres' })
+
+    expect(resolveHostPort).toHaveBeenCalledWith('/repo/docker', 'postgres')
+  })
+
   it('throws when no compose file exists in the repo', async () => {
     vi.mocked(parseRepoComposeService).mockReturnValue({ composeFile: null, postgres: null })
 
