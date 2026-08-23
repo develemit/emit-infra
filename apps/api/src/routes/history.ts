@@ -32,6 +32,14 @@ interface MetricPoint {
   containers: { name: string; cpu: number; memMb: number; restarts: number }[]
 }
 
+// Sprint 305: typed so it round-trips through this route's `return { deploys }`
+// — deploy-records.ts (deployRecordDone) has written this on every history
+// line since sprint 290; the type just hadn't caught up.
+interface DeployLaunchInfo {
+  mode: 'detached' | 'interactive' | 'unattended-override'
+  marker: string
+}
+
 interface DeployHistoryEntry {
   status: string
   sha: string
@@ -43,6 +51,7 @@ interface DeployHistoryEntry {
   /** Per-phase seconds (ci, auth, build, retag, preDeploy, deploy). Absent on pre-2026-08 entries. */
   phases?: Record<string, number>
   message?: string
+  launch?: DeployLaunchInfo
 }
 
 interface CiHistoryEntry {

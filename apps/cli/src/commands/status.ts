@@ -11,6 +11,7 @@ import {
   getTerraformOutput,
   evaluateGateStaleness,
   type DeployStatusRecord,
+  type DeployLaunchInfo,
   type RunState,
   type GateStalenessResult,
 } from '@emit-infra/core'
@@ -42,15 +43,34 @@ export async function readLocalStatusRecord(cwd: string, file: string): Promise<
   }
 }
 
+// Sprint 305: renders launch.mode/launch.marker (sprint 290) so "was this
+// one of my agent-launched deploys?" doesn't require `jq`. `interactive` is
+// the boring default and gets the same dim treatment as everything else on
+// the line; `unattended-override` means someone bypassed the unattended-shell
+// gate and is styled like the Push gate's warn color so it stands out.
+// `marker` (which env var tripped detection) is appended only when non-empty
+// — an empty marker is the ordinary case and adding "via " would be noise.
+function formatLaunchSuffix(launch: DeployLaunchInfo): string {
+  const markerPart = launch.marker ? ` via ${launch.marker}` : ''
+  const color = launch.mode === 'unattended-override' ? chalk.yellow : chalk.dim
+  return ` ${color(`[${launch.mode}${markerPart}]`)}`
+}
+
 // Uses the same classifier the API enriches its status routes with (sprint
 // 284), so an operator answers "is it actually running?" the same way from
 // the terminal as from the dashboard — no separate local heuristic.
-export function formatPipelineLine(label: string, record: DeployStatusRecord | null): string {
+//
+// `launch` is a separate param rather than read off `record.launch` so the
+// CI call site's omission is visible in the code, not an implicit fact about
+// what CI records happen to carry (sprint 290: CI records never carry a
+// `launch` block; deploy records do).
+export function formatPipelineLine(label: string, record: DeployStatusRecord | null, launch?: DeployLaunchInfo): string {
   if (!record) return `  ${label}: ${chalk.dim('no local record')}`
   const result = classifyRunState(record)
   const color = RUN_STATE_COLOR[result.state]
   const progress = record.progress ? ` — ${record.progress.label} (${record.progress.pct}%)` : ''
-  return `  ${label}: ${color(result.state)}${progress} ${chalk.dim(`(${result.reason})`)}`
+  const launchSuffix = launch ? formatLaunchSuffix(launch) : ''
+  return `  ${label}: ${color(result.state)}${progress} ${chalk.dim(`(${result.reason})`)}${launchSuffix}`
 }
 
 interface UnpushedGitInfo {
@@ -70,6 +90,15 @@ async function getUnpushedGitInfo(cwd: string): Promise<UnpushedGitInfo | null> 
   return { count: commitDates.length, newestCommitAt: commitDates[0] ?? null }
 }
 
+// Sprint 305: pure predicate for the "never pushed through the hooks" case,
+// pulled out of printLocalPipelineState so it's testable without wiring up
+// that function's console/fs/git side effects. Either record existing means
+// "CI ran, deploy never did" (or vice versa) is real information and the
+// section still prints in full.
+export function hasLocalPipelineRecord(ci: DeployStatusRecord | null, deploy: DeployStatusRecord | null): boolean {
+  return Boolean(ci || deploy)
+}
+
 export function formatGateStalenessLine(verdict: GateStalenessResult): string | null {
   if (verdict.reason === 'no-unpushed') return null
   const color = verdict.warn ? chalk.yellow : chalk.dim
@@ -81,9 +110,14 @@ async function printLocalPipelineState(cwd: string): Promise<void> {
     readLocalStatusRecord(cwd, '.ci-status.json'),
     readLocalStatusRecord(cwd, '.deploy-status.json'),
   ])
+  // Sprint 305: a project that's never been pushed through the hooks has
+  // neither file — printing the header plus two "no local record" lines
+  // every time is noise, not information.
+  if (!hasLocalPipelineRecord(ci, deploy)) return
+
   console.log(chalk.cyan('Local pipeline (this machine):'))
   console.log(formatPipelineLine('CI    ', ci))
-  console.log(formatPipelineLine('Deploy', deploy))
+  console.log(formatPipelineLine('Deploy', deploy, deploy?.launch))
 
   const gitInfo = await getUnpushedGitInfo(cwd)
   if (gitInfo) {

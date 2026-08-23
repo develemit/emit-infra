@@ -2,6 +2,13 @@ import { apiFetch, authHeaders, getApiBase } from './api-auth'
 
 const API_BASE = getApiBase()
 
+// Sprint 290's launch stamp — how the deploy was started. Absent on
+// pre-290 entries. Deploy-only; ci-history entries never carry it.
+export interface DeployLaunchInfo {
+  mode: 'detached' | 'interactive' | 'unattended-override'
+  marker: string
+}
+
 export interface DeployHistoryEntry {
   status: string
   sha: string
@@ -13,6 +20,7 @@ export interface DeployHistoryEntry {
   /** Per-phase seconds (ci, auth, build, retag, preDeploy, deploy). Absent on pre-2026-08 entries. */
   phases?: Record<string, number>
   message?: string
+  launch?: DeployLaunchInfo
 }
 
 export interface DeployHistoryResponse {

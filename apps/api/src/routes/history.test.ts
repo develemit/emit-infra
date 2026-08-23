@@ -172,6 +172,37 @@ describe('GET /projects/:name/deploy-history', () => {
     expect(withPhases?.phases).toEqual({ ci: 23, auth: 1, build: 71, retag: 14, deploy: 123 })
     expect(withoutPhases?.phases).toBeUndefined()
   })
+
+  // Sprint 305: deployRecordDone has written "launch" onto every history line
+  // since sprint 290 — this route's own DeployHistoryEntry type just hadn't
+  // declared it, so it round-tripped untyped instead of being dropped.
+  it('passes launch through for sprint-290+ entries and omits it for older entries', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    const lines = [
+      JSON.stringify({
+        status: 'deployed', sha: 'a'.repeat(40), branch: 'main',
+        startedAt: '2026-08-01T00:00:00Z', completedAt: '2026-08-01T00:03:30Z',
+        durationSec: 210, servicesBuilt: ['api'],
+        launch: { mode: 'unattended-override', marker: 'CI' },
+      }),
+      JSON.stringify({
+        status: 'deployed', sha: 'b'.repeat(40), branch: 'main',
+        startedAt: '2026-07-01T00:00:00Z', completedAt: '2026-07-01T00:02:00Z',
+        durationSec: 120, servicesBuilt: ['api'],
+      }),
+    ]
+    vi.mocked(existsSync).mockReturnValueOnce(true)
+    vi.mocked(open).mockResolvedValue(mockFileHandle(lines.join('\n') + '\n') as never)
+
+    const res = await app.inject({ method: 'GET', url: '/projects/myapp/deploy-history' })
+
+    expect(res.statusCode).toBe(200)
+    const data = res.json() as { deploys: { sha: string; launch?: { mode: string; marker: string } }[] }
+    const withLaunch = data.deploys.find(d => d.sha === 'a'.repeat(40))
+    const withoutLaunch = data.deploys.find(d => d.sha === 'b'.repeat(40))
+    expect(withLaunch?.launch).toEqual({ mode: 'unattended-override', marker: 'CI' })
+    expect(withoutLaunch?.launch).toBeUndefined()
+  })
 })
 
 describe('GET /projects/:name/ci-history', () => {

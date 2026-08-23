@@ -97,6 +97,12 @@ export function DeployTimeline({ deploys, name, repoUrl }: Props) {
                     {d.servicesBuilt.length > 0 && (
                       <span className="truncate max-w-[200px]">{d.servicesBuilt.join(', ')}</span>
                     )}
+                    {d.launch && (
+                      <span className={d.launch.mode === 'unattended-override' ? 'text-warn' : undefined}>
+                        {d.launch.mode}
+                        {d.launch.marker && ` via ${d.launch.marker}`}
+                      </span>
+                    )}
                   </div>
                   {d.message && (
                     <div className="mt-0.5 text-[11px] text-subtle truncate max-w-[420px]">{d.message}</div>

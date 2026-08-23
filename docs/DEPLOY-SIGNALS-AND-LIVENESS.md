@@ -126,13 +126,11 @@ in-flight and terminal — carries `"launch":{"mode","marker"}`
 | `interactive` | Launched from a shell the gate didn't need to challenge (had a controlling terminal, or no unattended-shell marker was set) |
 
 `marker` names which of `CLAUDECODE`/`CLAUDE_CODE_ENTRYPOINT`/`CI` was set, if
-any. Neither field is currently printed by `emit-infra status` or the
-dashboard — read it straight out of `.deploy-status.json` or
-`.deploy-history.jsonl`:
-
-```bash
-python3 -c "import json;print(json.load(open('.deploy-status.json')).get('launch'))"
-```
+any. Since sprint 305, both fields are printed without touching the raw JSON:
+`emit-infra status` shows `launch.mode` on the Deploy line (with `via
+<marker>` appended when a marker fired), styled to stand out for
+`unattended-override`; the dashboard's Deploy History card shows the same on
+each history row.
 
 A `deploying` record with `launch.mode: "detached"` that later shows up
 `orphaned` is a real durability-mechanism failure worth its own investigation
