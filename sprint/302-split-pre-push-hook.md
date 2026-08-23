@@ -105,16 +105,16 @@ correctly under that, same as today.
   `pnpm test:hooks` to confirm
 
 ## Acceptance criteria
-- [ ] `scripts/hooks/pre-push` is under ~250 lines
-- [ ] Every new extracted file is under ~150 lines
-- [ ] `pnpm test:hooks` passes under bash 3.2 with the same or higher
+- [x] `scripts/hooks/pre-push` is under ~250 lines
+- [x] Every new extracted file is under ~150 lines
+- [x] `pnpm test:hooks` passes under bash 3.2 with the same or higher
       assertion count as the pre-split baseline
-- [ ] `bash -n` is clean on every touched script
-- [ ] The gate ordering invariant (ignored-paths filter → unattended gate →
+- [x] `bash -n` is clean on every touched script
+- [x] The gate ordering invariant (ignored-paths filter → unattended gate →
       `_fail_deploy` definition → `deploy_init`) is verified explicitly by
       reading the final file, and the inline comments explaining it are
       unchanged
-- [ ] One real push on a wired project confirms the hook still works end to
+- [x] One real push on a wired project confirms the hook still works end to
       end, **or** that verification is explicitly deferred to the next
       natural deploy (do not make a live production push a blocking
       criterion — it stalls headless runs; see sprint 282)
@@ -127,3 +127,69 @@ correctly under that, same as today.
   load-bearing and out of scope for a pure module-reorg sprint
 - `docs/PRE-PUSH-HOOK.md` — sprint 294 covers that doc
 - Any behavior change. This is a pure module reorganization.
+
+## Completed
+
+**Date:** 2026-08-22
+
+### Summary
+Extracted the two lower-risk clusters identified in the sprint's Context
+section out of `scripts/hooks/pre-push`: config parsing (the `python3 -c`
+eval block that reads `.emit-infra.json` plus the `DEPLOY_IGNORE_PATHS`
+resolution) went into `load_pre_push_config()` in the new
+`scripts/lib/pre-push-config.sh`, and the CI-phase runner went into
+`run_ci()` in the new `scripts/lib/pre-push-ci-phase.sh`. Both new files
+follow the `_LOADED`-guard pattern from sprints 300/301 and are sourced from
+`pre-push` right alongside the existing `ci-utils.sh`/`deploy-plan.sh`/
+`docker-build.sh` sourcing. Kept the two extractions as separate files
+(rather than folding CI-phase into the config file, which the sprint left as
+an option) since they're unrelated concerns and each is small enough on its
+own (55 and 42 lines) that combining wouldn't buy anything.
+
+The deploy-gate sequence — `PUSHING_TO_MAIN` check through `deploy_done
+deployed` — was left untouched and in place, as instructed; none of its
+lines moved, and its ordering-explanation comments (dry-run guard,
+unattended-shell gate, `_fail_deploy`/`deploy_init`) are byte-for-byte what
+they were before.
+
+`pre-push` dropped from 307 to 245 lines, comfortably under the ~250 target.
+`pnpm test:hooks` was run under `/bin/bash` (3.2) both before and after the
+change (redirected to a file rather than relying on the Bash tool's
+default-timeout auto-background, which was found to buffer only the tail of
+long-running output): baseline was 160 passed / 0 failed across the 8 test
+files invoked by `test:hooks`, and the post-split run matched exactly —
+160 passed / 0 failed, with the only diff being timestamps embedded in two
+heartbeat-timing assertions.
+
+### Files changed
+- `scripts/hooks/pre-push` — config-loading eval block and `run_ci()`
+  definition replaced with `load_pre_push_config "$CONFIG_FILE"` and a call
+  to `run_ci` sourced from the new lib files; deploy-gate sequence
+  unchanged
+- (new) `scripts/lib/pre-push-config.sh` — `load_pre_push_config()`,
+  reads `.emit-infra.json` into the caller's shell scope and resolves
+  `DEPLOY_IGNORE_PATHS`
+- (new) `scripts/lib/pre-push-ci-phase.sh` — `run_ci()`, the self-contained
+  CI phase (ERR trap, `ci_init`/`ci_step`/`ci_done`, un-trap on success)
+
+### Verification
+- `bash -n scripts/hooks/pre-push scripts/lib/pre-push-config.sh
+  scripts/lib/pre-push-ci-phase.sh`: clean on all three
+- `pnpm test:hooks` under `/bin/bash` (3.2): 160/160 pass, 0 fail, matching
+  the pre-split baseline exactly (same per-suite counts: 47, 7, 12, 6, 12,
+  17, 34, 25)
+- Gate ordering invariant verified by reading the final `pre-push` top to
+  bottom: ignored-paths filter (line ~80) → unattended-shell gate (line
+  ~96) → `_fail_deploy` definition (line ~125) → `deploy_init` call (line
+  ~184), in that order, with all three ordering-explanation comment blocks
+  present verbatim
+- Real end-to-end push: **deferred to the next natural deploy**, per the
+  criterion's own allowance and sprint 282's guidance against a blocking
+  live push in a headless run. `pnpm test:hooks`'s own integration suite
+  (`deploy-detached.test.sh`, `deploy-unattended-gate.test.sh`) already
+  exercises the real hook end to end via a bare-repo remote, including the
+  post-split sourcing chain, which is the strongest coverage available
+  without an actual production target.
+
+### Follow-ups
+none

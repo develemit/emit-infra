@@ -19,79 +19,17 @@ fi
 source "$EMIT_INFRA_DIR/scripts/lib/ci-utils.sh"
 source "$EMIT_INFRA_DIR/scripts/lib/deploy-plan.sh"
 source "$EMIT_INFRA_DIR/scripts/lib/docker-build.sh"
+source "$EMIT_INFRA_DIR/scripts/lib/pre-push-config.sh"
+source "$EMIT_INFRA_DIR/scripts/lib/pre-push-ci-phase.sh"
 
 # ── read config ────────────────────────────────────────────────────────────────
-eval "$(python3 -c "
-import json, shlex
-c = json.load(open('$CONFIG_FILE'))
-ci = c.get('ci', {})
-bg = c.get('blueGreen', {})
-gh = c.get('github', {})
-
-def out(name, val):
-    print(f'{name}={shlex.quote(str(val))}')
-
-out('PROJECT_NAME', c.get('name', ''))
-out('CI_TARGETS', ' '.join(ci.get('prePush', ['lint', 'typecheck', 'test', 'build'])))
-out('ENV_FILE', ci.get('envFile', ''))
-out('GHCR_ORG', ci.get('ghcrOrg', ''))
-out('GHCR_REPO', ci.get('ghcrRepo', gh.get('repo', '').split('/')[-1]))
-out('IMAGE_PREFIX', ci.get('imagePrefix', ''))
-out('SSH_KEY', ci.get('sshKey', '~/.ssh/emit-deploy'))
-out('BG_SERVICES', ' '.join(s['name'] for s in bg.get('services', [])))
-out('BUILD_ARGS_JSON', json.dumps(ci.get('buildArgs', {})))
-out('BUILD_TARGETS_JSON', json.dumps(ci.get('buildTargets', {})))
-out('BUILD_VARIANTS_JSON', json.dumps(ci.get('buildVariants', {})))
-out('PRE_DEPLOY_JSON', json.dumps(ci.get('preDeploy', [])))
-out('DEPLOY_IGNORE_PATHS_OVERRIDE', ' '.join(ci.get('deployIgnorePaths', [])))
-out('DEPLOY_IGNORE_PATHS_EXTRA', ' '.join(ci.get('deployIgnorePathsExtra', [])))
-out('BUILD_TRIGGER_PATHS', ' '.join(ci.get('buildTriggerPaths', [])))
-out('BUILD_CACHE', ci.get('buildCache', 'inline'))
-")"
-
-# ci.deployIgnorePaths replaces the built-in defaults; deployIgnorePathsExtra
-# appends to them. See docs/PRE-PUSH-HOOK.md.
-if [[ -n "$DEPLOY_IGNORE_PATHS_OVERRIDE" ]]; then
-  IFS=' ' read -r -a DEPLOY_IGNORE_PATHS <<< "$DEPLOY_IGNORE_PATHS_OVERRIDE"
-else
-  DEPLOY_IGNORE_PATHS=("${EMIT_DEFAULT_DEPLOY_IGNORE_PATHS[@]}")
-fi
-for _p in $DEPLOY_IGNORE_PATHS_EXTRA; do DEPLOY_IGNORE_PATHS+=("$_p"); done
+load_pre_push_config "$CONFIG_FILE"
 
 SSH_KEY="${SSH_KEY/#\~/$HOME}"
 SHA=$(git rev-parse HEAD)
 BUILD_NUMBER=$(git rev-list --count HEAD)
 
 # ── phase 1: CI ────────────────────────────────────────────────────────────────
-run_ci() {
-  trap 'ci_done failure; echo "✗ CI failed"; exit 1' ERR
-
-  local target_count
-  target_count=$(echo "$CI_TARGETS" | wc -w | tr -d ' ')
-  ci_init "$target_count"
-  _emit_trap_signals ci
-
-  for target in $CI_TARGETS; do
-    ci_step "$target"
-    echo "→ $target"
-    if [[ "$target" == "format" ]]; then
-      # Formatting is a whole-repo prettier check, not a per-project nx
-      # target — `nx affected -t format` finds no matching projects and
-      # silently no-ops (confirmed empirically: exits 0, "No tasks were
-      # run"), including for root-level files like README.md that don't
-      # belong to any nx project. Run the root script directly instead.
-      pnpm format
-    else
-      pnpm nx affected -t "$target" --base=origin/main
-    fi
-  done
-
-  ci_done success
-  echo "✓ CI passed ($SHA)"
-  trap - ERR
-  _emit_untrap_signals
-}
-
 run_ci
 
 # ── phase 2: deploy (only on push to main) ────────────────────────────────────
