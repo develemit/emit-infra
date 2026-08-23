@@ -205,6 +205,10 @@ export function registerSetup(program: Command): void {
       // ── Step 5/6: GitHub secrets ──────────────────────────────────────────────
       step(ghStep, total, `Syncing secrets to ${config.github.repo}`)
       const serverIp = await getTerraformOutput('server_ip', tfDir)
+      if (!serverIp) {
+        console.error(chalk.red('Could not read server_ip from terraform output. Did "terraform apply" succeed?'))
+        process.exit(1)
+      }
       const privateKeyContent = readFileSync(key.privateKey, 'utf-8')
       await execa('gh', ['secret', 'set', 'SERVER_IP', '--repo', config.github.repo], { input: serverIp })
       await execa('gh', ['secret', 'set', 'SSH_PRIVATE_KEY', '--repo', config.github.repo], { input: privateKeyContent })

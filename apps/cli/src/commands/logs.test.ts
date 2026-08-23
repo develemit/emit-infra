@@ -5,6 +5,7 @@ import { buildLogsScript, registerLogs } from './logs.js'
 vi.mock('@emit-infra/core', () => ({
   loadConfig: vi.fn(),
   sshExec: vi.fn(),
+  getTerraformOutput: vi.fn(),
 }))
 
 import { loadConfig, sshExec } from '@emit-infra/core'

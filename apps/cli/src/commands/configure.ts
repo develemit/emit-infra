@@ -2,7 +2,7 @@ import { Command } from 'commander'
 import { join, resolve } from 'node:path'
 import { existsSync } from 'node:fs'
 import chalk from 'chalk'
-import { loadConfig, runAnsible, type ProjectConfig } from '@emit-infra/core'
+import { loadConfig, runAnsible, getTerraformOutput, type ProjectConfig } from '@emit-infra/core'
 
 export function registerConfigure(program: Command): void {
   program
@@ -60,16 +60,13 @@ export async function resolveInventoryPath(projectName: string, config?: Project
   }
 
   const tfDir = join(process.cwd(), 'terraform')
-  try {
-    const { execa } = await import('execa')
-    const result = await execa('terraform', ['-chdir=' + tfDir, 'output', '-raw', 'server_ip'])
-    const ip = result.stdout.trim()
-    const { writeFileSync } = await import('node:fs')
-    writeFileSync(inventoryPath, `[${projectName}]\n${ip}\n`)
-    return inventoryPath
-  } catch {
+  const ip = await getTerraformOutput('server_ip', tfDir)
+  if (!ip) {
     throw new Error(
       `Could not determine server IP. Pass --inventory or run "emit-infra provision" first.`,
     )
   }
+  const { writeFileSync } = await import('node:fs')
+  writeFileSync(inventoryPath, `[${projectName}]\n${ip}\n`)
+  return inventoryPath
 }

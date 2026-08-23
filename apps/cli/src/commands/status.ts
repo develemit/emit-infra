@@ -3,7 +3,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { readFile } from 'node:fs/promises'
 import chalk from 'chalk'
-import { loadConfig, sshExec, classifyRunState, type DeployStatusRecord, type RunState } from '@emit-infra/core'
+import { loadConfig, sshExec, classifyRunState, getTerraformOutput, type DeployStatusRecord, type RunState } from '@emit-infra/core'
 
 function buildStatusScript(appPort: string): string {
   return [
@@ -67,7 +67,7 @@ export function registerStatus(program: Command): void {
       console.log(chalk.cyan(`Status for ${chalk.bold(config.name)}\n`))
       await printLocalPipelineState(process.cwd())
 
-      const host = opts.host ?? (await getTerraformOutput('server_ip'))
+      const host = opts.host ?? (await getTerraformOutput('server_ip', join(process.cwd(), 'terraform')))
       if (!host) {
         console.error(chalk.red('Could not determine server IP. Pass --host or run provision first.'))
         process.exit(1)
@@ -80,20 +80,4 @@ export function registerStatus(program: Command): void {
       const output = await sshExec(host, buildStatusScript(appPort), opts.key)
       console.log(output)
     })
-}
-
-export async function getTerraformOutput(key: string): Promise<string | null> {
-  try {
-    const { execa } = await import('execa')
-    // `-json` (not `-raw <key>`) so an empty state parses to `{}` instead of
-    // dumping a "No outputs found" warning onto stdout with exit code 0 —
-    // `-raw` on a project with no outputs corrupted the SSH hostname with
-    // that warning text (observed on diner-decider, sprint 258).
-    const result = await execa('terraform', ['-chdir=terraform', 'output', '-json'])
-    const outputs = JSON.parse(result.stdout) as Record<string, { value?: unknown }>
-    const value = outputs[key]?.value
-    return typeof value === 'string' && value.length > 0 ? value : null
-  } catch {
-    return null
-  }
 }

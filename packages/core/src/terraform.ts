@@ -23,7 +23,17 @@ export async function runTerraform(
   }
 }
 
-export async function getTerraformOutput(key: string, cwd: string): Promise<string> {
-  const result = await execa('terraform', ['output', '-raw', key], { cwd })
-  return result.stdout.trim()
+export async function getTerraformOutput(key: string, cwd: string): Promise<string | null> {
+  try {
+    // `-json` (not `-raw <key>`) so an empty state parses to `{}` instead of
+    // dumping a "No outputs found" warning onto stdout with exit code 0 —
+    // `-raw` on a project with no outputs corrupted the SSH hostname with
+    // that warning text (observed on diner-decider, sprint 258).
+    const result = await execa('terraform', ['output', '-json'], { cwd })
+    const outputs = JSON.parse(result.stdout) as Record<string, { value?: unknown }>
+    const value = outputs[key]?.value
+    return typeof value === 'string' && value.length > 0 ? value : null
+  } catch {
+    return null
+  }
 }

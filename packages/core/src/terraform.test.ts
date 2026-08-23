@@ -70,21 +70,58 @@ describe('runTerraform', () => {
 })
 
 describe('getTerraformOutput', () => {
-  it('calls terraform output -raw with key and cwd', async () => {
-    mockedExeca.mockResolvedValueOnce({ stdout: '10.0.0.1', stderr: '', exitCode: 0 } as any)
+  it('calls terraform output -json with cwd', async () => {
+    mockedExeca.mockResolvedValueOnce({
+      stdout: JSON.stringify({ server_ip: { value: '10.0.0.1', type: 'string' } }),
+      stderr: '',
+      exitCode: 0,
+    } as any)
 
     await getTerraformOutput('server_ip', '/tf/project')
 
     const call = mockedExeca.mock.calls[0] as any
     expect(call[0]).toBe('terraform')
-    expect(call[1]).toEqual(['output', '-raw', 'server_ip'])
+    expect(call[1]).toEqual(['output', '-json'])
     expect(call[2].cwd).toBe('/tf/project')
   })
 
-  it('trims whitespace from stdout', async () => {
-    mockedExeca.mockResolvedValueOnce({ stdout: '  10.0.0.1  \n', stderr: '', exitCode: 0 } as any)
+  it('resolves a key that exists', async () => {
+    mockedExeca.mockResolvedValueOnce({
+      stdout: JSON.stringify({ server_ip: { value: '10.0.0.1', type: 'string' } }),
+      stderr: '',
+      exitCode: 0,
+    } as any)
 
     const result = await getTerraformOutput('server_ip', '/tf')
     expect(result).toBe('10.0.0.1')
+  })
+
+  it('returns null for a key that does not exist in the outputs', async () => {
+    mockedExeca.mockResolvedValueOnce({
+      stdout: JSON.stringify({ other_key: { value: 'x', type: 'string' } }),
+      stderr: '',
+      exitCode: 0,
+    } as any)
+
+    const result = await getTerraformOutput('server_ip', '/tf')
+    expect(result).toBeNull()
+  })
+
+  it('returns null for a project with no outputs at all (the "-raw" corruption case)', async () => {
+    // Regression: `terraform output -raw <key>` on a project with no outputs
+    // writes a "Warning: No outputs found" banner to stdout with exit code 0,
+    // which the old -raw-based implementation returned verbatim as the value.
+    // `-json` on the same state returns a clean `{}`.
+    mockedExeca.mockResolvedValueOnce({ stdout: '{}', stderr: '', exitCode: 0 } as any)
+
+    const result = await getTerraformOutput('server_ip', '/tf')
+    expect(result).toBeNull()
+  })
+
+  it('returns null when terraform exits non-zero', async () => {
+    mockedExeca.mockRejectedValueOnce(new Error('terraform exited with code 1'))
+
+    const result = await getTerraformOutput('server_ip', '/tf')
+    expect(result).toBeNull()
   })
 })

@@ -2,7 +2,7 @@ import { Command } from 'commander'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import chalk from 'chalk'
-import { loadConfig, sshExec } from '@emit-infra/core'
+import { loadConfig, sshExec, getTerraformOutput } from '@emit-infra/core'
 
 export function buildLogsScript(
   container: string | undefined,
@@ -55,7 +55,7 @@ export function registerLogs(program: Command): void {
       ) => {
         const config = loadConfig(opts.config)
 
-        const host = opts.host ?? (await getTerraformOutput('server_ip'))
+        const host = opts.host ?? (await getTerraformOutput('server_ip', join(process.cwd(), 'terraform')))
         if (!host) {
           console.error(chalk.red('Could not determine server IP. Pass --host or run provision first.'))
           process.exit(1)
@@ -67,14 +67,4 @@ export function registerLogs(program: Command): void {
         console.log(output)
       }
     )
-}
-
-async function getTerraformOutput(key: string): Promise<string | null> {
-  try {
-    const { execa } = await import('execa')
-    const result = await execa('terraform', ['-chdir=terraform', 'output', '-raw', key])
-    return result.stdout.trim() || null
-  } catch {
-    return null
-  }
 }

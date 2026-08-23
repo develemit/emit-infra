@@ -79,6 +79,7 @@ export async function operationRoutes(app: FastifyInstance) {
     if (exitCode === 0) {
       try {
         const ip = await getTerraformOutput('server_ip', terraformDir)
+        if (!ip) throw new Error('terraform output "server_ip" is empty after apply')
         await writeInventory(name, ip, (config?.['sshKeyName'] as string | undefined) ?? 'emit-deploy')
       } catch (err) {
         app.log.error({ err, project: name }, 'failed to write inventory after terraform apply')

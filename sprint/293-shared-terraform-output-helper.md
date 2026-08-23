@@ -63,15 +63,69 @@ now, and two are actively wrong. This is the trigger it was waiting for.
 - `apps/cli/src/commands/logs.ts` — delete buggy `-raw` copy, import shared
 
 ## Acceptance criteria
-- [ ] Exactly one `getTerraformOutput` implementation exists in the repo
-- [ ] No `terraform output -raw` invocation remains
-- [ ] A project with no terraform outputs returns a clean empty/null result with
+- [x] Exactly one `getTerraformOutput` implementation exists in the repo
+- [x] No `terraform output -raw` invocation remains
+- [x] A project with no terraform outputs returns a clean empty/null result with
       no warning text mixed into the value — asserted by a test
-- [ ] `emit-infra status` and `emit-infra logs` both still resolve a server IP
-- [ ] Test coverage in `packages/core/src/terraform.test.ts` for all four cases
+- [x] `emit-infra status` and `emit-infra logs` both still resolve a server IP
+- [x] Test coverage in `packages/core/src/terraform.test.ts` for all four cases
       in task 6
-- [ ] `pnpm test`, `pnpm lint`, `pnpm typecheck` green; `apps/cli/dist` rebuilt
+- [x] `pnpm test`, `pnpm lint`, `pnpm typecheck` green; `apps/cli/dist` rebuilt
 
 ## Out of scope
 - Changing what `status`/`logs` do with the resolved host.
 - Terraform provisioning, state management, or the `terraform-init` command.
+
+## Completed
+
+**Date:** 2026-08-22
+
+### Summary
+Consolidated to one `getTerraformOutput(key, cwd): Promise<string | null>` in
+`packages/core/src/terraform.ts`, using `terraform output -json` (the
+`status.ts` reference implementation) with the comment explaining why `-raw`
+corrupts the value on a project with no outputs. Kept the `(key, cwd)`
+signature from the existing core export (already used by `setup.ts` and
+`operations.ts`), and standardized the return type on `string | null` — the
+CLI copies' choice — since it forces every caller to handle "terraform ran
+but produced no value" explicitly instead of silently trusting a string that
+might be corrupted output text. `setup.ts` and `operations.ts` previously
+treated the core function as `Promise<string>` with no null-handling; both
+now check for `null` and fail with a clear error instead of forwarding a
+`null`-as-string.
+
+While grepping for other `terraform output` invocations (task 5), found a
+fourth, un-named copy in `configure.ts`'s `resolveInventoryPath` — an inline
+`execa('terraform', [..., 'output', '-raw', 'server_ip'])` that the original
+grep for the function name `getTerraformOutput` wouldn't have caught. Folded
+it into the shared helper too, since it had the exact same no-outputs
+corruption bug.
+
+Verified against real projects rather than just mocks: `diner-decider`
+(the project that originally produced the corruption, sprint 258) has zero
+terraform outputs today, and `emit-infra status` there now cleanly reports
+"Could not determine server IP" instead of a corrupted host — confirming the
+fix end-to-end. `emit-infra status` and `emit-infra logs` against `develemail`
+(which has a real `server_ip` output) both resolved `178.105.171.1` correctly.
+
+### Files changed
+- `packages/core/src/terraform.ts` — single `getTerraformOutput` impl, `-json`-based, returns `string | null`
+- `packages/core/src/terraform.test.ts` — coverage for key-exists, key-absent, no-outputs-at-all, and terraform-fails cases
+- `apps/cli/src/commands/status.ts` — deleted local copy, imports shared helper, passes `join(process.cwd(), 'terraform')` as cwd
+- `apps/cli/src/commands/status.test.ts` — removed duplicate `getTerraformOutput` tests (coverage now lives in `terraform.test.ts`)
+- `apps/cli/src/commands/logs.ts` — deleted buggy `-raw` copy, imports shared helper
+- `apps/cli/src/commands/logs.test.ts` — added `getTerraformOutput` to the `@emit-infra/core` mock
+- `apps/cli/src/commands/configure.ts` — folded the fourth, unnamed `-raw` invocation in `resolveInventoryPath` into the shared helper
+- `apps/cli/src/commands/setup.ts` — added explicit `null` check on `getTerraformOutput` before using `serverIp`
+- `apps/api/src/routes/operations.ts` — added explicit `null` check on `getTerraformOutput` before calling `writeInventory`
+
+### Verification
+- `pnpm test`: 160/160 pass (17 test files)
+- `pnpm lint`: clean across all 5 projects
+- `pnpm typecheck`: clean across all 5 projects
+- `apps/cli/dist` rebuilt via `nx build cli`; confirmed no `-raw` string remains in the bundle
+- `emit-infra status` on `diner-decider` (zero terraform outputs): reports "Could not determine server IP" cleanly, no warning text leaked
+- `emit-infra status` and `emit-infra logs` on `develemail`: both resolve `178.105.171.1` and complete successfully
+
+### Follow-ups
+- `[defer]` `apps/api/src/routes/operations.ts`'s inventory-write failure now throws a slightly more specific error message ("terraform output \"server_ip\" is empty after apply") — worth confirming the SSE error surface in the dashboard renders it usefully, but out of scope for this sprint.
