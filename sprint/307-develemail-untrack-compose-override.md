@@ -95,3 +95,66 @@ branch switch after the removal commit could tempt someone to "restore" it.
   command run and the result, not an assertion that it would work.
 - `CLAUDE.md`'s two mentions are accurate.
 - Committed in develemail, with the reasoning in the commit message.
+
+## Completed
+
+**Date:** 2026-08-23
+
+### Summary
+Executed in `~/projects/develemail` per the sprint's target-repo note (no
+emit-infra files touched). Captured the tracked override's content to
+`/tmp/override-tracked.yml` first, then merged its three fixes —
+`RUN_MIGRATIONS: 'true'`, the `${VAR:-default}` dev fallbacks for
+`UNSUBSCRIBE_SECRET`/`ENCRYPTION_KEY` on api and worker, and the
+`127.0.0.1` (not `localhost`) api healthcheck — into
+`docker-compose.override.yml.example`, carrying their explanatory comments
+across verbatim. Everything `.example` already had that the override lacked
+(the `inbound` service block, `INBOUND_SECRET`, `NOTIFICATION_FROM_ADDRESS`,
+commented `WORKER_CONCURRENCY`/relay block, PgBouncer header comment) was
+left in place — those are template features, not things the override's
+absence should delete.
+
+Ran `git rm --cached docker-compose.override.yml`; the file stays on disk
+byte-for-byte (diffed against the `/tmp` capture — identical) and drops out
+of the index, so `.gitignore` line 67 now actually takes effect.
+
+Verified the "fresh copy works" claim empirically rather than by inspection:
+rsynced the whole repo to `/tmp/develemail-scratch` (the real
+`docker-compose.override.yml` was never touched — confirmed unchanged after
+the fact), copied the merged `.example` to `.override` there, and ran
+`docker compose up -d --build`. To avoid colliding on the fixed
+`container_name`s and ports the base compose file uses, brought the real
+local stack down first with `docker compose down` (no `-v`, named volumes
+untouched) and back up afterward with the original untouched file —
+confirmed `develemail-api` reports healthy again post-restore. In the
+scratch run: postgres/mailpit/rspamd came up healthy, api reported healthy
+via the new `127.0.0.1` probe, worker and web ran with no restarts, and the
+newly-included `inbound` service started and listened on 2526 (its
+`INBOUND_SECRET`/`ENCRYPTION_KEY` defaulted to blank with a compose warning,
+same as the un-merged `.example` already behaved — out of scope to fix
+further). `postfix` and `opendkim` failed the same way they did before this
+change (`ALLOWED_SENDER_DOMAINS` unset, opendkim exit 78) — a pre-existing
+base `docker-compose.yml` issue, unrelated to the override/`.example` split
+and explicitly out of scope.
+
+Both `CLAUDE.md` mentions (line 102, line 122) were already accurate and
+needed no edit — line 102 just references the file's role in the compose
+network, line 122 already correctly describes it as gitignored, which is
+now actually true.
+
+### Files changed (in `~/projects/develemail`, not emit-infra)
+- `docker-compose.override.yml` — untracked via `git rm --cached`; unchanged on disk.
+- `docker-compose.override.yml.example` — merged the tracked override's three dev-fix values and their comments.
+
+### Verification
+- `git ls-files --error-unmatch docker-compose.override.yml`: fails (untracked) — confirmed both pre- and post-commit.
+- `diff /tmp/override-tracked.yml docker-compose.override.yml`: no output (content intact).
+- `git status --ignored --porcelain`: shows `!! docker-compose.override.yml` (ignored, not untracked-and-listed).
+- Scratch `docker compose up -d --build` from a fresh `.example` copy: postgres/mailpit/rspamd/api healthy, worker/web/inbound running with 0 restarts; command output and container states captured in-session.
+- `develemail`'s pre-commit hook (`format`/`lint`/`typecheck`/`test` on affected projects): passed, no affected projects for a compose-file-only change.
+- Live local stack: brought back up with the original file after the scratch test; `develemail-api` reports healthy.
+- Committed in develemail as `642c197`.
+
+### Follow-ups
+- `[defer]` develemail's `postfix`/`opendkim` containers fail to start locally (`ALLOWED_SENDER_DOMAINS` unset, opendkim exits with code 78) — pre-existing, unrelated to this sprint, noticed while bringing the stack up for verification.
+- `[defer]` develemail's `docker-compose.yml` `opendkim` image (`instrumentisto/opendkim`) has no `linux/arm64/v8` build, so it runs under emulation on Apple Silicon hosts — noticed in passing, not investigated.
