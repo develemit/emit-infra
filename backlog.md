@@ -145,6 +145,8 @@ fleet-clean criterion was amended to expect exactly these two.
 - (sprint 300, 2026-08-23) A few doc comments still point readers to `deploy-plan.sh` for functions that now live in `deploy-launch.sh`/`deploy-smart-build.sh` (`scripts/lib/ci-utils.sh:29`, `scripts/collect-metrics.sh:106`, `docs/DEPLOY-GATES.md:88,104`). Functionally correct — sourcing `deploy-plan.sh` still resolves them — but the pointer names the wrong file. Worth a pass next time one of those is touched.
 - (sprint 300, 2026-08-23) `docs/PRE-PUSH-HOOK.md`'s file-responsibility table (~line 12) describes `deploy-plan.sh` as owning decision logic, the unattended-shell gate, and launch-mode declaration in one row — could be split into rows matching the new four-file layout.
 
+- (sprint 301, 2026-08-23) `scripts/lib/ci-heartbeat.sh` at 77 lines is the largest extract from the ci-utils split, almost entirely the block comment explaining the distinct-tmp-name race-avoidance rationale carried over from the original. Fine as-is; noted only because the other four landed in the 30-60 line range.
+
 ## ✅ Converted to Sprints
 
 - ~~(sprint 124, 2026-07-01) `getTerraformOutput` is duplicated in `status.ts` and `logs.ts` — extract to a shared helper when a third consumer appears~~ → sprint-293 (2026-08-21)
