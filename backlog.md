@@ -133,6 +133,8 @@ fleet-clean criterion was amended to expect exactly these two.
 - (sprint 295, 2026-08-22) ESLint warns "The Next.js plugin was not detected in your ESLint configuration" on every dashboard lint/build run. Unrelated to the build bug; cheap to fix if someone is touching `apps/dashboard/eslint.config.*`.
 - (infra, 2026-08-22) `packages/core/src/db-url-connect.test.ts > waitUntilReady > retries until the timeout, then throws with the last error` is load-sensitive: it failed once under a parallel `nx run-many -t test --skip-nx-cache` and passed 4/4 uncached in isolation. Same class as the fixed-timing flakes repaired in `hook-signals.test.sh` (f69168b) and `use-ops-chat.test.ts` (d90a11e) — a fixed timeout raced under load. Last touched by sprint 276.
 
+- (sprint 296, 2026-08-22) Nx flagged `core:test` as a "flaky task" in two separate `pnpm test` runs during sprint 296's verification — independently corroborating the `db-url-connect.test.ts > waitUntilReady` flake filed from sprint 295's spot-check. Two independent observations now; worth fixing with the same capture-then-poll treatment as `hook-signals.test.sh` (f69168b) and `use-ops-chat.test.ts` (d90a11e).
+
 ## ✅ Converted to Sprints
 
 - ~~(sprint 124, 2026-07-01) `getTerraformOutput` is duplicated in `status.ts` and `logs.ts` — extract to a shared helper when a third consumer appears~~ → sprint-293 (2026-08-21)
