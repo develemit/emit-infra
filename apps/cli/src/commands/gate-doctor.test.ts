@@ -160,6 +160,16 @@ describe('reportHasIssues', () => {
     }
     expect(reportHasIssues([report])).toBe(true)
   })
+
+  it('is true when a project has a config issue even with no static findings or target results', () => {
+    const report: ProjectGateReport = {
+      repo: 'tastease',
+      staticFindings: [],
+      targetResults: [],
+      configIssue: { kind: 'malformed-pre-push', message: 'ci.prePush is present but not a string array (got a string) — using default targets' },
+    }
+    expect(reportHasIssues([report])).toBe(true)
+  })
 })
 
 describe('buildGateReport', () => {
@@ -178,5 +188,11 @@ describe('buildGateReport', () => {
     const report = await buildGateReport(project, true, 1000)
     expect(report.targetResults.map((r) => r.target)).toEqual(['lint', 'build'])
     expect(execa).toHaveBeenCalledTimes(2)
+  })
+
+  it('carries the project configIssue through to the report', async () => {
+    const flagged: GateProject = { ...project, configIssue: { kind: 'unparseable-json', message: '.emit-infra.json failed to parse: Unexpected token' } }
+    const report = await buildGateReport(flagged, false, 1000)
+    expect(report.configIssue).toEqual(flagged.configIssue)
   })
 })

@@ -6,6 +6,7 @@ import { scanGateFleet, findGateProject, type GateProject } from '../lib/gate-do
 import { scanCiScriptForEnvPrefixes } from '../lib/gate-doctor-static.js'
 import { runGateTarget, type TargetResult } from '../lib/gate-doctor-run.js'
 import {
+  printConfigIssue,
   printStaticFindings,
   printDynamicResults,
   printSummary,
@@ -37,7 +38,7 @@ export async function buildGateReport(
     }
   }
 
-  return { repo: project.repo, staticFindings, targetResults }
+  return { repo: project.repo, staticFindings, targetResults, ...(project.configIssue ? { configIssue: project.configIssue } : {}) }
 }
 
 export function registerGateDoctor(program: Command): void {
@@ -70,6 +71,7 @@ export function registerGateDoctor(program: Command): void {
       const reports: ProjectGateReport[] = []
       for (const project of projects) {
         const report = await buildGateReport(project, opts.dynamic, timeoutMs)
+        printConfigIssue(report.repo, report.configIssue)
         printStaticFindings(report.repo, report.staticFindings)
         printDynamicResults(report.repo, report.targetResults)
         reports.push(report)

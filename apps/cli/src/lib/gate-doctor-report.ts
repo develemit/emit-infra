@@ -1,19 +1,30 @@
 import chalk from 'chalk'
 import type { StaticFinding } from './gate-doctor-static.js'
 import type { TargetResult } from './gate-doctor-run.js'
+import type { ConfigIssue } from './gate-doctor-scan.js'
 
 export interface ProjectGateReport {
   repo: string
   staticFindings: StaticFinding[]
   targetResults: TargetResult[]
+  configIssue?: ConfigIssue
 }
 
+// A malformed/unparseable .emit-infra.json counts toward the doctor's exit
+// code, same as a static finding or a failed target: gate-doctor's whole job
+// is proving the push gate is runnable, and either case means the config the
+// real hook reads is not what the doctor just checked.
 function reportFailing(report: ProjectGateReport): boolean {
-  return report.staticFindings.length > 0 || report.targetResults.some((t) => !t.passed)
+  return Boolean(report.configIssue) || report.staticFindings.length > 0 || report.targetResults.some((t) => !t.passed)
 }
 
 export function reportHasIssues(reports: ProjectGateReport[]): boolean {
   return reports.some(reportFailing)
+}
+
+export function printConfigIssue(repo: string, configIssue: ConfigIssue | undefined): void {
+  if (!configIssue) return
+  console.log(chalk.red(`\n✖ ${repo}: ${configIssue.message}`))
 }
 
 export function printStaticFindings(repo: string, findings: StaticFinding[]): void {
