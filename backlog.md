@@ -139,6 +139,9 @@ fleet-clean criterion was amended to expect exactly these two.
 - (sprint 298, 2026-08-23) `gate-doctor --dynamic`'s default 600s per-target timeout is a guess; revisit once real build/test durations across the fleet are on hand (emulated Docker builds are documented elsewhere as multi-minute).
 - (sprint 298, 2026-08-23) `gate-doctor` reads `.emit-infra.json`'s raw `ci.prePush` array and falls back to the hook's default list if absent/malformed, without warning the way `loadConfig`'s zod validation would. Silent leniency worth noting, not a correctness issue.
 
+- (sprint 299, 2026-08-23) `emit-infra status` requires a `.emit-infra.json` in cwd, so the new Push-gate line can't be smoke-tested against emit-infra itself (local-only tool, no config file). Verified via direct function call against the built dist instead — worth an end-to-end CLI test fixture for `status` if a future sprint wants one.
+- (sprint 299, 2026-08-23) The gate-staleness rule doesn't special-case a project whose default branch isn't `main`. Matches existing convention (`deploy-detached.sh` and `gate-doctor-run.ts` both hardcode `origin/main`), so an inherited gap rather than a new one.
+
 ## ✅ Converted to Sprints
 
 - ~~(sprint 124, 2026-07-01) `getTerraformOutput` is duplicated in `status.ts` and `logs.ts` — extract to a shared helper when a third consumer appears~~ → sprint-293 (2026-08-21)
