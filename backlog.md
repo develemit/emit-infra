@@ -139,6 +139,9 @@ fleet-clean criterion was amended to expect exactly these two.
 
 - (sprint 305, 2026-08-22) No test file exists for `apps/dashboard/src/components/detail/deploy-timeline.tsx` — the launch-mode rendering added there is verified only indirectly (API passthrough test + JSX typecheck). A future sprint touching that component should add render tests.
 
+- (sprint 306, 2026-08-23) `@next/eslint-plugin-next` resolved to `15.5.23` while `next` itself is pinned to `15.5.19` (via `apps/dashboard/package.json`'s `^15.0.0`). Harmless today — the plugin's `flatConfig` export has been stable across that range — but worth pinning them to match if either drifts further.
+- (sprint 306, 2026-08-23) `pnpm nx run dashboard:build` intermittently prints an "Nx detected a flaky task" notice for `dashboard:lint` (stdout differs slightly run-to-run even with `--skip-nx-cache`). Pre-existing and unrelated to the plugin registration; note if it becomes noisy.
+
 ## ✅ Converted to Sprints
 
 - ~~(infra, 2026-08-23) **Fourth fixed-timing test flake this month — worth a systemic pass.** `scripts/lib/deploy-detached.test.sh:213` asserts `[[ $NOWAIT_ELAPSED -lt 4 ]]` against a 4s push: 1-second granularity with zero margin, so under the full `test:hooks` chain's load `--no-wait`'s own node startup (classify-run-state.mjs, sprint 289) pushes elapsed to exactly 4 and it fails. Observed once during sprint 302's spot-check; 4/4 passes in isolation. Same class as the already-fixed `hook-signals.test.sh` (f69168b) and `use-ops-chat.test.ts` (d90a11e), and the still-open `db-url-connect.test.ts > waitUntilReady` flake. A sweep for fixed-timing assertions across the repo's suites would likely be cheaper than fixing them one incident at a time.~~ → sprint-303 (2026-08-22)
