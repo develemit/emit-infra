@@ -65,17 +65,74 @@ writes a record when it must not.
 - `scripts/lib/deploy-unattended-gate.test.sh` — assertion names only
 
 ## Acceptance criteria
-- [ ] `init-deploy.test.ts` no longer spawns a cold `npx tsx` compile in its hot
+- [x] `init-deploy.test.ts` no longer spawns a cold `npx tsx` compile in its hot
       path, and its timeout is reduced accordingly
-- [ ] The blue-green init-deploy case passes 5 consecutive runs under concurrent
+- [x] The blue-green init-deploy case passes 5 consecutive runs under concurrent
       CPU load, not just once idle
-- [ ] No assertion in `scripts/lib/deploy-unattended-gate.test.sh` is named as
+- [x] No assertion in `scripts/lib/deploy-unattended-gate.test.sh` is named as
       the inverse of what it verifies; the assertions themselves are unchanged
-- [ ] `pnpm test:hooks` still reports the same number of passing gate assertions
+- [x] `pnpm test:hooks` still reports the same number of passing gate assertions
       as before (renames only, no coverage lost)
-- [ ] `pnpm test`, `pnpm lint`, `pnpm typecheck` green
+- [x] `pnpm test`, `pnpm lint`, `pnpm typecheck` green
 
 ## Out of scope
 - `use-sse-stream.test.ts`'s exact-count assertions — see Context.
 - Any behavior change to `init-deploy` itself or to the unattended gate.
 - A broader test-suite audit; these are two named items.
+
+## Completed
+
+**Date:** 2026-08-23
+
+### Summary
+Chose **pre-warm** over mocking for the `init-deploy.test.ts` race: a `beforeAll`
+now bundles the CLI once via the same `node apps/cli/esbuild.mjs` script `nx run
+cli:build` uses (no second build path invented), and the subprocess test invokes
+the resulting `dist/index.js` directly with `node` instead of `npx tsx
+index.ts`. Pre-warm was picked over mocking because the test's whole point is
+exercising the *real* CLI entrypoint end-to-end (arg parsing, service
+detection, file scaffolding) — calling the exported action function directly
+would have dropped that coverage. The tradeoff: this test now depends on the
+CLI bundle being buildable, but `beforeAll` rebuilds it fresh every run (esbuild
+bundling this entrypoint takes ~0.1s), so there's no risk of the stale-`dist`
+trap noted in project memory. Timeout dropped from 30s to 10s — generous
+headroom for a `node` process start plus in-memory work, no compile step left
+to race.
+
+Verified the flake is actually gone, not just theoretically: ran the suite 5
+consecutive times while all 16 cores were pinned by background `yes` loops —
+every run passed in well under a second (320–460ms for all 7 tests combined),
+down from a fixed-timeout race that needed 30s of headroom.
+
+For the naming fix, grepped every `check_false`/`check_true`/`case`-based
+assertion in `deploy-unattended-gate.test.sh` (34 total). Only two were
+actually inverted: the two file-existence checks at what are now lines
+171–172, renamed from `".deploy-status.json created on blocked push"` /
+`".deploy-history.jsonl created on blocked push"` to `"no ... created on
+blocked push"`. Every other `check_false` in the file already phrases its name
+as the negative outcome it verifies (`"not blocked: ..."`, `"... reports
+none"`, `"... never skips"`), so nothing else needed touching. Confirmed
+`deploy-plan.test.sh` and `deploy-path-filter.test.sh` are out of scope per the
+sprint's own Files-involved/Out-of-scope sections and left them alone.
+
+### Files changed
+- `apps/cli/src/commands/init-deploy.test.ts` — pre-warm the CLI bundle once in
+  `beforeAll`, invoke `node dist/index.js` instead of `npx tsx index.ts`, drop
+  the 30s timeout to 10s
+- `scripts/lib/deploy-unattended-gate.test.sh` — renamed the two inverted
+  `check_false` assertion names; assertions themselves unchanged
+
+### Verification
+- `init-deploy.test.ts` under `yes`-loop CPU load on all 16 cores, 5 consecutive
+  runs: 7/7 passing each time, 320–461ms per run
+- `pnpm test:hooks`: gate suite reports 34 passed, 0 failed (same count as
+  before the rename); full hooks run 76/76 passed, 0 failed
+- `pnpm test`: 42 test files, 356 tests, all passing
+- `pnpm lint`: clean across all 5 projects
+- `pnpm typecheck`: clean across all 5 projects
+
+### Follow-ups
+- `[defer]` Nx flagged `core:test` as a "flaky task" in two separate `pnpm
+  test` runs during verification (unrelated to this sprint's files — core
+  isn't touched here). Worth a look if it recurs, but not a blocker for this
+  change.

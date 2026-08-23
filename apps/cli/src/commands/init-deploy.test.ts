@@ -1,9 +1,14 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { execaSync } from 'execa'
 
 import { detectServices, detectHealthPaths } from '../lib/detect-project.js'
+
+// apps/cli/src/commands -> repo root
+const repoRoot = join(__dirname, '..', '..', '..', '..')
+const cliDist = join(repoRoot, 'apps', 'cli', 'dist', 'index.js')
 
 describe('detectServices', () => {
   let dir: string
@@ -107,6 +112,14 @@ describe('detectHealthPaths', () => {
 describe('init-deploy config generation', () => {
   let dir: string
 
+  beforeAll(() => {
+    // Pre-warm: build the CLI bundle once via the normal esbuild pipeline (the
+    // same one `nx run cli:build` uses) instead of racing a cold `npx tsx`
+    // compile inside the test below. esbuild bundling this entrypoint takes
+    // well under a second, so this doesn't reintroduce the timing risk.
+    execaSync('node', [join(repoRoot, 'apps', 'cli', 'esbuild.mjs')], { cwd: repoRoot })
+  })
+
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'init-deploy-gen-'))
   })
@@ -115,7 +128,7 @@ describe('init-deploy config generation', () => {
     rmSync(dir, { recursive: true, force: true })
   })
 
-  it('generates blueGreen config in .emit-infra.json', async () => {
+  it('generates blueGreen config in .emit-infra.json', () => {
     writeFileSync(
       join(dir, '.emit-infra.json'),
       JSON.stringify({
@@ -134,8 +147,7 @@ describe('init-deploy config generation', () => {
     writeFileSync(join(appsDir, 'api', 'Dockerfile'), 'FROM node:20')
     writeFileSync(join(appsDir, 'web', 'Dockerfile'), 'FROM node:20')
 
-    const { execaSync } = await import('execa')
-    execaSync('npx', ['tsx', join(__dirname, '..', 'index.ts'), 'init-deploy', '--port-base', '4000', '-y'], {
+    execaSync('node', [cliDist, 'init-deploy', '--port-base', '4000', '-y'], {
       cwd: dir,
       env: { ...process.env, NODE_ENV: 'test' },
       reject: false,
@@ -145,7 +157,5 @@ describe('init-deploy config generation', () => {
     expect(config.blueGreen).toBeDefined()
     expect(config.blueGreen.services).toHaveLength(2)
     expect(config.name).toBe('test-project')
-    // Cold-starts npx + tsx compilation of the CLI entrypoint: ~3s idle, but it
-    // races vitest's 5s default under parallel load and flakes the whole suite.
-  }, 30_000)
+  }, 10_000)
 })

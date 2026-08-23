@@ -168,8 +168,8 @@ case "$BLOCK_CLAUDECODE_OUT" in
   *"EMIT_DEPLOY_DETACHED"*) ok "block message also names the override env var" ;;
   *) no "block message also names the override env var (got: $BLOCK_CLAUDECODE_OUT)" ;;
 esac
-check_false ".deploy-status.json created on blocked push" test -e "$GATE_REPO/.deploy-status.json"
-check_false ".deploy-history.jsonl created on blocked push" test -e "$GATE_REPO/.deploy-history.jsonl"
+check_false "no .deploy-status.json created on blocked push" test -e "$GATE_REPO/.deploy-status.json"
+check_false "no .deploy-history.jsonl created on blocked push" test -e "$GATE_REPO/.deploy-history.jsonl"
 check "CI phase still completes on a blocked deploy push" \
   "$(python3 -c "import json; print(json.load(open('$GATE_REPO/.ci-status.json'))['status'])" 2>/dev/null)" \
   "success"
