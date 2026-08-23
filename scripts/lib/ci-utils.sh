@@ -32,10 +32,26 @@
 #
 # packages/core/src/deploy-records.ts mirrors both shapes deliberately; keep
 # field names/types identical if either side changes.
+#
+# This file keeps module state + the ci/deploy writers (ci_init/ci_step/
+# ci_done/deploy_init/deploy_step/deploy_done) — they touch nearly every
+# piece of state below, so splitting them out would buy little and risks the
+# most. Everything else is split into narrower-footprint files this sources
+# internally; every consumer that used to source this file alone still gets
+# all of them transitively. See ci-log-capture.sh, ci-atomic-write.sh,
+# ci-phase-tracking.sh, ci-heartbeat.sh, and ci-signals.sh for the rest of
+# the functions historically documented here (split in sprint 301).
 
 # Guard against double-sourcing without resetting in-flight state
 [[ -n "${_EMIT_CI_UTILS_LOADED:-}" ]] && return 0
 _EMIT_CI_UTILS_LOADED=1
+
+_EMIT_CI_UTILS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$_EMIT_CI_UTILS_DIR/ci-log-capture.sh"
+source "$_EMIT_CI_UTILS_DIR/ci-atomic-write.sh"
+source "$_EMIT_CI_UTILS_DIR/ci-phase-tracking.sh"
+source "$_EMIT_CI_UTILS_DIR/ci-heartbeat.sh"
+source "$_EMIT_CI_UTILS_DIR/ci-signals.sh"
 
 _EMIT_SHA=""
 _EMIT_BRANCH=""
@@ -66,192 +82,6 @@ _EMIT_WRITER_PID=$$
 _EMIT_WRITER_HOST=$(hostname -s 2>/dev/null || true)
 _EMIT_CI_HEARTBEAT_PID=""
 _EMIT_DEPLOY_HEARTBEAT_PID=""
-
-# Mirror stdout/stderr to a log file via a background tee we can wait on.
-# A plain `exec > >(tee ...)` loses buffered output when the script exits
-# right after a failure (bash doesn't wait for process substitutions, and
-# $! isn't set for them on bash 3.2), truncating the log at the failing step.
-_emit_start_log() {
-  local file="$1" fifo
-  fifo=$(mktemp -u "${TMPDIR:-/tmp}/emit-log.XXXXXX") || return 0
-  mkfifo "$fifo" 2>/dev/null || return 0
-  tee -a "$file" < "$fifo" &
-  _EMIT_TEE_PID=$!
-  exec 3>&1 4>&2 > "$fifo" 2>&1
-  rm -f "$fifo"
-}
-
-# Restore stdout/stderr and wait for tee to drain so the log is complete.
-_emit_flush_log() {
-  [[ -n "$_EMIT_TEE_PID" ]] || return 0
-  exec 1>&3 2>&4 3>&- 4>&-
-  wait "$_EMIT_TEE_PID" 2>/dev/null || true
-  _EMIT_TEE_PID=""
-}
-
-_emit_rotate_logs() {
-  local dir="$1" max="${2:-100}"
-  local count
-  count=$(ls -t "$dir"/*.log 2>/dev/null | wc -l)
-  if [[ $count -gt $max ]]; then
-    ls -t "$dir"/*.log 2>/dev/null | tail -n +"$((max + 1))" | xargs rm -f
-  fi
-}
-
-_emit_truncate_history() {
-  local f="$1" max=1000 keep=500
-  if [[ -f "$f" ]] && [[ $(wc -l < "$f") -gt $max ]]; then
-    tail -n "$keep" "$f" > "${f}.tmp" && mv "${f}.tmp" "$f"
-  fi
-}
-
-_emit_services_json() {
-  if [[ -z "$_EMIT_SERVICES_BUILT" ]]; then
-    echo "[]"
-    return
-  fi
-  printf '["%s"]\n' "$(echo "$_EMIT_SERVICES_BUILT" | sed 's/ /","/g')"
-}
-
-deploy_set_services() { _EMIT_SERVICES_BUILT="$*"; }
-
-# ── per-phase timing ──────────────────────────────────────────────────────────
-deploy_record_phase() {
-  local name="${1//\"/}" sec="$2"
-  [[ -n "$_EMIT_PHASES" ]] && _EMIT_PHASES+=","
-  _EMIT_PHASES+="$(printf '"%s":%d' "$name" "$sec")"
-}
-
-_emit_close_phase() {
-  [[ -n "$_EMIT_PHASE_NAME" ]] || return 0
-  deploy_record_phase "$_EMIT_PHASE_NAME" "$(( $(date +%s) - _EMIT_PHASE_EPOCH ))"
-  _EMIT_PHASE_NAME=""
-}
-
-# Start timing a phase; closes the previous one. deploy_done closes the last.
-deploy_phase() {
-  _emit_close_phase
-  _EMIT_PHASE_NAME="${1//\"/}"
-  _EMIT_PHASE_EPOCH=$(date +%s)
-}
-
-_emit_phases_json() { printf '{%s}\n' "$_EMIT_PHASES"; }
-
-_emit_write_atomic() {
-  local content="$1" dest="$2" tmp="${3:-${2}.tmp}"
-  printf '%s\n' "$content" > "$tmp" && mv "$tmp" "$dest"
-}
-
-# ── writer liveness heartbeat (sprint 283) ──────────────────────────────────
-# A deploy has long silent stretches (an emulated linux/amd64 image build can
-# run minutes between deploy_step calls), so "last write time" alone would
-# misreport an active build as orphaned. A background refresher rewrites just
-# the "heartbeatAt" field on an interval so a reader can tell "no update in
-# 5 minutes" from "still building." It reads the file rather than rebuilding
-# it from in-process state, since it runs in a forked subshell that only has
-# a frozen snapshot of variables from the moment _emit_start_heartbeat ran —
-# reading the file picks up whatever the latest deploy_step/ci_step wrote.
-_emit_refresh_heartbeat() {
-  local file="$1" content ts
-  [[ -f "$file" ]] || return 0
-  content=$(cat "$file") || return 0
-  case "$content" in
-    *'"writer":'*) ;;
-    *) return 0 ;; # terminal record already written — nothing to refresh
-  esac
-  ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-  content=$(printf '%s' "$content" | sed -E 's/"heartbeatAt":"[^"]*"/"heartbeatAt":"'"$ts"'"/')
-  # A distinct tmp name from the main writer's "${file}.tmp" — deploy_step/
-  # ci_step run in the foreground process while this runs in a background
-  # subshell, so sharing one tmp path would let the two racily stomp each
-  # other's in-flight write (last mv wins, the other fails with "No such
-  # file or directory"). Different tmp names mean at worst the *destination*
-  # write race is a lost update, self-healing at the next tick — never a
-  # missing/corrupt file.
-  _emit_write_atomic "$content" "$file" "${file}.hb.tmp"
-}
-
-# Start a background refresher for the given phase's status file. Checks its
-# parent is still alive every 5s (so a `kill -9` of the hook is noticed
-# quickly even though SIGKILL can't be trapped) and refreshes the heartbeat
-# every 30s. Stores the refresher's pid in the phase-specific global so
-# _emit_stop_heartbeat can reap it.
-_emit_start_heartbeat() {
-  local kind="$1" file parent=$$
-  case "$kind" in
-    ci) file=.ci-status.json ;;
-    deploy) file=.deploy-status.json ;;
-    *) echo "_emit_start_heartbeat: unknown kind '$kind'" >&2; return 1 ;;
-  esac
-  (
-    while :; do
-      for _ in 1 2 3 4 5 6; do
-        kill -0 "$parent" 2>/dev/null || exit 0
-        sleep 5
-      done
-      kill -0 "$parent" 2>/dev/null || exit 0
-      _emit_refresh_heartbeat "$file"
-    done
-  ) &
-  if [[ "$kind" == "ci" ]]; then _EMIT_CI_HEARTBEAT_PID=$!; else _EMIT_DEPLOY_HEARTBEAT_PID=$!; fi
-}
-
-# Stop the refresher for the given phase, if one is running. Safe to call
-# even when none was started (e.g. a phase that never got past _init).
-_emit_stop_heartbeat() {
-  local kind="$1" pid
-  if [[ "$kind" == "ci" ]]; then pid="$_EMIT_CI_HEARTBEAT_PID"; _EMIT_CI_HEARTBEAT_PID=""
-  else pid="$_EMIT_DEPLOY_HEARTBEAT_PID"; _EMIT_DEPLOY_HEARTBEAT_PID=""
-  fi
-  [[ -n "$pid" ]] || return 0
-  kill "$pid" 2>/dev/null || true
-  wait "$pid" 2>/dev/null || true
-}
-
-# ── signal handling (sprint 282) ────────────────────────────────────────────
-# INT/TERM/HUP can arrive mid-build — e.g. an agent's background shell torn
-# down mid-deploy. Neither fires the ERR trap `_fail_deploy` installs in
-# pre-push, and the process is simply gone before any `on_fail` callback can
-# run, so without this the status file freezes at "running"/"deploying"
-# forever (2026-08-19 emit-social incident). SIGKILL can't be trapped at all;
-# that gap is closed separately by sprint 283's liveness metadata, not here.
-#
-# `ci_done`/`deploy_done` guard themselves against a second call via the
-# `_EMIT_*_FINALIZED` flags below, so a signal that lands just after a normal
-# completion is a harmless no-op instead of a duplicate history line.
-_emit_reraise() {
-  trap - INT TERM HUP
-  kill -s "$1" "$$"
-}
-
-_emit_ci_signal_handler() {
-  ci_done failure
-  _emit_reraise "$1"
-}
-
-_emit_deploy_signal_handler() {
-  deploy_done interrupted
-  _emit_reraise "$1"
-}
-
-# Install INT/TERM/HUP handlers for the given phase ("ci" or "deploy"). Call
-# _emit_untrap_signals when the phase ends normally so a signal during the
-# *next* phase doesn't fire this phase's writer.
-_emit_trap_signals() {
-  local kind="$1" fn sig
-  case "$kind" in
-    ci) fn=_emit_ci_signal_handler ;;
-    deploy) fn=_emit_deploy_signal_handler ;;
-    *) echo "_emit_trap_signals: unknown kind '$kind'" >&2; return 1 ;;
-  esac
-  for sig in INT TERM HUP; do
-    trap "$fn $sig" "$sig"
-  done
-}
-
-_emit_untrap_signals() {
-  trap - INT TERM HUP
-}
 
 ci_init() {
   _EMIT_CI_TOTAL=$1

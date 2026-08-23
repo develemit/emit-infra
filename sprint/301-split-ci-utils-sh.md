@@ -120,16 +120,16 @@ just confirm no field name/type drifts as a side effect of the split.
   `scripts/lib/deploy-detached.test.sh` — sourcing updates if needed
 
 ## Acceptance criteria
-- [ ] `scripts/lib/ci-utils.sh` and every new extracted file are under ~250
+- [x] `scripts/lib/ci-utils.sh` and every new extracted file are under ~250
       lines
-- [ ] `pnpm test:hooks` passes under bash 3.2 with the same or higher
+- [x] `pnpm test:hooks` passes under bash 3.2 with the same or higher
       assertion count as the pre-split baseline, specifically including
       `hook-signals.test.sh` and `deploy-liveness.test.sh`
-- [ ] `bash -n` is clean on every touched script
-- [ ] Every consumer sources the correct file(s); no stale path to a moved
+- [x] `bash -n` is clean on every touched script
+- [x] Every consumer sources the correct file(s); no stale path to a moved
       function remains anywhere in the repo (`grep -r` for the old function
       names to confirm)
-- [ ] A manual smoke test (e.g. sourcing `ci-utils.sh` and running through
+- [x] A manual smoke test (e.g. sourcing `ci-utils.sh` and running through
       `ci_init` → `ci_step` → `ci_done`, and `deploy_init` → a simulated
       signal → checking `.deploy-status.json` shows `interrupted`) confirms
       the cross-file state coupling still works, not just the existing test
@@ -140,3 +140,101 @@ just confirm no field name/type drifts as a side effect of the split.
 - `scripts/hooks/pre-push` — covered by sprint 302
 - Any behavior change or JSON shape change. This is a pure module
   reorganization.
+
+## Completed
+
+**Date:** 2026-08-23
+
+### Summary
+Split `scripts/lib/ci-utils.sh` (368 lines) into a thin "core" file plus five
+narrow-footprint cluster files, following the exact pattern sprint 300
+established for `deploy-plan.sh` (guard, `_LOADED` flag per file, core file
+sources sub-files via its own `BASH_SOURCE`-resolved dir):
+
+- `scripts/lib/ci-log-capture.sh` (43 lines) — `_emit_start_log`,
+  `_emit_flush_log`, `_emit_rotate_logs`. Touches only `_EMIT_TEE_PID`.
+- `scripts/lib/ci-atomic-write.sh` (37 lines) — `_emit_write_atomic`,
+  `_emit_truncate_history`, `_emit_services_json`, `deploy_set_services`.
+  `_emit_write_atomic` takes content/dest as plain args; the rest touch only
+  `_EMIT_SERVICES_BUILT`.
+- `scripts/lib/ci-phase-tracking.sh` (35 lines) — `deploy_record_phase`,
+  `_emit_close_phase`, `deploy_phase`, `_emit_phases_json`. Touches
+  `_EMIT_PHASES`/`_EMIT_PHASE_NAME`/`_EMIT_PHASE_EPOCH`.
+- `scripts/lib/ci-heartbeat.sh` (77 lines) — `_emit_refresh_heartbeat`,
+  `_emit_start_heartbeat`, `_emit_stop_heartbeat` (sprint 283). Touches
+  `_EMIT_CI_HEARTBEAT_PID`/`_EMIT_DEPLOY_HEARTBEAT_PID`; calls
+  `_emit_write_atomic` from the atomic-write cluster.
+- `scripts/lib/ci-signals.sh` (59 lines) — `_emit_reraise`,
+  `_emit_ci_signal_handler`, `_emit_deploy_signal_handler`,
+  `_emit_trap_signals`, `_emit_untrap_signals` (sprint 282). Calls
+  `ci_done`/`deploy_done`, which live in the core file — a forward reference
+  that's safe because these only run later, as trap callbacks, by which time
+  the whole module is fully sourced.
+- `scripts/lib/ci-utils.sh` (198 lines, was 368) — kept its
+  `_EMIT_CI_UTILS_LOADED` guard, the full module-level `_EMIT_*` state block,
+  the writer pid/host computation, and all six writers
+  (`ci_init`/`ci_step`/`ci_done`/`deploy_init`/`deploy_step`/`deploy_done`),
+  since every one of them reads or writes several pieces of shared state and
+  splitting them apart would multiply cross-file coupling risk for no
+  file-size benefit.
+
+Sourcing order in the core file is sub-files first, then state declarations —
+matching the sprint's suggested shape. This is stylistic, not load-bearing:
+every `_EMIT_*` read happens inside a function body, never at source time, so
+bash resolves the variable whenever the function is later *called*, well
+after the whole file has finished sourcing. Verified directly with the
+signal-handler smoke test below, where `ci-signals.sh`'s forward reference to
+`deploy_done` (defined later, in the core file) resolves correctly when the
+trap fires.
+
+Because every consumer (`pre-push`, and the four test files touching this
+state) already sources `ci-utils.sh` by path rather than any individual
+cluster function, **no consumer needed a sourcing change** — same
+additive-plus-one-file-edit shape sprint 300 achieved for `deploy-plan.sh`.
+Doc references to `ci-utils.sh` in `docs/PRE-PUSH-HOOK.md` and
+`docs/DEPLOY-SIGNALS-AND-LIVENESS.md` remain accurate as-is: `ci-utils.sh` is
+still the file that owns and documents `ci_init`/`ci_step`/writer-status
+behavior, unlike sprint 300 where specific functions moved to differently-
+named files.
+
+### Files changed
+- `scripts/lib/ci-utils.sh` — reduced to state + writers + internal sourcing
+  of the five new cluster files
+- (new) `scripts/lib/ci-log-capture.sh` — log-capture cluster
+- (new) `scripts/lib/ci-atomic-write.sh` — atomic-write + history cluster
+- (new) `scripts/lib/ci-phase-tracking.sh` — phase-timing cluster
+- (new) `scripts/lib/ci-heartbeat.sh` — writer-liveness heartbeat cluster
+- (new) `scripts/lib/ci-signals.sh` — signal-handling cluster
+
+### Verification
+- Baseline (`pnpm test:hooks` under `/bin/bash` 3.2.57, pre-split):
+  47+7+12+6+12+17+34+25 = 160 assertions, 0 failed, exit 0.
+- Post-split (same suites, same shell): identical per-suite counts
+  (47/7/12/6/12/17/34/25), 0 failed, exit 0 — no regression, no drop.
+  `hook-signals.test.sh` and `deploy-liveness.test.sh` both green.
+- `pnpm test:hooks` (the actual npm-script command): 160/160 pass, exit 0.
+- `bash -n`: clean on all 6 touched `scripts/lib/*.sh` files plus
+  `scripts/hooks/pre-push`, `scripts/deploy-detached.sh`, and the four
+  consumer test files.
+- `grep -r` for every moved function name across the repo: only the new
+  cluster files, `ci-utils.sh` itself, and `hook-signals.test.sh`/
+  `deploy-liveness.test.sh` (which source `ci-utils.sh`, not a specific
+  cluster file) reference them — no stale direct path to a moved function.
+- Manual smoke test (`/bin/bash`, isolated tmp git repo, outside the test
+  suite): `ci_init 3` → `ci_step` → `ci_done success` produced a valid
+  terminal `.ci-status.json` and a matching `.ci-history.jsonl` line.
+  `deploy_init 5 detached CLAUDECODE` → `_emit_trap_signals deploy` → a
+  backgrounded `kill -TERM $$` → process exited 143 (128+15, signal-derived)
+  and `.deploy-status.json`/`.deploy-history.jsonl` both show
+  `"status":"interrupted"` with the `launch` block intact — confirms the
+  `ci-signals.sh` → core-file `deploy_done` forward reference resolves
+  correctly across the file boundary.
+- Line counts: 198/43/37/35/77/59 — all comfortably under the ~250 target.
+
+### Follow-ups
+- `[defer]` `scripts/lib/ci-heartbeat.sh` at 77 lines is the largest new
+  extract, almost entirely due to the block comment explaining the
+  distinct-tmp-name race-avoidance rationale carried over from the original.
+  Fine as-is; flagging only because it's the one file that didn't land near
+  the 30-60 line range the sprint estimated for the other four.
+- none (beyond the above observation)
