@@ -35,6 +35,10 @@ ansible/inventory/dynamic/
 # Project configs (contain real domains/names — keep templates, not instances)
 .emit-infra.json
 
+# scripts/serve-supervised.sh death records (sprint 310) — runtime state,
+# same treatment as .deploy-history.jsonl
+.server-deaths.jsonl
+
 # OS
 .DS_Store
 Thumbs.db
