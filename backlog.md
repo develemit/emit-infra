@@ -155,6 +155,9 @@ fleet-clean criterion was amended to expect exactly these two.
 
 - (sprint 311, 2026-08-26) `apps/api/project.json`'s `dev` command embeds shell parameter expansion (`${PORT:-7001}`) directly, relying on nx `run-commands` invoking it through a shell. Verified live, but no test exercises the nx target end-to-end — sprint 311 tested the underlying script with the args nx produces. Would need revisiting if nx's shell-invocation behaviour changes.
 
+- (sprint 313, 2026-08-26) `apps/api/src/routes/history.test.ts` is still 476 lines (down from 507 pre-sprint, after moving the trend tests out) — over this repo's 300-line target. A future touch of this file should split `ci-log`/`deploy-log` tests into their own file, following the same pattern used here for trend-routes.
+- (sprint 313, 2026-08-26) No test file exists yet for `deploy-timeline.tsx` (carried over from sprint 305 — untouched by this sprint, still open).
+
 ## ✅ Converted to Sprints
 
 - ~~(infra, 2026-08-23) **Fourth fixed-timing test flake this month — worth a systemic pass.** `scripts/lib/deploy-detached.test.sh:213` asserts `[[ $NOWAIT_ELAPSED -lt 4 ]]` against a 4s push: 1-second granularity with zero margin, so under the full `test:hooks` chain's load `--no-wait`'s own node startup (classify-run-state.mjs, sprint 289) pushes elapsed to exactly 4 and it fails. Observed once during sprint 302's spot-check; 4/4 passes in isolation. Same class as the already-fixed `hook-signals.test.sh` (f69168b) and `use-ops-chat.test.ts` (d90a11e), and the still-open `db-url-connect.test.ts > waitUntilReady` flake. A sweep for fixed-timing assertions across the repo's suites would likely be cheaper than fixing them one incident at a time.~~ → sprint-303 (2026-08-22)
