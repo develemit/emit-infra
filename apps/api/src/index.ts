@@ -32,6 +32,7 @@ import { deployRoutes } from './routes/deploy.js'
 import { startStatusMonitor } from './lib/status-monitor.js'
 import { startDigestScheduler } from './lib/digest-scheduler.js'
 import { registerAuth } from './lib/auth.js'
+import { formatFatalError } from './lib/fatal.js'
 
 const app = Fastify({ logger: process.env['NODE_ENV'] === 'development' ? { level: 'warn' } : true })
 
@@ -73,6 +74,20 @@ await app.register(deployRoutes)
 
 process.on('unhandledRejection', (reason, promise) => {
   app.log.error({ err: reason, promise }, 'Unhandled rejection')
+})
+
+// Unlike unhandledRejection above (log and keep running), an uncaught throw
+// leaves the process in an undefined state per Node's own guidance — the
+// safe move is to log richly and exit, letting the sprint-310 supervisor
+// (scripts/serve-supervised.sh, wired in via the `dev` target) start a clean
+// process and record the death. develemit-hq's server.ts deliberately does
+// the opposite (swallows uncaughtException and keeps running) because it has
+// no supervisor wrapping it yet — don't "fix" this file to match; they're
+// intentionally different until develemit-hq gets its own supervisor.
+process.on('uncaughtException', (err) => {
+  const { message, stack } = formatFatalError(err)
+  app.log.fatal({ err, stack }, `Uncaught exception: ${message}`)
+  process.exit(1)
 })
 
 const port = Number(process.env['PORT'] ?? 7001)

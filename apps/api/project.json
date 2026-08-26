@@ -19,7 +19,7 @@
       "executor": "nx:run-commands",
       "dependsOn": ["^build"],
       "options": {
-        "command": "tsx --env-file=apps/api/.env --watch apps/api/src/index.ts",
+        "command": "scripts/serve-supervised.sh --name emit-infra-api --health-url \"http://127.0.0.1:${PORT:-7001}/health\" -- tsx --env-file=apps/api/.env --watch apps/api/src/index.ts",
         "env": {
           "NODE_ENV": "development"
         }
