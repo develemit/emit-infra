@@ -41,6 +41,24 @@ export interface CiHistoryResponse {
   runs: CiHistoryEntry[]
 }
 
+// Sprint 310's serve-supervised.sh writes one of these per restart/stop.
+export interface ServerDeathEntry {
+  ts: string
+  name: string
+  reason: 'health-timeout' | 'exited'
+  exitCode: number | null
+  signal: string | null
+  uptimeSec: number
+  restartCount: number
+  pid: number | null
+  host: string
+  lastOutput: string
+}
+
+export interface ServerDeathsResponse {
+  deaths: ServerDeathEntry[]
+}
+
 export interface Incident {
   startedAt: number
   resolvedAt: number | null
@@ -63,6 +81,11 @@ export function getDeployHistory(name: string, limit?: number): Promise<DeployHi
 export function getCiHistory(name: string, limit?: number): Promise<CiHistoryResponse> {
   const qs = limit ? `?limit=${limit}` : ''
   return apiFetch<CiHistoryResponse>(`/projects/${encodeURIComponent(name)}/ci-history${qs}`)
+}
+
+export function getServerDeaths(name: string, limit?: number): Promise<ServerDeathsResponse> {
+  const qs = limit ? `?limit=${limit}` : ''
+  return apiFetch<ServerDeathsResponse>(`/projects/${encodeURIComponent(name)}/server-deaths${qs}`)
 }
 
 export async function getCiLog(name: string, sha: string): Promise<string> {

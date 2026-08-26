@@ -205,6 +205,74 @@ describe('GET /projects/:name/deploy-history', () => {
   })
 })
 
+describe('GET /projects/:name/server-deaths', () => {
+  let app: FastifyInstance
+
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    app = Fastify({ logger: false })
+    await app.register(historyRoutes)
+    await app.ready()
+  })
+
+  afterEach(async () => {
+    await app.close()
+  })
+
+  it('returns 404 when project is not found', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([])
+
+    const res = await app.inject({ method: 'GET', url: '/projects/missing/server-deaths' })
+
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('returns 400 when limit is invalid', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+
+    const res = await app.inject({ method: 'GET', url: '/projects/myapp/server-deaths?limit=0' })
+
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('returns empty deaths array when file does not exist', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    vi.mocked(open).mockRejectedValue(new Error('ENOENT'))
+
+    const res = await app.inject({ method: 'GET', url: '/projects/myapp/server-deaths' })
+
+    expect(res.statusCode).toBe(200)
+    const data = res.json() as { deaths: unknown[] }
+    expect(data.deaths).toEqual([])
+  })
+
+  it('returns records newest-first and honours limit', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    const lines = [
+      JSON.stringify({
+        ts: '2026-08-23T01:00:00Z', name: 'myapp', reason: 'health-timeout',
+        exitCode: null, signal: null, uptimeSec: 120, restartCount: 1,
+        pid: 111, host: 'box1', lastOutput: 'first',
+      }),
+      JSON.stringify({
+        ts: '2026-08-23T02:00:00Z', name: 'myapp', reason: 'exited',
+        exitCode: 1, signal: 'SIGTERM', uptimeSec: 60, restartCount: 2,
+        pid: 222, host: 'box1', lastOutput: 'second',
+      }),
+    ]
+    vi.mocked(existsSync).mockReturnValueOnce(true)
+    vi.mocked(open).mockResolvedValue(mockFileHandle(lines.join('\n') + '\n') as never)
+
+    const res = await app.inject({ method: 'GET', url: '/projects/myapp/server-deaths?limit=1' })
+
+    expect(res.statusCode).toBe(200)
+    const data = res.json() as { deaths: { ts: string; reason: string }[] }
+    expect(data.deaths).toHaveLength(1)
+    expect(data.deaths[0]?.ts).toBe('2026-08-23T02:00:00Z')
+    expect(data.deaths[0]?.reason).toBe('exited')
+  })
+})
+
 describe('GET /projects/:name/ci-history', () => {
   let app: FastifyInstance
 
@@ -352,104 +420,6 @@ describe('GET /projects/:name/deploy-log/:sha', () => {
     expect(res.statusCode).toBe(200)
     expect(res.headers['content-type']).toContain('text/plain')
     expect(res.body).toBe('Deploy log content\nSuccess')
-  })
-})
-
-describe('GET /projects/:name/disk-trend', () => {
-  let app: FastifyInstance
-
-  beforeEach(async () => {
-    vi.clearAllMocks()
-    app = Fastify({ logger: false })
-    await app.register(historyRoutes)
-    await app.ready()
-  })
-
-  afterEach(async () => {
-    await app.close()
-  })
-
-  it('returns 404 when project is not found', async () => {
-    vi.mocked(discoverProjects).mockResolvedValue([])
-
-    const res = await app.inject({ method: 'GET', url: '/projects/missing/disk-trend' })
-
-    expect(res.statusCode).toBe(404)
-  })
-
-  it('returns zero trend when file does not exist', async () => {
-    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
-    vi.mocked(open).mockRejectedValue(new Error('ENOENT'))
-
-    const res = await app.inject({ method: 'GET', url: '/projects/myapp/disk-trend' })
-
-    expect(res.statusCode).toBe(200)
-    const data = res.json() as { disk: number; pctPerDay: number; projectedDaysUntilFull: null }
-    expect(data.disk).toBe(0)
-    expect(data.pctPerDay).toBe(0)
-    expect(data.projectedDaysUntilFull).toBeNull()
-  })
-
-  it('returns trend on happy path', async () => {
-    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
-    vi.mocked(open).mockRejectedValue(new Error('ENOENT'))
-
-    const res = await app.inject({ method: 'GET', url: '/projects/myapp/disk-trend' })
-
-    expect(res.statusCode).toBe(200)
-    const data = res.json() as { disk: number; pctPerDay: number; projectedDaysUntilFull: number | null }
-    expect(typeof data.disk).toBe('number')
-    expect(typeof data.pctPerDay).toBe('number')
-    expect(data.projectedDaysUntilFull === null || typeof data.projectedDaysUntilFull === 'number').toBe(true)
-  })
-})
-
-describe('GET /projects/:name/memory-trend', () => {
-  let app: FastifyInstance
-
-  beforeEach(async () => {
-    vi.clearAllMocks()
-    app = Fastify({ logger: false })
-    await app.register(historyRoutes)
-    await app.ready()
-  })
-
-  afterEach(async () => {
-    await app.close()
-  })
-
-  it('returns 404 when project is not found', async () => {
-    vi.mocked(discoverProjects).mockResolvedValue([])
-
-    const res = await app.inject({ method: 'GET', url: '/projects/missing/memory-trend' })
-
-    expect(res.statusCode).toBe(404)
-  })
-
-  it('returns zero trend when file does not exist', async () => {
-    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
-    vi.mocked(open).mockRejectedValue(new Error('ENOENT'))
-
-    const res = await app.inject({ method: 'GET', url: '/projects/myapp/memory-trend' })
-
-    expect(res.statusCode).toBe(200)
-    const data = res.json() as { mem: number; pctPerDay: number; projectedDaysUntilFull: null }
-    expect(data.mem).toBe(0)
-    expect(data.pctPerDay).toBe(0)
-    expect(data.projectedDaysUntilFull).toBeNull()
-  })
-
-  it('returns trend on happy path', async () => {
-    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
-    vi.mocked(open).mockRejectedValue(new Error('ENOENT'))
-
-    const res = await app.inject({ method: 'GET', url: '/projects/myapp/memory-trend' })
-
-    expect(res.statusCode).toBe(200)
-    const data = res.json() as { mem: number; pctPerDay: number; projectedDaysUntilFull: number | null }
-    expect(typeof data.mem).toBe('number')
-    expect(typeof data.pctPerDay).toBe('number')
-    expect(data.projectedDaysUntilFull === null || typeof data.projectedDaysUntilFull === 'number').toBe(true)
   })
 })
 

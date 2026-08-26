@@ -99,17 +99,17 @@ the type is genuinely shared, in which case `packages/types` is the home.
 - possibly `packages/types` — only if the type is genuinely shared
 
 ## Acceptance criteria
-- [ ] `GET /projects/:name/server-deaths` returns records newest-first and
+- [x] `GET /projects/:name/server-deaths` returns records newest-first and
       honours `limit`.
-- [ ] A project with no `.server-deaths.jsonl` returns an empty list with a 2xx,
+- [x] A project with no `.server-deaths.jsonl` returns an empty list with a 2xx,
       not an error.
-- [ ] Unknown project → 404; bad params → 400, matching sibling routes.
-- [ ] `apps/api/src/routes/history.test.ts` covers: records returned newest
+- [x] Unknown project → 404; bad params → 400, matching sibling routes.
+- [x] `apps/api/src/routes/history.test.ts` covers: records returned newest
       first, `limit` honoured, missing file → empty, unknown project → 404.
-- [ ] The dashboard renders deaths on the project detail view with
+- [x] The dashboard renders deaths on the project detail view with
       `lastOutput` collapsed by default.
-- [ ] A project with zero deaths shows a quiet empty state.
-- [ ] `pnpm test` and `pnpm typecheck` clean.
+- [x] A project with zero deaths shows a quiet empty state.
+- [x] `pnpm test` and `pnpm typecheck` clean.
 
 ## Out of scope
 - Alerting, push notifications, or any "you are down right now" indicator —
@@ -117,3 +117,78 @@ the type is genuinely shared, in which case `packages/types` is the home.
 - Changing the supervisor or the record shape (sprint 310 owns that).
 - Retrofitting death records onto anything other than the two supervised
   servers.
+
+## Completed
+
+**Date:** 2026-08-26
+
+### Summary
+Added `GET /projects/:name/server-deaths`, following `deploy-history`'s exact
+validate/find/read/slice/reverse shape, and wired it through to a new
+`ServerDeathsPanel` on the Reliability sub-page (next to `IncidentPanel` and
+`AlertHistoryPanel` — a crash record is a reliability signal, not a pipeline
+one, so it lives there rather than on the Pipelines page that hosts
+`DeployTimeline`/`CiTimeline`). The panel self-fetches via `name` (same
+pattern as `IncidentPanel`/`AlertHistoryPanel`), shows a quiet one-line empty
+state ("No crashes recorded.") when there are zero deaths, and keeps
+`lastOutput` behind a per-row disclosure toggle so a 40-line log blob never
+pushes the list around by default.
+
+While adding the route, `apps/api/src/routes/history.ts` was about to cross
+this repo's 300-line file-size target (271 → 303 with the new route +
+type). Rather than let it grow past the line, `disk-trend` and
+`memory-trend` — the two routes that duplicated an identical
+sum-of-squares linear-regression block verbatim, differing only in which
+`MetricPoint` field they tracked — were extracted into
+`apps/api/src/routes/trend-routes.ts`, backed by a new pure
+`computeLinearTrend(points, key)` helper in `apps/api/src/lib/trend.ts` (unit
+tested directly, no HTTP mocking needed) and a shared `MetricPoint` type in
+`apps/api/src/lib/metric-point.ts`. This was a deduplication that fell out
+of the size budget, not sprint-scope creep — no route's request/response
+shape changed, confirmed by moving their existing tests over verbatim into
+`trend-routes.test.ts` and having them pass unmodified against the new
+registration.
+
+### Files changed
+- `apps/api/src/routes/history.ts` — added `ServerDeathEntry` type and the
+  `server-deaths` route; removed `disk-trend`/`memory-trend` (moved out);
+  `MetricPoint` now imported from `lib/metric-point.ts` instead of declared
+  locally.
+- `apps/api/src/routes/history.test.ts` — added the `server-deaths` describe
+  block (404/400/empty-file/newest-first+limit); removed the
+  `disk-trend`/`memory-trend` blocks (moved to `trend-routes.test.ts`).
+- (new) `apps/api/src/routes/trend-routes.ts` — `disk-trend` and
+  `memory-trend`, now built on `computeLinearTrend`.
+- (new) `apps/api/src/routes/trend-routes.test.ts` — the moved
+  disk-trend/memory-trend route tests, unchanged in behavior.
+- (new) `apps/api/src/lib/trend.ts` — `computeLinearTrend(points, key)`.
+- (new) `apps/api/src/lib/trend.test.ts` — direct unit tests of the
+  regression math (rising/falling/flat/empty/short series).
+- (new) `apps/api/src/lib/metric-point.ts` — shared `MetricPoint` interface.
+- `apps/api/src/index.ts` — registers the new `trendRoutes`.
+- `apps/dashboard/src/lib/api-history.ts` — added `ServerDeathEntry`,
+  `ServerDeathsResponse`, and `getServerDeaths`.
+- (new) `apps/dashboard/src/components/detail/server-deaths-panel.tsx` —
+  renders the list; collapsed `lastOutput` disclosure; quiet empty state.
+- (new) `apps/dashboard/src/components/detail/server-deaths-panel.test.tsx`
+  — render tests covering empty state, fetch failure, cause labeling (signal
+  vs exit code vs health-timeout), disclosure toggle, and the count badge.
+- `apps/dashboard/app/projects/[name]/reliability/page.tsx` — mounts
+  `ServerDeathsPanel` between `IncidentPanel` and `AlertHistoryPanel`.
+
+### Verification
+- `pnpm test`: 370/370 pass in `api` (45 files, up from 43), 224/224 pass in
+  `dashboard` (up from 23 to 24 files) — full monorepo run green.
+- `pnpm typecheck`: clean across all 5 projects.
+- Manually traced `readJsonl`'s `existsSync` check (`apps/api/src/lib/jsonl.ts`)
+  to confirm a missing `.server-deaths.jsonl` returns `[]` rather than
+  throwing, before writing the "missing file" test.
+
+### Follow-ups
+- `[defer]` `apps/api/src/routes/history.test.ts` is still 476 lines (down
+  from 507 pre-sprint, after moving the trend tests out) — over this repo's
+  300-line target. A future touch of this file should split `ci-log`/
+  `deploy-log` tests into their own file, following the same pattern used
+  here for trend-routes.
+- `[defer]` No test file exists yet for `deploy-timeline.tsx` (carried over
+  from sprint 305 — untouched by this sprint, still open).

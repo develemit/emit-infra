@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises'
 import { z } from 'zod/v4'
 import { readJsonl, downsample } from '../lib/jsonl.js'
 import { findProject } from '../lib/project-helpers.js'
+import type { MetricPoint } from '../lib/metric-point.js'
 
 const NameParam = z.object({ name: z.string().min(1).max(100) })
 const ShaParam = z.object({
@@ -13,24 +14,6 @@ const ShaParam = z.object({
 })
 const HoursQuery = z.object({ hours: z.coerce.number().int().min(1).max(720).default(24) })
 const LimitQuery = z.object({ limit: z.coerce.number().int().min(1).max(200).default(50) })
-
-interface MetricPoint {
-  t: number
-  cpu: number
-  mem: number
-  memUsedMb: number
-  memTotalMb: number
-  disk: number
-  diskUsedGb: string
-  diskTotalGb: string
-  netRxBytes: number
-  netTxBytes: number
-  nginx4xx?: number
-  nginx5xx?: number
-  queueFailed?: number | null
-  queueWait?: number | null
-  containers: { name: string; cpu: number; memMb: number; restarts: number }[]
-}
 
 // Sprint 305: typed so it round-trips through this route's `return { deploys }`
 // — deploy-records.ts (deployRecordDone) has written this on every history
@@ -62,6 +45,22 @@ interface CiHistoryEntry {
   completedAt: string
   durationSec: number
   message?: string
+}
+
+// Sprint 310's serve-supervised.sh writes one of these per restart/stop to
+// .server-deaths.jsonl. Sprint 313 just reads it — the record shape is owned
+// by the supervisor, not this route.
+interface ServerDeathEntry {
+  ts: string
+  name: string
+  reason: 'health-timeout' | 'exited'
+  exitCode: number | null
+  signal: string | null
+  uptimeSec: number
+  restartCount: number
+  pid: number | null
+  host: string
+  lastOutput: string
 }
 
 const MAX_METRIC_POINTS = 500
@@ -107,6 +106,22 @@ export async function historyRoutes(app: FastifyInstance) {
     const deploys = all.slice(-query.data.limit).reverse()
 
     return { deploys }
+  })
+
+  app.get('/projects/:name/server-deaths', async (req, reply) => {
+    const params = NameParam.safeParse(req.params)
+    if (!params.success) return reply.status(400).send({ error: params.error.message })
+    const query = LimitQuery.safeParse(req.query)
+    if (!query.success) return reply.status(400).send({ error: query.error.message })
+
+    const project = await findProject(params.data.name)
+    if (!project) return reply.status(404).send({ error: 'not found' })
+
+    const filePath = join(homedir(), 'projects', params.data.name, '.server-deaths.jsonl')
+    const all = await readJsonl<ServerDeathEntry>(filePath, undefined, { tail: 50_000 })
+    const deaths = all.slice(-query.data.limit).reverse()
+
+    return { deaths }
   })
 
   app.get('/projects/:name/ci-history', async (req, reply) => {
@@ -156,88 +171,6 @@ export async function historyRoutes(app: FastifyInstance) {
       } catch {
         return reply.status(404).send({ error: 'log not found' })
       }
-    },
-  )
-
-  app.get(
-    '/projects/:name/disk-trend',
-    async (req, reply) => {
-      const params = NameParam.safeParse(req.params)
-      if (!params.success) return reply.status(400).send({ error: params.error.message })
-      const project = await findProject(params.data.name)
-      if (!project) return reply.status(404).send({ error: 'not found' })
-
-      const cutoff = Math.floor(Date.now() / 1000) - 7 * 24 * 3600
-      const filePath = join(homedir(), 'projects', params.data.name, '.metrics.jsonl')
-      const points = await readJsonl<MetricPoint>(
-        filePath,
-        (p) => typeof p.t === 'number' && p.t >= cutoff && typeof p.disk === 'number' && !('error' in p),
-        { tail: 50_000 },
-      )
-
-      if (points.length < 5) {
-        return { disk: points[points.length - 1]?.disk ?? 0, pctPerDay: 0, projectedDaysUntilFull: null }
-      }
-
-      const n = points.length
-      let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0
-      for (const p of points) {
-        sumX += p.t
-        sumY += p.disk
-        sumXY += p.t * p.disk
-        sumX2 += p.t * p.t
-      }
-      const denom = n * sumX2 - sumX * sumX
-      const slopePerSec = denom === 0 ? 0 : (n * sumXY - sumX * sumY) / denom
-      const pctPerDay = slopePerSec * 86400
-      const currentDisk = points[points.length - 1]!.disk
-
-      const projectedDaysUntilFull = pctPerDay <= 0
-        ? null
-        : (100 - currentDisk) / pctPerDay
-
-      return { disk: currentDisk, pctPerDay, projectedDaysUntilFull }
-    },
-  )
-
-  app.get(
-    '/projects/:name/memory-trend',
-    async (req, reply) => {
-      const params = NameParam.safeParse(req.params)
-      if (!params.success) return reply.status(400).send({ error: params.error.message })
-      const project = await findProject(params.data.name)
-      if (!project) return reply.status(404).send({ error: 'not found' })
-
-      const cutoff = Math.floor(Date.now() / 1000) - 7 * 24 * 3600
-      const filePath = join(homedir(), 'projects', params.data.name, '.metrics.jsonl')
-      const points = await readJsonl<MetricPoint>(
-        filePath,
-        (p) => typeof p.t === 'number' && p.t >= cutoff && typeof p.mem === 'number' && !('error' in p),
-        { tail: 50_000 },
-      )
-
-      if (points.length < 5) {
-        return { mem: points[points.length - 1]?.mem ?? 0, pctPerDay: 0, projectedDaysUntilFull: null }
-      }
-
-      const n = points.length
-      let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0
-      for (const p of points) {
-        sumX += p.t
-        sumY += p.mem
-        sumXY += p.t * p.mem
-        sumX2 += p.t * p.t
-      }
-      const denom = n * sumX2 - sumX * sumX
-      const slopePerSec = denom === 0 ? 0 : (n * sumXY - sumX * sumY) / denom
-      const pctPerDay = slopePerSec * 86400
-      const currentMem = points[points.length - 1]!.mem
-
-      const projectedDaysUntilFull = pctPerDay <= 0
-        ? null
-        : (100 - currentMem) / pctPerDay
-
-      return { mem: currentMem, pctPerDay, projectedDaysUntilFull }
     },
   )
 
