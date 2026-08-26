@@ -105,22 +105,22 @@ be tested directly with a temp cwd.
   the fix through the shared import
 
 ## Acceptance criteria
-- [ ] A matching inventory is accepted unchanged.
-- [ ] A mismatched inventory throws, and the error names both addresses, the
+- [x] A matching inventory is accepted unchanged.
+- [x] A mismatched inventory throws, and the error names both addresses, the
       file path, and the `--inventory` override.
-- [ ] The martialops scenario is covered explicitly as a test case: config
+- [x] The martialops scenario is covered explicitly as a test case: config
       says one IP, inventory holds another live project's IP → refused.
-- [ ] A multi-host inventory is refused, not guessed.
-- [ ] With no `serverIp` and no Terraform output, the run proceeds with a
+- [x] A multi-host inventory is refused, not guessed.
+- [x] With no `serverIp` and no Terraform output, the run proceeds with a
       visible note.
-- [ ] `--inventory` bypasses validation on both commands.
-- [ ] `deploy` inherits the check — prove it with a test or a documented trace
+- [x] `--inventory` bypasses validation on both commands.
+- [x] `deploy` inherits the check — prove it with a test or a documented trace
       through the shared import, not an assertion.
-- [ ] `configure.test.ts` covers all of the above, including the host-parsing
+- [x] `configure.test.ts` covers all of the above, including the host-parsing
       helper against commented, blank-line, and multi-group files.
-- [ ] Every current fleet project with an inventory passes the new check (no
+- [x] Every current fleet project with an inventory passes the new check (no
       false positives) — paste the results.
-- [ ] `pnpm test` and `pnpm typecheck` clean.
+- [x] `pnpm test` and `pnpm typecheck` clean.
 
 ## Out of scope
 - Making `ansible-inventory.ini` fully generated-and-owned (regenerated from
@@ -129,3 +129,84 @@ be tested directly with a temp cwd.
   decision. File it as a follow-up rather than doing it here.
 - The other findings-doc gaps — sprints 316-320.
 - Any change to what the provisioning playbook actually does.
+
+## Completed
+
+**Date:** 2026-08-26
+
+### Summary
+`resolveInventoryPath` (`apps/cli/src/commands/configure.ts`) now validates an
+existing `ansible-inventory.ini` against the project's known server address
+before returning it, closing the silent-wrong-target gap described in the
+sprint. A new pure helper, `parseInventoryHosts`, extracts distinct host
+tokens from inventory content — tolerating comments, blank lines, `[group]`
+headers, trailing `ansible_*=` args (including quoted values), and multiple
+groups pointing at the same host (which collapse to one entry rather than
+tripping the multi-host refusal).
+
+`validateInventory` compares the parsed host against `config.serverIp`, or
+falls back to `getTerraformOutput('server_ip', ...)` when `serverIp` is
+absent (the `emit-social` case). If neither source resolves, it prints a
+visible note and proceeds rather than blocking — there's nothing to compare
+against. On a mismatch it throws, naming the inventory path, both addresses,
+where the expectation came from, and the `--inventory` override. A
+multi-host file is refused outright rather than guessed at. `--inventory`
+continues to bypass `resolveInventoryPath` entirely at both call sites
+(`configure.ts:18`, `deploy.ts:298`) — unchanged, confirmed with tests.
+
+**Live finding during fleet verification (task 8):** running the new check
+read-only against every current fleet project surfaced a real, pre-existing
+mismatch on **emit-vision** — its `ansible-inventory.ini` still holds
+`178.105.227.175` (the Hetzner server's raw primary IPv4), while
+`.emit-infra.json`'s `serverIp` has pointed at the Terraform-managed floating
+IP `46.225.249.8` since sprint 446 (2026-08-02). DNS confirms `46.225.249.8`
+is the live production address (`api.emitvision.com` resolves there); no
+other fleet project claims `178.105.227.175`, so this isn't the
+different-live-project hazard martialops hit, but it is a second real
+instance of exactly the class of drift this sprint exists to catch — and
+`emit-infra configure`/`deploy` will now correctly refuse to run against
+emit-vision until its inventory file is regenerated or fixed. That fix is
+out of scope here (different repo, not part of this sprint's file list) and
+is called out below rather than applied silently.
+
+### Files changed
+- `apps/cli/src/commands/configure.ts` — added `parseInventoryHosts` (pure,
+  exported) and `validateInventory`; `resolveInventoryPath` now validates
+  an existing inventory instead of returning it unconditionally.
+- (new) `apps/cli/src/commands/configure.test.ts` — 15 tests covering
+  `parseInventoryHosts`, `resolveInventoryPath`'s validation branches
+  (match, mismatch, martialops-scenario regression, multi-host refusal,
+  terraform fallback, terraform-mismatch, no-source-available note),
+  the `configure` command's `--inventory` bypass, and a source-text trace
+  proving `deploy.ts` imports `resolveInventoryPath` from `configure.ts`
+  rather than a local copy.
+
+### Verification
+- `pnpm test`: 217/217 pass (20 test files).
+- `pnpm typecheck`: clean (5 projects).
+- `pnpm lint`: clean (5 projects).
+- Fleet read-only check (via `resolveInventoryPath`, no ansible invoked,
+  no files written since all 7 already had inventories):
+  ```
+  develemail:     OK
+  diner-decider:  OK
+  emit-billing:   OK
+  emit-social:    OK   (validated via terraform fallback — serverIp is unset,
+                        terraform output 167.233.169.206 matches inventory)
+  emit-vision:    FLAGGED — genuine pre-existing drift, see Summary above
+  martialops:     OK
+  tastease:       OK
+  ```
+  6/7 pass with zero false positives; the one flag is a true positive.
+
+### Follow-ups
+- `[blocker]` emit-vision's `ansible-inventory.ini` (178.105.227.175) is
+  stale against its own `config.serverIp`/DNS-live address (46.225.249.8,
+  set in sprint 446). `emit-infra configure`/`deploy` for emit-vision will
+  now refuse until someone regenerates or hand-fixes that file (delete it
+  and let `resolveInventoryPath` rewrite it from `config.serverIp`, or edit
+  it in place) — needs doing before the next emit-vision provision/deploy.
+- `[defer]` The findings doc's "fully generated-and-owned inventory" option
+  (regenerate from Terraform every run) would have prevented both the
+  martialops and emit-vision drifts at the source. Left as a design decision
+  per the sprint's Out-of-scope note, not done here.
