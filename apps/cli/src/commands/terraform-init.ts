@@ -1,9 +1,10 @@
 import { Command } from 'commander'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
 import chalk from 'chalk'
 import { loadConfig, runTerraform } from '@emit-infra/core'
+import { buildBackendConfigArgs } from '../lib/terraform-backend-config.js'
 
 export function registerTerraformInit(program: Command): void {
   program
@@ -35,8 +36,16 @@ export function registerTerraformInit(program: Command): void {
         process.exit(1)
       }
 
+      let backendArgs: string[]
+      try {
+        backendArgs = buildBackendConfigArgs(readFileSync(credPath, 'utf-8'))
+      } catch (err) {
+        console.error(chalk.red(`Invalid backend credentials in ${credPath}: ${(err as Error).message}`))
+        process.exit(1)
+      }
+
       console.log(chalk.bold(`Initialising Terraform for ${chalk.cyan(name)}...`))
-      await runTerraform('init', ['-input=false', `-backend-config=${credPath}`], tfDir)
+      await runTerraform('init', ['-input=false', ...backendArgs], tfDir)
       console.log(chalk.green('\n  ✓ Terraform initialised — you can now run terraform plan/apply'))
     })
 }

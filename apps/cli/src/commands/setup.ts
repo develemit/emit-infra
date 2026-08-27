@@ -18,6 +18,7 @@ import {
   revokeR2Token,
 } from '@emit-infra/core'
 import { buildBlueGreenProvisionVars } from '../lib/blue-green-provision-vars.js'
+import { terraformInitWithR2Retry } from '../lib/terraform-init-retry.js'
 
 export function registerSetup(program: Command): void {
   program
@@ -150,11 +151,25 @@ export function registerSetup(program: Command): void {
 
       // ── Step 4: Terraform ─────────────────────────────────────────────────────
       step(4, total, 'Provisioning infrastructure')
-      await runTerraform('init', [
-        '-input=false',
-        `-backend-config=access_key=${stateToken.accessKeyId}`,
-        `-backend-config=secret_key=${stateToken.secretAccessKey}`,
-      ], tfDir)
+      await terraformInitWithR2Retry(async () => {
+        // Stream (rather than inherit) so a transient 401 from the freshly
+        // minted token — see terraform-init-retry.ts — is visible to
+        // isTransientR2AuthError; runTerraform's inherit-mode error otherwise
+        // collapses to a bare "exited with code 1".
+        let stderrBuf = ''
+        try {
+          await runTerraform('init', [
+            '-input=false',
+            `-backend-config=access_key=${stateToken.accessKeyId}`,
+            `-backend-config=secret_key=${stateToken.secretAccessKey}`,
+          ], tfDir, (stream, text) => {
+            console.log(text)
+            if (stream === 'stderr') stderrBuf += text + '\n'
+          })
+        } catch (err) {
+          throw new Error(`${(err as Error).message}\n${stderrBuf}`)
+        }
+      })
       await runTerraform('apply', ['-auto-approve', '-input=false'], tfDir)
       ok('Infrastructure provisioned')
 

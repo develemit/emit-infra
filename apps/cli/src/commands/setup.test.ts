@@ -140,6 +140,7 @@ describe('setup command', () => {
       'init',
       ['-input=false', '-backend-config=access_key=fake-access-key', '-backend-config=secret_key=fake-secret-key'],
       tfDir,
+      expect.any(Function),
     )
   })
 
