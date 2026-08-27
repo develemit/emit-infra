@@ -1,9 +1,14 @@
 # Retire the persistent GHCR credentials from fleet servers
 **Difficulty:** 3
 
-> _Touches every live production server. Gated on sprints 317 and 319 both
-> landing and being proven — without login-per-deploy, removing these
-> credentials breaks every blue-green deploy in the fleet._
+> _Touches every live production server. Gated on sprint **317** landing and
+> being proven — without login-per-deploy, removing these credentials breaks
+> every blue-green deploy in the fleet._
+>
+> _Re-gated 2026-08-26: this sprint previously also required 319 (GitHub App
+> tokens). It does not. 317 is what makes per-deploy login work; 319 only
+> changes **which** token flows through it. 319 is deferred to backlog, so do
+> not wait on it — see "Which credential this leaves in place" below._
 
 ## Goal
 No long-lived GitHub credential sits on any fleet server. Registry auth is
@@ -18,11 +23,22 @@ session, whose scopes include `repo` — full read/write to every private
 repository on the account. martialops' and diner-decider's servers were both
 confirmed to have this file; it is fleet-wide, not project-specific.
 
-Sprints 317 and 319 remove the reason for it to exist: 317 adds the
-login-per-deploy task to blue-green, and 319 makes the credential a
-`packages: read` token that expires in an hour. This sprint is the cleanup that
-makes those worth doing — until the old file is gone, the broad-scope
-credential is still on disk regardless of what future deploys use.
+Sprint 317 removes the reason for it to exist: it adds the login-per-deploy
+task to blue-green, so nothing needs a credential sitting on disk between
+deploys. This sprint is the cleanup that makes 317 worth doing — until the old
+file is gone, the broad-scope credential is still on disk regardless of what
+future deploys use.
+
+### Which credential this leaves in place
+With 319 deferred, the token that flows at deploy time is still the operator's
+`gh` OAuth session (`ghcr_token`, set by `scripts/hooks/pre-push:191` from
+`gh auth token`, passed through `deploy.ts:172`). It is still broad-scope. What
+changes is its **lifetime and location**: transient and in-process under
+`no_log: true`, instead of at rest in `/root/.docker/config.json` on six
+internet-facing hosts. That is the bulk of the exposure removed with no new
+credential and no browser step. Narrowing the scope to `packages: read` with a
+one-hour expiry is the remaining increment, and it lives in backlog as the
+GitHub App item.
 
 ## Context
 
@@ -113,7 +129,7 @@ of any log this repo captures (`.deploy-logs/`).
 - [ ] martialops is informed that the Priority 1 finding is closed.
 
 ## Out of scope
-- Any code change to emit-infra — 317 and 319 own those.
+- Any code change to emit-infra — 317 owns those.
 - Servers whose project has not proven a post-317 deploy. Skip and report.
 - Rotating or revoking the old `gh` OAuth token itself. Worth doing given it
   sat on internet-facing hosts, but it is the operator's personal account
