@@ -5,13 +5,17 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { buildDeployExtraVars, checkBackupEnv, computeEnvRemoval, enforceEnvRemovalGuard, parseEnvFile, printDryRunPlan, registerDeploy } from './deploy.js'
 
-vi.mock('@emit-infra/core', () => ({
-  loadConfig: vi.fn(),
-  runAnsible: vi.fn(),
-  sshExec: vi.fn(),
-  deployRecordInit: vi.fn().mockResolvedValue({ sha: '', branch: '', message: '', startedAt: '', startedEpochMs: 0 }),
-  deployRecordDone: vi.fn().mockResolvedValue(undefined),
-}))
+vi.mock('@emit-infra/core', async () => {
+  const actual = await vi.importActual<typeof import('@emit-infra/core')>('@emit-infra/core')
+  return {
+    loadConfig: vi.fn(),
+    runAnsible: vi.fn(),
+    sshExec: vi.fn(),
+    deployRecordInit: vi.fn().mockResolvedValue({ sha: '', branch: '', message: '', startedAt: '', startedEpochMs: 0 }),
+    deployRecordDone: vi.fn().mockResolvedValue(undefined),
+    redactSecrets: actual.redactSecrets,
+  }
+})
 
 vi.mock('./configure.js', () => ({
   resolveInventoryPath: vi.fn().mockResolvedValue('/fake/inventory.ini'),
@@ -451,6 +455,21 @@ describe('printDryRunPlan — env file key count', () => {
     const output = logSpy.mock.calls.map((c) => c.join(' ')).join('\n')
     expect(output).toContain('✗ missing')
     expect(output).not.toContain('keys)')
+    logSpy.mockRestore()
+  })
+
+  it('redacts a secret extra-var value while still printing its key', () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    printDryRunPlan(baseConfig as ReturnType<typeof loadConfig>, '/inv.ini', {
+      ghcr_token: 'gho_supersecrettoken',
+      project_name: 'test-project',
+    })
+
+    const output = logSpy.mock.calls.map((c) => c.join(' ')).join('\n')
+    expect(output).toContain('ghcr_token')
+    expect(output).not.toContain('gho_supersecrettoken')
+    expect(output).toContain('test-project')
     logSpy.mockRestore()
   })
 })

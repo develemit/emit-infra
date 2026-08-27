@@ -28,3 +28,4 @@ export { detectPortCollisions, detectCredentialCollisions, detectDefaultPortWarn
 export { dockerInspectWorkingDir, verifyContainerOwnership, type DockerInspectFn, type OwnershipResult } from './db-scan-ownership.js'
 export { parseComposePortOutput, resolveHostPort, buildDatabaseUrl, dockerComposePort, type DockerComposePortFn } from './db-url-resolve.js'
 export { createPool, waitUntilReady, fetchCurrentDatabase, assertDatabaseIdentity } from './db-url-connect.js'
+export { redactSecrets } from './redact.js'

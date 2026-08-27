@@ -3,7 +3,7 @@ import { join, dirname } from 'node:path'
 import { readFileSync, existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import chalk from 'chalk'
-import { loadConfig, runAnsible, sshExec, deployRecordInit, deployRecordDone, type ProjectConfig } from '@emit-infra/core'
+import { loadConfig, runAnsible, sshExec, deployRecordInit, deployRecordDone, redactSecrets, type ProjectConfig } from '@emit-infra/core'
 import { resolveInventoryPath } from './configure.js'
 import { parseKeyList, filterExcludedKeys } from './secrets-scaffold.js'
 import { parseEnvEntries } from '../lib/env-file.js'
@@ -86,7 +86,7 @@ export function printDryRunPlan(
   }
 
   console.log(chalk.bold('\nAnsible extra-vars:'))
-  console.log(JSON.stringify(extraVars, null, 2))
+  console.log(JSON.stringify(redactSecrets(extraVars), null, 2))
 
   if (config.blueGreen) {
     console.log(chalk.dim('\nℹ Active/inactive slot is detected at deploy time by Ansible.'))
