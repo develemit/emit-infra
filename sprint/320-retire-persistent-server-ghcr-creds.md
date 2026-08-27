@@ -218,3 +218,42 @@ of any log this repo captures (`.deploy-logs/`).
 - The martialops findings doc status note should be flipped from "open" to
   "closed" once the migration actually completes on all 7 servers — leave
   that edit for whichever sprint run finishes the job.
+
+## Blocked (2026-08-27, re-check)
+
+**Re-verified prerequisite 2 against current `.deploy-status.json` for all 7
+fleet servers (checked at 2026-08-27T13:12:30Z):**
+
+| project | last completedAt | status | vs 317.3 (07:39:42Z) |
+|---|---|---|---|
+| develemail | 2026-08-26T05:33:29Z | deployed | before — skip |
+| diner-decider | 2026-08-27T07:38:06Z | **failed** | before — skip |
+| emit-billing | 2026-08-13T19:10:53Z | deployed | before — skip |
+| emit-vision | 2026-08-26T04:48:53Z | deployed | before — skip |
+| martialops | **2026-08-27T13:11:29Z** | **deployed** | **after — qualifies** |
+| tastease | 2026-08-27T05:24:58Z | deployed | before — skip |
+| emit-social | 2026-08-27T04:46:38Z | deployed | before — skip |
+
+martialops now has a real successful deploy after 317.3 landed — the first
+project in the fleet to clear prerequisite 2. It is ready for the per-server
+migration (backup → `docker logout ghcr.io` → deploy → verify pulls →
+confirm no `ghcr.io` entry remains), following the runbook at
+`docs/GHCR-CREDENTIAL-RETIREMENT.md`.
+
+**Not executed this run.** The migration touches a live, internet-facing
+production server: it logs out the credential the server currently relies on
+to pull images, then depends on a real redeploy succeeding to restore pull
+access. That is exactly the class of irreversible/outward-facing production
+action this skill's headless-session rules require a halt for rather than
+unattended execution — clearing the automated prerequisite gate is necessary
+but was already flagged in the prior pass as not sufficient on its own. No
+backup, logout, or deploy was run against martialops or any other server this
+pass; nothing was touched.
+
+### What's needed to unblock
+Explicit go-ahead to run the martialops per-server procedure from
+`docs/GHCR-CREDENTIAL-RETIREMENT.md` (backup `/root/.docker/config.json`,
+`docker logout ghcr.io`, redeploy, verify pulls and absence of a `ghcr.io`
+entry). Once approved and run, re-check the other 6 servers' deploy statuses
+before declaring the sprint complete — six of seven are still pre-317.3 and
+will need their own qualifying deploys first.
