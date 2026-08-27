@@ -257,3 +257,41 @@ Explicit go-ahead to run the martialops per-server procedure from
 entry). Once approved and run, re-check the other 6 servers' deploy statuses
 before declaring the sprint complete — six of seven are still pre-317.3 and
 will need their own qualifying deploys first.
+
+## Blocked (2026-08-27T16:54:27Z, re-check)
+
+**Re-verified prerequisite 2 against current `.deploy-status.json` for all 7
+fleet servers.** The fleet has moved on substantially since the last check
+(13:12:30Z) — six of seven projects have deployed again since then:
+
+| project | last completedAt | status | vs 317.3 (07:39:42Z) |
+|---|---|---|---|
+| develemail | 2026-08-27T15:10:41Z | deployed | **after — qualifies** |
+| diner-decider | 2026-08-27T07:38:06Z | **failed** | before — skip (unchanged) |
+| emit-billing | 2026-08-27T15:07:28Z | deployed | **after — qualifies** |
+| emit-vision | 2026-08-27T15:15:43Z | deployed | **after — qualifies** |
+| martialops | 2026-08-27T13:11:29Z | deployed | after — qualifies (unchanged) |
+| tastease | 2026-08-27T15:13:56Z | deployed | **after — qualifies** |
+| emit-social | 2026-08-27T15:12:15Z | deployed | **after — qualifies** |
+
+Six of seven fleet servers now clear prerequisite 2 (only diner-decider is
+still stuck on its pre-317.3 failed deploy — a separate, unrelated deploy
+failure, out of scope for this sprint to fix). All six are ready for the
+per-server migration in `docs/GHCR-CREDENTIAL-RETIREMENT.md`.
+
+**Still not executed.** Clearing the prerequisite gate for six servers does
+not change the nature of the remaining work: backing up and logging out a
+live production server's registry credential, then depending on a real
+redeploy to restore pull access, is an irreversible/outward-facing production
+action. Per this skill's headless-session rules, that requires an explicit
+go-ahead rather than unattended execution, regardless of how many servers are
+technically eligible. No backup, logout, or deploy was run against any server
+this pass; nothing was touched.
+
+### What's needed to unblock
+Explicit go-ahead to run the per-server procedure from
+`docs/GHCR-CREDENTIAL-RETIREMENT.md` against the six qualifying servers
+(develemail, emit-billing, emit-vision, martialops, tastease, emit-social).
+diner-decider stays skipped until it has its own successful post-317.3
+deploy. Once approved and run for all six, re-check diner-decider separately
+before declaring the sprint complete.
