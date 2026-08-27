@@ -17,6 +17,7 @@ import {
   createR2Token,
   revokeR2Token,
 } from '@emit-infra/core'
+import { buildBlueGreenProvisionVars } from '../lib/blue-green-provision-vars.js'
 
 export function registerSetup(program: Command): void {
   program
@@ -241,6 +242,7 @@ export function registerSetup(program: Command): void {
           nginx_wildcard_cert: config.nginx?.wildcardCert ?? false,
           cloudflare_api_token: process.env.TF_VAR_cloudflare_api_token ?? '',
           certbot_email: process.env.CERTBOT_EMAIL || `ops@${config.domain}`,
+          ...buildBlueGreenProvisionVars(config),
         }
         if (config.nginx?.customConfigSrc) {
           ansibleVars.nginx_custom_config_src = join(process.cwd(), config.nginx.customConfigSrc)

@@ -185,6 +185,49 @@ describe('setup command', () => {
     )
   })
 
+  it('passes blue_green and the blue-slot ports for a blue-green project', async () => {
+    setupHappyPath()
+    vi.mocked(loadConfig).mockReturnValue({
+      ...baseConfig,
+      blueGreen: {
+        services: [
+          { name: 'web', bluePort: 4300, greenPort: 4400 },
+          { name: 'api', bluePort: 4301, greenPort: 4401 },
+        ],
+        composeStructure: 'separate',
+      },
+    } as ReturnType<typeof loadConfig>)
+
+    const program = new Command()
+    program.exitOverride()
+    registerSetup(program)
+    await program.parseAsync(['node', 'cli', 'setup'])
+
+    const inventoryPath = join(process.cwd(), 'ansible-inventory.ini')
+    expect(runAnsible).toHaveBeenCalledWith(
+      'provision',
+      inventoryPath,
+      expect.objectContaining({
+        blue_green: true,
+        blue_web_port: 4300,
+        blue_api_port: 4301,
+      }),
+    )
+  })
+
+  it('does not pass blue_green or slot ports for a non-blue-green project', async () => {
+    setupHappyPath()
+
+    const program = new Command()
+    program.exitOverride()
+    registerSetup(program)
+    await program.parseAsync(['node', 'cli', 'setup'])
+
+    const callVars = vi.mocked(runAnsible).mock.calls[0]?.[2] as Record<string, unknown>
+    expect(callVars).not.toHaveProperty('blue_green')
+    expect(callVars).not.toHaveProperty('blue_web_port')
+  })
+
   it('pushes SERVER_IP and SSH_PRIVATE_KEY to github', async () => {
     setupHappyPath()
 

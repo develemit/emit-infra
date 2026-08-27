@@ -3,6 +3,7 @@ import { join, resolve } from 'node:path'
 import { existsSync, readFileSync } from 'node:fs'
 import chalk from 'chalk'
 import { loadConfig, runAnsible, getTerraformOutput, type ProjectConfig } from '@emit-infra/core'
+import { buildBlueGreenProvisionVars } from '../lib/blue-green-provision-vars.js'
 
 export function registerConfigure(program: Command): void {
   program
@@ -20,6 +21,7 @@ export function registerConfigure(program: Command): void {
       const extraVars: Record<string, unknown> = {
         project_name: config.name,
         domain: config.domain,
+        ...buildBlueGreenProvisionVars(config),
       }
 
       if (config.nginx?.wildcardCert) {

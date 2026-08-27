@@ -107,20 +107,113 @@ broken assumption as the workaround.
 - `ansible/roles/nginx/tasks/main.yml` — read-only; no change expected
 
 ## Acceptance criteria
-- [ ] The fleet audit table is recorded, and every blue-green project is
+- [x] The fleet audit table is recorded, and every blue-green project is
       confirmed to also use `customConfigSrc` (or the exception is flagged).
-- [ ] `configure` and `setup` both pass `blue_green` and the blue-slot ports
+- [x] `configure` and `setup` both pass `blue_green` and the blue-slot ports
       for a blue-green project, and neither passes them for a non-blue-green
       one.
-- [ ] Tests assert the extra-vars for both commands, both cases — name the
+- [x] Tests assert the extra-vars for both commands, both cases — name the
       test file.
-- [ ] A dry-run/check against a blue-green project shows the nginx role would
+- [x] A dry-run/check against a blue-green project shows the nginx role would
       create `/etc/nginx/blue-green/` and the slot config; a non-blue-green
       project shows neither.
-- [ ] No existing project's rendered vhost template changes — demonstrate,
+- [x] No existing project's rendered vhost template changes — demonstrate,
       don't assert.
-- [ ] DEPLOYMENT-PITFALLS #17 describes actual behaviour.
-- [ ] `pnpm test` and `pnpm typecheck` clean.
+- [x] DEPLOYMENT-PITFALLS #17 describes actual behaviour.
+- [x] `pnpm test` and `pnpm typecheck` clean.
+
+## Completed
+
+**Date:** 2026-08-27
+
+### Summary
+`configure.ts` and `setup.ts` now both call a new shared helper,
+`buildBlueGreenProvisionVars` (`apps/cli/src/lib/blue-green-provision-vars.ts`),
+that reads `config.blueGreen` and returns `{ blue_green: true, blue_web_port,
+blue_api_port, blue_worker_port, blue_marketing_port }` — mapping
+`blueGreen.services[].name` to the specific var names the nginx role's
+blue-slot template reads (`main.yml:143-150`), and defaulting to `{}` for
+non-blue-green projects so it can be spread into either command's extra-vars
+unconditionally. A service name with no known mapping (e.g. martialops'
+`marketing-web`) is simply omitted — the role falls back to its own default
+port, which is documented, deliberate behavior, not a bug (see test comment).
+
+The fleet re-audit (task 1) confirmed the sprint's own claim: all 7 live
+blue-green projects also set `nginx.customConfigSrc`, so the role's own vhost
+template task (gated `when: nginx_custom_config_src is not defined`) stays
+skipped everywhere and no vhost changes. The blue-slot directory/file task is
+gated only on `blue_green`, not on `customConfigSrc` — that's the task this
+sprint newly activates.
+
+Verification used a scratch Ansible playbook (`roles: [nginx]` with
+`ANSIBLE_ROLES_PATH` pointed at the repo, run with `--check --diff
+--start-at-task` against `localhost`/`connection: local`) rather than any
+real or scratch server, per the "no live re-provisioning" constraint. Three
+runs cover the acceptance criteria: `blue_green=true` with no
+`customConfigSrc` (mkdir + slot-file diffs, correct ports); `blue_green=false`
++ `customConfigSrc` set (all three gated tasks skip — matches every real
+project's current behavior); `blue_green=true` + `customConfigSrc` set (the
+vhost template task still skips, but the blue-green dir/slot-file tasks now
+run — the actual fix, confirmed against the real-world shape every fleet
+project has). A `reload nginx` handler failure appeared at the tail of two
+runs — that's `ansible.builtin.service` not supporting Darwin/launchd on this
+dev machine, unrelated to and after the task diffs being verified; it does
+not appear in any of the diffs used as evidence.
+
+#### Fleet audit table (blueGreen × customConfigSrc, 2026-08-27)
+| Project | blueGreen | customConfigSrc | Vhost template affected? |
+|---|---|---|---|
+| develemail | yes | `infra/nginx/prod.conf` | no |
+| diner-decider | yes | `infra/nginx/prod.conf` | no |
+| emit-billing | yes | `infra/nginx/prod.conf` | no |
+| emit-social | yes | `docker/nginx/prod.conf` | no |
+| emit-vision | yes | `infra/nginx/emit-vision.conf` | no |
+| martialops | yes | `docker/nginx/martialops.conf` | no |
+| tastease | yes | `docker/nginx/prod.conf` | no |
+
+No exceptions — every blue-green project sets `customConfigSrc`, matching the
+sprint's pre-audit claim.
+
+### Files changed
+- (new) `apps/cli/src/lib/blue-green-provision-vars.ts` — shared
+  `buildBlueGreenProvisionVars(config)` helper
+- (new) `apps/cli/src/lib/blue-green-provision-vars.test.ts` — unit tests for
+  the mapping, including the unmapped-service-name case
+- `apps/cli/src/commands/configure.ts` — spreads
+  `buildBlueGreenProvisionVars(config)` into `extraVars`
+- `apps/cli/src/commands/setup.ts` — spreads
+  `buildBlueGreenProvisionVars(config)` into `ansibleVars`
+- `apps/cli/src/commands/configure.test.ts` — extended with a blue-green /
+  non-blue-green extra-vars describe block
+- `apps/cli/src/commands/setup.test.ts` — same, for `setup`
+- `docs/DEPLOYMENT-PITFALLS.md` — #17 now describes the fix (CLI passes
+  `blue_green` automatically) instead of the previously-false "run the
+  playbook" advice with no code path that ever set the gating var
+
+### Verification
+- `pnpm test`: 370/370 pass (also ran the 3 changed/new files directly: 30/30)
+- `pnpm typecheck`: clean (5/5 projects)
+- Scratch `ansible-playbook --check --diff` against the `nginx` role
+  (`localhost`, `connection: local`, `ANSIBLE_ROLES_PATH` pointed at the repo,
+  no live/scratch server touched): confirmed mkdir + slot-file diffs for
+  `blue_green=true`, confirmed all three gated tasks skip for
+  `blue_green=false` + `customConfigSrc`, confirmed the vhost template stays
+  skipped (only the blue-green tasks activate) for `blue_green=true` +
+  `customConfigSrc` — the shape every fleet project will hit after this
+  sprint.
+
+### Follow-ups
+- `[defer]` `apps/cli/src/commands/setup.ts` was already at 303 lines before
+  this sprint (over the 300-line guideline) and is now 305 — the R2/secrets
+  provisioning block (steps 3 and 5) is a good extraction candidate into its
+  own helper module. Out of scope here; flagging per house style rather than
+  doing an unrequested refactor mid-sprint.
+- `[defer]` martialops names its marketing service `marketing-web`, not
+  `marketing`, so `buildBlueGreenProvisionVars` won't map it to
+  `blue_marketing_port` — it silently falls back to the role's default
+  (4303), which happens to match martialops' actual `bluePort`. Harmless
+  today, but worth either renaming the service or teaching the mapping
+  about it if that ever drifts.
 
 ## Out of scope
 - Changing the nginx role's tasks or templates — they are correct; nothing was

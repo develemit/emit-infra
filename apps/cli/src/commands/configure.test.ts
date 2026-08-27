@@ -202,6 +202,66 @@ describe('configure command — --inventory bypasses resolveInventoryPath', () =
   })
 })
 
+describe('configure command — blue-green extra-vars', () => {
+  let dir: string
+  let originalCwd: string
+
+  beforeEach(() => {
+    dir = realpathSync(mkdtempSync(join(tmpdir(), 'configure-bg-')))
+    originalCwd = process.cwd()
+    process.chdir(dir)
+    vi.clearAllMocks()
+    vi.mocked(runAnsible).mockResolvedValue(undefined)
+  })
+
+  afterEach(() => {
+    process.chdir(originalCwd)
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('passes blue_green and the blue-slot ports for a blue-green project', async () => {
+    vi.mocked(loadConfig).mockReturnValue({
+      ...baseConfig,
+      blueGreen: {
+        services: [
+          { name: 'web', bluePort: 4300, greenPort: 4400 },
+          { name: 'api', bluePort: 4301, greenPort: 4401 },
+        ],
+        composeStructure: 'separate',
+      },
+    } as ReturnType<typeof loadConfig>)
+
+    const program = new Command()
+    program.exitOverride()
+    registerConfigure(program)
+    await program.parseAsync(['node', 'cli', 'configure', '--inventory', join(dir, 'inv.ini')])
+
+    expect(runAnsible).toHaveBeenLastCalledWith(
+      'provision',
+      join(dir, 'inv.ini'),
+      expect.objectContaining({
+        blue_green: true,
+        blue_web_port: 4300,
+        blue_api_port: 4301,
+      }),
+    )
+  })
+
+  it('does not pass blue_green or slot ports for a non-blue-green project', async () => {
+    vi.mocked(loadConfig).mockReturnValue({ ...baseConfig } as ReturnType<typeof loadConfig>)
+    writeFileSync(join(dir, 'inv.ini'), '[martialops]\n178.105.239.144\n')
+
+    const program = new Command()
+    program.exitOverride()
+    registerConfigure(program)
+    await program.parseAsync(['node', 'cli', 'configure', '--inventory', join(dir, 'inv.ini')])
+
+    const callVars = vi.mocked(runAnsible).mock.calls[0]?.[2] as Record<string, unknown>
+    expect(callVars).not.toHaveProperty('blue_green')
+    expect(callVars).not.toHaveProperty('blue_web_port')
+  })
+})
+
 describe('deploy inherits the inventory check through the shared import', () => {
   it('imports resolveInventoryPath from configure.ts, not a local copy', async () => {
     const deploySource = await import('node:fs').then((fs) =>

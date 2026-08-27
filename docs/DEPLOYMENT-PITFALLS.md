@@ -349,9 +349,11 @@ The vhost the project owns in its repo (`nginx.customConfigSrc`) must handle HTT
 
 **Cause:** The project's nginx config includes `/etc/nginx/blue-green/<project>.conf` to load named upstreams (e.g. `upstream <project>_web { server 127.0.0.1:4400; }`). This file is written by `blue-green-deploy.sh` on each deploy — but on the very first deploy it doesn't exist yet. nginx refuses to reload with a missing include.
 
-**Fix:** The Ansible `nginx` role already handles this — its final task writes an initial blue-slot config to `/etc/nginx/blue-green/<project>.conf` using `blue-green-slot.conf.j2`. **Run the Ansible playbook before the first deploy.** This is a hard prerequisite for blue-green projects; CI cannot substitute for it.
+The Ansible `nginx` role's final task does write an initial blue-slot config to `/etc/nginx/blue-green/<project>.conf` using `blue-green-slot.conf.j2`, gated on the `blue_green` variable — but until sprint 316, no CLI command ever set that variable, so the task never ran on any real provision. `emit-infra configure` and `emit-infra setup` now read `blueGreen` from `.emit-infra.json` and pass `blue_green` (plus the blue-slot ports, mapped from `blueGreen.services`) to the `provision` playbook automatically.
 
-If you need to bootstrap manually without Ansible:
+**Fix:** Run `emit-infra configure <project>` (or `emit-infra setup`, which calls it) before the first deploy. This is a hard prerequisite for blue-green projects; CI cannot substitute for it. As long as the project's `.emit-infra.json` declares `blueGreen`, the CLI takes care of the rest.
+
+If you need to bootstrap manually without the CLI/Ansible:
 
 ```bash
 mkdir -p /etc/nginx/blue-green
