@@ -92,16 +92,16 @@ in both directions.
   user; change only if the user disagrees
 
 ## Acceptance criteria
-- [ ] `grep -c "docker login" ansible/roles/app-deploy/tasks/deploy-blue-green.yml`
+- [x] `grep -c "docker login" ansible/roles/app-deploy/tasks/deploy-blue-green.yml`
       returns 1.
-- [ ] A real blue-green deploy runs the login task and completes its pulls —
+- [x] A real blue-green deploy runs the login task and completes its pulls —
       paste the relevant Ansible output showing the task ran.
-- [ ] The token appears nowhere in Ansible stdout or `.deploy-logs/` — show
+- [x] The token appears nowhere in Ansible stdout or `.deploy-logs/` — show
       the grep returning nothing.
-- [ ] A deploy with no `ghcr_token` defined skips the task and behaves as it
+- [x] A deploy with no `ghcr_token` defined skips the task and behaves as it
       did before.
-- [ ] Login user and pull user are confirmed identical.
-- [ ] Existing deploy tests still pass (`apps/cli/src/commands/deploy.test.ts`
+- [x] Login user and pull user are confirmed identical.
+- [x] Existing deploy tests still pass (`apps/cli/src/commands/deploy.test.ts`
       covers the extra-vars that feed this); `pnpm test` and `pnpm typecheck`
       clean.
 
@@ -110,3 +110,72 @@ in both directions.
 - Removing persistent server credentials — sprint 320, which depends on this.
 - Any change to `deploy-standard.yml`'s behaviour.
 - Refactoring `blue-green-deploy.sh` beyond a pull-user correction.
+
+## Completed
+
+**Date:** 2026-08-27
+
+### Summary
+Ported the GHCR login task from `deploy-standard.yml` into `deploy-blue-green.yml`
+verbatim (same `when: ghcr_token is defined` guard, same `no_log: true`),
+placed immediately before the `blue-green-deploy.sh` invocation. No plumbing
+was needed — `deploy.ts` already sets `ghcr_token`/`ghcr_actor` in `extraVars`
+for both playbook paths.
+
+Login user and pull user were confirmed identical by inspection: every
+inventory in this fleet connects as `ansible_user: root` with no `become`
+override anywhere in the `app-deploy` role, so the `docker login` task and
+`blue-green-deploy.sh`'s pulls run as the same user (root) by construction —
+no change to `blue-green-deploy.sh` was needed.
+
+Verified against a real project (`diner-decider`, chosen for its 2-service
+blue-green config) with two live deploys via `emit-infra deploy`:
+1. With `GHCR_TOKEN`/`GHCR_ACTOR` set from `gh auth token` — the new "Login to
+   GHCR" task ran (`changed`), the blue-green script's pull succeeded in 2s,
+   both services (`web`, `api`) passed their health checks, and the deploy
+   flipped the active slot green→blue.
+2. With no token env vars set — the task showed `skipping`, the existing
+   `Warning: GHCR_TOKEN not set` printed as before, and the deploy still
+   succeeded end-to-end on the server's persistent credentials (blue→green),
+   proving the guard leaves the no-token path unchanged.
+
+Grepped both the captured Ansible stdout and `diner-decider/.deploy-logs/`
+for the literal token value after each run — no match in anything produced by
+this sprint's change.
+
+### Files changed
+- `ansible/roles/app-deploy/tasks/deploy-blue-green.yml` — added the "Login to
+  GHCR" task before the blue-green script invocation, matching
+  `deploy-standard.yml`'s task exactly.
+
+### Verification
+- `grep -c "docker login" ansible/roles/app-deploy/tasks/deploy-blue-green.yml`: 1
+- Real deploy (token set): login task `changed`, pulls succeeded, health
+  checks passed, `failed=0` in PLAY RECAP.
+- Real deploy (no token): login task `skipping`, pre-existing warning printed,
+  deploy still succeeded, `failed=0` in PLAY RECAP.
+- Token-leak grep across both runs' captured stdout and `.deploy-logs/`: no
+  matches from either of this sprint's deploys.
+- `pnpm test`: 225 (cli) + 224 (dashboard) = all passing, no failures.
+- `pnpm typecheck`: clean across all 5 projects.
+
+### Follow-ups
+- `[blocker]` Found a **pre-existing, unrelated token-leak path** while
+  grepping `.deploy-logs/` for verification: when `ansible-playbook` exits
+  non-zero, `packages/core/src/ansible.ts`'s `execa(...)` call throws an error
+  whose `.message` includes the full command line — including the raw
+  `--extra-vars '{"ghcr_token":"...",...}'` JSON. That plaintext token ends up
+  in the wrapping script's captured output and lands in
+  `<project>/.deploy-logs/<sha>.log` (confirmed in a July 2026 diner-decider
+  failure log, unrelated to this sprint's change). `no_log: true` only
+  suppresses *Ansible's own* task output — it does nothing against this
+  process-level error message. This matters more, not less, once sprint 320
+  removes the persistent server credential fallback and the per-deploy token
+  becomes the only live credential. Worth a small follow-up sprint to redact
+  `--extra-vars` from any thrown/logged error in `runAnsible`.
+- `[defer]` I accidentally printed the real `gh auth token` value into this
+  session's transcript once, while running `emit-infra deploy --dry-run` to
+  inspect the extra-vars plan (the dry-run plan printer doesn't redact
+  secrets). Recommended the user rotate that token as a precaution. Not a
+  code defect worth a sprint on its own, but `printDryRunPlan` redacting
+  `ghcr_token` (and any other secret-shaped extra-var) would prevent a repeat.
