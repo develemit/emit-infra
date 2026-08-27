@@ -165,9 +165,11 @@ other fleet project claims `178.105.227.175`, so this isn't the
 different-live-project hazard martialops hit, but it is a second real
 instance of exactly the class of drift this sprint exists to catch — and
 `emit-infra configure`/`deploy` will now correctly refuse to run against
-emit-vision until its inventory file is regenerated or fixed. That fix is
-out of scope here (different repo, not part of this sprint's file list) and
-is called out below rather than applied silently.
+emit-vision until its inventory file is regenerated or fixed. That fix was
+out of this sprint's file list (different repo) so it was filed as a
+follow-up rather than applied silently — and then **resolved the same day**;
+see the Follow-ups section for the resolution and what the investigation
+turned up.
 
 ### Files changed
 - `apps/cli/src/commands/configure.ts` — added `parseInventoryHosts` (pure,
@@ -198,14 +200,30 @@ is called out below rather than applied silently.
   tastease:       OK
   ```
   6/7 pass with zero false positives; the one flag is a true positive.
+- Post-fix re-run (after resolving the emit-vision follow-up): **7/7 OK**.
+- Built-CLI end-to-end (`apps/cli/dist/index.js`, confirmed rebuilt after the
+  source change and containing `parseInventoryHosts`): a mismatched inventory
+  and a multi-host inventory each refuse before invoking Ansible and exit `1`,
+  so hooks and CI fail loudly rather than continuing.
+- `ansible -i ansible-inventory.ini emit-vision -m ping` against the
+  regenerated emit-vision inventory: `SUCCESS => "ping": "pong"`.
 
 ### Follow-ups
-- `[blocker]` emit-vision's `ansible-inventory.ini` (178.105.227.175) is
-  stale against its own `config.serverIp`/DNS-live address (46.225.249.8,
-  set in sprint 446). `emit-infra configure`/`deploy` for emit-vision will
-  now refuse until someone regenerates or hand-fixes that file (delete it
-  and let `resolveInventoryPath` rewrite it from `config.serverIp`, or edit
-  it in place) — needs doing before the next emit-vision provision/deploy.
+- `[resolved]` ~~`[blocker]`~~ emit-vision's `ansible-inventory.ini` held the
+  stale `178.105.227.175` against its `config.serverIp` of `46.225.249.8`.
+  **Fixed 2026-08-26, same day.** Follow-up investigation established the
+  stale address is the *same machine* — SSH to both IPs returns hostname
+  `emit-vision-prod`, confirming `178.105.227.175` is the server's raw
+  primary IPv4 and `46.225.249.8` the Terraform-managed floating IP on top
+  of it. So this was never a wrong-machine hazard like martialops; it was
+  benign drift that the new check nonetheless (correctly) refuses on.
+  Resolved by deleting the file and letting `resolveInventoryPath`
+  regenerate it from `config.serverIp`, which also corrected a second
+  disagreement: the old file pinned `ansible_ssh_private_key_file=
+  ~/.ssh/id_ed25519` while config declares `sshKeyName: emit-vision-deploy`
+  (both keys authenticate, but the file now matches config). Verified:
+  `ansible -m ping` over the regenerated inventory returns `SUCCESS =>
+  pong`, and all 7 fleet projects now pass the check.
 - `[defer]` The findings doc's "fully generated-and-owned inventory" option
   (regenerate from Terraform every run) would have prevented both the
   martialops and emit-vision drifts at the source. Left as a design decision
