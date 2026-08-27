@@ -80,6 +80,34 @@ describe('runAnsible', () => {
     expect(opts.stdio).toBe('inherit')
   })
 
+  it('does not leak the command line or extra-vars secrets when the stdio-inherit call fails', async () => {
+    const leakyError = Object.assign(
+      new Error(
+        `Command failed with exit code 3: ansible-playbook deploy.yml -i hosts --extra-vars '{"ghcr_token":"gho_TESTSECRET"}'`,
+      ),
+      {
+        exitCode: 3,
+        command: `ansible-playbook deploy.yml -i hosts --extra-vars '{"ghcr_token":"gho_TESTSECRET"}'`,
+        escapedCommand: `ansible-playbook deploy.yml -i hosts --extra-vars '{"ghcr_token":"gho_TESTSECRET"}'`,
+        shortMessage: `Command failed with exit code 3: ansible-playbook deploy.yml -i hosts --extra-vars '{"ghcr_token":"gho_TESTSECRET"}'`,
+      },
+    )
+    mockedExeca.mockRejectedValueOnce(leakyError)
+
+    let caught: Error | undefined
+    try {
+      await runAnsible('deploy', '/inv/hosts', { ghcr_token: 'gho_TESTSECRET' })
+    } catch (err) {
+      caught = err as Error
+    }
+
+    expect(caught).toBeDefined()
+    expect(caught!.message).not.toContain('gho_TESTSECRET')
+    expect(caught!.message).not.toContain('--extra-vars')
+    expect(caught!.message).toBe('ansible-playbook exited with code 3')
+    expect('cause' in caught!).toBe(false)
+  })
+
   it('streams stdout and stderr lines to onLine callback', async () => {
     mockedExeca.mockReturnValueOnce(makeProc(0, ['line1', 'line2'], ['err1']))
 

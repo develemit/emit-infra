@@ -8,7 +8,12 @@ export async function runTerraform(
   onLine?: (stream: 'stdout' | 'stderr', text: string) => void,
 ): Promise<void> {
   if (!onLine) {
-    await execa('terraform', [cmd, ...args], { cwd, stdio: 'inherit' })
+    try {
+      await execa('terraform', [cmd, ...args], { cwd, stdio: 'inherit' })
+    } catch (err) {
+      const exitCode = (err as { exitCode?: number }).exitCode ?? 1
+      throw new Error(`terraform exited with code ${exitCode}`)
+    }
     return
   }
 

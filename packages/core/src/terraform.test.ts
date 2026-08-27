@@ -47,6 +47,34 @@ describe('runTerraform', () => {
     expect(opts.stdio).toBe('inherit')
   })
 
+  it('does not leak the command line or -backend-config secrets when the stdio-inherit call fails', async () => {
+    const leakyError = Object.assign(
+      new Error(
+        `Command failed with exit code 1: terraform init -backend-config=secret_key=R2_TESTSECRET`,
+      ),
+      {
+        exitCode: 1,
+        command: `terraform init -backend-config=secret_key=R2_TESTSECRET`,
+        escapedCommand: `terraform init -backend-config=secret_key=R2_TESTSECRET`,
+        shortMessage: `Command failed with exit code 1: terraform init -backend-config=secret_key=R2_TESTSECRET`,
+      },
+    )
+    mockedExeca.mockRejectedValueOnce(leakyError)
+
+    let caught: Error | undefined
+    try {
+      await runTerraform('init', ['-backend-config=secret_key=R2_TESTSECRET'], '/tf')
+    } catch (err) {
+      caught = err as Error
+    }
+
+    expect(caught).toBeDefined()
+    expect(caught!.message).not.toContain('R2_TESTSECRET')
+    expect(caught!.message).not.toContain('-backend-config=')
+    expect(caught!.message).toBe('terraform exited with code 1')
+    expect('cause' in caught!).toBe(false)
+  })
+
   it('streams stdout and stderr lines to onLine callback', async () => {
     mockedExeca.mockReturnValueOnce(makeProc(0, ['Applying...', 'Done.'], ['Warning: foo']))
 

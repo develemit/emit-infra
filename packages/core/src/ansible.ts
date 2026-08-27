@@ -30,7 +30,12 @@ export async function runAnsible(
   }
 
   if (!onLine) {
-    await execa('ansible-playbook', args, { stdio: 'inherit', env })
+    try {
+      await execa('ansible-playbook', args, { stdio: 'inherit', env })
+    } catch (err) {
+      const exitCode = (err as { exitCode?: number }).exitCode ?? 1
+      throw new Error(`ansible-playbook exited with code ${exitCode}`)
+    }
     return
   }
 
