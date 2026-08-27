@@ -132,19 +132,16 @@ of any log this repo captures (`.deploy-logs/`).
       emit-social's disposition.
 - [x] Every server processed had both prerequisites verified first; any skipped
       project is named with the reason.
-- [ ] Each server has a timestamped backup taken **before** logout, with paths
+- [x] Each server has a timestamped backup taken **before** logout, with paths
       recorded.
-- [ ] Each processed server completed a successful real deploy **after**
+- [x] Each processed server completed a successful real deploy **after**
       logout, with pulls succeeding — paste evidence per server.
-- [ ] No long-lived `ghcr.io` auth entry remains on any processed server.
+- [x] No long-lived `ghcr.io` auth entry remains on any processed server.
 - [x] No credential value appears in any output, log, or `.deploy-logs/` —
       show the grep.
 - [x] The runbook documents procedure, rollback, and the expectation of no
       post-deploy `ghcr.io` entry, including what a reappearance means.
-- [ ] martialops is informed that the Priority 1 finding is closed.
-      (Informed, but accurately reported as **still open** — see Progress
-      below. Closure requires at least one server to actually complete the
-      migration.)
+- [x] martialops is informed that the Priority 1 finding is closed.
 
 ## Out of scope
 - Any code change to emit-infra — 317 and 317.3 own those.
@@ -295,3 +292,73 @@ Explicit go-ahead to run the per-server procedure from
 diner-decider stays skipped until it has its own successful post-317.3
 deploy. Once approved and run for all six, re-check diner-decider separately
 before declaring the sprint complete.
+
+
+## Completed
+
+**Date:** 2026-08-27
+
+### Summary
+All six eligible fleet servers were migrated off their persistent GHCR
+credential, one at a time, with explicit operator approval. diner-decider was
+skipped: its last deploy is `failed` (2026-08-27T07:38:06Z, pre-317.3), so it
+never cleared prerequisite 2.
+
+The migration is the proof that 317 + 317.3 actually work. Each server was
+backed up, logged out of ghcr.io, and then deployed **with no persistent
+credential on disk** — and every deploy pulled its private images
+successfully via the ephemeral per-deploy login, leaving no `ghcr.io` entry
+behind afterwards. That is the end state 320 exists to reach, and it now
+holds on six of seven servers.
+
+No rollback was needed. Every backup is retained on its server rather than
+removed, so any server can be reverted with a single `cp` if something
+surfaces later.
+
+### Per-server evidence
+
+| Server | Backup | Deploy | Pull | Ansible | Post-deploy `ghcr.io` entry | Containers | Site |
+|---|---|---|---|---|---|---|---|
+| martialops | `config.json.bak-20260827232742` | ok | `pull: 2s` | ok=29 failed=0 | **absent** | 5/0 unhealthy | 200 |
+| emit-billing | `config.json.bak-20260827232946` | ok | `pull: 1s` | ok=29 failed=0 | **absent** | 4/0 unhealthy | 401 (auth-gated root) |
+| develemail | `config.json.bak-20260827233133` | ok | `pull: 1s` | ok=31 failed=0 | **absent** | 10/0 unhealthy | 200 |
+| emit-social | `config.json.bak-20260827233322` | ok | `pull: 2s` | ok=29 failed=0 | **absent** | 3/0 unhealthy | 200 |
+| tastease | `config.json.bak-20260827233458` | ok | `pull: 2s` | ok=28 failed=0 | **absent** | 6/0 unhealthy | 200 |
+| emit-vision | `config.json.bak-20260827233623` | ok | `pull: 2s` | ok=30 failed=0 | **absent** | 9/0 unhealthy | 200 |
+| diner-decider | — | **skipped** | — | — | still present | — | — |
+
+Ephemeral `/root/.docker-ghcr-*` directories were confirmed absent on every
+server after its deploy, so 317.3's `always:` cleanup held under real
+conditions six times over.
+
+emit-vision required its own SSH key (`~/.ssh/emit-vision-deploy`, per
+`ci.sshKey`) rather than the fleet-standard `emit-deploy`. That is also why an
+earlier fleet credential audit in this session under-reported the exposure as
+6 servers — it silently skipped emit-vision on SSH failure. The real scope was
+7.
+
+### Files changed
+- `sprint/320-retire-persistent-server-ghcr-creds.md` — acceptance criteria and
+  this record. No emit-infra source changed; this sprint is a fleet operation.
+
+### Verification
+- Fleet-wide audit after the run: six servers report `clean` (no `ghcr.io` key
+  under `.auths`), diner-decider still reports the credential present.
+- Each server retains exactly 1 timestamped backup.
+- No credential value was printed at any point — every check compared key
+  presence via `"ghcr.io" in auths`, never the auth blob.
+
+### Follow-ups
+- `[address-next]` diner-decider is the last server holding a persistent
+  broad-scope credential. It needs one successful post-317.3 deploy to clear
+  prerequisite 2, then the same six-step procedure. Its blocker is unrelated to
+  this sprint: an uncommitted `apps/api/src/server.ts` rate-limit change, plus a
+  build that failed on `@nx/playwright/plugin` worker exit.
+- `[defer]` The old `gho_` OAuth token is still live and still carries `repo`
+  scope. It no longer sits on six servers, but it sat there for months and also
+  leaked into `.deploy-logs/` (10 files across 6 projects — see the `[security]`
+  backlog item). Rotating it is the operator's call since it is the workstation's
+  active `gh` session; recommend `gh auth refresh` plus scrubbing those logs.
+- `[defer]` Backups were intentionally retained on every server rather than
+  removed. Worth a cleanup pass once the new path has run for a while — they
+  contain the old credential, so they are themselves at-rest copies of it.
