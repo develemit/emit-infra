@@ -33,25 +33,40 @@ type StatusData = {
 // first failure and each *change* in failure, then stay quiet until recovery.
 const lastHttpFailure = new Map<string, string>()
 
+// A null return means "we could not determine", and the dashboard renders that
+// as Down — so a single slow probe must not produce one. 5s was too tight:
+// Cloudflare-proxied domains checked from a loaded workstation intermittently
+// exceeded it, flipping healthy projects to Down (observed 2026-08-27, 5 of 7
+// projects flapping between a real status and null across consecutive polls).
+// One retry on a longer budget: a genuinely unreachable host still fails both
+// attempts, while a transient stall no longer reads as an outage.
+const HTTP_CHECK_TIMEOUT_MS = 10_000
+const HTTP_CHECK_ATTEMPTS = 2
+
 async function checkHttp(domain: string): Promise<number | null> {
-  try {
-    const res = await fetch(`https://${domain}`, {
-      method: 'HEAD',
-      redirect: 'follow',
-      signal: AbortSignal.timeout(5000),
-    })
-    if (lastHttpFailure.delete(domain)) {
-      console.info(`HTTP check recovered for ${domain}: ${res.status}`)
+  let lastErr: unknown
+  for (let attempt = 1; attempt <= HTTP_CHECK_ATTEMPTS; attempt++) {
+    try {
+      const res = await fetch(`https://${domain}`, {
+        method: 'HEAD',
+        redirect: 'follow',
+        signal: AbortSignal.timeout(HTTP_CHECK_TIMEOUT_MS),
+      })
+      if (lastHttpFailure.delete(domain)) {
+        console.info(`HTTP check recovered for ${domain}: ${res.status}`)
+      }
+      return res.status
+    } catch (err) {
+      lastErr = err
     }
-    return res.status
-  } catch (err) {
-    const signature = String(err)
-    if (lastHttpFailure.get(domain) !== signature) {
-      lastHttpFailure.set(domain, signature)
-      console.warn(`HTTP check failed for ${domain}: ${err}`)
-    }
-    return null
   }
+
+  const signature = String(lastErr)
+  if (lastHttpFailure.get(domain) !== signature) {
+    lastHttpFailure.set(domain, signature)
+    console.warn(`HTTP check failed for ${domain} after ${HTTP_CHECK_ATTEMPTS} attempts: ${lastErr}`)
+  }
+  return null
 }
 
 function toInt(s: string | undefined): number | undefined {
