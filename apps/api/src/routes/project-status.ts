@@ -27,6 +27,12 @@ type StatusData = {
   activeSlot: string | null
 }
 
+// The status monitor polls every 60s, so a permanently unreachable domain
+// would otherwise log an identical line forever and drown real errors — the
+// test-smoke fixture's RFC 5737 address is unreachable *by design*. Log the
+// first failure and each *change* in failure, then stay quiet until recovery.
+const lastHttpFailure = new Map<string, string>()
+
 async function checkHttp(domain: string): Promise<number | null> {
   try {
     const res = await fetch(`https://${domain}`, {
@@ -34,9 +40,16 @@ async function checkHttp(domain: string): Promise<number | null> {
       redirect: 'follow',
       signal: AbortSignal.timeout(5000),
     })
+    if (lastHttpFailure.delete(domain)) {
+      console.info(`HTTP check recovered for ${domain}: ${res.status}`)
+    }
     return res.status
   } catch (err) {
-    console.warn(`HTTP check failed for ${domain}: ${err}`)
+    const signature = String(err)
+    if (lastHttpFailure.get(domain) !== signature) {
+      lastHttpFailure.set(domain, signature)
+      console.warn(`HTTP check failed for ${domain}: ${err}`)
+    }
     return null
   }
 }
@@ -67,7 +80,12 @@ async function lastDeployEpoch(name: string): Promise<string | null> {
     if (!entry.completedAt) return null
     return String(Math.floor(new Date(entry.completedAt).getTime() / 1000))
   } catch (err) {
-    console.warn(`[lastDeployEpoch] failed to read/parse ${path}: ${err}`)
+    // A project that has never deployed simply has no history file. That is a
+    // normal state, already expressed by the `null` return — warning about it
+    // every poll cycle reports a non-problem as a failure.
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+      console.warn(`[lastDeployEpoch] failed to read/parse ${path}: ${err}`)
+    }
     return null
   }
 }

@@ -194,3 +194,51 @@ describe.each([
     expect(classifyRunState).toHaveBeenCalledWith(record)
   })
 })
+
+describe('status poll logging is quiet about by-design conditions', () => {
+  let app: FastifyInstance
+  let warn: ReturnType<typeof vi.spyOn>
+  let info: ReturnType<typeof vi.spyOn>
+
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    info = vi.spyOn(console, 'info').mockImplementation(() => {})
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject] as never)
+    vi.mocked(sshExec).mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 } as never)
+    app = Fastify({ logger: false })
+    await app.register(projectStatusRoutes)
+    await app.ready()
+  })
+
+  afterEach(async () => {
+    await app.close()
+    warn.mockRestore()
+    info.mockRestore()
+    vi.unstubAllGlobals()
+  })
+
+  // Regression: the test-smoke fixture has no .deploy-history.jsonl (it has
+  // never deployed, by design), and every 60s poll logged that as a failure.
+  it('does not warn when .deploy-history.jsonl is simply absent (ENOENT)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ status: 200 }))
+    const enoent = Object.assign(new Error('ENOENT: no such file or directory'), { code: 'ENOENT' })
+    vi.mocked(readFile).mockRejectedValue(enoent)
+
+    await app.inject({ method: 'GET', url: '/projects/myapp/status' })
+
+    const lines = warn.mock.calls.map((c) => String(c[0])).join('\n')
+    expect(lines).not.toContain('[lastDeployEpoch]')
+  })
+
+  it('still warns when the history file exists but is unreadable for another reason', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ status: 200 }))
+    const denied = Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' })
+    vi.mocked(readFile).mockRejectedValue(denied)
+
+    await app.inject({ method: 'GET', url: '/projects/myapp/status' })
+
+    const lines = warn.mock.calls.map((c) => String(c[0])).join('\n')
+    expect(lines).toContain('[lastDeployEpoch]')
+  })
+})
