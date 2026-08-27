@@ -1,9 +1,10 @@
 # Retire the persistent GHCR credentials from fleet servers
 **Difficulty:** 3
 
-> _Touches every live production server. Gated on sprint **317** landing and
-> being proven — without login-per-deploy, removing these credentials breaks
-> every blue-green deploy in the fleet._
+> _Touches every live production server. Gated on sprints **317** and **317.3**
+> landing and being proven — without login-per-deploy, removing these
+> credentials breaks every blue-green deploy in the fleet, and without an
+> ephemeral docker config the next deploy writes the credential straight back._
 >
 > _Re-gated 2026-08-26: this sprint previously also required 319 (GitHub App
 > tokens). It does not. 317 is what makes per-deploy login work; 319 only
@@ -23,9 +24,10 @@ session, whose scopes include `repo` — full read/write to every private
 repository on the account. martialops' and diner-decider's servers were both
 confirmed to have this file; it is fleet-wide, not project-specific.
 
-Sprint 317 removes the reason for it to exist: it adds the login-per-deploy
-task to blue-green, so nothing needs a credential sitting on disk between
-deploys. This sprint is the cleanup that makes 317 worth doing — until the old
+Sprints 317 and 317.3 remove the reason for it to exist: 317 adds the
+login-per-deploy task to blue-green, and 317.3 makes that login write to an
+ephemeral config directory that is cleaned up afterwards, so nothing needs a
+credential sitting on disk between deploys. This sprint is the cleanup that makes 317 worth doing — until the old
 file is gone, the broad-scope credential is still on disk regardless of what
 future deploys use.
 
@@ -81,9 +83,20 @@ you are actually on before running anything destructive.
 ### Verifying the file is gone and stays gone
 `docker logout ghcr.io` rewrites `config.json` rather than deleting it; check
 that the `ghcr.io` auth entry specifically is absent, not that the file is
-missing. A subsequent deploy will re-add a *short-lived* entry — that is
-expected and correct, and worth stating in the runbook so the next person does
-not "fix" it.
+missing.
+
+**Corrected 2026-08-27 (caught in review by martialops).** An earlier version of
+this section said a subsequent deploy would re-add a *short-lived* entry that
+was "expected and correct". That was wrong. Sprint 317's login task is a plain
+`docker login ghcr.io` with no `--config` override and no logout, so the next
+deploy rewrites the same broad-scope `gho_` token back into
+`/root/.docker/config.json` permanently — making this sprint a one-time cleanup
+that undoes itself. Sprint **317.3** fixes that by logging in to an ephemeral
+config directory removed after each deploy.
+
+So the correct expectation, once 317.3 has landed: after a deploy, there should
+be **no** `ghcr.io` entry in `/root/.docker/config.json` at all. If one appears,
+that is a regression in 317.3, not normal behaviour — do not wave it through.
 
 ### Do not print credentials
 Compare by hash or by key presence. Never echo the auth blob, and keep it out
@@ -96,11 +109,13 @@ of any log this repo captures (`.deploy-logs/`).
 3. Per server, in order: back up, `docker logout ghcr.io`, deploy, verify
    pulls succeeded, record the outcome.
 4. On any failure, restore that server's backup and halt the sprint.
-5. Confirm on each completed server that no long-lived `ghcr.io` auth entry
-   remains, and that a post-deploy entry (if present) is the short-lived one.
+5. Confirm on each completed server that **no** `ghcr.io` auth entry remains
+   after a deploy. With 317.3 landed there should be none at all; an entry
+   reappearing means 317.3 regressed — halt rather than accepting it.
 6. Check `emit-social` separately, since it has no `serverIp`.
 7. Write a short runbook documenting the per-server procedure, the rollback,
-   and the note that a post-deploy short-lived entry is expected.
+   and the expectation that no `ghcr.io` entry exists after a deploy — plus
+   what to do if one reappears (a 317.3 regression, not a normal state).
 8. Update the findings doc's status in
    `~/projects/martialops/docs/ops/emit-infra-upstream-findings.md` — or file a
    note for martialops — recording that Priority 1 is closed, so its sprint 114
@@ -124,12 +139,12 @@ of any log this repo captures (`.deploy-logs/`).
 - [ ] No long-lived `ghcr.io` auth entry remains on any processed server.
 - [ ] No credential value appears in any output, log, or `.deploy-logs/` —
       show the grep.
-- [ ] The runbook documents procedure, rollback, and the expected post-deploy
-      short-lived entry.
+- [ ] The runbook documents procedure, rollback, and the expectation of no
+      post-deploy `ghcr.io` entry, including what a reappearance means.
 - [ ] martialops is informed that the Priority 1 finding is closed.
 
 ## Out of scope
-- Any code change to emit-infra — 317 owns those.
+- Any code change to emit-infra — 317 and 317.3 own those.
 - Servers whose project has not proven a post-317 deploy. Skip and report.
 - Rotating or revoking the old `gh` OAuth token itself. Worth doing given it
   sat on internet-facing hosts, but it is the operator's personal account
