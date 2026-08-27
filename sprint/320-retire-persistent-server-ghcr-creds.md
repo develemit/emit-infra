@@ -128,20 +128,23 @@ of any log this repo captures (`.deploy-logs/`).
   note (or a filed follow-up if editing another repo's doc is undesirable)
 
 ## Acceptance criteria
-- [ ] The server list is derived at execution time and recorded, including
+- [x] The server list is derived at execution time and recorded, including
       emit-social's disposition.
-- [ ] Every server processed had both prerequisites verified first; any skipped
+- [x] Every server processed had both prerequisites verified first; any skipped
       project is named with the reason.
 - [ ] Each server has a timestamped backup taken **before** logout, with paths
       recorded.
 - [ ] Each processed server completed a successful real deploy **after**
       logout, with pulls succeeding — paste evidence per server.
 - [ ] No long-lived `ghcr.io` auth entry remains on any processed server.
-- [ ] No credential value appears in any output, log, or `.deploy-logs/` —
+- [x] No credential value appears in any output, log, or `.deploy-logs/` —
       show the grep.
-- [ ] The runbook documents procedure, rollback, and the expectation of no
+- [x] The runbook documents procedure, rollback, and the expectation of no
       post-deploy `ghcr.io` entry, including what a reappearance means.
 - [ ] martialops is informed that the Priority 1 finding is closed.
+      (Informed, but accurately reported as **still open** — see Progress
+      below. Closure requires at least one server to actually complete the
+      migration.)
 
 ## Out of scope
 - Any code change to emit-infra — 317 and 317.3 own those.
@@ -149,3 +152,69 @@ of any log this repo captures (`.deploy-logs/`).
 - Rotating or revoking the old `gh` OAuth token itself. Worth doing given it
   sat on internet-facing hosts, but it is the operator's personal account
   credential and that decision is theirs — file it as a recommendation.
+
+## Progress (2026-08-27)
+
+### Done so far
+- Derived the server list at execution time from `~/projects/*/.emit-infra.json`
+  (`serverIp` field): develemail (178.105.171.1), diner-decider
+  (167.233.43.96), emit-billing (167.233.158.240), emit-vision
+  (46.225.249.8), martialops (178.105.239.144), tastease (178.104.195.59).
+- Checked emit-social separately (no `serverIp` in `.emit-infra.json` as
+  expected) — found its server IP in `.env.prod`'s `SERVER_IP`
+  (167.233.169.206) and confirmed it's live and reachable via
+  `emit-infra status` (containers healthy, uptime 44 days). All 7 projects
+  use `blueGreen` deploys, so all 7 are in scope once eligible.
+- Verified prerequisite 1 (login task exists in `deploy-blue-green.yml`) for
+  all 7: true fleet-wide since it's emit-infra's own shared Ansible role
+  (`ansible/roles/app-deploy/tasks/deploy-blue-green.yml:28-63`), landed in
+  317 (commit `7c941cc`, 2026-08-26T23:53:20-07:00) and made ephemeral by
+  317.3 (commit `a1c8a18`, 2026-08-27T00:39:42-07:00 =
+  2026-08-27T07:39:42Z).
+- Verified prerequisite 2 (a successful deploy using the per-deploy login,
+  i.e. timestamped after 317.3) for all 7 via each project's
+  `.deploy-status.json`: **every one predates 317.3** — the latest
+  successful deploy across the fleet was tastease at 2026-08-27T05:24:58Z,
+  over 2 hours before 317.3 landed; diner-decider's most recent attempt
+  (07:38:06Z) was also before 317.3 and failed regardless. **All 7 servers
+  were skipped** per the sprint's own gating rule — none has demonstrated it
+  can pull without the persistent file since the ephemeral fix landed.
+- Wrote the runbook: `docs/GHCR-CREDENTIAL-RETIREMENT.md` — background,
+  current fleet-readiness snapshot, prerequisites, per-server procedure,
+  rollback, and the "no `ghcr.io` entry should reappear post-317.3" check
+  including what a reappearance means (317.3 regression).
+- Filed an accurate status note in
+  `~/projects/martialops/docs/ops/emit-infra-upstream-findings.md` (Priority
+  1 section) — reports that gaps 1 and the ephemeral-config follow-up have
+  landed but the migration itself has not run on any server, so the item
+  stays **open**, not closed. Did not claim closure since it isn't true yet.
+- No credential values were printed, logged, or written anywhere this pass
+  (no server was touched) — confirmed via grep on both new/edited docs; the
+  only `gho_...` strings present are the pre-existing placeholder pattern
+  `gho_<token>`, not real values.
+
+### Blocked on
+- Every fleet server is blocked on the same thing: a real, successful
+  production deploy for that project timestamped after 317.3 landed
+  (2026-08-27T07:39:42Z). Sprint 320 cannot manufacture that deploy itself —
+  it has to happen through each project's normal deploy flow — and running
+  `docker logout` / server work ahead of that proof would be exactly the
+  premature migration the sprint's prerequisite section exists to prevent.
+- Separately: the server-touching tasks in this sprint (backup, logout,
+  deploy, verify) are irreversible/outward-facing production actions. Per
+  this skill's headless-session rules, those aren't something to do without
+  the prerequisite proof in hand regardless — so even once a project clears
+  prerequisite 2, that project's server work should be confirmed rather than
+  batched through unattended.
+
+### Pickup notes
+- Re-run this sprint (or just the per-server loop) once any project shows a
+  `.deploy-status.json` with `"status": "deployed"` and `finishedAt` after
+  `2026-08-27T07:39:42Z`. Check all 7 — don't assume the rest are still
+  behind just because one caught up.
+- The runbook at `docs/GHCR-CREDENTIAL-RETIREMENT.md` has the exact
+  per-server procedure ready to execute; it doesn't need to be rewritten,
+  just followed once a project qualifies.
+- The martialops findings doc status note should be flipped from "open" to
+  "closed" once the migration actually completes on all 7 servers — leave
+  that edit for whichever sprint run finishes the job.
