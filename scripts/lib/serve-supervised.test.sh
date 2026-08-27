@@ -224,6 +224,123 @@ else
 fi
 cd "$WORK"
 
+echo "a fresh hold file defers a health-timeout restart; a stale one lets it through"
+CASE5="$WORK/case-hold"; mkdir -p "$CASE5"; cd "$CASE5"
+PORT5=18975
+NAME5="${NAME_PREFIX}-hold"
+# Target never answers on $PORT5 at all, so every probe fails from the start —
+# the only thing standing between it and a restart is the hold file.
+"$SUP" --name "$NAME5" --health-url "http://127.0.0.1:$PORT5/" --dir "$CASE5" \
+  --interval 1 --failures 2 --max-restarts 2 \
+  --hold-file hold --hold-stale 3 --hold-max 600 -- bash -c 'while true; do sleep 3600; done' &
+SUP_PID=$!
+# Keep the hold fresh for well past --interval * --failures.
+for _ in 1 2 3 4 5 6 7 8; do touch "$CASE5/hold"; sleep 0.5; done
+if [[ -f "$CASE5/.server-deaths.jsonl" ]]; then
+  no "a fresh hold file defers the restart (death recorded anyway)"
+else
+  ok "a fresh hold file defers the restart"
+fi
+# Stop refreshing: the hold goes stale after --hold-stale and the kill lands.
+_wait_until "the restart to land once the hold goes stale" 200 \
+  _line_count_at_least "$CASE5/.server-deaths.jsonl" 1
+check "the deferred death is still recorded as health-timeout" \
+  "$(_last_json_field "$CASE5/.server-deaths.jsonl" reason)" "health-timeout"
+kill -TERM "$SUP_PID" 2>/dev/null
+wait "$SUP_PID" 2>/dev/null
+cd "$WORK"
+
+echo "--hold-max bounds the deferral so a wedged server still restarts"
+CASE6="$WORK/case-holdmax"; mkdir -p "$CASE6"; cd "$CASE6"
+PORT6=18976
+NAME6="${NAME_PREFIX}-holdmax"
+"$SUP" --name "$NAME6" --health-url "http://127.0.0.1:$PORT6/" --dir "$CASE6" \
+  --interval 1 --failures 2 --max-restarts 2 \
+  --hold-file hold --hold-stale 30 --hold-max 3 -- bash -c 'while true; do sleep 3600; done' &
+SUP_PID=$!
+# Refresh forever — only --hold-max can end this deferral.
+( for _ in $(seq 1 60); do touch "$CASE6/hold"; sleep 0.5; done ) &
+TOUCHER=$!
+_wait_until "--hold-max to expire and force the restart" 200 \
+  _line_count_at_least "$CASE6/.server-deaths.jsonl" 1
+ok "--hold-max forces a restart even while the hold file stays fresh"
+kill "$TOUCHER" 2>/dev/null
+kill -TERM "$SUP_PID" 2>/dev/null
+wait "$SUP_PID" 2>/dev/null
+cd "$WORK"
+
+echo "a reparented grandchild holding the port is reaped instead of blocking the restart"
+CASE8="$WORK/case-orphan"; mkdir -p "$CASE8"; cd "$CASE8"
+source "$LIB_DIR/serve-supervised-lib.sh"
+PORT8=18978
+python3 -m http.server "$PORT8" --bind 127.0.0.1 >/dev/null 2>&1 &
+ORPHAN=$!
+_wait_until "the orphan listener to come up" 100 _curl_ok "http://127.0.0.1:$PORT8/"
+_svsup_wait_port_free 127.0.0.1 "$PORT8" 5 && no "fixture check: port should read as busy"
+_svsup_kill_port_holders 127.0.0.1 "$PORT8" >/dev/null
+if _wait_until "the port to free up after killing the holder" 100 \
+     _svsup_wait_port_free 127.0.0.1 "$PORT8" 2; then
+  ok "_svsup_kill_port_holders frees a port held by a process we do not own"
+fi
+kill -9 "$ORPHAN" 2>/dev/null
+wait "$ORPHAN" 2>/dev/null
+cd "$WORK"
+
+echo "_svsup_wait_pids_gone waits on descendants, not just the root"
+CASE9="$WORK/case-treewait"; mkdir -p "$CASE9"; cd "$CASE9"
+# A trailing `while` loop, not a bare `sleep`: bash exec-optimises the last
+# simple command of `-c`, which would replace the parent and reparent the
+# background child to pid 1 before the test even starts.
+cat > tree.sh <<'EOF'
+#!/usr/bin/env bash
+sleep 3600 &
+echo $! > descendant.pid
+while true; do sleep 1; done
+EOF
+chmod +x tree.sh
+./tree.sh &
+ROOT=$!
+_wait_until "the fixture descendant to register" 50 test -s "$CASE9/descendant.pid"
+DESCENDANT=$(cat "$CASE9/descendant.pid")
+TREE=$(_svsup_tree_pids "$ROOT")
+case " $(echo $TREE) " in
+  *" $DESCENDANT "*) ok "_svsup_tree_pids includes the descendant" ;;
+  *) no "_svsup_tree_pids includes the descendant (root $ROOT, want $DESCENDANT, got: $(echo $TREE))" ;;
+esac
+# Kill only the root. Its child survives and reparents to pid 1 — exactly the
+# orphan that used to keep holding the port after a "successful" teardown.
+kill -9 "$ROOT" 2>/dev/null; wait "$ROOT" 2>/dev/null
+# shellcheck disable=SC2086
+if _svsup_wait_pids_gone 5 $TREE; then
+  no "_svsup_wait_pids_gone returns early while the descendant is still alive"
+else
+  ok "_svsup_wait_pids_gone keeps waiting while the descendant is still alive"
+fi
+kill -9 "$DESCENDANT" 2>/dev/null
+# shellcheck disable=SC2086
+if _svsup_wait_pids_gone 30 $TREE; then
+  ok "_svsup_wait_pids_gone returns once the whole tree is gone"
+else
+  no "_svsup_wait_pids_gone returns once the whole tree is gone"
+fi
+cd "$WORK"
+
+echo "a stop signal during restart backoff does not spawn one more child"
+CASE10="$WORK/case-stopbackoff"; mkdir -p "$CASE10"; cd "$CASE10"
+NAME10="${NAME_PREFIX}-stopbackoff"
+# Target exits immediately, so the supervisor spends nearly all its time in
+# the backoff sleep — the window where a stop signal used to leak a child.
+"$SUP" --name "$NAME10" --health-url "http://127.0.0.1:18979/" --dir "$CASE10" \
+  --interval 1 --failures 1 --max-restarts 9 -- bash -c 'exit 1' &
+SUP_PID=$!
+_wait_until "the supervisor to reach its backoff" 150 _line_count_at_least "$CASE10/.server-deaths.jsonl" 2
+kill -TERM "$SUP_PID" 2>/dev/null
+if _wait_until "the supervisor to exit" 100 bash -c "! kill -0 $SUP_PID 2>/dev/null"; then
+  ok "the supervisor exits promptly when stopped mid-backoff"
+fi
+wait "$SUP_PID" 2>/dev/null
+cd "$WORK"
+
 echo "log rotation caps the archive directory at the configured count"
 CASE7="$WORK/case-rotate"; mkdir -p "$CASE7"; cd "$CASE7"
 source "$LIB_DIR/ci-log-capture.sh"

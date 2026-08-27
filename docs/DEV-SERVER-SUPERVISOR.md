@@ -32,6 +32,7 @@ keeps hitting.
 ```bash
 scripts/serve-supervised.sh --name <slug> --health-url <url> \
   [--dir <path>] [--interval <s>] [--failures <n>] [--max-restarts <n>] \
+  [--probe-timeout <s>] [--hold-file <path>] [--hold-stale <s>] [--hold-max <s>] \
   -- <command...>
 ```
 
@@ -43,6 +44,10 @@ scripts/serve-supervised.sh --name <slug> --health-url <url> \
 | `--interval` | 5 | Seconds between health probes |
 | `--failures` | 3 | Consecutive failed probes before treating the server as dead — a single blip doesn't trigger a restart |
 | `--max-restarts` | 10 | Stop restarting (and print a banner) after this many consecutive deaths |
+| `--probe-timeout` | 3 | Per-probe `curl` timeout |
+| `--hold-file` | *(none)* | While this file is fresh, defer a health-timeout restart. Relative paths resolve against `--dir` |
+| `--hold-stale` | 30 | How recently `--hold-file` must have been touched to count as held |
+| `--hold-max` | 900 | Longest a single unhealthy episode may be deferred |
 
 Example, wrapping the API's dev server:
 
@@ -63,11 +68,41 @@ in front of it, not replace it. An outer `launchd` layer comes later
    panel still shows it live) and `~/.local/log/<name>.log`.
 2. Polls `--health-url` every `--interval` seconds. `--failures` consecutive
    failures counts as death.
-3. On death: kills the whole process **tree** (not just the top pid — the
-   real listener is often a grandchild), waits for the port to release, then
-   restarts with exponential backoff (1s, 2s, 4s… capped at 60s).
-4. After `--max-restarts` consecutive deaths, stops and prints a persistent
+3. On death: snapshots the process **tree** and kills all of it (not just the
+   top pid — the real listener is often a grandchild), waits for *every* pid
+   in that snapshot to go away, escalating to `SIGKILL` for stragglers, then
+   waits for the port to release, then restarts with exponential backoff
+   (1s, 2s, 4s… capped at 60s).
+4. If the port is *still* held after all that, `SIGKILL`s whatever is
+   listening on it. A grandchild that reparents to pid 1 mid-teardown keeps
+   the socket, and every subsequent start then dies instantly — on
+   `EADDRINUSE`, or for `next dev` on "Another next dev server is already
+   running" — until something reaps it. Loopback health URLs only.
+5. After `--max-restarts` consecutive deaths, stops and prints a persistent
    banner instead of spinning silently.
+
+## Deferring a restart with `--hold-file`
+
+A failed probe means "this server did not answer within `--probe-timeout`",
+which is not the same as "this server is dead". A supervised dev server that
+hosts agent sessions — develemit-hq does — gets its event loop starved
+whenever one of those agents starts a heavy job (a full Playwright suite, a
+build). Restarting then kills the entire process tree, and the agent doing
+that work is *inside* it: the supervisor takes down the very work that caused
+the stall, mid-run.
+
+`--hold-file` lets the supervised process say "I'm busy, don't bounce me".
+While the file exists and its mtime is newer than `--hold-stale`, a
+health-timeout defers instead of killing.
+
+The file's mtime doubles as a liveness signal, which is what makes this safe:
+it only stays fresh while the process is alive *and* still running timers, so
+a genuinely wedged server stops refreshing it and the hold lapses on its own
+with no extra probing. `--hold-max` bounds a single episode as a backstop.
+
+develemit-hq drives this from `src/lib/supervisor-hold.ts`, refreshing
+`.supervisor-hold` every 5s while any PTY or headless Claude session is
+active, and deleting it as soon as none are.
 5. `Ctrl-C` (`SIGINT`/`SIGTERM`) forwards to the child and exits — this is a
    normal stop, not a death: no restart, no record.
 

@@ -1,10 +1,14 @@
 # serve-supervised-lib.sh — process-tree, health-probe, log-rotation, and
 # death-record helpers for scripts/serve-supervised.sh (sprint 310).
 #
+#   _svsup_tree_pids <pid>                        -> echo <pid> + every descendant
 #   _svsup_kill_tree <pid> [sig]                 -> signal <pid> and every descendant
-#   _svsup_wait_tree_gone <pid> [timeout-ds]      -> poll until <pid> is gone
+#   _svsup_wait_pids_gone <timeout-ds> <pid...>   -> poll until all are gone
 #   _svsup_parse_host_port <url>                  -> echoes "<host> <port>"
 #   _svsup_wait_port_free <host> <port> [timeout-ds] -> poll until nothing answers
+#   _svsup_lsof_bin                               -> path to lsof (not on launchd's PATH)
+#   _svsup_kill_port_holders <host> <port>        -> SIGKILL whatever still listens
+#   _svsup_hold_active <file> [max-age-s]         -> is the hold file being refreshed?
 #   _svsup_probe_health <url> [timeout-s]         -> curl the health endpoint
 #   _svsup_rotate_log <file> <max-bytes> <archive-dir> <max-keep>
 #   _svsup_append_death <deaths-file> <name> <reason> <exit> <sig> <uptime>
@@ -16,6 +20,19 @@
 
 [[ -n "${_SVSUP_LIB_LOADED:-}" ]] && return 0
 _SVSUP_LIB_LOADED=1
+
+# Echo <pid> and every descendant, leaves first. Callers must snapshot the
+# tree BEFORE signalling it: the instant a parent exits its children are
+# reparented to pid 1, and `pgrep -P` can no longer reach them from the
+# original root.
+_svsup_tree_pids() {
+  local pid="$1" child
+  [[ -n "$pid" ]] || return 0
+  for child in $(pgrep -P "$pid" 2>/dev/null); do
+    _svsup_tree_pids "$child"
+  done
+  echo "$pid"
+}
 
 # Kill <pid> and every descendant, leaves first. tsx --watch's real process
 # is a grandchild (watcher -> server), so killing just the top pid can leave
@@ -29,10 +46,18 @@ _svsup_kill_tree() {
   kill -s "$sig" "$pid" 2>/dev/null || true
 }
 
-_svsup_wait_tree_gone() {
-  local pid="$1" timeout_ds="${2:-50}" i=0
+# Poll until every pid in "$@" is gone. Waiting on the root pid alone is not
+# enough — it is the reparented grandchild holding the port that blocks the
+# next start, and it outlives the root by definition.
+_svsup_wait_pids_gone() {
+  local timeout_ds="$1"; shift
+  local i=0 pid alive
   while [[ $i -lt $timeout_ds ]]; do
-    kill -0 "$pid" 2>/dev/null || return 0
+    alive=0
+    for pid in "$@"; do
+      if kill -0 "$pid" 2>/dev/null; then alive=1; break; fi
+    done
+    [[ $alive -eq 0 ]] && return 0
     sleep 0.1
     i=$((i + 1))
   done
@@ -62,6 +87,53 @@ _svsup_wait_port_free() {
     i=$((i + 1))
   done
   return 1
+}
+
+# On macOS lsof ships in /usr/sbin, which is absent from the PATH launchd
+# hands a LaunchAgent — and this script runs under one. Resolve it by path
+# rather than trusting PATH, or the port-holder reap silently no-ops in
+# exactly the environment it exists for.
+_svsup_lsof_bin() {
+  local candidate
+  for candidate in /usr/sbin/lsof /usr/bin/lsof /opt/homebrew/bin/lsof /usr/local/bin/lsof; do
+    [[ -x "$candidate" ]] && { echo "$candidate"; return 0; }
+  done
+  command -v lsof 2>/dev/null
+}
+
+# Last resort when the port is still held after the tree teardown: SIGKILL
+# whatever is listening on it. A grandchild that reparented to pid 1 mid-kill
+# keeps the socket, and every subsequent start then dies instantly — on
+# EADDRINUSE, or for `next dev` on "Another next dev server is already
+# running" — until something reaps it. Loopback only; a health URL pointing
+# at a real host is never ours to kill.
+_svsup_kill_port_holders() {
+  local host="$1" port="$2" lsof_bin pids pid
+  case "$host" in
+    127.0.0.1|localhost|::1|0.0.0.0) ;;
+    *) return 0 ;;
+  esac
+  lsof_bin=$(_svsup_lsof_bin) || return 0
+  [[ -n "$lsof_bin" ]] || return 0
+  pids=$("$lsof_bin" -ti "tcp:$port" -sTCP:LISTEN 2>/dev/null)
+  [[ -n "$pids" ]] || return 0
+  for pid in $pids; do
+    echo "  killing orphaned listener pid $pid on $host:$port"
+    kill -9 "$pid" 2>/dev/null || true
+  done
+}
+
+# True while <file> exists and was touched within <max-age> seconds. The
+# supervised process refreshes it only while it is doing work that must not
+# be interrupted, so staleness doubles as a liveness signal: a wedged process
+# stops refreshing and the hold lapses on its own, with no extra probe.
+_svsup_hold_active() {
+  local file="$1" max_age="${2:-30}" mtime now
+  [[ -n "$file" && -f "$file" ]] || return 1
+  mtime=$(stat -f %m "$file" 2>/dev/null || stat -c %Y "$file" 2>/dev/null) || return 1
+  [[ -n "$mtime" ]] || return 1
+  now=$(date +%s)
+  [[ $((now - mtime)) -le $max_age ]]
 }
 
 _svsup_probe_health() {
