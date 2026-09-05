@@ -20,11 +20,22 @@ image_name() {
 
 get_build_args() {
   local svc="$1"
+  # Skip any configured build arg whose env var is unset or empty rather than
+  # emitting `--build-arg NAME=`. Docker takes the LAST --build-arg for a given
+  # name, and an empty one both beats an explicit value passed earlier on the
+  # command line and overrides the Dockerfile's own `ARG NAME=default`. That is
+  # how martialops shipped for months with /healthz reporting `"build":""`
+  # instead of either the real build number or the `dev` fallback: the hook set
+  # BUILD_NUMBER without exporting it, so this lookup saw nothing and quietly
+  # clobbered the correct value on the line above. Omitting the flag lets the
+  # explicit value and the Dockerfile default work as intended.
   python3 -c "
 import json, os
 args = json.loads('$BUILD_ARGS_JSON')
 for a in args.get('$svc', []):
     val = os.environ.get(a['env'], '')
+    if val == '':
+        continue
     print(f'--build-arg {a[\"name\"]}={val}')
 " 2>/dev/null || true
 }

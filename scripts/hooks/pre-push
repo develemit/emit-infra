@@ -27,7 +27,14 @@ load_pre_push_config "$CONFIG_FILE"
 
 SSH_KEY="${SSH_KEY/#\~/$HOME}"
 SHA=$(git rev-parse HEAD)
+# Exported here, not at deploy time: the image build below shells out to
+# python3 (docker-build.sh's get_build_args) to resolve .emit-infra.json's
+# buildArgs from the environment, and a plain shell variable is invisible to a
+# subprocess. Exporting only before `emit-infra deploy` — which is where this
+# used to live — is far too late for the build that bakes the value in.
+export SHA
 BUILD_NUMBER=$(git rev-list --count HEAD)
+export BUILD_NUMBER
 
 # ── phase 1: CI ────────────────────────────────────────────────────────────────
 run_ci
@@ -237,7 +244,6 @@ deploy_step "Deploying via emit-infra"
 echo "→ running emit-infra deploy"
 export GHCR_TOKEN="$TOKEN"
 export GHCR_ACTOR="${GHCR_USER:-$GHCR_ORG}"
-export BUILD_NUMBER
 node "$EMIT_INFRA_DIR/apps/cli/dist/index.js" deploy
 
 deploy_done deployed
