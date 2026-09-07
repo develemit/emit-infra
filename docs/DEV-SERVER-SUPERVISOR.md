@@ -169,3 +169,57 @@ that was already ignored on entry — the same limitation
 `scripts/lib/hook-signals.test.sh` documents for its own INT case. SIGTERM
 (which exercises the identical handler function) is proven end-to-end
 instead.
+
+## The watchdog layer: `scripts/dev-stack-watchdog.sh`
+
+`serve-supervised.sh` fixes the process-check blind spot one level down from
+launchd; `dev-stack-watchdog.sh` fixes the same blind spot one level up.
+Sprint 322.
+
+**Why launchd's `KeepAlive` can't do this.** `com.emit.infra` runs
+`caffeinate → pnpm run dev → nx → serve-supervised.sh`, and `KeepAlive`
+watches only the top of that chain. When the API supervisor exits on an
+external `SIGTERM` (`reason: "signalled"`, sprint 321) it deliberately does
+not restart — that's a normal stop, not a crash — but `pnpm dev` and the
+Next dashboard keep running happily underneath it. launchd sees a live job
+and never restarts anything, even though the API has been unreachable for
+hours. The only reliable signal that the stack is actually healthy is that
+`http://127.0.0.1:7001/health` answers, which is exactly the argument this
+document already makes for `serve-supervised.sh` itself.
+
+**What it does**, on a `StartInterval` timer (120s, via
+`com.emit.dev-stack-watchdog.plist`):
+
+1. Probes `--url` (default `http://127.0.0.1:${PORT:-7001}/health`, reusing
+   `_svsup_probe_health` from `scripts/lib/serve-supervised-lib.sh`). Success
+   resets the consecutive-failure counter and exits — no log line, no action.
+2. On failure, increments a counter persisted under
+   `~/.local/state/dev-stack-watchdog/`. Before acting on it, checks whether
+   launchd actually has `--label` (default `com.emit.infra`) loaded
+   (`launchctl print gui/$UID/<label>`). An unloaded job means
+   `pnpm launch:stop` ran on purpose — the watchdog clears its counter and
+   does nothing rather than fight a deliberate stop.
+3. At `--threshold` (default 3) consecutive failures with the job still
+   loaded, runs `launchctl kickstart -k gui/$UID/<label>`, logs one line to
+   `~/.local/log/dev-stack-watchdog.log`, and resets the counter.
+4. Rate-limits recovery to `--ceiling` (default 3) kickstarts per rolling
+   hour, tracked in the same state directory. Past the ceiling it logs a
+   "give up" line instead of restart-looping a genuinely broken stack.
+
+**Disabling it:** `launchctl bootout gui/$(id -u)/com.emit.dev-stack-watchdog`
+unloads the watchdog itself (independent of `pnpm launch:stop`, which only
+targets `com.emit.infra`). Delete
+`~/Library/LaunchAgents/com.emit.dev-stack-watchdog.plist` to remove it for
+good.
+
+**Scope:** local dev only, and only `com.emit.infra` by default — the script
+takes `--url`/`--label` so the same binary can later supervise
+develemit-hq's `com.develemit.hq`, but wiring that plist is a follow-up.
+
+Tests: `scripts/lib/dev-stack-watchdog.test.sh`, wired into `pnpm test:hooks`.
+Stubs `curl` and `launchctl` as shell functions defined before the script is
+sourced — the same injection shape `docker-build.test.sh` and
+`deploy-plan.test.sh` use for `docker`/`pnpm` — covering: healthy (no
+action), below threshold (no action), at threshold (one kickstart), job
+unloaded (no action regardless of failure count), and ceiling reached (no
+kickstart, one give-up log line).
