@@ -194,6 +194,9 @@ fleet-clean criterion was amended to expect exactly these two.
 - (sprint 322, 2026-09-07) No notification/alerting on watchdog action beyond the log line — also explicitly out of scope for sprint 322
 - (sprint 322, 2026-09-07) This repo has no committed-plist convention yet; if a second scheduled agent gets added later it may be worth deciding whether to commit plists under e.g. `scripts/launchd/` for reviewability, rather than leaving them only in `~/Library/LaunchAgents/`
 
+- (sprint 323, 2026-09-07) The HTTP-check heartbeat message hardcodes "occurrences" phrasing regardless of `heartbeatMs`; `formatDuration()` handles hours/minutes/seconds generically but wasn't exercised with a non-default interval in tests — worth a test if that ever becomes configurable via env var.
+- (sprint 323, 2026-09-07) `isReservedTestDomain` only matches IPv4 literals; a hostname resolving to a reserved range (unlikely in practice) would still be probed. Out of scope per sprint 323's IP-literal framing.
+
 ## ✅ Converted to Sprints
 
 - ~~(infra, 2026-08-23) **Fourth fixed-timing test flake this month — worth a systemic pass.** `scripts/lib/deploy-detached.test.sh:213` asserts `[[ $NOWAIT_ELAPSED -lt 4 ]]` against a 4s push: 1-second granularity with zero margin, so under the full `test:hooks` chain's load `--no-wait`'s own node startup (classify-run-state.mjs, sprint 289) pushes elapsed to exactly 4 and it fails. Observed once during sprint 302's spot-check; 4/4 passes in isolation. Same class as the already-fixed `hook-signals.test.sh` (f69168b) and `use-ops-chat.test.ts` (d90a11e), and the still-open `db-url-connect.test.ts > waitUntilReady` flake. A sweep for fixed-timing assertions across the repo's suites would likely be cheaper than fixing them one incident at a time.~~ → sprint-303 (2026-08-22)
