@@ -7,6 +7,7 @@ import { sshExec, classifyRunState, type DeployStatusRecord } from '@emit-infra/
 import { findProject, sshKeyPath, SAFE_NAME_RE } from '../lib/project-helpers.js'
 import { createTtlCache } from '../lib/ttl-cache.js'
 import { buildStatusCommand, parseStatusLines } from '../lib/status-command.js'
+import { createHttpCheckLog, isReservedTestDomain } from '../lib/http-check-log.js'
 
 const STATUS_TTL = 20_000
 type StatusData = {
@@ -27,11 +28,10 @@ type StatusData = {
   activeSlot: string | null
 }
 
-// The status monitor polls every 60s, so a permanently unreachable domain
-// would otherwise log an identical line forever and drown real errors — the
-// test-smoke fixture's RFC 5737 address is unreachable *by design*. Log the
-// first failure and each *change* in failure, then stay quiet until recovery.
-const lastHttpFailure = new Map<string, string>()
+// The status monitor polls every 60s. Dedup and heartbeat decisions live in
+// http-check-log.ts (unit-testable without a network); this map is just the
+// per-process instance of that decision state.
+const httpCheckLog = createHttpCheckLog()
 
 // A null return means "we could not determine", and the dashboard renders that
 // as Down — so a single slow probe must not produce one. 5s was too tight:
@@ -43,7 +43,21 @@ const lastHttpFailure = new Map<string, string>()
 const HTTP_CHECK_TIMEOUT_MS = 10_000
 const HTTP_CHECK_ATTEMPTS = 2
 
+// test-smoke and similar fixtures point `domain` at an RFC 5737 address that
+// is unroutable by design — probing it is pure waste and the failure noise it
+// generates isn't a real signal. Log once (the first time it's seen), not on
+// every poll.
+const loggedFixtureDomains = new Set<string>()
+
 async function checkHttp(domain: string): Promise<number | null> {
+  if (isReservedTestDomain(domain)) {
+    if (!loggedFixtureDomains.has(domain)) {
+      loggedFixtureDomains.add(domain)
+      console.info(`HTTP check skipping ${domain}: reserved/documentation IP range (fixture, not a real target)`)
+    }
+    return null
+  }
+
   let lastErr: unknown
   for (let attempt = 1; attempt <= HTTP_CHECK_ATTEMPTS; attempt++) {
     try {
@@ -52,7 +66,7 @@ async function checkHttp(domain: string): Promise<number | null> {
         redirect: 'follow',
         signal: AbortSignal.timeout(HTTP_CHECK_TIMEOUT_MS),
       })
-      if (lastHttpFailure.delete(domain)) {
+      if (httpCheckLog.onRecovery(domain)) {
         console.info(`HTTP check recovered for ${domain}: ${res.status}`)
       }
       return res.status
@@ -61,11 +75,8 @@ async function checkHttp(domain: string): Promise<number | null> {
     }
   }
 
-  const signature = String(lastErr)
-  if (lastHttpFailure.get(domain) !== signature) {
-    lastHttpFailure.set(domain, signature)
-    console.warn(`HTTP check failed for ${domain} after ${HTTP_CHECK_ATTEMPTS} attempts: ${lastErr}`)
-  }
+  const message = httpCheckLog.onFailure(domain, lastErr, HTTP_CHECK_ATTEMPTS)
+  if (message) console.warn(message)
   return null
 }
 
