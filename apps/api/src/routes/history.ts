@@ -53,7 +53,7 @@ interface CiHistoryEntry {
 interface ServerDeathEntry {
   ts: string
   name: string
-  reason: 'health-timeout' | 'exited'
+  reason: 'health-timeout' | 'exited' | 'signalled'
   exitCode: number | null
   signal: string | null
   uptimeSec: number

@@ -45,7 +45,7 @@ export interface CiHistoryResponse {
 export interface ServerDeathEntry {
   ts: string
   name: string
-  reason: 'health-timeout' | 'exited'
+  reason: 'health-timeout' | 'exited' | 'signalled'
   exitCode: number | null
   signal: string | null
   uptimeSec: number
@@ -53,6 +53,8 @@ export interface ServerDeathEntry {
   pid: number | null
   host: string
   lastOutput: string
+  /** Sprint 321's parent-chain snapshot, captured only for `reason: 'signalled'`. */
+  signalContext?: string | null
 }
 
 export interface ServerDeathsResponse {

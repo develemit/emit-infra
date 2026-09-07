@@ -104,7 +104,9 @@ develemit-hq drives this from `src/lib/supervisor-hold.ts`, refreshing
 `.supervisor-hold` every 5s while any PTY or headless Claude session is
 active, and deleting it as soon as none are.
 5. `Ctrl-C` (`SIGINT`/`SIGTERM`) forwards to the child and exits — this is a
-   normal stop, not a death: no restart, no record.
+   normal stop, not a crash, so it never restarts. It still appends one death
+   record with `reason: "signalled"` (sprint 321), so a signalled server
+   leaves forensic evidence instead of vanishing silently — see below.
 
 ## Death records
 
@@ -115,23 +117,32 @@ JSONL-append convention as `.deploy-history.jsonl`:
 {
   "ts": "2026-08-26T21:05:12Z",
   "name": "emit-infra-api",
-  "reason": "health-timeout",   // or "exited"
+  "reason": "health-timeout",   // or "exited" or "signalled"
   "exitCode": 143,
   "signal": "15",
   "uptimeSec": 812,
   "restartCount": 2,
   "pid": 50385,
   "host": "studio",
-  "lastOutput": "...last ~40 log lines..."
+  "lastOutput": "...last ~40 log lines...",
+  "signalContext": null
 }
 ```
 
-`reason` distinguishes the two death shapes:
+`reason` distinguishes the three death shapes:
 
 - `health-timeout` — the process (or its watcher) is still running, but the
   health endpoint stopped answering. This is the `tsx --watch` case.
 - `exited` — the top-level process the supervisor launched exited on its
   own (no watcher wrapping it, or the watcher itself died).
+- `signalled` (sprint 321) — the supervisor itself received `SIGTERM`/`SIGINT`
+  and is shutting down on purpose, not restarting. `signal` carries the
+  signal name (`"TERM"`/`"INT"`, not the numeric string the other two reasons
+  use). `signalContext` is a best-effort snapshot of the sender's parent
+  process (`ps -o pid=,ppid=,command= -p $PPID`, captured in the trap handler)
+  to help identify who sent it after the fact — `null` when unavailable.
+  `uptimeSec`/`pid` are `0`/`null` if the signal arrived before any child had
+  spawned yet.
 
 ## Log rotation
 

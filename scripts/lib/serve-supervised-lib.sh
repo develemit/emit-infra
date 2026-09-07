@@ -12,7 +12,7 @@
 #   _svsup_probe_health <url> [timeout-s]         -> curl the health endpoint
 #   _svsup_rotate_log <file> <max-bytes> <archive-dir> <max-keep>
 #   _svsup_append_death <deaths-file> <name> <reason> <exit> <sig> <uptime>
-#                        <restarts> <pid> <host> <log-file>
+#                        <restarts> <pid> <host> <log-file> [<signal-context>]
 #   _svsup_backoff_seconds <attempt> [cap]        -> 1,2,4,8… capped at [cap]
 #
 # Pure enough to unit-test in isolation (serve-supervised.test.sh sources
@@ -171,14 +171,20 @@ _svsup_rotate_log() {
 # (not printf) because lastOutput is arbitrary program output — quotes,
 # backslashes, unicode — and a printf-assembled string would produce
 # invalid JSON on the first death whose log line contains a stray quote.
+# <signal-context> is optional (sprint 321): a best-effort parent-chain
+# snapshot captured at signal time, populated only for reason "signalled".
+# It's passed as a subprocess argv element rather than interpolated into the
+# python source, so quotes/newlines in it can't break the script — json.dumps
+# escapes it like any other string.
 _svsup_append_death() {
   local deaths_file="$1" name="$2" reason="$3" exit_code="$4" signal="$5" \
-        uptime="$6" restart_count="$7" pid="$8" host="$9" log_file="${10}"
+        uptime="$6" restart_count="$7" pid="$8" host="$9" log_file="${10}" \
+        signal_context="${11:-}"
   python3 - "$deaths_file" "$name" "$reason" "$exit_code" "$signal" \
-    "$uptime" "$restart_count" "$pid" "$host" "$log_file" <<'PYEOF'
+    "$uptime" "$restart_count" "$pid" "$host" "$log_file" "$signal_context" <<'PYEOF'
 import json, sys, datetime
 
-deaths_file, name, reason, exit_code, signal, uptime, restart_count, pid, host, log_file = sys.argv[1:11]
+deaths_file, name, reason, exit_code, signal, uptime, restart_count, pid, host, log_file, signal_context = sys.argv[1:12]
 
 def to_int(v):
     try:
@@ -204,6 +210,7 @@ record = {
     "pid": to_int(pid),
     "host": host,
     "lastOutput": last_output,
+    "signalContext": signal_context or None,
 }
 
 with open(deaths_file, "a") as f:

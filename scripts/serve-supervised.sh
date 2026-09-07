@@ -57,6 +57,10 @@ hold_since=0
 SHUTTING_DOWN=0
 CHILD_PID=""
 SLEEP_PID=""
+CHILD_ACTIVE=0
+start_epoch=0
+SVSUP_SIGNAL_NAME=""
+SVSUP_SIGNAL_CONTEXT=""
 
 die() { echo "✗ serve-supervised: $*" >&2; exit 1; }
 usage() { sed -n '2,29p' "$SELF"; }
@@ -88,6 +92,11 @@ parse_args() {
 _svsup_handle_signal() {
   local sig="$1"
   SHUTTING_DOWN=1
+  SVSUP_SIGNAL_NAME="$sig"
+  # Best-effort: identify who sent this later. Must not block or error — a
+  # signal handler that hangs on ps or trips `set -u` never gets to forward
+  # the signal to the child.
+  SVSUP_SIGNAL_CONTEXT="$(ps -o pid=,ppid=,command= -p "$PPID" 2>/dev/null)"
   echo "→ [$NAME] received SIG$sig — forwarding to child, exiting without restart"
   [[ -n "$CHILD_PID" ]] && _svsup_kill_tree "$CHILD_PID" "$sig"
   [[ -n "$SLEEP_PID" ]] && kill "$SLEEP_PID" 2>/dev/null
@@ -174,7 +183,8 @@ main() {
 
     "${COMMAND[@]}" &
     CHILD_PID=$!
-    local start_epoch fail_count death_reason death_exit death_sig
+    CHILD_ACTIVE=1
+    local fail_count death_reason death_exit death_sig
     start_epoch=$(date +%s)
     fail_count=0
     hold_since=0
@@ -251,6 +261,7 @@ main() {
 
     _svsup_append_death "$deaths_file" "$NAME" "$death_reason" "$death_exit" "$death_sig" \
       "$uptime" "$restart_count" "$CHILD_PID" "$host_short" "$log_file"
+    CHILD_ACTIVE=0
 
     restart_count=$((restart_count + 1))
     if [[ $restart_count -ge $MAX_RESTARTS ]]; then
@@ -269,6 +280,21 @@ main() {
     wait "$SLEEP_PID" 2>/dev/null
     SLEEP_PID=""
   done
+
+  # The loop above only ever breaks via one of the three SHUTTING_DOWN guards,
+  # so reaching here always means a signal — but guard it anyway rather than
+  # rely on that invariant holding forever. This is the single place a
+  # signalled exit gets recorded, so it fires exactly once no matter which of
+  # the three guards is the one that actually broke the loop.
+  if [[ $SHUTTING_DOWN -eq 1 ]]; then
+    local sig_uptime=0 sig_pid=""
+    if [[ $CHILD_ACTIVE -eq 1 && $start_epoch -gt 0 ]]; then
+      sig_uptime=$(( $(date +%s) - start_epoch ))
+      sig_pid="$CHILD_PID"
+    fi
+    _svsup_append_death "$deaths_file" "$NAME" "signalled" "" "$SVSUP_SIGNAL_NAME" \
+      "$sig_uptime" "$restart_count" "$sig_pid" "$host_short" "$log_file" "$SVSUP_SIGNAL_CONTEXT"
+  fi
 
   echo "→ [$NAME] supervisor exiting cleanly"
   _emit_flush_log

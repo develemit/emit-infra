@@ -81,13 +81,43 @@ stop was intentional and is the entire investigation when it wasn't.
 - `docs/DEV-SERVER-SUPERVISOR.md` — document the `signalled` reason and what it means
 
 ## Acceptance criteria
-- [ ] `kill -TERM` on a running supervisor appends exactly one `.server-deaths.jsonl` record with `reason: "signalled"` and `signal: "TERM"`
-- [ ] The supervisor still exits without restarting after a signal (unchanged behavior)
-- [ ] A health-timeout death still writes `reason: "health-timeout"` — no regression
-- [ ] Every record remains valid JSON, including when `signalContext` contains quotes or newlines
-- [ ] New tests in `scripts/lib/serve-supervised.test.sh` cover the signalled path, the no-duplicate case, and the health-timeout regression
-- [ ] `pnpm test:hooks` passes
-- [ ] `pnpm typecheck` and `pnpm lint` pass if any TypeScript was touched
+- [x] `kill -TERM` on a running supervisor appends exactly one `.server-deaths.jsonl` record with `reason: "signalled"` and `signal: "TERM"`
+- [x] The supervisor still exits without restarting after a signal (unchanged behavior)
+- [x] A health-timeout death still writes `reason: "health-timeout"` — no regression
+- [x] Every record remains valid JSON, including when `signalContext` contains quotes or newlines
+- [x] New tests in `scripts/lib/serve-supervised.test.sh` cover the signalled path, the no-duplicate case, and the health-timeout regression
+- [x] `pnpm test:hooks` passes
+- [x] `pnpm typecheck` and `pnpm lint` pass if any TypeScript was touched
+
+## Completed
+
+**Date:** 2026-09-07
+
+### Summary
+A signalled supervisor now appends a `.server-deaths.jsonl` record before exiting, instead of leaving no trace. `_svsup_handle_signal()` captures the signal name and a best-effort parent-chain snapshot (`ps -o pid=,ppid=,command= -p $PPID`) into new globals as soon as the trap fires — cheap and failure-tolerant, wrapped in `2>/dev/null` so a signal handler never blocks or errors. The three `SHUTTING_DOWN` guards in the main loop still all funnel to one place right before `"supervisor exiting cleanly"`; a single `_svsup_append_death` call was added there, guarded by `[[ $SHUTTING_DOWN -eq 1 ]]`, so the record is written exactly once regardless of which guard actually broke the loop.
+
+The trickiest part was the "no child spawned yet" edge case: `start_epoch` used to be `local`-declared *inside* the outer loop body, so a signal arriving at the very first `SHUTTING_DOWN` check (before that `local` line ever ran) would reference an undeclared variable under `set -u` and crash. Fixed by promoting `start_epoch` to a pre-initialized global (`0`) alongside a new `CHILD_ACTIVE` flag that's only `1` while a child is actually running — the signalled-death block uses `CHILD_ACTIVE` to decide whether to report a real uptime/pid or `0`/empty, so a stale pid from an already-recorded crash never leaks into an unrelated signalled record recorded during backoff sleep.
+
+`_svsup_append_death` gained an 11th optional positional arg, `signal_context`, passed straight to python's `json.dumps` (never interpolated into the python source), so quotes and newlines in the captured `ps` output can't produce broken JSON — same reasoning the function already applies to `lastOutput`. The field is always present in the record (`null` when empty) for a stable shape. Existing call sites needed no changes since bash treats a missing positional arg as empty.
+
+Dashboard and API types picked up `'signalled'` in the `reason` union and an optional `signalContext` field; `server-deaths-panel.tsx`'s `causeLabel()` got an explicit `signalled` branch (`"stopped by SIG{signal}"`) so it doesn't fall through to the more alarming generic `"killed by ..."` wording.
+
+### Files changed
+- `scripts/serve-supervised.sh` — signal handler captures signal name + parent-chain snapshot; new globals `CHILD_ACTIVE`/`start_epoch`/`SVSUP_SIGNAL_NAME`/`SVSUP_SIGNAL_CONTEXT`; single post-loop append for the signalled death
+- `scripts/lib/serve-supervised-lib.sh` — `_svsup_append_death` gains the optional `signalContext` field, passed as argv (not interpolated) for JSON safety
+- `scripts/lib/serve-supervised.test.sh` — rewrote the Ctrl-C test to assert the new signalled record (reason/signal/no-duplicate/no-restart), added a static `set -u` safety check and a direct JSON round-trip test for a `signalContext` with quotes and newlines
+- `apps/api/src/routes/history.ts` — widened `ServerDeathEntry.reason` to include `'signalled'`
+- `apps/dashboard/src/lib/api-history.ts` — widened `reason` union, added optional `signalContext`
+- `apps/dashboard/src/components/detail/server-deaths-panel.tsx` — explicit `causeLabel()` case for `signalled`
+- `docs/DEV-SERVER-SUPERVISOR.md` — documented the `signalled` reason, the JSON shape, and updated the "Ctrl-C forwards and exits" bullet to note it now records
+
+### Verification
+- `pnpm test:hooks`: full 11 suites, all pass, including `serve-supervised.test.sh` 29/29 (was 26 before the new tests)
+- `pnpm typecheck`: clean (5 projects)
+- `pnpm lint`: clean (5 projects)
+
+### Follow-ups
+- `[defer]` `causeLabel()`'s Badge is still hardcoded to `variant="err"` (red) for every reason including the new intentional `signalled` one — a cosmetic nit, not a correctness issue
 
 ## Out of scope
 - Changing whether a signalled supervisor restarts — that is sprint 322's problem, solved outside the supervisor

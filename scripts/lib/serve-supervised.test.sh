@@ -139,7 +139,7 @@ kill -TERM "$SUP_PID" 2>/dev/null
 wait "$SUP_PID" 2>/dev/null
 cd "$WORK"
 
-echo "Ctrl-C (SIGTERM/SIGINT's sibling trap) stops the supervisor and child cleanly, records no death, does not restart"
+echo "Ctrl-C (SIGTERM/SIGINT's sibling trap) stops the supervisor and child cleanly, does not restart, and records exactly one 'signalled' death (sprint 321)"
 # Exercised end-to-end with SIGTERM, not SIGINT: bash sets SIGINT to
 # ignored-by-default for an async (`&`) job launched from a non-interactive
 # shell, and POSIX forbids a script from overriding a signal that was
@@ -165,10 +165,41 @@ if [[ -n "$CHILD_PID" ]] && ! kill -0 "$CHILD_PID" 2>/dev/null; then
 else
   no "the child process was killed on a clean stop (pid $CHILD_PID still alive)"
 fi
-if [[ -f "$CASE3/.server-deaths.jsonl" ]]; then
-  no "no death recorded for a clean stop (file exists)"
+check "exactly one death record was appended for the signal (no duplicates across the three SHUTTING_DOWN guards)" \
+  "$(wc -l < "$CASE3/.server-deaths.jsonl" 2>/dev/null | tr -d ' ')" "1"
+check "the signalled death's reason is 'signalled'" \
+  "$(_last_json_field "$CASE3/.server-deaths.jsonl" reason)" "signalled"
+check "the signalled death's signal is TERM" \
+  "$(_last_json_field "$CASE3/.server-deaths.jsonl" signal)" "TERM"
+check "the supervisor did not restart after the signal (restartCount stayed 0)" \
+  "$(_last_json_field "$CASE3/.server-deaths.jsonl" restartCount)" "0"
+cd "$WORK"
+
+echo "start_epoch/CHILD_ACTIVE are pre-initialized globals, so a signal before the first child ever spawns can't trip 'set -u'"
+# Mirrors the INT-wiring test below: sourcing without running main() lets us
+# inspect state a real `kill -TERM` race against the first spawn can't
+# reliably reproduce (same rationale as the INT test's own comment).
+INIT_STATE=$( ( source "$SUP"; echo "$start_epoch $CHILD_ACTIVE" ) )
+check "start_epoch and CHILD_ACTIVE start at 0 before any child spawns" "$INIT_STATE" "0 0"
+
+echo "_svsup_append_death writes valid JSON even when signalContext contains quotes and newlines (sprint 321)"
+CASE3B="$WORK/case-signalcontext-json"; mkdir -p "$CASE3B"; cd "$CASE3B"
+source "$LIB_DIR/serve-supervised-lib.sh"
+echo "some log output" > fake.log
+NASTY_CONTEXT=$'1234 1 "quoted \'sender\'"\nmultiline "tail"'
+_svsup_append_death "$CASE3B/.server-deaths.jsonl" "$NAME_PREFIX-ctxtest" "signalled" "" "TERM" \
+  0 0 "" "" "$CASE3B/fake.log" "$NASTY_CONTEXT"
+# Passed as argv, not interpolated into python source — same reasoning as
+# _svsup_append_death itself uses python3's json.dumps instead of printf.
+if python3 -c "
+import json, sys
+path, expected = sys.argv[1], sys.argv[2]
+r = json.loads(open(path).readlines()[-1])
+sys.exit(0 if r.get('reason') == 'signalled' and r.get('signalContext') == expected else 1)
+" "$CASE3B/.server-deaths.jsonl" "$NASTY_CONTEXT"; then
+  ok "a signalContext with quotes and newlines round-trips as valid JSON"
 else
-  ok "no death recorded for a clean stop"
+  no "a signalContext with quotes and newlines round-trips as valid JSON"
 fi
 cd "$WORK"
 

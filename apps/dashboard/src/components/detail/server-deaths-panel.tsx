@@ -12,6 +12,7 @@ interface Props {
 
 function causeLabel(death: ServerDeathEntry): string {
   if (death.reason === 'health-timeout') return 'health check timed out'
+  if (death.reason === 'signalled') return `stopped by SIG${death.signal ?? '?'}`
   if (death.signal) return `killed by ${death.signal}`
   if (death.exitCode !== null) return `exited ${death.exitCode}`
   return 'exited'
