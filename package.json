@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "nx run-many -t dev",
+    "launch": "launchctl kickstart -k gui/$(id -u)/com.emit.infra || launchctl bootstrap gui/$(id -u) $HOME/Library/LaunchAgents/com.emit.infra.plist",
+    "launch:stop": "launchctl bootout gui/$(id -u)/com.emit.infra",
     "build": "nx run-many -t build",
     "lint": "nx run-many -t lint",
     "typecheck": "nx run-many -t typecheck",

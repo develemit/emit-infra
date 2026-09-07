@@ -56,6 +56,11 @@ push_payload_summary() {
   fi
   local count oldest
   count=$(git rev-list --count "$remote_sha..$local_sha")
-  oldest=$(git log --reverse --format='%ar — %s' "$remote_sha..$local_sha" | head -1)
+  # `git log --reverse` buffers the whole range before emitting, so piping it
+  # into `head -1` closes the pipe while git is still writing — SIGPIPE, exit
+  # 141, and with pipefail that fails the whole pre-push hook. It only bites on
+  # large pushes (reproduced at 98 commits, clean at 2), which is why it sat
+  # latent. Dropping --reverse and taking the last line is the same commit.
+  oldest=$(git log --format='%ar — %s' "$remote_sha..$local_sha" | tail -1)
   echo "→ shipping $count commit(s); oldest: $oldest"
 }
