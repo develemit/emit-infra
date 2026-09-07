@@ -223,3 +223,43 @@ sourced — the same injection shape `docker-build.test.sh` and
 action), below threshold (no action), at threshold (one kickstart), job
 unloaded (no action regardless of failure count), and ceiling reached (no
 kickstart, one give-up log line).
+
+## The launchd log layer: `scripts/rotate-launchd-logs.sh`
+
+The "Log rotation" section above only covers the file the supervisor mirrors
+into (`~/.local/log/<name>.log`). The file launchd itself owns —
+`StandardOutPath`/`StandardErrorPath` on the plist — sits one level above
+that and has no cap of its own: `com.emit.infra`'s and `com.develemit.hq`'s
+launchd logs (`~/.local/log/emit-infra-launchd.log`,
+`~/.local/log/develemit-hq-launchd.log`) grow for the life of the agent.
+Sprint 324: a stack that spent hours failing produced a 95MB
+`develemit-hq-launchd.log`, and the one line that explained the outage was
+buried under thousands of Next.js proxy-error lines generated *by* the
+outage itself.
+
+`scripts/rotate-launchd-logs.sh` closes that gap by reusing
+`_svsup_rotate_log` directly — the same copytruncate helper described above,
+called against the launchd-owned files instead of the supervisor-mirrored
+ones. Same constraint applies with even higher stakes here: **renaming the
+file out from under launchd does not work**. launchd holds the
+`StandardOutPath` fd open for the lifetime of the job; a rename leaves it
+writing into an unlinked inode forever while the new file at that path stays
+empty. Truncate-in-place (`: > "$file"` after copying the tail to an
+archive) is the only rotation that a running launchd job survives.
+
+Defaults to the three known unbounded logs (`emit-infra-launchd.log`,
+`develemit-hq-launchd.log`, `metrics-collector.log`) at a 5MB cap, 5 archives
+kept per log (oldest deleted first), archived into a sibling directory named
+after the log (`~/.local/log/<name>/`). Runs hourly via
+`com.emit.log-rotate.plist` (`StartInterval`), or by hand with
+`--log <path> --max-bytes <n> --max-keep <n>`.
+
+**Disabling it:** `launchctl bootout gui/$(id -u)/com.emit.log-rotate`.
+Delete `~/Library/LaunchAgents/com.emit.log-rotate.plist` to remove it for
+good.
+
+Tests: `scripts/lib/rotate-launchd-logs.test.sh`, wired into `pnpm test:hooks`
+— covers a log over the cap (archived, truncated, inode unchanged so a live
+appending writer keeps working), a log under the cap (untouched, no archive
+dir created), the archive directory capping at `--max-keep`, and the default
+log list.

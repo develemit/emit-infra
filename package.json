@@ -11,7 +11,7 @@
     "lint": "nx run-many -t lint",
     "typecheck": "nx run-many -t typecheck",
     "test": "nx run-many -t test",
-    "test:hooks": "bash scripts/lib/deploy-plan.test.sh && bash scripts/lib/deploy-path-filter.test.sh && bash scripts/lib/docker-build.test.sh && bash scripts/lib/db-url.test.sh && bash scripts/lib/hook-signals.test.sh && bash scripts/lib/deploy-liveness.test.sh && bash scripts/lib/deploy-unattended-gate.test.sh && bash scripts/lib/deploy-detached.test.sh && bash scripts/lib/serve-supervised.test.sh && bash scripts/lib/resource-gate.test.sh && bash scripts/lib/check-all.test.sh && bash scripts/lib/dev-stack-watchdog.test.sh",
+    "test:hooks": "bash scripts/lib/deploy-plan.test.sh && bash scripts/lib/deploy-path-filter.test.sh && bash scripts/lib/docker-build.test.sh && bash scripts/lib/db-url.test.sh && bash scripts/lib/hook-signals.test.sh && bash scripts/lib/deploy-liveness.test.sh && bash scripts/lib/deploy-unattended-gate.test.sh && bash scripts/lib/deploy-detached.test.sh && bash scripts/lib/serve-supervised.test.sh && bash scripts/lib/resource-gate.test.sh && bash scripts/lib/check-all.test.sh && bash scripts/lib/dev-stack-watchdog.test.sh && bash scripts/lib/rotate-launchd-logs.test.sh",
     "graph": "nx graph",
     "tailscale:serve": "tailscale serve --bg --https=7003 http://127.0.0.1:7013",
     "tailscale:stop": "tailscale serve --https=7003 off"

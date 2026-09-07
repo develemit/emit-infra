@@ -76,15 +76,62 @@ fix belongs at the log layer: bound the file and rotate it.
 - `docs/DEV-SERVER-SUPERVISOR.md` — document log rotation
 
 ## Acceptance criteria
-- [ ] A launchd log over the cap is archived and truncated, and the **inode is unchanged** so the running agent keeps writing to it
-- [ ] A log under the cap is left alone
-- [ ] At most `max-keep` archives survive per log, oldest deleted first
-- [ ] Existing `_svsup_rotate_log` callers behave identically (no regression in `serve-supervised.test.sh`)
-- [ ] `develemit-hq-launchd.log` and `emit-infra-launchd.log` are back under the cap after the one-time cleanup
-- [ ] New tests are registered in and pass under `pnpm test:hooks`
+- [x] A launchd log over the cap is archived and truncated, and the **inode is unchanged** so the running agent keeps writing to it
+- [x] A log under the cap is left alone
+- [x] At most `max-keep` archives survive per log, oldest deleted first
+- [x] Existing `_svsup_rotate_log` callers behave identically (no regression in `serve-supervised.test.sh`)
+- [x] `develemit-hq-launchd.log` and `emit-infra-launchd.log` are back under the cap after the one-time cleanup
+- [x] New tests are registered in and pass under `pnpm test:hooks`
 
 ## Out of scope
 - Silencing Next.js's `Failed to proxy` lines — they originate inside Next's rewrite proxy, not our code
 - Switching any app to structured/JSON logging
 - Rotating production server logs on the fleet (those are managed by the servers' own logrotate)
 - Changing what any agent logs; this sprint only bounds where it lands
+
+## Completed
+
+**Date:** 2026-09-07
+
+### Summary
+`_svsup_rotate_log` (sprint 310) already truncates in place rather than
+renaming — `cp` the tail to an archive, then `: > "$file"` — so it needed no
+changes at all; it was reused directly against the launchd-owned files
+instead of the supervisor-mirrored ones. `scripts/rotate-launchd-logs.sh`
+takes a list of log paths (defaulting to the three known unbounded agent
+logs), applies a 5MB cap with 5 archives kept per log, archived into a
+sibling directory named after the log's own basename
+(`~/.local/log/<name>/`, mirroring the supervisor's `log_dir/${NAME}`
+convention). Scheduled hourly via `com.emit.log-rotate.plist`
+(`StartInterval`), which is bootstrapped and running.
+
+Verified the inode-preservation guarantee two ways: the unit-test suite
+(fixture files), and a live end-to-end check against a real background
+writer appending to a file every 200ms while rotation truncated it mid-write
+— the inode was identical before/after and the writer kept appending
+correctly to the truncated file with no gap or error, which is the exact
+behavior launchd's held `StandardOutPath` fd depends on. The one-time
+cleanup ran via the first real kickstart of the new agent (not a separate
+step): `develemit-hq-launchd.log` dropped from 95MB to 89 bytes and
+`emit-infra-launchd.log` from 10MB to 0 bytes, both archived intact, both
+confirmed still growing afterward (develemit-hq's went 89→334 bytes within
+3 seconds of the rotation, proving launchd's fd survived it).
+
+### Files changed
+- (new) `scripts/rotate-launchd-logs.sh` — size-capped truncate-in-place rotation for the three known launchd-owned agent logs, CLI flags `--log`/`--max-bytes`/`--max-keep`
+- (new) `scripts/lib/rotate-launchd-logs.test.sh` — coverage including the inode-preservation assertion, under-cap no-op, max-keep capping, and default log list
+- (new) `~/Library/LaunchAgents/com.emit.log-rotate.plist` — hourly agent, bootstrapped and confirmed running clean (`last exit code = 0`)
+- `package.json` — registered `rotate-launchd-logs.test.sh` in `test:hooks`
+- `docs/DEV-SERVER-SUPERVISOR.md` — new "The launchd log layer" section documenting the rotation, its rename-doesn't-work constraint, and how to disable it
+- `~/.local/log/emit-infra-launchd.log`, `~/.local/log/develemit-hq-launchd.log` — one-time cleanup, both rotated back under cap (not a repo file, noted for completeness)
+
+### Verification
+- `pnpm test:hooks`: 10/10 new tests pass, plus full suite (including `serve-supervised.test.sh` unmodified: 29/29) — no regression in existing callers
+- `pnpm typecheck`: clean (5 projects)
+- `pnpm lint`: clean (5 projects)
+- `pnpm test`: full 387/387 pass (touched root `package.json`, so ran the full suite rather than substituting an affected variant — this project has no `check:affected` script)
+- Manual: real launchd agent bootstrapped, kickstarted once, `last exit code = 0`; live-writer inode check passed against both a synthetic fixture and production logs during the one-time cleanup
+
+### Follow-ups
+- `[defer]` `dev-stack-watchdog.log`, `emit-infra-dashboard.log`, and other `~/.local/log/*.log` files outside the three named in this sprint are still unbounded (smaller today, but nothing stops them growing) — could be added to the default `--log` list in a later pass
+- `[defer]` `com.emit.log-rotate` has no equivalent to `dev-stack-watchdog`'s "unloaded means don't act" guard — not needed today since rotation is idempotent and harmless if a target log doesn't exist, but worth a note if the script ever grows side effects beyond file rotation
