@@ -64,21 +64,32 @@ in front of it, not replace it. An outer `launchd` layer comes later
 
 ## What it does
 
-1. Starts `<command...>`, mirroring its output to **both** stdout (so a PTY
+1. Before spawning `<command...>`, checks whether `--health-url`'s host:port
+   is already held and, if so, tries to reclaim it — see "Reclaiming an
+   orphaned port at startup" below (sprint 325).
+2. Starts `<command...>`, mirroring its output to **both** stdout (so a PTY
    panel still shows it live) and `~/.local/log/<name>.log`.
-2. Polls `--health-url` every `--interval` seconds. `--failures` consecutive
+3. Polls `--health-url` every `--interval` seconds. `--failures` consecutive
    failures counts as death.
-3. On death: snapshots the process **tree** and kills all of it (not just the
+4. On death: snapshots the process **tree** and kills all of it (not just the
    top pid — the real listener is often a grandchild), waits for *every* pid
    in that snapshot to go away, escalating to `SIGKILL` for stragglers, then
    waits for the port to release, then restarts with exponential backoff
    (1s, 2s, 4s… capped at 60s).
-4. If the port is *still* held after all that, `SIGKILL`s whatever is
+5. If the port is *still* held after all that, `SIGKILL`s whatever is
    listening on it. A grandchild that reparents to pid 1 mid-teardown keeps
    the socket, and every subsequent start then dies instantly — on
    `EADDRINUSE`, or for `next dev` on "Another next dev server is already
    running" — until something reaps it. Loopback health URLs only.
-5. After `--max-restarts` consecutive deaths, stops and prints a persistent
+6. An `EXIT` trap kills the child tree as a backstop on any exit this script
+   didn't plan for (sprint 325) — it cannot fire on `SIGKILL`, only on the
+   script's own unplanned errors; see below for the case that actually
+   matters, which is the *next* start's pre-spawn reclaim, not this trap.
+7. `Ctrl-C` (`SIGINT`/`SIGTERM`) forwards to the child and exits — this is a
+   normal stop, not a crash, so it never restarts. It still appends one death
+   record with `reason: "signalled"` (sprint 321), so a signalled server
+   leaves forensic evidence instead of vanishing silently — see below.
+8. After `--max-restarts` consecutive deaths, stops and prints a persistent
    banner instead of spinning silently.
 
 ## Deferring a restart with `--hold-file`
@@ -103,10 +114,73 @@ with no extra probing. `--hold-max` bounds a single episode as a backstop.
 develemit-hq drives this from `src/lib/supervisor-hold.ts`, refreshing
 `.supervisor-hold` every 5s while any PTY or headless Claude session is
 active, and deleting it as soon as none are.
-5. `Ctrl-C` (`SIGINT`/`SIGTERM`) forwards to the child and exits — this is a
-   normal stop, not a crash, so it never restarts. It still appends one death
-   record with `reason: "signalled"` (sprint 321), so a signalled server
-   leaves forensic evidence instead of vanishing silently — see below.
+
+## Reclaiming an orphaned port at startup
+
+`SIGKILL` (an OOM kill, or `kill -9` by hand) bypasses the TERM/INT traps
+above entirely — the dying process never runs them, so it never tears down
+its own child tree. The real dev server (a grandchild that reparented to
+pid 1) keeps holding the health port, and every subsequent start by a
+replacement supervisor fails on it — `EADDRINUSE`, or for `next dev`
+"Another next dev server is already running" — until someone kills the
+orphan by hand. Sprint 314 first hit this live on develemit-hq; sprint 325
+fixes it.
+
+The fix can't be a `KILL` trap — nothing can trap `SIGKILL` in the process
+being killed — so it's recovery on the *next* start instead of cleanup on
+death. Before spawning `<command...>`, the main loop always runs
+`_svsup_reclaim_port` against `--health-url`'s host:port — not gated behind a
+cheaper single-shot connect-attempt check first. That check was the first
+version of this fix, and it was wrong: a one-shot `nc` probe can flake on a
+loaded box (the probe itself stalls long enough to read as "free" when it
+isn't), which silently skips the reclaim on exactly the runs where the
+machine is busiest and a stale orphan is most likely to already be sitting on
+the port. `_svsup_reclaim_port`'s own `lsof`-based lookup is authoritative and
+already a fast no-op when nothing is listening, so there's no real check left
+to save by pre-filtering it:
+
+1. If nothing's listening, it's a no-op and the loop spawns as normal.
+2. If something is, fetch its full command line (`ps -ww`, not the default
+   truncated one — `ps` truncates to terminal width, which silently breaks
+   this check when running headless under launchd) and compare it against
+   the command this instance is about to launch (`_svsup_cmdline_matches_command`,
+   `scripts/lib/serve-supervised-lib.sh`). This is a substring match, not an
+   exact one — the process actually holding the port is usually a
+   *descendant* of the top-level command (`tsx --watch`'s real listener,
+   `next dev`'s render worker), so its argv is never literally identical.
+   The command's own interpreter/binary always counts as a candidate match;
+   later arguments only count if they're long enough and not a bare flag, so
+   this doesn't rubber-stamp a match on something as generic as `-w`.
+3. A match is killed (`_svsup_reclaim_port`) and the port is awaited free
+   before spawning. A non-match is refused — nothing is killed, a loud line
+   names the pid and its command line, and the supervisor exits rather than
+   starting a child that would silently lose the race for the port. Killing
+   an unrelated process that happens to be listening on the same port would
+   be a far worse bug than the one this fixes.
+
+As defense in depth, an `EXIT` trap also kills the child tree on any exit
+this script didn't plan for — an unbound variable tripping `set -u`, some
+future codepath falling through without reaching one of the three
+deliberate exits. It's guarded to never double-kill: it no-ops once
+`SHUTTING_DOWN` is set (the signal handler already tore the tree down
+itself) and after the normal `--max-restarts` exit (`CHILD_ACTIVE` is
+already cleared by then). It **cannot** fire on `SIGKILL` — nothing run by
+the dying process can — so the pre-spawn reclaim above, not this trap, is
+what actually recovers that case.
+
+**Next.js's dev-mode lock is not a separate problem here.** Beyond the port,
+`next dev` (when `experimental.lockDistDir` is on, as develemit-hq's config
+has it) also holds an OS-level advisory lock at `.next/dev/lock`
+(`DevServerInfo`/`Lockfile` in Next's `build/lockfile.js`), used to produce
+the "Another next dev server is already running" error. That lock is
+acquired by, and tied to a file descriptor owned by, the exact same process
+that binds the dev server port — Next's `startWatcher()` stores
+`pid: process.pid` in the lock and calls `Lockfile.acquireWithRetriesOrExit`
+in-process, not in a forked worker. Advisory (`flock`-style) locks are
+released by the kernel the instant the holding process's file descriptors
+close, on any termination including `SIGKILL` — so reclaiming the port (which
+kills that same process) always releases the lock in the same instant. No
+separate lock-file handling was needed.
 
 ## Death records
 
@@ -169,6 +243,19 @@ that was already ignored on entry — the same limitation
 `scripts/lib/hook-signals.test.sh` documents for its own INT case. SIGTERM
 (which exercises the identical handler function) is proven end-to-end
 instead.
+
+The pre-spawn reclaim (sprint 325) is covered end-to-end both ways: a real
+orphan process pre-bound to the health port with a command line matching
+what the supervisor is about to launch gets killed and the new child starts;
+one with a non-matching command line is left alone, and the supervisor exits
+non-zero with a logged refusal. `_svsup_cmdline_matches_command` itself is
+also covered directly against synthetic command lines (matching interpreter,
+matching entry-point path, no overlap at all, and a bare short flag alone).
+The `EXIT` trap is asserted by sourcing the script without running `main`
+(same technique the `start_epoch`/`CHILD_ACTIVE` init test above uses) and
+calling `_svsup_handle_exit` directly against a real fixture child+descendant
+tree — once with `SHUTTING_DOWN=0` (the tree dies) and once with
+`SHUTTING_DOWN=1` (it's left alone, proving no double-kill on a normal stop).
 
 ## The watchdog layer: `scripts/dev-stack-watchdog.sh`
 

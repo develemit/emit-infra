@@ -112,6 +112,25 @@ _svsup_handle_signal() {
 _svsup_install_traps() {
   trap '_svsup_handle_signal INT' INT
   trap '_svsup_handle_signal TERM' TERM
+  trap _svsup_handle_exit EXIT
+}
+
+# Best-effort backstop for an exit this script didn't plan for (an unbound
+# variable trips `set -u`, some future codepath falls through without
+# reaching one of the three deliberate exits). It cannot run on SIGKILL —
+# nothing can — recovering from that is the pre-spawn reclaim in main()
+# below, on the *next* start. This just stops an internal bug in this script
+# from leaving behind the same kind of orphan SIGKILL does.
+#
+# Guarded so it never double-kills: the signal handler already tore the tree
+# down itself before setting SHUTTING_DOWN, and the normal max-restarts exit
+# already cleared CHILD_ACTIVE before calling `exit 1`.
+_svsup_handle_exit() {
+  [[ $SHUTTING_DOWN -eq 1 ]] && return 0
+  if [[ $CHILD_ACTIVE -eq 1 && -n "$CHILD_PID" ]]; then
+    echo "✗ [$NAME] supervisor exiting unexpectedly — killing child tree defensively" >&2
+    _svsup_kill_tree "$CHILD_PID" TERM
+  fi
 }
 
 # A failed probe means "this server did not answer in $PROBE_TIMEOUT s" — not
@@ -180,6 +199,28 @@ main() {
     # the log pipe open, which hangs this script's own exit.
     [[ $SHUTTING_DOWN -eq 1 ]] && break
     _svsup_rotate_log "$log_file" "$MAX_LOG_BYTES" "$archive_dir" "$MAX_LOG_ARCHIVES"
+
+    # A prior supervisor that died to SIGKILL never ran its TERM/INT traps,
+    # so its real dev server (reparented to pid 1) can still be sitting on
+    # this port before this instance has spawned anything of its own. The
+    # normal post-teardown reclaim further down only covers a child *this*
+    # instance owns; this is the one check that catches an orphan from
+    # before this process existed.
+    #
+    # Always goes through _svsup_reclaim_port rather than gating on a
+    # cheaper single-shot `nc` probe first: a one-shot connect attempt is
+    # exactly the kind of check that can flake under load (a busy box can
+    # stall the probe itself long enough to read as "free" when it isn't),
+    # and silently skipping the reclaim on a bad read defeats the entire
+    # point. _svsup_reclaim_port's own lsof-based holder lookup is
+    # authoritative and already a no-op (returns 0 instantly) when nothing
+    # is listening, so there's nothing to save by pre-filtering it.
+    if ! _svsup_reclaim_port "$health_host" "$health_port" "${COMMAND[@]}"; then
+      echo "✗ [$NAME] $health_host:$health_port is held by a process that doesn't match the supervised command — refusing to start on top of it"
+      _emit_flush_log
+      exit 1
+    fi
+    _svsup_wait_port_free "$health_host" "$health_port" 50 || true
 
     "${COMMAND[@]}" &
     CHILD_PID=$!

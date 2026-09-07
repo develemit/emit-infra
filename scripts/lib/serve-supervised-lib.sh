@@ -8,6 +8,10 @@
 #   _svsup_wait_port_free <host> <port> [timeout-ds] -> poll until nothing answers
 #   _svsup_lsof_bin                               -> path to lsof (not on launchd's PATH)
 #   _svsup_kill_port_holders <host> <port>        -> SIGKILL whatever still listens
+#   _svsup_pid_cmdline <pid>                      -> full, untruncated command line
+#   _svsup_cmdline_matches_command <cmdline> <tok...> -> plausibly the same command?
+#   _svsup_reclaim_port <host> <port> <cmd tok...> -> kill a pre-held port's holder,
+#                                                     but only if its cmdline matches
 #   _svsup_hold_active <file> [max-age-s]         -> is the hold file being refreshed?
 #   _svsup_probe_health <url> [timeout-s]         -> curl the health endpoint
 #   _svsup_rotate_log <file> <max-bytes> <archive-dir> <max-keep>
@@ -121,6 +125,72 @@ _svsup_kill_port_holders() {
     echo "  killing orphaned listener pid $pid on $host:$port"
     kill -9 "$pid" 2>/dev/null || true
   done
+}
+
+# Full, untruncated command line for <pid>, or empty if it's already gone.
+# Plain `ps -o command=` truncates to the terminal width, which silently
+# breaks the plausibility check below in exactly the environment it matters
+# most: headless under launchd, with no terminal at all.
+_svsup_pid_cmdline() {
+  local pid="$1"
+  [[ -n "$pid" ]] || return 0
+  ps -ww -o command= -p "$pid" 2>/dev/null
+}
+
+# True if <holder_cmdline> plausibly comes from the same supervised command as
+# the "$@" tokens (the array serve-supervised.sh was invoked with after --).
+# This is a substring match, not an exact one: the process actually holding a
+# port is often a *descendant* of the command this script launched (tsx
+# --watch's real listener, next dev's render worker), so its argv is never
+# literally identical to ours. Token 0 (the interpreter/binary) always
+# counts; later tokens only count if they're long enough and not a bare flag,
+# so this doesn't rubber-stamp a match on something as generic as "-w" or
+# "dev".
+_svsup_cmdline_matches_command() {
+  local holder="$1"; shift
+  [[ -n "$holder" && $# -gt 0 ]] || return 1
+  local i=0 token
+  for token in "$@"; do
+    if [[ $i -eq 0 ]] || [[ ${#token} -ge 4 && "$token" != -* ]]; then
+      [[ "$holder" == *"$token"* ]] && return 0
+    fi
+    i=$((i + 1))
+  done
+  return 1
+}
+
+# Pre-spawn counterpart to _svsup_kill_port_holders (sprint 325). That one
+# fires after tearing down a child *this instance* just spawned and owns, so
+# any listener still on the port afterward is trusted by construction. This
+# one fires before the very first spawn of a fresh supervisor process, when
+# the port may be held by something this instance has never seen: a SIGKILLed
+# prior supervisor bypasses its TERM/INT traps and leaves its real dev server
+# (a grandchild reparented to pid 1) still listening. Refuses — kills
+# nothing, returns 1 — unless every holder's command line plausibly matches
+# "$@"; killing an unrelated process that happens to be on the port would be
+# a worse bug than the one this is fixing.
+_svsup_reclaim_port() {
+  local host="$1" port="$2"; shift 2
+  local lsof_bin pids pid holder refused=0
+  case "$host" in
+    127.0.0.1|localhost|::1|0.0.0.0) ;;
+    *) return 0 ;;
+  esac
+  lsof_bin=$(_svsup_lsof_bin) || return 0
+  [[ -n "$lsof_bin" ]] || return 0
+  pids=$("$lsof_bin" -ti "tcp:$port" -sTCP:LISTEN 2>/dev/null)
+  [[ -n "$pids" ]] || return 0
+  for pid in $pids; do
+    holder=$(_svsup_pid_cmdline "$pid")
+    if _svsup_cmdline_matches_command "$holder" "$@"; then
+      echo "  reclaiming orphaned listener pid $pid on $host:$port (cmd: $holder)"
+      kill -9 "$pid" 2>/dev/null || true
+    else
+      echo "✗ refusing to kill pid $pid on $host:$port — command line doesn't match the supervised command (cmd: ${holder:-<gone>})"
+      refused=1
+    fi
+  done
+  return $refused
 }
 
 # True while <file> exists and was touched within <max-age> seconds. The

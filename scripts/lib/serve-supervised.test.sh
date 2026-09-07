@@ -317,6 +317,130 @@ kill -9 "$ORPHAN" 2>/dev/null
 wait "$ORPHAN" 2>/dev/null
 cd "$WORK"
 
+echo "_svsup_cmdline_matches_command: token 0 always counts, later tokens only if long enough and not a bare flag"
+source "$LIB_DIR/serve-supervised-lib.sh"
+if _svsup_cmdline_matches_command "python3 -m http.server 18980 --bind 127.0.0.1" "python3" "-m" "http.server" "18980" "--bind" "127.0.0.1"; then
+  ok "matches when token 0 (the interpreter) is a substring of the holder's cmdline"
+else
+  no "matches when token 0 (the interpreter) is a substring of the holder's cmdline"
+fi
+if _svsup_cmdline_matches_command "node .../tsx/dist/loader.mjs apps/api/src/index.ts" "tsx" "--env-file=apps/api/.env" "--watch" "apps/api/src/index.ts"; then
+  ok "matches on a distinctive later token (the entry-point path) even when token 0 differs (tsx's own real worker is node, not tsx)"
+else
+  no "matches on a distinctive later token (the entry-point path) even when token 0 differs"
+fi
+if _svsup_cmdline_matches_command "python3 -m http.server 18980 --bind 127.0.0.1" "bash" "-c" "sleep 3600"; then
+  no "refuses a holder whose cmdline shares nothing with the supervised command"
+else
+  ok "refuses a holder whose cmdline shares nothing with the supervised command"
+fi
+if _svsup_cmdline_matches_command "some-totally-different-daemon -w -c" "startup-cmd" "-w" "-c"; then
+  no "a bare short flag alone ('-w'/'-c') is not enough to count as a match"
+else
+  ok "a bare short flag alone ('-w'/'-c') is not enough to count as a match"
+fi
+
+echo "a pre-held port whose holder's command line matches the supervised command is reclaimed, and the new child starts cleanly"
+CASE11="$WORK/case-reclaim-match"; mkdir -p "$CASE11"; cd "$CASE11"
+PORT11=18981
+NAME11="${NAME_PREFIX}-reclaim-match"
+# Simulates the SIGKILL scenario directly: an orphan left over from a prior
+# supervisor instance, running the exact same command this new instance is
+# about to (re)launch, still bound to the health port before this supervisor
+# has spawned anything of its own.
+python3 -m http.server "$PORT11" --bind 127.0.0.1 >/dev/null 2>&1 &
+ORPHAN11=$!
+_wait_until "the orphan to come up" 100 _curl_ok "http://127.0.0.1:$PORT11/"
+"$SUP" --name "$NAME11" --health-url "http://127.0.0.1:$PORT11/" --dir "$CASE11" \
+  --interval 1 --failures 3 --max-restarts 2 \
+  -- python3 -m http.server "$PORT11" --bind 127.0.0.1 &
+SUP_PID=$!
+if _wait_until "the orphan to be reclaimed (killed)" 100 bash -c "! kill -0 $ORPHAN11 2>/dev/null"; then
+  ok "the matching orphan was killed by the pre-spawn reclaim"
+else
+  no "the matching orphan was killed by the pre-spawn reclaim"
+fi
+if _wait_until "the health endpoint to come back up under the new child" 100 _curl_ok "http://127.0.0.1:$PORT11/"; then
+  ok "the supervisor's own child started cleanly after reclaiming the port"
+else
+  no "the supervisor's own child started cleanly after reclaiming the port"
+fi
+kill -TERM "$SUP_PID" 2>/dev/null
+wait "$SUP_PID" 2>/dev/null
+wait "$ORPHAN11" 2>/dev/null
+cd "$WORK"
+
+echo "a pre-held port whose holder's command line does not match the supervised command is refused, not killed, and the supervisor fails fast"
+CASE12="$WORK/case-reclaim-refuse"; mkdir -p "$CASE12"; cd "$CASE12"
+PORT12=18982
+NAME12="${NAME_PREFIX}-reclaim-refuse"
+python3 -m http.server "$PORT12" --bind 127.0.0.1 >/dev/null 2>&1 &
+UNRELATED12=$!
+_wait_until "the unrelated listener to come up" 100 _curl_ok "http://127.0.0.1:$PORT12/"
+OUTPUT12=$("$SUP" --name "$NAME12" --health-url "http://127.0.0.1:$PORT12/" --dir "$CASE12" \
+  --interval 1 --failures 3 --max-restarts 2 \
+  -- bash -c 'sleep 3600' 2>&1)
+RC12=$?
+if [[ $RC12 -ne 0 ]]; then
+  ok "the supervisor exits non-zero rather than starting on top of an unrecognized holder"
+else
+  no "the supervisor exits non-zero rather than starting on top of an unrecognized holder"
+fi
+case "$OUTPUT12" in
+  *"refusing to kill"*"refusing to start on top of it"*) ok "logs a loud refusal naming the holder, not a silent no-op" ;;
+  *) no "logs a loud refusal naming the holder, not a silent no-op (got: $OUTPUT12)" ;;
+esac
+if kill -0 "$UNRELATED12" 2>/dev/null; then
+  ok "the unrelated holder was left running, not killed"
+else
+  no "the unrelated holder was left running, not killed"
+fi
+kill -9 "$UNRELATED12" 2>/dev/null
+wait "$UNRELATED12" 2>/dev/null
+cd "$WORK"
+
+echo "the EXIT trap kills the child tree on an unplanned exit"
+CASE13="$WORK/case-exittrap"; mkdir -p "$CASE13"; cd "$CASE13"
+# A real fixture child + grandchild, so this proves the whole tree dies (the
+# same _svsup_kill_tree the death path uses), not just the top pid.
+cat > tree13.sh <<'EOF'
+#!/usr/bin/env bash
+sleep 3600 &
+echo $! > descendant.pid
+while true; do sleep 1; done
+EOF
+chmod +x tree13.sh
+./tree13.sh &
+FAKE_CHILD=$!
+_wait_until "the fixture descendant to register" 50 test -s "$CASE13/descendant.pid"
+FAKE_DESC=$(cat "$CASE13/descendant.pid")
+( source "$SUP"; NAME="exittrap-abnormal"; CHILD_PID=$FAKE_CHILD; CHILD_ACTIVE=1; SHUTTING_DOWN=0; _svsup_handle_exit )
+if _wait_until "the fixture child and descendant to both die" 50 \
+     bash -c "! kill -0 $FAKE_CHILD 2>/dev/null && ! kill -0 $FAKE_DESC 2>/dev/null"; then
+  ok "the EXIT trap kills the whole child tree on an unplanned exit"
+else
+  no "the EXIT trap kills the whole child tree on an unplanned exit"
+fi
+kill -9 "$FAKE_CHILD" "$FAKE_DESC" 2>/dev/null
+cd "$WORK"
+
+echo "the EXIT trap is a no-op once SHUTTING_DOWN is set — the signal handler already tore the tree down itself, so this must not double-kill"
+CASE14="$WORK/case-exittrap-noop"; mkdir -p "$CASE14"; cd "$CASE14"
+cp "$CASE13/tree13.sh" tree14.sh
+./tree14.sh &
+FAKE_CHILD2=$!
+_wait_until "the fixture descendant to register" 50 test -s "$CASE14/descendant.pid"
+FAKE_DESC2=$(cat "$CASE14/descendant.pid")
+( source "$SUP"; NAME="exittrap-shutdown"; CHILD_PID=$FAKE_CHILD2; CHILD_ACTIVE=1; SHUTTING_DOWN=1; _svsup_handle_exit )
+sleep 0.3
+if kill -0 "$FAKE_CHILD2" 2>/dev/null && kill -0 "$FAKE_DESC2" 2>/dev/null; then
+  ok "the EXIT trap left the tree alone when SHUTTING_DOWN was already set"
+else
+  no "the EXIT trap left the tree alone when SHUTTING_DOWN was already set"
+fi
+kill -9 "$FAKE_CHILD2" "$FAKE_DESC2" 2>/dev/null
+cd "$WORK"
+
 echo "_svsup_wait_pids_gone waits on descendants, not just the root"
 CASE9="$WORK/case-treewait"; mkdir -p "$CASE9"; cd "$CASE9"
 # A trailing `while` loop, not a bare `sleep`: bash exec-optimises the last
