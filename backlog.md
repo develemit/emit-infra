@@ -188,6 +188,8 @@ fleet-clean criterion was amended to expect exactly these two.
 - (emit-billing deploy 2026-08-27) CLI-direct `emit-infra deploy` (without the pre-push build phase) wipes `BUILD_NUMBER` from the server `.env`, silently demoting pinned image tags to `:latest`. The env-copy task should preserve the existing server-side BUILD_NUMBER when no `build_number` extra-var is supplied.
 - (emit-billing deploy 2026-08-27) `deploy-detached.sh`'s child died when the launching agent-shell's process group was cleaned up (status went `interrupted` mid-build) — detachment isn't surviving harness kills. Consider `setsid`/full daemonization; `--no-wait` launches survived.
 
+- (sprint 321, 2026-09-07) `causeLabel()`'s Badge is still hardcoded to `variant="err"` (red) for every reason including the new intentional `signalled` one — a cosmetic nit, not a correctness issue
+
 ## ✅ Converted to Sprints
 
 - ~~(infra, 2026-08-23) **Fourth fixed-timing test flake this month — worth a systemic pass.** `scripts/lib/deploy-detached.test.sh:213` asserts `[[ $NOWAIT_ELAPSED -lt 4 ]]` against a 4s push: 1-second granularity with zero margin, so under the full `test:hooks` chain's load `--no-wait`'s own node startup (classify-run-state.mjs, sprint 289) pushes elapsed to exactly 4 and it fails. Observed once during sprint 302's spot-check; 4/4 passes in isolation. Same class as the already-fixed `hook-signals.test.sh` (f69168b) and `use-ops-chat.test.ts` (d90a11e), and the still-open `db-url-connect.test.ts > waitUntilReady` flake. A sweep for fixed-timing assertions across the repo's suites would likely be cheaper than fixing them one incident at a time.~~ → sprint-303 (2026-08-22)
