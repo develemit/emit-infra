@@ -61,19 +61,34 @@ startup, not a build-time failure. Two sub-cases:
   run at all, and separately needs the *target* binary wherever that
   `node_modules` gets copied onto a target-platform stage.
 
-Fix with pnpm's `supportedArchitectures` (in the root `package.json`'s `pnpm`
-field — not `.npmrc`; pnpm resolves this per-package.json, not as a flat
-config key, as of pnpm 10.x):
+Fix with pnpm's `supportedArchitectures`, in **`pnpm-workspace.yaml`** (not
+`.npmrc`, and not the root `package.json`'s `pnpm` field — see "Where the
+setting lives" below; verified on pnpm 10.30.2):
 
-```jsonc
-"pnpm": {
-  "supportedArchitectures": {
-    "os": ["linux", "darwin", "current"],
-    "cpu": ["x64", "arm64"],
-    "libc": ["musl", "glibc"]
-  }
-}
+```yaml
+supportedArchitectures:
+  os: [linux, darwin, current]
+  cpu: [x64, arm64]
+  libc: [musl, glibc]
 ```
+
+**Where the setting lives matters.** pnpm reads it from either place for a
+plain `pnpm install`, which is why the `package.json` location looked fine
+for weeks. But a deps stage keyed on the lockfile — `COPY pnpm-lock.yaml
+pnpm-workspace.yaml`, then `pnpm fetch`, then `COPY package.json`, then
+`pnpm install --offline` — runs `fetch` before any `package.json` exists in
+the stage. With the setting in `package.json`, `fetch` never sees it and
+downloads only the build host's binaries. The offline install then can't get
+the target ones and **leaves dangling symlinks** for them: the
+`.pnpm/@esbuild+linux-x64@…` slot and the link to it exist, but the package
+directory it points at doesn't. "Is the x64 package present?" answers yes;
+loading it fails. `pnpm-workspace.yaml` is copied before `fetch`, so the
+setting survives this ordering. This hit tastease on 2026-09-11 (build 1247,
+sprint 141 had just adopted `pnpm fetch`): db-migrate's `tsx` crashed with
+"@esbuild/linux-arm64 is present but this platform needs @esbuild/linux-x64",
+and the web and marketing images shipped arm64-only `sharp`. The migration
+crash stopped the deploy before blue/green switched, so prod never served the
+broken images.
 
 This installs both arch's optional platform binaries wherever pnpm resolves
 them, so the `$BUILDPLATFORM` stage can execute its own build tools *and*
@@ -124,9 +139,10 @@ exec-format error the first time someone ran a migration, well after the
 image had already built and pushed successfully. Fixed by giving `migrate`
 its own plain `FROM node:22-alpine` stage (matching develemail's reference
 `migrate` pattern) instead of inheriting `builder`, plus
-`pnpm.supportedArchitectures` in tastease's root `package.json` so both
-platforms' esbuild binaries are available for `tsx` to pick the right one
-from at runtime.
+`supportedArchitectures` so both platforms' esbuild binaries are available
+for `tsx` to pick the right one from at runtime. (It was originally put in
+tastease's root `package.json`; it moved to `pnpm-workspace.yaml` on
+2026-09-11 after the `pnpm fetch` failure described above.)
 
 **Verify before shipping**, every time this pattern touches a service with
 native dependencies: `docker buildx build --platform linux/amd64 ... --load`,
@@ -135,3 +151,21 @@ succeeds) on something *other* than an exec-format or "wrong ELF class"
 error — a missing env var or a refused DB connection is a clean pass; a
 native-module crash is not. A real deploy with server-side log verification
 is the definitive check.
+
+**Starting the container isn't enough when the native module loads lazily.**
+A Next.js standalone image starts cleanly with a broken `sharp`, because
+Next only loads `sharp` on the first `/_next/image` request. Load each native
+module explicitly on the target platform instead:
+- `sharp` is an optional dependency of `next`, so in pnpm's layout it only
+  resolves *from next's package dir* — `require('sharp')` from the app root
+  fails even on a good image. Resolve it via
+  `createRequire(require.resolve('next/package.json'))('sharp')`.
+- For `tsx`/esbuild, transform a one-line `.ts` file with `npx tsx`.
+- Don't substitute a presence check (`ls node_modules/.pnpm | grep x64`); the
+  dangling-link failure above passes it.
+
+tastease's `scripts/check-image-arch.sh` (`pnpm check:image-arch`, or
+`--tag <build>` for an already-built release) is a reference implementation.
+Validate a new probe both ways before trusting it: it must pass on a
+known-good release and fail on a known-bad one. On tastease, 1174 passes and
+1247 fails all three probes.
