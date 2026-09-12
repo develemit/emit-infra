@@ -121,21 +121,21 @@ than adding a third file**. There is no `check:affected` in this repo;
 - `package.json` — only if a new test file proves necessary
 
 ## Acceptance criteria
-- [ ] Discovery produces all 21 fleet images, including the 11 listed above;
+- [x] Discovery produces all 21 fleet images, including the 11 listed above;
       quote the resolved list in the report
-- [ ] tastease resolves to `easyliving/*` and develemail to `develemail-*` —
+- [x] tastease resolves to `easyliving/*` and develemail to `develemail-*` —
       proving the `imagePrefix` vs `ghcrRepo` branch is honoured, not guessed
-- [ ] Build variants (`-migrate`) add no extra package
-- [ ] A project with an unparseable config or no services is skipped with a
+- [x] Build variants (`-migrate`) add no extra package
+- [x] A project with an unparseable config or no services is skipped with a
       warning and does not abort the run
-- [ ] Any name in the old hardcoded array that discovery does not produce is
+- [x] Any name in the old hardcoded array that discovery does not produce is
       reported, not silently dropped
-- [ ] `--dry-run` over the full discovered list completes and its per-image
+- [x] `--dry-run` over the full discovered list completes and its per-image
       counts are recorded, with newly covered images called out separately
-- [ ] Sprint 330's guarantee still holds under discovery: no deployed release is
+- [x] Sprint 330's guarantee still holds under discovery: no deployed release is
       selected for deletion anywhere in the fleet
-- [ ] Coverage for all of the above in `scripts/lib/ghcr-prune.test.sh`
-- [ ] `pnpm test:hooks` passes (this repo has no `check:affected`)
+- [x] Coverage for all of the above in `scripts/lib/ghcr-prune.test.sh`
+- [x] `pnpm test:hooks` passes (this repo has no `check:affected`)
 
 ## Out of scope
 - The retention rules themselves — sprint 330 owns the deployed-release
@@ -145,3 +145,107 @@ than adding a third file**. There is no `check:affected` in this repo;
   numbers; let a human approve the first real prune.
 - Pruning any registry other than GHCR, or server-side image retention.
 - Adding a "project is retired, stop pruning it" concept.
+
+## Completed
+
+**Date:** 2026-09-12
+
+### Summary
+`ghcr-prune.sh`'s `PACKAGES` array is gone. `scripts/lib/ghcr-prune-lib.sh`
+gained `_ghcrprune_discover_packages`, which walks every
+`~/projects/*/.emit-infra.json`, reads `ci.ghcrOrg`, `ci.ghcrRepo` (falling
+back to the last path segment of `github.repo`, mirroring
+`pre-push-config.sh:34`), `ci.imagePrefix`, and `blueGreen.services[].name`,
+and derives each service's GHCR package path by calling `image_name()`
+(sourced from `docker-build.sh`) with those values injected as a per-call
+env-var prefix — so naming can never drift from what the build actually
+pushes, the exact risk the sprint's Reason section called out. `ghcr-prune.sh`
+now prints the resolved package list at the top of every run and keeps a
+`--packages a,b,c` escape hatch for one-off runs.
+
+Discovery is deliberately per-project-conservative: a config that fails to
+parse, has no `ci.ghcrOrg`, or declares no `blueGreen.services` is skipped
+with a warning on stderr and the rest of the fleet still gets discovered —
+never treated as "nothing to keep" and never aborts the whole run. Live
+against the real fleet this produces exactly the 21 images the sprint's
+Reason table predicted: the original 10 plus 11 new (`develemail-inbound`,
+both `diner-decider-*`, all three `emit-billing-*`, both `emit-social-*`, and
+all three `martialops-*`). `test-smoke` (no `ci.ghcrOrg`, no services) is
+skipped with a warning, as designed. A manual reconciliation (`comm` between
+the old hardcoded array and live discovery output) confirmed zero stale names
+— every entry in the old array is still produced by discovery, so nothing was
+silently dropped.
+
+Owner scoping stays intentionally minimal per the sprint's guidance: discovery
+emits `<owner>\t<package>` pairs, and `ghcr-prune.sh` loudly warns and skips
+any package whose owner doesn't match the configured `GHCR_OWNER` rather than
+building multi-BASE resolution machinery for a case (a second GHCR org) that
+doesn't exist in the fleet yet. Every project today resolves to `develemit`,
+so this path is untested by the live run but exercised by nothing silently
+disappearing if it ever triggers.
+
+One correctness fix along the way: with the hardcoded array gone, `PACKAGES`
+can legitimately end up empty (bad `PROJECTS_DIR`, a `--packages ""`, or a
+fleet where every project fails discovery). Bash 3.2 — the version this
+machine's `bash` and the launchd job's `PATH` resolve to — throws "unbound
+variable" on `"${arr[@]}"` for a *declared-but-empty* array under `set -u`,
+which every downstream `for pkg in "${PACKAGES[@]}"` and `printf` would have
+hit. Added an explicit `${#PACKAGES[@]} -eq 0` guard that refuses loudly
+before either point, verified against this machine's actual bash 3.2.
+
+### Files changed
+- `scripts/ghcr-prune.sh` — hardcoded `PACKAGES` array replaced with
+  discovery (falls back to `--packages` override), prints the resolved list,
+  refuses to run on zero resolved packages
+- `scripts/lib/ghcr-prune-lib.sh` — (new) `_ghcrprune_parse_project_config`,
+  `_ghcrprune_discover_packages`; sources `docker-build.sh` for `image_name()`
+- `scripts/lib/ghcr-prune.test.sh` — 8 new fixture-driven cases: prefix-style
+  naming, repo-style naming (tastease's shape), `ghcrRepo` falling back to
+  `github.repo`, build variants adding no extra package, a project with no
+  `blueGreen.services`, and an unparseable config — all skip-with-warning
+  without aborting the rest of discovery
+
+### Verification
+- `pnpm test:hooks`: full suite, all 15 registered files (this repo has no
+  `check:affected`), 354/354 pass (`ghcr-prune.test.sh` itself: 31/31, up
+  from 23/23 before this sprint)
+- Live `_ghcrprune_discover_packages ~/projects`: resolves exactly 21
+  packages across `develemail`, `diner-decider`, `emit-billing`,
+  `emit-social`, `emit-vision`, `martialops`, and `tastease`; `test-smoke` is
+  skipped with a printed warning (no `ci.ghcrOrg`, no services) and does not
+  abort the run
+- `bash scripts/ghcr-prune.sh --dry-run`: completes over the full discovered
+  list, reports 1126 versions across 21 images (up from 974 across the old
+  10), with per-image counts printed for the newly covered images
+  (`develemail-inbound`: 4, `diner-decider-web`: 60, `diner-decider-api`: 61,
+  `emit-billing-*`: 0 each, `emit-social-web`: 0, `emit-social-api`: 2,
+  `martialops-web`: 9, `martialops-api`: 8, `martialops-marketing-web`: 8)
+- `bash scripts/ghcr-prune.sh --packages a,b --dry-run`: override path
+  restricts the run to exactly the given packages
+- Reconciliation: `comm` between the old 10-entry array and live discovery
+  output shows zero old names missing from discovery and exactly the 11
+  predicted new entries added
+- Sprint 330's guarantee re-verified against a newly covered image: real
+  selection against `martialops-api`'s live version list (fleet-wide 7
+  protected deployed shas) selected 8 ids for pruning and did not select the
+  currently-deployed version (id `1226587088`, tagged `826` /
+  `412710c4b52c8031f832b99d9800ee744541f796` / `latest`)
+- No live DELETE calls were made during this session's work
+
+### Follow-ups
+- `[defer]` The newly covered images (`develemail-inbound`,
+  `diner-decider-*`, `emit-billing-*`, `emit-social-*`, `martialops-*`) have
+  never been pruned and some carry a real backlog (`diner-decider-web`: 60,
+  `diner-decider-api`: 61 versions eligible today). Per this sprint's scope, a
+  human should review the `--dry-run` output before the first live prune
+  touches them.
+- `[defer]` Multi-owner discovery (a package whose `ci.ghcrOrg` differs from
+  the configured `GHCR_OWNER`) is loudly skipped rather than supported —
+  untested against a real second org since none exists in the fleet yet.
+- `[defer]` Live-deletion verification (a real non-dry-run prune) is still
+  pending the user's decision on granting `delete:packages` to the `gh`
+  credential this script and the launchd job use — unchanged from sprints 330
+  and 330.1.
+- `[defer]` `com.emit.ghcr-prune` remains unloaded by design; re-bootstrap it
+  once the user is satisfied with the discovered package list and the
+  newly-covered backlog above.

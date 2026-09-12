@@ -55,11 +55,38 @@
 #                                                          last field 1 if an
 #                                                          auth/scope failure
 #                                                          cut the run short).
+#   _ghcrprune_discover_packages <projects-dir>         -> walks every
+#                                                          */.emit-infra.json
+#                                                          under the given
+#                                                          dir and echoes one
+#                                                          "<owner><TAB>
+#                                                          <package>" line per
+#                                                          declared
+#                                                          blueGreen.services
+#                                                          entry, reusing
+#                                                          image_name() so
+#                                                          naming can't drift
+#                                                          from what actually
+#                                                          gets built. A
+#                                                          project whose
+#                                                          config can't be
+#                                                          parsed, has no
+#                                                          ci.ghcrOrg, or
+#                                                          declares no
+#                                                          services is skipped
+#                                                          with a warning on
+#                                                          stderr — never
+#                                                          silently treated as
+#                                                          "nothing to keep".
+#                                                          See sprint 331.
 #
 # Fixture-tested (no live API calls) in ghcr-prune.test.sh.
 
 [[ -n "${_GHCRPRUNE_LIB_LOADED:-}" ]] && return 0
 _GHCRPRUNE_LIB_LOADED=1
+
+_GHCRPRUNE_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$_GHCRPRUNE_LIB_DIR/docker-build.sh"
 
 # A project that never deployed has no status file at all — that's a normal,
 # quiet "nothing to protect", not a failure. A status file that exists but
@@ -198,4 +225,73 @@ _ghcrprune_delete_ids() {
     fi
   done
   echo "$deleted $failed 0"
+}
+
+# Reads one project's .emit-infra.json and echoes four lines: ghcrOrg,
+# ghcrRepo (falling back to the last path segment of github.repo, the same
+# rule scripts/lib/pre-push-config.sh:34 applies), imagePrefix, and a
+# comma-joined list of blueGreen.services[].name. Build variants
+# (ci.buildVariants) are intentionally not read here — a variant is a tag
+# suffix on an existing service's image, not a separate package (sprint 331).
+# Returns 2 if the file isn't valid JSON.
+_ghcrprune_parse_project_config() {
+  local config="$1"
+  python3 -c '
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+except Exception:
+    sys.exit(2)
+ci = d.get("ci", {})
+gh = d.get("github", {})
+bg = d.get("blueGreen", {})
+ghcr_org = ci.get("ghcrOrg") or ""
+repo = gh.get("repo") or ""
+ghcr_repo = ci.get("ghcrRepo") or (repo.split("/")[-1] if repo else "")
+image_prefix = ci.get("imagePrefix") or ""
+services = [s.get("name", "") for s in bg.get("services", []) if s.get("name")]
+print(ghcr_org)
+print(ghcr_repo)
+print(image_prefix)
+print(",".join(services))
+' "$config"
+}
+
+# Walks $1/*/.emit-infra.json and echoes "<owner>\t<package>" for every
+# declared service, deriving the package path from image_name() (sourced
+# above) rather than restating its ghcrOrg/ghcrRepo/imagePrefix rule — see
+# the doc comment at the top of this file.
+_ghcrprune_discover_packages() {
+  local projects_dir="$1" config project parsed
+  local ghcr_org ghcr_repo image_prefix services_csv
+  local -a svc_array
+  local svc full pkg
+  for config in "$projects_dir"/*/.emit-infra.json; do
+    [[ -f "$config" ]] || continue
+    project="$(basename "$(dirname "$config")")"
+
+    if ! parsed=$(_ghcrprune_parse_project_config "$config" 2>/dev/null); then
+      echo "ghcr-prune: $project: .emit-infra.json could not be parsed — skipping discovery for this project" >&2
+      continue
+    fi
+
+    { read -r ghcr_org; read -r ghcr_repo; read -r image_prefix; read -r services_csv; } <<< "$parsed"
+
+    if [[ -z "$ghcr_org" ]]; then
+      echo "ghcr-prune: $project: no ci.ghcrOrg configured — skipping discovery for this project" >&2
+      continue
+    fi
+    if [[ -z "$services_csv" ]]; then
+      echo "ghcr-prune: $project: no blueGreen.services declared — skipping discovery for this project" >&2
+      continue
+    fi
+
+    IFS=',' read -r -a svc_array <<< "$services_csv"
+    for svc in "${svc_array[@]}"; do
+      [[ -z "$svc" ]] && continue
+      full=$(GHCR_ORG="$ghcr_org" GHCR_REPO="$ghcr_repo" IMAGE_PREFIX="$image_prefix" image_name "$svc")
+      pkg="${full#ghcr.io/$ghcr_org/}"
+      printf '%s\t%s\n' "$ghcr_org" "$pkg"
+    done
+  done
 }

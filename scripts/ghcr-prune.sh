@@ -8,7 +8,12 @@
 # manifest list) are never counted toward the keep budget and never deleted —
 # there is no reliable way from this API alone to tell an orphaned untagged
 # manifest from one still referenced by a retained tag. See sprint 330.
-# Usage: ./scripts/ghcr-prune.sh [--keep N] [--dry-run]
+#
+# The package list is discovered from every ~/projects/*/.emit-infra.json's
+# blueGreen.services rather than hardcoded, so a new project or service is
+# covered the day it ships. Pass --packages to override discovery for a
+# one-off run. See sprint 331.
+# Usage: ./scripts/ghcr-prune.sh [--keep N] [--dry-run] [--packages a,b,c]
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -18,20 +23,38 @@ KEEP=10
 DRY_RUN=false
 GHCR_OWNER="develemit"
 PROJECTS_DIR="${PROJECTS_DIR:-$HOME/projects}"
+PACKAGES_OVERRIDE=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --keep) KEEP="$2"; shift 2 ;;
     --dry-run) DRY_RUN=true; shift ;;
-    *) echo "usage: ghcr-prune.sh [--keep N] [--dry-run]" >&2; exit 1 ;;
+    --packages) PACKAGES_OVERRIDE="$2"; shift 2 ;;
+    *) echo "usage: ghcr-prune.sh [--keep N] [--dry-run] [--packages a,b,c]" >&2; exit 1 ;;
   esac
 done
 
-PACKAGES=(
-  develemail-web develemail-api develemail-worker
-  "easyliving/api" "easyliving/web" "easyliving/marketing"
-  emit-api emit-worker emit-web emit-marketing
-)
+PACKAGES=()
+if [[ -n "$PACKAGES_OVERRIDE" ]]; then
+  IFS=',' read -r -a PACKAGES <<< "$PACKAGES_OVERRIDE"
+else
+  discovered=$(_ghcrprune_discover_packages "$PROJECTS_DIR")
+  while IFS=$'\t' read -r pkg_owner pkg_path; do
+    [[ -z "$pkg_path" ]] && continue
+    if [[ "$pkg_owner" != "$GHCR_OWNER" ]]; then
+      echo "⚠ $pkg_path belongs to owner '$pkg_owner', not the configured GHCR_OWNER='$GHCR_OWNER' — multi-owner pruning isn't supported yet, skipping" >&2
+      continue
+    fi
+    PACKAGES+=("$pkg_path")
+  done <<< "$discovered"
+fi
+
+if [[ ${#PACKAGES[@]} -eq 0 ]]; then
+  echo "✗ resolved 0 packages — refusing to run (discovery found nothing, or --packages was empty)" >&2
+  exit 1
+fi
+echo "resolved package list (${#PACKAGES[@]}):"
+printf '  %s\n' "${PACKAGES[@]}"
 
 # Preflight: a real prune needs delete:packages or every DELETE below 403s
 # and (before sprint 330.1) got silently discarded. Refuse before doing any

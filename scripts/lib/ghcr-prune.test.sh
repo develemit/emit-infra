@@ -204,6 +204,75 @@ CALLS=0
 _ghcrprune_delete_ids base pkg 1 2 3 >/dev/null
 check "auth failure on the first id never touches the remaining ids" "$CALLS" "0"
 
+# ── _ghcrprune_discover_packages ──────────────────────────────────────────────
+echo "_ghcrprune_discover_packages"
+
+FLEET="$WORK/fleet"
+mkdir -p "$FLEET/prefix-style" "$FLEET/repo-style" "$FLEET/repo-fallback" \
+  "$FLEET/no-services" "$FLEET/unparseable" "$FLEET/has-variants"
+
+# prefix-style naming: ci.imagePrefix wins even though ghcrRepo would also resolve.
+cat > "$FLEET/prefix-style/.emit-infra.json" <<'JSON'
+{"ci": {"ghcrOrg": "develemit", "imagePrefix": "widget-"},
+ "github": {"repo": "develemit/widget"},
+ "blueGreen": {"services": [{"name": "web"}, {"name": "api"}]}}
+JSON
+
+# repo-style naming (tastease's shape): no imagePrefix, explicit ghcrRepo.
+cat > "$FLEET/repo-style/.emit-infra.json" <<'JSON'
+{"ci": {"ghcrOrg": "develemit", "ghcrRepo": "gadget"},
+ "github": {"repo": "develemit/gadget-monorepo"},
+ "blueGreen": {"services": [{"name": "api"}, {"name": "web"}]}}
+JSON
+
+# ghcrRepo omitted entirely -> falls back to the last segment of github.repo.
+cat > "$FLEET/repo-fallback/.emit-infra.json" <<'JSON'
+{"ci": {"ghcrOrg": "develemit"},
+ "github": {"repo": "develemit/gizmo"},
+ "blueGreen": {"services": [{"name": "api"}]}}
+JSON
+
+# No blueGreen.services declared at all -> skipped, not treated as "nothing to keep".
+cat > "$FLEET/no-services/.emit-infra.json" <<'JSON'
+{"ci": {"ghcrOrg": "develemit"}, "github": {"repo": "develemit/no-services"}}
+JSON
+
+# Unparseable config -> skipped with a warning, rest of the fleet still discovered.
+echo 'not json' > "$FLEET/unparseable/.emit-infra.json"
+
+# Build variants are a tag suffix on an existing service, never an extra package.
+cat > "$FLEET/has-variants/.emit-infra.json" <<'JSON'
+{"ci": {"ghcrOrg": "develemit", "imagePrefix": "thing-",
+        "buildVariants": {"api": [{"target": "migrate", "tagSuffix": "-migrate"}]}},
+ "github": {"repo": "develemit/thing"},
+ "blueGreen": {"services": [{"name": "api"}]}}
+JSON
+
+got=$(_ghcrprune_discover_packages "$FLEET" 2>/dev/null | sort)
+want=$(printf 'develemit\tgadget/api\ndevelemit\tgadget/web\ndevelemit\tgizmo/api\ndevelemit\tthing-api\ndevelemit\twidget-api\ndevelemit\twidget-web' | sort)
+check "prefix-style, repo-style, repo-fallback, and variant-bearing projects all resolve correctly" "$got" "$want"
+
+check "prefix-style naming wins over ghcrRepo fallback" \
+  "$(_ghcrprune_discover_packages "$FLEET" 2>/dev/null | grep -c 'widget-api\|widget-web')" "2"
+
+check "repo-style naming produces <ghcrRepo>/<service>, not a prefix" \
+  "$(_ghcrprune_discover_packages "$FLEET" 2>/dev/null | grep -c 'gadget/api\|gadget/web')" "2"
+
+check "ghcrRepo falls back to the last segment of github.repo" \
+  "$(_ghcrprune_discover_packages "$FLEET" 2>/dev/null | grep -c 'gizmo/api')" "1"
+
+check "build variants add no extra package (only 'thing-api', never 'thing-api-migrate')" \
+  "$(_ghcrprune_discover_packages "$FLEET" 2>/dev/null | grep -c '^develemit\tthing-api$')" "1"
+
+warnings=$(_ghcrprune_discover_packages "$FLEET" 2>&1 >/dev/null)
+check "a project with no services declared is skipped with a warning" \
+  "$(echo "$warnings" | grep -c 'no-services.*no blueGreen.services')" "1"
+check "an unparseable config is skipped with a warning" \
+  "$(echo "$warnings" | grep -c 'unparseable.*could not be parsed')" "1"
+
+check "unparseable/no-services projects never appear in discovery output" \
+  "$(_ghcrprune_discover_packages "$FLEET" 2>/dev/null | grep -c 'no-services\|unparseable')" "0"
+
 echo
 echo "== $PASS passed, $FAIL failed =="
 [[ $FAIL -eq 0 ]]
