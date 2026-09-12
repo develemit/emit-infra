@@ -50,6 +50,26 @@ Failing must call the same `_fail_deploy` path the build fan-out uses, so
 `.deploy-status.json` lands on `failed` rather than sticking at `deploying`
 (the bug sprint 267 fixed; see the comment above `run_build_fanout`).
 
+### Preserved reference artifacts (read before validating)
+`scripts/ghcr-prune.sh` keeps only the 10 most recent versions per image and runs
+weekly (Sundays 03:17). On 2026-09-12 `api:1174-migrate` and `api:1174` sat at
+ranks 12 and 15 in that ordering — past the keep-10 cutoff — so **expect them to
+be gone from GHCR**. They were pulled for `linux/amd64` and preserved before the
+next prune run:
+
+- Loaded in the local Docker store as `ghcr.io/develemit/easyliving/<img>:<tag>`
+  for all eight of `api|web|marketing` x `1174|1247` (plus the two `-migrate` tags).
+- Archived as tarballs in `~/.local/share/emit-arch-refs/` (`easyliving-api-*.tar`),
+  since `docker image prune -a` would otherwise reclaim them as unused. Restore
+  with `docker load -i <tar>`.
+
+So: **resolve reference images locally; never assume a registry pull will work.**
+`web:1174`/`web:1247` and the `marketing` pair were still in GHCR at the time of
+writing (ranks 2-6), but `api:1247` sat at rank 9 — one tastease deploy from
+eviction — so treat the local copies as the source of truth for all of them.
+This does not change the guard's own behaviour for *newly built* images, which
+are present locally right after the build; it only affects this validation step.
+
 ### Getting the image to probe
 `build_image` pushes rather than `--load`s, but in practice the built image has
 also been present in the local Docker store (tastease's 1247 images were
@@ -141,11 +161,13 @@ every test file is registered in the root `package.json`'s `test:hooks` script
   guard is enforced, not advisory
 
 ## Acceptance criteria
-- [ ] **Two-way validated against real artifacts.** tastease has a ready-made
-      pair in GHCR: run the probes against release **1174 (must pass all three)**
-      and **1247 (must fail all three)**. Record both outputs in the sprint
-      report. A guard only ever exercised against good input proves nothing —
-      that is exactly how this bug shipped.
+- [ ] **Two-way validated against real artifacts.** Run the probes against
+      tastease release **1174 (must pass all three)** and **1247 (must fail all
+      three)**. Record both outputs in the sprint report. A guard only ever
+      exercised against good input proves nothing — that is exactly how this bug
+      shipped. **Do not `docker pull` these from GHCR** — see "Preserved
+      reference artifacts" in Context; `api:1174` and `api:1174-migrate` were
+      pruned from the registry on 2026-09-13 and exist only locally now.
 - [ ] A failing probe aborts before the deploy step runs, and
       `.deploy-status.json` ends at `failed` (not stuck at `deploying`)
 - [ ] The failure message names the image, the probe, and the module's own error

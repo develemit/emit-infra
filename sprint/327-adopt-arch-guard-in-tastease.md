@@ -73,7 +73,12 @@ the old slot serving, which is a pass for safety but means nothing shipped.
    `~/projects/tastease/.emit-infra.json`, using sprint 326's schema — the `api`
    entry must target the `-migrate` build variant, not the service image.
 2. Confirm the shared guard resolves the same three images the local script does,
-   by running it against releases 1174 (all pass) and 1247 (all fail).
+   by running it against releases 1174 (all pass) and 1247 (all fail). Resolve
+   those from the **local** Docker store / the tarballs in
+   `~/.local/share/emit-arch-refs/` — `api:1174` and `api:1174-migrate` were
+   preserved there on 2026-09-12 precisely because the weekly GHCR prune drops
+   them (see sprint 326, "Preserved reference artifacts"). A `docker pull` will
+   404.
 3. Delete `~/projects/tastease/scripts/check-image-arch.sh` and its
    `check:image-arch` script entry once the shared guard covers it.
 4. Update tastease's `CLAUDE.md` "Data & deploys" section: replace the manual
@@ -99,7 +104,8 @@ the old slot serving, which is a pass for safety but means nothing shipped.
       `.deploy-status.json`: API `uptime` reset and a fresh `release` number on
       prod events
 - [ ] The shared guard reproduces the reference results: release 1174 passes all
-      three probes, release 1247 fails all three
+      three probes, release 1247 fails all three — using the locally preserved
+      artifacts, not a registry pull
 - [ ] The `-migrate` build variant is probed, not just the `api` service image —
       state in the report how this was confirmed
 - [ ] No local copy remains: `scripts/check-image-arch.sh` and its package.json

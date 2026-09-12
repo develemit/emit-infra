@@ -91,12 +91,17 @@ pre-push hook refuses `$CLAUDECODE` shells, so use `bash
 --no-wait` and read `.deploy-status.json` plus
 `/tmp/emit-deploy-<project>-<sha>.log` directly rather than `--watch`.
 
-**Both repos have unpushed commits** (develemail ~25 ahead of its deployed
-`e0949ed`; diner-decider ~27 ahead of `367de26`). Deploying either ships all of
-that, not just this sprint's change. Check what is in each range before
-deploying, and if a range looks like it needs its own review, stop and report
-rather than shipping it blind — the change here is inert either way, so it is
-fine to leave a project undeployed with the fix committed.
+**Both repos have large unpushed ranges** — measured 2026-09-12: develemail **55**
+commits ahead of its deployed `e0949ed`, diner-decider **32** ahead of `367de26`.
+Both counts drift, so re-measure with `git rev-list --count <deployed-sha>..HEAD`
+rather than trusting these numbers. Deploying either ships the whole range, not
+just this sprint's change. Read what is in each range before deploying, and if it
+looks like it needs its own review, **stop and report rather than shipping it
+blind** — 55 commits is far past the point where a deploy is a routine
+side effect of an unrelated sprint. This sprint's change is inert either way
+(neither project's Dockerfiles use `pnpm fetch` yet), so leaving a project
+undeployed with the fix committed is a perfectly good outcome — prefer it over
+shipping a range you have not read.
 
 ## Tasks
 1. develemail: move `supportedArchitectures` from `package.json:86-101` into

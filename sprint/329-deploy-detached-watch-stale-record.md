@@ -28,23 +28,38 @@ exactly the wrong moment.
 ## Context
 
 ### The stale-record bug
-`scripts/deploy-detached.sh` (sprint 289) polls `.deploy-status.json` until it
-reaches a terminal state. The record carries a `sha`, and the log path is derived
-from it — hence `/tmp/emit-deploy-<project>-<sha>.log`. When `--watch` runs
-without knowing which sha it should be watching, it reads whatever sha the file
-currently holds. If the newly launched deploy hasn't written its record yet, that
-is the *previous* deploy's sha, and if that old record is already terminal, the
-logic misreads the situation entirely.
+Read the code before trusting any summary of it — verified 2026-09-12:
+
+- `watch_main()` (`scripts/deploy-detached.sh:211-216`) is the whole bug.
+  It reads the sha out of `.deploy-status.json` (`:214`) and derives `base` from
+  it, then hands both to `poll_for_result`.
+- `poll_for_result` (`:118-135`) does **not** poll `.deploy-status.json`. It
+  blocks until the sentinel file `${base}.rc` exists — i.e.
+  `/tmp/emit-deploy-<project>-<sha>.rc`. The status JSON is read only twice:
+  once at `:214` to choose the sha, and again in `print_summary` (`:156-157`),
+  which *does* correctly guard on `record_sha == sha`.
+- The blocking path already does the right thing: `main` (`:231-234`) resolves
+  the sha with `git rev-parse HEAD` and derives `base` from that. **So the fix is
+  to make `--watch` behave like the path that already works**, not to invent a
+  new scheme.
+
+Both observed failure modes follow from that one bad line:
+- The stale sha's `.rc` does **not** exist (the 2026-09-11 incident) → the loop
+  spins to `--timeout` and prints `⏳ still running after 540s` for a deploy that
+  finished minutes earlier.
+- The stale sha's `.rc` **does** still exist in `/tmp` → `print_summary` runs
+  against the wrong sha and instantly reports a previous deploy's outcome as this
+  one's. Arguably worse, and equally reachable; cover both.
 
 Fix direction: `--watch` should establish the sha it cares about — `HEAD` is the
 natural default, since that is what a detached deploy ships — and treat a record
-for a *different* sha as "this deploy hasn't started yet", not as its status.
-Resolve the log path from that sha too. A terminal status for another sha must
-never be reported as this deploy's outcome.
+or sentinel for a *different* sha as "this deploy hasn't started yet", not as its
+status. Resolve the log and `.rc` paths from that sha too. A terminal result for
+another sha must never be reported as this deploy's outcome.
 
-Worth checking while in here: the same confusion can affect the default
-blocking mode, which polls immediately after launching. Establish the target sha
-once, in one place, and have both modes use it.
+The blocking mode is already sha-correct, so this is mostly about giving `--watch`
+the same footing: establish the target sha once, in one place, and have both modes
+use it.
 
 ### Existing coverage and conventions
 `scripts/lib/deploy-detached.test.sh` already exists and is registered in the
