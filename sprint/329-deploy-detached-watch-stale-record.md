@@ -104,19 +104,21 @@ file.
 - `backlog.md` — close the item filed 2026-09-11, plus any folded-in items
 
 ## Acceptance criteria
-- [ ] A terminal record for a different sha is never reported as the watched
+- [x] A terminal record for a different sha is never reported as the watched
       deploy's outcome — covered by a test that fails against today's code
-- [ ] The watched log path is derived from the target sha, not from whatever the
+- [x] The watched log path is derived from the target sha, not from whatever the
       status file happens to hold
-- [ ] "Record hasn't appeared yet" is distinguishable from "running" and
+- [x] "Record hasn't appeared yet" is distinguishable from "running" and
       "finished" in the output
-- [ ] `git ls-files -s scripts/deploy-detached.sh` shows mode `100755`, and
+- [x] `git ls-files -s scripts/deploy-detached.sh` shows mode `100755`, and
       invoking it directly (no `bash` prefix) works
-- [ ] Test coverage for all of the above in
+- [x] Test coverage for all of the above in
       `scripts/lib/deploy-detached.test.sh`; new cases add no real sleeps
-- [ ] `pnpm test:hooks` passes
+- [x] `pnpm test:hooks` passes
 - [ ] A real deploy of any project is watched end to end with the fixed script,
-      and its reported outcome matches `.deploy-status.json`
+      and its reported outcome matches `.deploy-status.json` — not run this
+      pass (would mean launching a real production deploy; deferred to the
+      next natural one, same precedent as sprint 289/291)
 
 ## Out of scope
 - Rewriting how `.deploy-status.json` is written, or adding history/locking.
@@ -125,3 +127,96 @@ file.
   any wording that should change.
 - The image-arch guard (sprints 326-328), even though 327 has to work around the
   `bash` prefix until this lands.
+
+## Completed
+
+**Date:** 2026-09-12
+
+### Summary
+The bug was exactly where the sprint's Context section said it was: `watch_main`
+read the target sha out of `.deploy-status.json` instead of resolving it the
+same way `main()`'s launch path already did (`git rev-parse HEAD`). Fixed by
+extracting that resolution into a shared `target_sha()` helper used by both
+`main()` and `watch_main()`, so there is exactly one place a detached deploy's
+sha comes from. Since `status_base`/the `.rc`/`.log` paths were already keyed
+by sha, fixing the sha resolution alone closes both failure modes the sprint
+described (stale-sha timeout misreport, and stale-sha terminal-record
+misreport) — no change was needed to `poll_for_result`'s or `print_summary`'s
+existing sha-matching logic.
+
+Added a second helper, `record_state_for_sha()`, purely for the "hasn't
+appeared yet" vs. "running" distinction (task 3): it reads
+`.deploy-status.json`'s `sha` field and reports `running` only when it matches
+the target sha, `not-started` otherwise (missing file, missing field, or a
+different sha — all read the same, which is the point). `poll_for_result` now
+prints this once up front and again in the timeout message, so a timed-out
+`--watch` no longer says "still running" when nothing has actually started.
+
+`watch_main` still refuses outright when `.deploy-status.json` doesn't exist
+at all (no deploy has ever been recorded for the project) — that guard didn't
+depend on the sha field and stays a legitimate precondition. The old "status
+file has no 'sha' field" guard was removed since sha no longer comes from that
+file; a missing/empty sha field there now just reads as `not-started`, which
+is the correct behavior, not an error.
+
+Fixed the executable bit on `scripts/deploy-detached.sh` (`chmod +x` +
+`git update-index --chmod=+x`, so the mode is recorded in git, not just on
+disk). Checked every other script directly under `scripts/*.sh` (not
+`scripts/lib/*.sh`, which are sourced libraries, not invoked directly) —
+`deploy-detached.sh` was the only one missing `+x`.
+
+**Decision on the two related backlog items** (task 6): left both as-is,
+`[defer]`. The 3600s default `--timeout` and the flat `sleep 10` poll
+granularity are performance/tuning concerns unrelated to this sprint's
+correctness bug, and folding them in would have widened scope on a
+difficulty-2 sprint without adding test coverage for the actual bug. They're
+already tracked in `backlog.md` (lines pre-dating this sprint).
+
+**The one acceptance criterion left unchecked**: "a real deploy of any
+project is watched end to end." Running that for real means launching an
+actual production `git push origin main` against a live project — an
+irreversible, outward-facing action, and exactly the category of action the
+user explicitly deferred for sprints 327/328 this same session. Sprint 289
+(which built this script) and sprint 291 (its verification checklist) hit the
+identical situation and deferred the real-world check to "whatever project's
+next ordinary detached deploy happens to be" rather than manufacturing one;
+this sprint follows that precedent. Every other criterion is covered by a
+fast, deterministic, git-repo-backed test, including one written specifically
+to fail against pre-fix code (verified by stashing the fix and re-running).
+
+### Files changed
+- `scripts/deploy-detached.sh` — added `target_sha()` (shared sha resolution
+  for launch and watch) and `record_state_for_sha()` (running vs. not-started
+  vs. finished); `watch_main()` and `main()` both now resolve the sha through
+  `target_sha()`; `poll_for_result()` reports the not-started/running
+  distinction up front and in its timeout message; mode changed to `100755`
+- `scripts/lib/deploy-detached.test.sh` — `watch_main` fixtures now use a real
+  git repo (required since sha resolution is now `git rev-parse HEAD`); added
+  the stale-sha-terminal-record regression case (fails against pre-fix code);
+  added a not-started-vs-running case to the `poll_for_result` block; removed
+  the now-obsolete "status file has no sha field" case
+- `backlog.md` — closed the mode-644 half of the 2026-08-27 entry, pointing at
+  this sprint; the parent-teardown-survival half of that entry is unrelated
+  and still open
+
+### Verification
+- `bash scripts/lib/deploy-detached.test.sh`: 28/28 pass
+- Regression proof: stashed `scripts/deploy-detached.sh` (keeping the updated
+  test file) and re-ran — the new stale-record test fails against the old
+  code exactly as expected (reports "deploy finished: deployed" for a
+  different sha, exit 0 instead of 2); restored the fix and it passes again
+- `pnpm test:hooks` (full chain, all 14 suites): all suites downstream of
+  `deploy-detached.test.sh` in the `&&` chain completed, which is only
+  possible if it exited 0 — full run ended `[exited with code 0]`
+- `bash -n` clean on both touched scripts
+- `git ls-files -s scripts/deploy-detached.sh` → `100755 ...`; `./scripts/deploy-detached.sh --help` runs without a `bash` prefix
+
+### Follow-ups
+- `[defer]` The real-deploy end-to-end check (last acceptance criterion) is
+  still outstanding — verify the next time any wired project runs an ordinary
+  detached deploy, and confirm the reported outcome matches
+  `.deploy-status.json`. Same pattern as sprint 291.
+- `[defer]` Default `--timeout` (3600s) and `poll_for_result`'s flat
+  `sleep 10` granularity (both flagged in sprint 289/303's backlog) were
+  reviewed per task 6 and left as-is — unrelated to this sprint's correctness
+  fix, no new evidence changes the prior call.

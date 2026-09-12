@@ -65,6 +65,29 @@ record_field() {
   python3 -c "import json;print(json.load(open('$1')).get('$2',''))" 2>/dev/null || echo ""
 }
 
+# The sha a detached deploy for PROJECT_DIR is always about — sprint 329.
+# Both launch (main) and --watch (watch_main) must derive it the same way,
+# from git HEAD, never from whatever .deploy-status.json happens to hold: that
+# file can (and did, 2026-09-11) still be carrying a *previous* deploy's
+# terminal record when --watch starts polling.
+target_sha() {
+  (cd "$PROJECT_DIR" && git rev-parse HEAD)
+}
+
+# Tells --watch's caller whether a record for the target sha exists yet,
+# distinct from "running" (record present, not yet terminal) and from
+# "finished" (the .rc sentinel is what poll_for_result already checks for
+# that). A record for a *different* sha — stale, from a prior deploy — must
+# read the same as no record at all.
+record_state_for_sha() {
+  local sha="$1" status_file="$PROJECT_DIR/.deploy-status.json" record_sha
+  if [[ -f "$status_file" ]]; then
+    record_sha=$(record_field "$status_file" sha)
+    [[ "$record_sha" == "$sha" ]] && { echo "running"; return; }
+  fi
+  echo "not-started"
+}
+
 # ── preflight ──────────────────────────────────────────────────────────────
 preflight() {
   [[ -d "$PROJECT_DIR/.git" ]] || die "not a git repository: $PROJECT_DIR"
@@ -120,10 +143,17 @@ poll_for_result() {
   start=$(date +%s)
 
   echo "→ polling for completion (timeout ${timeout}s); log: ${base}.log"
+  case "$(record_state_for_sha "$sha")" in
+    running) echo "  status: running" ;;
+    not-started) echo "  status: no record yet for ${sha:0:7} — hasn't started, or record not written" ;;
+  esac
   while [[ ! -f "${base}.rc" ]]; do
     elapsed=$(( $(date +%s) - start ))
     if [[ $elapsed -ge $timeout ]]; then
-      echo "⏳ still running after ${timeout}s — not killing it."
+      case "$(record_state_for_sha "$sha")" in
+        running) echo "⏳ still running after ${timeout}s — not killing it." ;;
+        not-started) echo "⏳ still no record for ${sha:0:7} after ${timeout}s — not killing it." ;;
+      esac
       echo "  log: ${base}.log"
       echo "  resume watching with: $SELF --dir '$PROJECT_DIR' --watch"
       return 2
@@ -211,8 +241,7 @@ status_base() {
 watch_main() {
   local status_file="$PROJECT_DIR/.deploy-status.json" sha
   [[ -f "$status_file" ]] || die "no $status_file — nothing to watch"
-  sha=$(record_field "$status_file" sha)
-  [[ -n "$sha" ]] || die "$status_file has no 'sha' field — nothing to watch"
+  sha=$(target_sha) || die "cannot resolve HEAD in $PROJECT_DIR — nothing to watch"
   poll_for_result "$sha" "$(status_base "$(project_name "$PROJECT_DIR")" "$sha")" "$TIMEOUT"
 }
 
@@ -229,7 +258,7 @@ main() {
   preflight
 
   local sha base
-  sha=$(cd "$PROJECT_DIR" && git rev-parse HEAD)
+  sha=$(target_sha)
   base="$(status_base "$(project_name "$PROJECT_DIR")" "$sha")"
   launch "$sha" "$base"
 

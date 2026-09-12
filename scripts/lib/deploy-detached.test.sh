@@ -127,32 +127,66 @@ echo 0 > "${POLL_BASE}.rc"
 ( source "$SCRIPT"; PROJECT_DIR="$PROJECT_DIR"; poll_for_result deadbee "$POLL_BASE" 30 >/dev/null; )
 check "poll_for_result: rc file already present -> resolves immediately" "$?" "0"
 
-rm -f "${POLL_BASE}.rc"
+# sprint 329: no record at all (or a record for another sha) reads as
+# "not started", never as "running" — that distinction is the whole point.
+rm -f "${POLL_BASE}.rc" "$PROJECT_DIR/.deploy-status.json"
 OUT=$( ( source "$SCRIPT"; PROJECT_DIR="$PROJECT_DIR"; poll_for_result deadbee "$POLL_BASE" 1; ) )
 RC=$?
 check "poll_for_result: times out without killing anything, distinct exit code" "$RC" "2"
-case "$OUT" in *"still running"*) ok "poll_for_result: timeout message says still running" ;;
-  *) no "poll_for_result: timeout message says still running (got: $OUT)" ;; esac
+case "$OUT" in
+  *"still running"*) no "poll_for_result: no record yet -> not reported as running (got: $OUT)" ;;
+  *"no record"*) ok "poll_for_result: no record yet is distinguishable from running" ;;
+  *) no "poll_for_result: no record yet is distinguishable from running (got: $OUT)" ;;
+esac
+
+printf '{"status":"deploying","sha":"deadbee"}\n' > "$PROJECT_DIR/.deploy-status.json"
+OUT=$( ( source "$SCRIPT"; PROJECT_DIR="$PROJECT_DIR"; poll_for_result deadbee "$POLL_BASE" 1; ) )
+RC=$?
+check "poll_for_result: matching in-flight record times out, distinct exit code" "$RC" "2"
+case "$OUT" in *"still running"*) ok "poll_for_result: timeout message says still running for a matching record" ;;
+  *) no "poll_for_result: timeout message says still running for a matching record (got: $OUT)" ;; esac
 
 rm -rf "$PS_WORK"
 
 echo
 echo "unit: watch_main"
+# sprint 329: watch_main must resolve the sha it watches from git HEAD, same
+# as the launch path — never from whatever .deploy-status.json holds, since
+# that file can still carry a *previous* deploy's record. Needs a real repo
+# so target_sha's `git rev-parse HEAD` has something to resolve.
 WM_WORK=$(mktemp -d)
 mkdir -p "$WM_WORK/proj"
-echo '{"name":"watch-proj"}' > "$WM_WORK/proj/.emit-infra.json"
+( cd "$WM_WORK/proj" && git init -q && git config user.email t@t.t && git config user.name t
+  echo '{"name":"watch-proj"}' > .emit-infra.json
+  git add -A && git commit -qm base ) >/dev/null 2>&1
+WM_HEAD=$(cd "$WM_WORK/proj" && git rev-parse HEAD)
+
 ( source "$SCRIPT"; PROJECT_DIR="$WM_WORK/proj"; TIMEOUT=5; watch_main >/dev/null 2>&1; )
 check "watch_main: no status file -> refuses" "$?" "1"
 
-echo '{"sha":"","status":"deploying"}' > "$WM_WORK/proj/.deploy-status.json"
-( source "$SCRIPT"; PROJECT_DIR="$WM_WORK/proj"; TIMEOUT=5; watch_main >/dev/null 2>&1; )
-check "watch_main: status file with no sha -> refuses" "$?" "1"
+# The stale-record regression (sprint 329): a terminal record — AND its
+# matching .rc sentinel — for a *different* sha than HEAD must never be
+# reported as this deploy's outcome. Fails against pre-fix code, which reads
+# the sha straight out of the status file and would immediately report
+# "deploy finished: deployed" here.
+echo '{"sha":"deadbeefstale","status":"deployed"}' > "$WM_WORK/proj/.deploy-status.json"
+STALE_BASE=$( ( source "$SCRIPT"; status_base watch-proj deadbeefstale ) )
+echo 0 > "${STALE_BASE}.rc"
+WM_OUT=$( ( source "$SCRIPT"; PROJECT_DIR="$WM_WORK/proj"; TIMEOUT=1; watch_main 2>&1; ) )
+WM_RC=$?
+check "watch_main: a stale sha's terminal record does not resolve this deploy" "$WM_RC" "2"
+case "$WM_OUT" in
+  *"deploy finished: deployed"*) no "watch_main: stale record's outcome is not reported (got: $WM_OUT)" ;;
+  *"no record"*) ok "watch_main: stale record is reported as no-record-yet, not this deploy's outcome" ;;
+  *) no "watch_main: stale record is reported as no-record-yet, not this deploy's outcome (got: $WM_OUT)" ;;
+esac
+rm -f "${STALE_BASE}.rc" "${STALE_BASE}.log"
 
-echo '{"sha":"cafef00d","status":"deployed"}' > "$WM_WORK/proj/.deploy-status.json"
-BASE=$( ( source "$SCRIPT"; status_base watch-proj cafef00d ) )
+echo "{\"sha\":\"$WM_HEAD\",\"status\":\"deployed\"}" > "$WM_WORK/proj/.deploy-status.json"
+BASE=$( ( source "$SCRIPT"; status_base watch-proj "$WM_HEAD" ) )
 echo 0 > "${BASE}.rc"
 ( source "$SCRIPT"; PROJECT_DIR="$WM_WORK/proj"; TIMEOUT=5; watch_main >/dev/null 2>&1; )
-check "watch_main: finds the matching sha's rc file and resolves" "$?" "0"
+check "watch_main: finds HEAD sha's rc file and resolves" "$?" "0"
 rm -f "${BASE}.rc" "${BASE}.log"
 rm -rf "$WM_WORK"
 
