@@ -65,6 +65,28 @@ const {createRequire}=require('module');
 const nextPkg=createRequire(process.cwd()+'/').resolve('next/package.json');
 console.log('ok', createRequire(nextPkg)('sharp').versions.sharp)\""
       ;;
+    sharp)
+      # For a service that requires sharp directly (not through next), a
+      # plain require from the app root is the real test — no createRequire
+      # indirection needed, since sharp isn't buried in another package's dir.
+      printf '%s' "node -e \"console.log('ok', require('sharp').versions.sharp)\""
+      ;;
+    drizzle-kit)
+      # drizzle-kit's own `--version` does not exercise esbuild — verified by
+      # running it against a build with the wrong-arch esbuild binary and
+      # watching it succeed anyway. drizzle-kit only loads esbuild once it
+      # transpiles a TS config file (drizzle.config.ts), which real `migrate`
+      # invocations do but which needs a live DB to reach cleanly. Resolve
+      # the exact esbuild instance drizzle-kit depends on and exercise it
+      # directly with transformSync, matching what config-loading does
+      # without needing a database.
+      printf '%s' "node -e \"
+const {createRequire}=require('module');
+const req=createRequire(require.resolve('drizzle-kit'));
+const esbuild=req('esbuild');
+esbuild.transformSync('const x: number = 1; console.log(x)', {loader: 'ts'});
+console.log('ok', esbuild.version);\""
+      ;;
     *)
       return 1
       ;;

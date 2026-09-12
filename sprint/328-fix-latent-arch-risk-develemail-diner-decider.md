@@ -128,19 +128,19 @@ shipping a range you have not read.
 - `docs/CROSS-PLATFORM-BUILD-PATTERN.md` — per-project notes
 
 ## Acceptance criteria
-- [ ] Neither repo has `supportedArchitectures` in `package.json`; both have it in
+- [x] Neither repo has `supportedArchitectures` in `package.json`; both have it in
       `pnpm-workspace.yaml` with a comment explaining why
-- [ ] `pnpm install --frozen-lockfile` passes in both repos with no lockfile change
-- [ ] diner-decider's `pnpm.overrides` and `pnpm.patchedDependencies` are
+- [x] `pnpm install --frozen-lockfile` passes in both repos with no lockfile change
+- [x] diner-decider's `pnpm.overrides` and `pnpm.patchedDependencies` are
       untouched — confirm explicitly in the report
-- [ ] Each new probe is demonstrated **both ways**: passing on a correctly built
+- [x] Each new probe is demonstrated **both ways**: passing on a correctly built
       image, failing on one built without the setting. Quote both.
-- [ ] develemail's `web` has no sharp probe, with the reason recorded
-- [ ] Test coverage for the new probe kinds in
+- [x] develemail's `web` has no sharp probe, with the reason recorded
+- [x] Test coverage for the new probe kinds in
       `scripts/lib/image-arch-check.test.sh`
-- [ ] `pnpm test:hooks` passes in emit-infra; each touched repo's own check
+- [x] `pnpm test:hooks` passes in emit-infra; each touched repo's own check
       command passes
-- [ ] Deploy state of both projects is stated plainly — deployed and verified, or
+- [x] Deploy state of both projects is stated plainly — deployed and verified, or
       committed and deliberately not deployed, with the reason
 
 ## Out of scope
@@ -152,3 +152,130 @@ shipping a range you have not read.
   emit-vision and math-problemizer likely ship arm64-only `sharp` via Next
   standalone and are harmless only because none uses a raster `next/image` —
   worth a follow-up item, not work here.
+
+## Completed
+
+**Date:** 2026-09-12
+
+### Summary
+develemail and diner-decider both moved `supportedArchitectures` out of root
+`package.json` and into `pnpm-workspace.yaml` (with a comment explaining why,
+matching tastease's pattern), closing the latent arch risk before the
+lockfile-keyed deps-stage rollout in `backlog.md` lands. Neither Dockerfile
+changed, and neither project's `pnpm install --frozen-lockfile` touched its
+lockfile — the move is a no-op for today's builds, as designed.
+
+Both new `ci.imageArchProbes` kinds needed real investigation, not just the
+sprint's suggested shapes, because both suggestions turned out not to
+reproduce the failure:
+
+- **`sharp` (diner-decider)** works as suggested: diner-decider's `api` is
+  Fastify, not Next, and imports `sharp` directly at startup
+  (`domains/uploads`, `domains/places-photos`). A plain `require('sharp')`
+  from the app root (WORKDIR `/app` in the runner) is the correct probe — no
+  `createRequire` indirection needed since sharp isn't buried in another
+  package's dir.
+- **`drizzle-kit` (develemail) — the sprint's suggested `--version` invocation
+  does not exercise esbuild.** Verified directly: ran `drizzle-kit --version`
+  against a migrate image built with the platform's native esbuild binary
+  physically removed, and it printed a clean version string anyway — esbuild
+  is only touched when drizzle-kit transpiles a TS config file
+  (`drizzle.config.ts`), which needs `drizzle-kit migrate` reaching that step,
+  which itself needs a database to fail past cleanly and produces messy,
+  non-deterministic output (a stuck connection spinner) unsuitable as a
+  probe. Instead the `drizzle-kit` probe resolves the exact esbuild instance
+  `drizzle-kit` depends on (`createRequire(require.resolve('drizzle-kit'))('esbuild')`)
+  and calls `transformSync` directly — the same native binary invocation
+  `migrate` would eventually make, without needing a database. This is worth
+  flagging because the sprint file's own suggestion, if implemented literally,
+  would have shipped a probe that always passes.
+
+develemail's `web` was confirmed to need no sharp probe: no `next/image`
+imports anywhere in `apps/web`, and no other develemail app imports `sharp`.
+
+**A real, unrelated, active bug was found and left unfixed (out of scope):**
+building diner-decider's actual `apps/api/Dockerfile` at HEAD fails —
+`RUN pnpm nx run api:build` errors with `Cannot find module
+'@diner-decider/quota-limits'` / `'@diner-decider/db-test-guard'`. The
+Dockerfile's `COPY` list was never updated for `packages/quota-limits` and
+`packages/db-test-guard` (added in sprint 88, "Give web and api one shared
+source for the quota limits"), part of diner-decider's 32-commit unpushed
+range. `nx run api:build` succeeds fine outside Docker (all packages present
+on disk), so nothing local caught this. To validate the `sharp` probe against
+a real production-shaped image, a temporary local patch was applied to a
+throwaway `git clone` in `/tmp` (never touching the real repo) adding the two
+missing `COPY` lines; the real `apps/api/Dockerfile` is untouched. This is a
+confirmed build-breaking regression sitting in diner-decider's undeployed
+range — see Follow-ups.
+
+**Neither project was deployed.** develemail has 55 and diner-decider has 32
+commits ahead of their deployed SHAs, spanning many unrelated sprints; per the
+sprint's own guidance, this change is inert either way (no Dockerfile uses
+`pnpm fetch` yet), so shipping either range blind as a side effect of this
+sprint was not worth the risk — and diner-decider's Dockerfile is actively
+broken right now, so pushing it would fail at the build step regardless. Both
+fixes are committed and ready to ship whenever those repos' own maintainers
+review and push their respective ranges.
+
+### Files changed
+- `~/projects/develemail/package.json` — removed `pnpm.supportedArchitectures`
+  (kept `onlyBuiltDependencies`)
+- (new content) `~/projects/develemail/pnpm-workspace.yaml` — added
+  `supportedArchitectures` with an explanatory comment
+- `~/projects/develemail/.emit-infra.json` — added `ci.imageArchProbes.api`
+  (`-migrate` variant, `drizzle-kit` kind)
+- `~/projects/diner-decider/package.json` — removed `pnpm.supportedArchitectures`
+  (kept `overrides` and `patchedDependencies` untouched)
+- (new content) `~/projects/diner-decider/pnpm-workspace.yaml` — added
+  `supportedArchitectures` with an explanatory comment
+- `~/projects/diner-decider/.emit-infra.json` — added `ci.imageArchProbes.api`
+  (`sharp` kind)
+- `scripts/lib/image-arch-check.sh` — added `sharp` and `drizzle-kit` probe
+  kinds
+- `scripts/lib/image-arch-check.test.sh` — 9 new cases covering both kinds,
+  pass and fail
+- `docs/CROSS-PLATFORM-BUILD-PATTERN.md` — records all three projects now
+  keeping the setting in `pnpm-workspace.yaml`, and documents all four probe
+  kinds including why `drizzle-kit --version` doesn't work
+
+### Verification
+- `pnpm install --frozen-lockfile`: both repos, lockfile hash unchanged,
+  exit 0
+- diner-decider `package.json` diff: only `supportedArchitectures` removed;
+  `overrides` and `patchedDependencies` blocks untouched (confirmed via diff)
+- Two-way validation, real Docker images built for `linux/amd64`, run through
+  the actual `run_image_arch_checks` entry point (not just raw `docker run`):
+  - `drizzle-kit` kind: good migrate image → `✓ image-arch-check: api variant
+    -migrate (...develemail-api:9001-migrate) [drizzle-kit]: ok 0.25.12`;
+    broken (setting removed) → `✗ ... needs the "@esbuild/linux-x64" package
+    instead`
+  - `sharp` kind: good api image → `✓ image-arch-check: api
+    (...diner-decider-api:9001) [sharp]: ok 0.35.4`; broken → `✗ ... Error:
+    Could not load the "sharp" module using the linuxmusl-x64 runtime`
+- `scripts/lib/image-arch-check.test.sh`: 34/34 pass (25 prior + 9 new)
+- `pnpm test:hooks` (emit-infra): 14 suites, 0 `FAIL` lines, exit 0
+- `pnpm check:affected` (develemail): 20 projects, 56/56 tasks (cache hit),
+  `✓ check-all (affected) passed`
+- `pnpm check:affected` (diner-decider): 8 projects, 21/21 tasks (cache hit),
+  `✓ check-all (affected) passed`
+- Deploy state: both repos committed, neither deployed (see Summary)
+
+### Follow-ups
+- `[blocker]` diner-decider's `apps/api/Dockerfile` fails to build at HEAD —
+  `COPY apps/api ./apps/api` / `COPY packages/db ./packages/db` never gained
+  entries for `packages/quota-limits` and `packages/db-test-guard` (added
+  sprint 88). The next diner-decider deploy that rebuilds `api` will fail at
+  `pnpm nx run api:build` inside Docker. Needs two `COPY` line pairs added
+  (package.json for the install-cache layer, full source before the build
+  step) — a 10-minute fix, but it's a diner-decider Dockerfile change and this
+  sprint's "no Dockerfile changes" scope line means it wasn't made here.
+- `[defer]` develemail and diner-decider are both several dozen commits ahead
+  of their deployed SHAs (55 and 32 respectively) with no deploy attempted by
+  this sprint. Whoever picks up either repo next should read the range before
+  pushing, not assume it's routine.
+- `[defer]` The sprint file suggested `drizzle-kit --version` as the probe
+  invocation; it doesn't exercise esbuild and would have been a
+  silently-broken probe. Worth a quick skim of any future sprint's suggested
+  probe *commands* (not just kinds) before trusting them verbatim — this is
+  the second probe-kind sprint in a row (326, 328) where the naive approach
+  needed correcting against a real image.

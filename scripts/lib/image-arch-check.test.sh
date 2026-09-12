@@ -133,6 +133,41 @@ OUT=$(run_image_arch_checks web); RC=$?
 check "next-sharp: exit 0" "$RC" "0"
 check_contains "next-sharp: names the kind" "$OUT" "next-sharp"
 
+echo "sharp probe (diner-decider: required directly, not via next)"
+
+IMAGE_ARCH_PROBES_JSON='{"api":[{"kind":"sharp"}]}'
+GHCR_ORG="good"
+INSPECT_OK_REFS="ghcr.io/good/api:42"
+reset_calls
+OUT=$(run_image_arch_checks api); RC=$?
+check "sharp: exit 0 on good image" "$RC" "0"
+check_contains "sharp: names the kind" "$OUT" "sharp"
+
+GHCR_ORG="broken"
+INSPECT_OK_REFS="ghcr.io/broken/api:42"
+reset_calls
+OUT=$(run_image_arch_checks api); RC=$?
+check "sharp: nonzero exit on broken image" "$RC" "1"
+check_contains "sharp: shows the module's own error" "$OUT" "Could not load"
+
+echo "drizzle-kit probe (develemail migrate: --version doesn't exercise esbuild, transformSync does)"
+
+IMAGE_ARCH_PROBES_JSON='{"api":[{"kind":"drizzle-kit","variant":"-migrate"}]}'
+GHCR_ORG="good"
+INSPECT_OK_REFS="ghcr.io/good/api:42-migrate"
+reset_calls
+OUT=$(run_image_arch_checks api); RC=$?
+check "drizzle-kit: exit 0 on good image" "$RC" "0"
+check_contains "drizzle-kit: names the tag suffix" "$OUT" "ghcr.io/good/api:42-migrate"
+check_contains "drizzle-kit: names the kind" "$OUT" "drizzle-kit"
+
+GHCR_ORG="broken"
+INSPECT_OK_REFS="ghcr.io/broken/api:42-migrate"
+reset_calls
+OUT=$(run_image_arch_checks api); RC=$?
+check "drizzle-kit: nonzero exit on broken image" "$RC" "1"
+check_contains "drizzle-kit: shows the module's own error" "$OUT" "needs the"
+
 echo "unknown probe kind"
 
 IMAGE_ARCH_PROBES_JSON='{"weird":[{"kind":"bogus"}]}'

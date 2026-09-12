@@ -63,7 +63,12 @@ startup, not a build-time failure. Two sub-cases:
 
 Fix with pnpm's `supportedArchitectures`, in **`pnpm-workspace.yaml`** (not
 `.npmrc`, and not the root `package.json`'s `pnpm` field — see "Where the
-setting lives" below; verified on pnpm 10.30.2):
+setting lives" below; verified on pnpm 10.30.2). As of sprint 328, every
+project with the setting keeps it in `pnpm-workspace.yaml`: tastease
+(sprint 268/327, the original discovery), develemail and diner-decider
+(sprint 328, moved out of `package.json` preemptively — neither Dockerfile
+uses `pnpm fetch` yet, so the move was a no-op today, but it removes the
+landmine before the fleet-wide lockfile-keyed deps stage rollout lands):
 
 ```yaml
 supportedArchitectures:
@@ -193,7 +198,21 @@ via `ci.buildVariants`):
 }
 ```
 
-Two named `kind`s exist today — `tsx` (transforms a one-line `.ts` file) and
-`next-sharp` (resolves `sharp` from `next`'s own package dir, matching how
-Next's image optimizer does it). Both load the module rather than checking
-for its presence, for the dangling-symlink reason above.
+Four named `kind`s exist today. All load the module rather than checking for
+its presence, for the dangling-symlink reason above:
+
+- `tsx` — transforms a one-line `.ts` file with `npx tsx`.
+- `next-sharp` — resolves `sharp` from `next`'s own package dir, matching how
+  Next's image optimizer does it.
+- `sharp` — for a service that requires `sharp` directly rather than through
+  `next` (diner-decider's Fastify `api`, sprint 328): a plain `require('sharp')`
+  from the app root, no `createRequire` indirection needed.
+- `drizzle-kit` — for a `migrate`-style stage that runs `drizzle-kit migrate`
+  rather than a raw `tsx` script (develemail, sprint 328). `drizzle-kit
+  --version` does **not** exercise esbuild — verified by running it against a
+  wrong-arch build and watching it print a clean version string anyway.
+  `drizzle-kit` only loads esbuild when it transpiles a TS config file
+  (`drizzle.config.ts`), which real `migrate` runs do, but reaching that
+  cleanly needs a live database. The probe instead resolves the exact esbuild
+  instance `drizzle-kit` depends on and calls `transformSync` directly,
+  exercising the same native binary without needing a database.
