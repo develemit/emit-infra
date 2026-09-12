@@ -161,25 +161,25 @@ every test file is registered in the root `package.json`'s `test:hooks` script
   guard is enforced, not advisory
 
 ## Acceptance criteria
-- [ ] **Two-way validated against real artifacts.** Run the probes against
+- [x] **Two-way validated against real artifacts.** Run the probes against
       tastease release **1174 (must pass all three)** and **1247 (must fail all
       three)**. Record both outputs in the sprint report. A guard only ever
       exercised against good input proves nothing — that is exactly how this bug
       shipped. **Do not `docker pull` these from GHCR** — see "Preserved
       reference artifacts" in Context; `api:1174` and `api:1174-migrate` were
       pruned from the registry on 2026-09-13 and exist only locally now.
-- [ ] A failing probe aborts before the deploy step runs, and
+- [x] A failing probe aborts before the deploy step runs, and
       `.deploy-status.json` ends at `failed` (not stuck at `deploying`)
-- [ ] The failure message names the image, the probe, and the module's own error
+- [x] The failure message names the image, the probe, and the module's own error
       (e.g. `needs the "@esbuild/linux-x64" package instead`)
-- [ ] A project with no `imageArchProbes` runs no Docker commands and adds no
+- [x] A project with no `imageArchProbes` runs no Docker commands and adds no
       measurable time — verify against a project whose `.emit-infra.json` omits
       the key
-- [ ] Probes load the module; the suite includes a case proving a
+- [x] Probes load the module; the suite includes a case proving a
       presence-style check would have passed where the load-based probe fails
-- [ ] Test coverage in `scripts/lib/image-arch-check.test.sh`, registered in
+- [x] Test coverage in `scripts/lib/image-arch-check.test.sh`, registered in
       `test:hooks`
-- [ ] `pnpm test:hooks` passes (this repo has no `check:affected`; shell libs are
+- [x] `pnpm test:hooks` passes (this repo has no `check:affected`; shell libs are
       covered by that suite)
 
 ## Out of scope
@@ -190,3 +190,79 @@ every test file is registered in the root `package.json`'s `test:hooks` script
   sprint 328 for develemail and diner-decider).
 - Fixing `supportedArchitectures` placement in other repos — sprint 328.
 - Multi-arch manifests, or building natively on an x64 machine.
+
+## Completed
+
+**Date:** 2026-09-12
+
+### Summary
+Added `scripts/lib/image-arch-check.sh`, a shared guard the pre-push hook runs
+between the build fan-out and the deploy step. `run_image_arch_checks
+<built-service>...` reads `ci.imageArchProbes` (new key, defaulting to `{}`)
+and, for every built service that declares a probe, resolves the just-built
+image (local Docker store first, `docker pull --platform linux/amd64` as
+fallback) and loads the named module inside a container on the target
+platform. Two probe kinds cover the fleet today: `tsx` (transforms a one-line
+`.ts` file, catching the esbuild-via-tsx failure mode) and `next-sharp`
+(resolves `sharp` from `next`'s own package dir, matching how Next's image
+optimizer does it — `require('sharp')` from the app root fails even on a good
+image). Both load the module rather than checking for its presence: pnpm
+leaves a dangling symlink for a platform it never fetched, so `ls
+node_modules/.pnpm | grep linux-x64` passes on a broken image, which is the
+exact way tastease build 1247 shipped.
+
+Wired into `scripts/hooks/pre-push` right after `run_build_fanout` (inside the
+same `if [[ ${#TO_BUILD[@]} -gt 0 ]]` block, before the retag/pre-deploy/deploy
+phases), calling `_fail_deploy` on any failing probe so `.deploy-status.json`
+reaches `failed` rather than sticking at `deploying`. `pre-push-config.sh` now
+also emits `IMAGE_ARCH_PROBES_JSON`, following the exact shape the other
+`ci.*` JSON keys already use. Confirmed the no-op path invokes zero Docker
+commands and takes ~0s when a project's config omits the key — the projects
+that will actually declare probes (tastease, develemail, diner-decider) are
+sprints 327/328, out of scope here.
+
+Validated two ways against tastease's preserved local images (not pulled —
+`api:1174`/`api:1174-migrate` no longer exist in GHCR per the sprint's Context
+section): release 1174 passes all three probes (`tsx`, `web` next-sharp,
+`marketing` next-sharp); release 1247 fails all three with the real
+module-load error (`needs the "@esbuild/linux-x64" package instead` for the
+migrate image, `Could not load the "sharp" module using the linuxmusl-x64
+runtime` for web/marketing). Confirmed zero `docker pull` invocations across
+both validation runs — resolution came entirely from the local store.
+
+### Files changed
+- (new) `scripts/lib/image-arch-check.sh` — probe kinds (`tsx`, `next-sharp`)
+  + `run_image_arch_checks` runner, local-then-pull image resolution
+- (new) `scripts/lib/image-arch-check.test.sh` — 25 cases: no-op fast path
+  (zero Docker calls), pass/fail for both probe kinds, the dangling-symlink
+  regression proof (a presence-style check reports "PRESENT" against the same
+  image the load-based probe correctly fails), image resolution fallback and
+  total-failure paths, unknown-kind handling
+- `scripts/lib/pre-push-config.sh` — reads `ci.imageArchProbes` into
+  `IMAGE_ARCH_PROBES_JSON`, defaulting to `{}`
+- `scripts/hooks/pre-push` — sources the new lib, runs the check after the
+  build fan-out on `_fail_deploy` failure, bumps the progress-bar `STEPS`
+  count by one more when builds run
+- `package.json` — registered the new test file in `test:hooks`
+- `docs/CROSS-PLATFORM-BUILD-PATTERN.md` — documented `ci.imageArchProbes` and
+  that the guard is enforced fleet-wide, not advisory
+
+### Verification
+- `pnpm test:hooks`: full suite (14 files) passes, exit 0, 0 `FAIL` lines;
+  `image-arch-check: 25 passed, 0 failed` within it
+- Two-way validation against tastease releases 1174/1247 (locally-preserved
+  images, zero registry pulls): 1174 passes all three probes, 1247 fails all
+  three with the module's own error — outputs captured above
+- Harness test reproducing the hook's real `_fail_deploy`/`deploy_init` flow:
+  a failing probe stops execution before the (stubbed) deploy step runs, and
+  `.deploy-status.json` ends at `{"status":"failed",...}`
+- No-op path: `IMAGE_ARCH_PROBES_JSON="{}"` invokes 0 docker commands, ~0s
+
+### Follow-ups
+- `[defer]` Sprint 327/328 need to actually declare `ci.imageArchProbes` in
+  tastease/develemail/diner-decider's `.emit-infra.json` for this guard to
+  bite in practice — it is wired but inert everywhere until then, as designed.
+- `[defer]` The `next-sharp` probe assumes the emit-fleet convention of a
+  Next.js standalone image laid out at `/app/apps/<svc>`; if a future project
+  uses a different runner layout the probe's `cd` will need a config knob
+  rather than being inferred from the service name.

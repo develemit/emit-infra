@@ -19,6 +19,7 @@ fi
 source "$EMIT_INFRA_DIR/scripts/lib/ci-utils.sh"
 source "$EMIT_INFRA_DIR/scripts/lib/deploy-plan.sh"
 source "$EMIT_INFRA_DIR/scripts/lib/docker-build.sh"
+source "$EMIT_INFRA_DIR/scripts/lib/image-arch-check.sh"
 source "$EMIT_INFRA_DIR/scripts/lib/pre-push-config.sh"
 source "$EMIT_INFRA_DIR/scripts/lib/pre-push-ci-phase.sh"
 
@@ -179,9 +180,9 @@ else
   echo "→ all services unchanged since last deploy, re-tagging only"
 fi
 
-# steps: auth + (build+push if needed) + (retag if needed) + deploy
+# steps: auth + (build+push + arch-check if needed) + (retag if needed) + deploy
 STEPS=2
-[[ ${#TO_BUILD[@]} -gt 0 ]] && STEPS=$((STEPS + 1))
+[[ ${#TO_BUILD[@]} -gt 0 ]] && STEPS=$((STEPS + 2))
 [[ ${#TO_RETAG[@]} -gt 0 ]] && STEPS=$((STEPS + 1))
 
 # count pre-deploy commands
@@ -215,6 +216,10 @@ if [[ ${#TO_BUILD[@]} -gt 0 ]]; then
   # EMIT_BUILD_PARALLEL on a host with more Docker build memory configured.
   MAX_PARALLEL=${EMIT_BUILD_PARALLEL:-1}
   run_build_fanout "$MAX_PARALLEL" _fail_deploy "${TO_BUILD[@]}"
+
+  deploy_phase archCheck
+  deploy_step "Checking image architecture"
+  run_image_arch_checks "${TO_BUILD[@]}" || _fail_deploy
 fi
 
 if [[ ${#TO_RETAG[@]} -gt 0 ]]; then

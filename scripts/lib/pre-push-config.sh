@@ -5,8 +5,9 @@
 #   Sets PROJECT_NAME, CI_TARGETS, ENV_FILE, GHCR_ORG, GHCR_REPO,
 #   IMAGE_PREFIX, SSH_KEY, BG_SERVICES, BUILD_ARGS_JSON, BUILD_TARGETS_JSON,
 #   BUILD_VARIANTS_JSON, PRE_DEPLOY_JSON, BUILD_TRIGGER_PATHS, BUILD_CACHE,
-#   and the DEPLOY_IGNORE_PATHS array in the caller's scope (called without a
-#   subshell, same as the inline block it replaces). Depends on
+#   IMAGE_ARCH_PROBES_JSON, and the DEPLOY_IGNORE_PATHS array in the caller's
+#   scope (called without a subshell, same as the inline block it replaces).
+#   Depends on
 #   EMIT_DEFAULT_DEPLOY_IGNORE_PATHS already being in scope — sourced via
 #   deploy-path-filter.sh / deploy-plan.sh, which pre-push sources first.
 
@@ -37,6 +38,7 @@ out('BG_SERVICES', ' '.join(s['name'] for s in bg.get('services', [])))
 out('BUILD_ARGS_JSON', json.dumps(ci.get('buildArgs', {})))
 out('BUILD_TARGETS_JSON', json.dumps(ci.get('buildTargets', {})))
 out('BUILD_VARIANTS_JSON', json.dumps(ci.get('buildVariants', {})))
+out('IMAGE_ARCH_PROBES_JSON', json.dumps(ci.get('imageArchProbes', {})))
 out('PRE_DEPLOY_JSON', json.dumps(ci.get('preDeploy', [])))
 out('DEPLOY_IGNORE_PATHS_OVERRIDE', ' '.join(ci.get('deployIgnorePaths', [])))
 out('DEPLOY_IGNORE_PATHS_EXTRA', ' '.join(ci.get('deployIgnorePathsExtra', [])))

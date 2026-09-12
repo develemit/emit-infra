@@ -169,3 +169,31 @@ tastease's `scripts/check-image-arch.sh` (`pnpm check:image-arch`, or
 Validate a new probe both ways before trusting it: it must pass on a
 known-good release and fail on a known-bad one. On tastease, 1174 passes and
 1247 fails all three probes.
+
+**This is enforced fleet-wide, not advisory.** The shared pre-push hook
+(`scripts/hooks/pre-push` in emit-infra, sourcing
+`scripts/lib/image-arch-check.sh`) runs these probes against every
+freshly-built image, on the target platform, between the build fan-out and
+the deploy step — a failing probe aborts the deploy before anything reaches a
+server. It costs nothing for a project that declares no native dependencies:
+the check is a no-op, invoking no Docker commands at all, unless
+`.emit-infra.json`'s `ci.imageArchProbes` declares one.
+
+Declare probes per image, naming a tag suffix when the probe targets a build
+variant rather than the service image itself (tastease's `-migrate` target,
+via `ci.buildVariants`):
+
+```jsonc
+"ci": {
+  "imageArchProbes": {
+    "api":       [{ "variant": "-migrate", "kind": "tsx" }],
+    "web":       [{ "kind": "next-sharp" }],
+    "marketing": [{ "kind": "next-sharp" }]
+  }
+}
+```
+
+Two named `kind`s exist today — `tsx` (transforms a one-line `.ts` file) and
+`next-sharp` (resolves `sharp` from `next`'s own package dir, matching how
+Next's image optimizer does it). Both load the module rather than checking
+for its presence, for the dangling-symlink reason above.
