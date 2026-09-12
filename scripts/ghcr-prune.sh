@@ -33,6 +33,17 @@ PACKAGES=(
   emit-api emit-worker emit-web emit-marketing
 )
 
+# Preflight: a real prune needs delete:packages or every DELETE below 403s
+# and (before sprint 330.1) got silently discarded. Refuse before doing any
+# other work; --dry-run never deletes anything so it doesn't need the scope.
+if ! $DRY_RUN; then
+  auth_status=$(gh auth status 2>&1 || true)
+  if ! _ghcrprune_has_delete_scope "$auth_status"; then
+    echo "✗ gh token lacks 'delete:packages' — every DELETE would return 403. Refusing to run a real prune. Use --dry-run, or grant the scope (e.g. gh auth refresh -h github.com -s delete:packages)." >&2
+    exit 1
+  fi
+fi
+
 # Fail safe: an unparseable status file means we can no longer trust what's
 # running, and an empty result means we found nothing to protect at all —
 # either way, proceeding would risk deleting a live release (sprint 330).
@@ -62,6 +73,9 @@ else
 fi
 
 total_pruned=0
+total_deleted=0
+total_failed=0
+auth_stopped=false
 
 for pkg in "${PACKAGES[@]}"; do
   encoded=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=''))" "$pkg")
@@ -84,18 +98,37 @@ for pkg in "${PACKAGES[@]}"; do
 
   if $DRY_RUN; then
     echo "  would prune $count versions (dry run)"
-  else
-    echo "  pruning $count versions"
-    while IFS= read -r id; do
-      gh api --method DELETE "$BASE/packages/container/$encoded/versions/$id" --silent 2>/dev/null || true
-    done <<< "$ids"
+    total_pruned=$((total_pruned + count))
+    continue
   fi
 
-  total_pruned=$((total_pruned + count))
+  echo "  deleting $count versions"
+  ID_ARRAY=()
+  while IFS= read -r id; do
+    [[ -n "$id" ]] && ID_ARRAY+=("$id")
+  done <<< "$ids"
+
+  result=$(_ghcrprune_delete_ids "$BASE" "$encoded" "${ID_ARRAY[@]}")
+  read -r pkg_deleted pkg_failed pkg_auth_stop <<< "$result"
+  echo "  deleted $pkg_deleted, failed $pkg_failed"
+
+  total_deleted=$((total_deleted + pkg_deleted))
+  total_failed=$((total_failed + pkg_failed))
+
+  if [[ "$pkg_auth_stop" == "1" ]]; then
+    echo "✗ a DELETE failed with an authorization error (likely missing delete:packages) — stopping now instead of repeating the same failure for every remaining id" >&2
+    auth_stopped=true
+    break
+  fi
 done
 
 if $DRY_RUN; then
   echo "✓ dry run complete — would prune $total_pruned versions (kept $KEEP most recent tagged releases per image)"
-else
-  echo "✓ pruned $total_pruned versions (kept $KEEP most recent tagged releases per image)"
+  exit 0
+fi
+
+echo "✓ deleted $total_deleted, failed $total_failed (kept $KEEP most recent tagged releases per image)"
+
+if $auth_stopped || [[ $total_failed -gt 0 ]]; then
+  exit 1
 fi

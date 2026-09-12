@@ -30,6 +30,31 @@
 #                                                          are never selected
 #                                                          — see the function
 #                                                          comment below.
+#   _ghcrprune_has_delete_scope <gh-auth-status-text>   -> true if the text
+#                                                          (as printed by `gh
+#                                                          auth status`) lists
+#                                                          the delete:packages
+#                                                          scope
+#   _ghcrprune_delete_one <base> <encoded-pkg> <id>     -> issues one live
+#                                                          DELETE; rc 0
+#                                                          deleted, rc 2 an
+#                                                          auth/scope failure
+#                                                          (403), rc 1 any
+#                                                          other failure. A
+#                                                          standalone function
+#                                                          (sprint 330.1) so
+#                                                          tests can override
+#                                                          it with a fake
+#                                                          instead of calling
+#                                                          `gh` for real.
+#   _ghcrprune_delete_ids <base> <encoded-pkg> <id...>  -> calls
+#                                                          _ghcrprune_delete_one
+#                                                          per id, echoes
+#                                                          "<deleted> <failed>
+#                                                          <auth_stopped>" (the
+#                                                          last field 1 if an
+#                                                          auth/scope failure
+#                                                          cut the run short).
 #
 # Fixture-tested (no live API calls) in ghcr-prune.test.sh.
 
@@ -126,4 +151,51 @@ delete_ids = [v["id"] for v in eligible[keep:]]
 for i in delete_ids:
     print(i)
 ' "$keep" "$protected_json"
+}
+
+# Sprint 330.1: the gh token driving this script has write:packages but not
+# delete:packages, so every real DELETE returns 403. Refuse to start a
+# non-dry-run before issuing any DELETE, rather than let hundreds of them
+# fail identically and get silently discarded (the defect this sprint fixes).
+_ghcrprune_has_delete_scope() {
+  [[ "$1" == *"delete:packages"* ]]
+}
+
+# Issues one live DELETE. Kept as its own function (rather than inlined in
+# the loop below) so ghcr-prune.test.sh can override it with a fake — the
+# same pattern other *.test.sh files in this dir use for external commands —
+# without this file ever making a real `gh api` call.
+_ghcrprune_delete_one() {
+  local base="$1" encoded="$2" id="$3"
+  local err
+  if err=$(gh api --method DELETE "$base/packages/container/$encoded/versions/$id" --silent 2>&1); then
+    return 0
+  fi
+  [[ "$err" == *"HTTP 403"* ]] && return 2
+  return 1
+}
+
+# Deletes every id via _ghcrprune_delete_one, counting successes and
+# failures separately — a failed DELETE is never counted as pruned. Stops at
+# the first auth/scope failure (rc 2) instead of repeating the same failure
+# for every remaining id: echoes "<deleted> <failed> 1" and returns
+# immediately. On exhausting all ids without an auth failure, echoes
+# "<deleted> <failed> 0".
+_ghcrprune_delete_ids() {
+  local base="$1" encoded="$2"; shift 2
+  local deleted=0 failed=0 id rc
+  for id in "$@"; do
+    _ghcrprune_delete_one "$base" "$encoded" "$id"
+    rc=$?
+    if [[ $rc -eq 0 ]]; then
+      deleted=$((deleted + 1))
+    elif [[ $rc -eq 2 ]]; then
+      failed=$((failed + 1))
+      echo "$deleted $failed 1"
+      return 0
+    else
+      failed=$((failed + 1))
+    fi
+  done
+  echo "$deleted $failed 0"
 }

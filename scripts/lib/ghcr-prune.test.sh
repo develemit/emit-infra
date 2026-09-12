@@ -150,6 +150,60 @@ got=$(to_jsonl "$FIXTURE" | _ghcrprune_select_prune_ids 10)
 check "no protected shas -> latest kept" "$(echo "$got" | grep -c '^1$' || true)" "0"
 check "no protected shas -> latest-migrate kept" "$(echo "$got" | grep -c '^21$' || true)" "0"
 
+# ── _ghcrprune_has_delete_scope ───────────────────────────────────────────────
+echo "_ghcrprune_has_delete_scope"
+
+REAL_TOKEN_SCOPES="  - Token scopes: 'gist', 'read:org', 'repo', 'user', 'workflow', 'write:packages'"
+if _ghcrprune_has_delete_scope "$REAL_TOKEN_SCOPES"; then
+  no "today's real token text (no delete:packages) -> false"
+else
+  ok "today's real token text (no delete:packages) -> false"
+fi
+
+WITH_SCOPE="  - Token scopes: 'delete:packages', 'repo', 'write:packages'"
+if _ghcrprune_has_delete_scope "$WITH_SCOPE"; then
+  ok "token text with delete:packages -> true"
+else
+  no "token text with delete:packages -> true"
+fi
+
+# ── _ghcrprune_delete_one / _ghcrprune_delete_ids ─────────────────────────────
+echo "_ghcrprune_delete_ids"
+
+# Fakes stand in for _ghcrprune_delete_one so no live `gh api` call is ever
+# made here — see the doc comment on _ghcrprune_delete_one in the lib.
+_ghcrprune_delete_one() { return 0; }
+got=$(_ghcrprune_delete_ids base pkg 1 2 3)
+check "all succeed -> 3 deleted, 0 failed, not auth-stopped" "$got" "3 0 0"
+
+_ghcrprune_delete_one() {
+  local id="$3"
+  [[ "$id" == "2" ]] && return 1
+  return 0
+}
+got=$(_ghcrprune_delete_ids base pkg 1 2 3)
+check "one ordinary failure -> counted as failed, not deleted" "$got" "2 1 0"
+
+_ghcrprune_delete_one() {
+  local id="$3"
+  [[ "$id" == "1" ]] && return 0
+  [[ "$id" == "2" ]] && return 2
+  return 0
+}
+got=$(_ghcrprune_delete_ids base pkg 1 2 3)
+check "auth failure stops the run: 1 deleted before it, 1 failed, auth-stopped" \
+  "$got" "1 1 1"
+
+_ghcrprune_delete_one() {
+  local id="$3"
+  [[ "$id" == "1" ]] && return 2
+  CALLS=$((CALLS + 1))
+  return 0
+}
+CALLS=0
+_ghcrprune_delete_ids base pkg 1 2 3 >/dev/null
+check "auth failure on the first id never touches the remaining ids" "$CALLS" "0"
+
 echo
 echo "== $PASS passed, $FAIL failed =="
 [[ $FAIL -eq 0 ]]
