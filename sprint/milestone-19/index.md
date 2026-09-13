@@ -1,0 +1,40 @@
+# milestone-19
+
+Archived: 2026-09-13
+
+## Sprints
+
+- 303-fixed-timing-flake-sweep.md
+- 304-post-split-doc-accuracy.md
+- 305-surface-launch-mode-in-status.md
+- 306-gate-doctor-and-lint-papercuts.md
+- 307-develemail-untrack-compose-override.md
+- 308-martialops-ephemeral-dev-db.md
+- 309-garage-sailor-prime-ephemeral-dev-db.md
+- 310-health-probing-supervisor.md
+- 311-supervise-emit-infra-api.md
+- 312-supervise-develemit-hq.md
+- 313-surface-server-deaths-in-dashboard.md
+- 314-develemit-hq-dev-launchd-agent.md
+- 315-validate-ansible-inventory.md
+- 316-pass-blue-green-to-provisioning.md
+- 317-ghcr-login-in-blue-green-deploy.md
+- 317.1-no-argv-in-execa-errors.md
+- 317.2-redact-dry-run-plan-secrets.md
+- 317.3-ephemeral-ghcr-docker-config.md
+- 318-terraform-init-and-r2-token-race.md
+- 320-retire-persistent-server-ghcr-creds.md
+- 321-record-signal-deaths.md
+- 322-dev-stack-health-watchdog.md
+- 323-http-check-log-dedup.md
+- 324-rotate-launchd-logs.md
+- 325-supervisor-exit-trap-orphans.md
+- 326-image-arch-native-load-guard.md
+- 327-adopt-arch-guard-in-tastease.md
+- 328-fix-latent-arch-risk-develemail-diner-decider.md
+- 328.1-diner-decider-dockerfile-missing-packages.md
+- 328.2-diner-decider-dockerignore-nested-node-modules.md
+- 329-deploy-detached-watch-stale-record.md
+- 330-never-prune-deployed-release.md
+- 330.1-ghcr-prune-fail-loudly-on-delete-errors.md
+- 331-derive-prune-packages-from-fleet.md
