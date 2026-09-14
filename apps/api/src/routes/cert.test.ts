@@ -32,7 +32,9 @@ const mockProject = {
   projectDir: '/projects/myapp',
 }
 
-// Realistic openssl output with SANs and timer
+// Realistic openssl + systemctl output — LastTriggerUSec is systemd's
+// human-readable timestamp format despite the name, verified live against a
+// real server, not a raw microsecond epoch value.
 const MOCK_OPENSSL_OUTPUT = [
   'issuer=C=US, O=Let\'s Encrypt, CN=R11',
   'subject=CN=example.com',
@@ -41,7 +43,9 @@ const MOCK_OPENSSL_OUTPUT = [
   'notAfter=Apr  1 00:00:00 2025 GMT',
   'X509v3 Subject Alternative Name:',
   '    DNS:example.com, DNS:www.example.com',
-  'LastTriggerUSec=1735689600000000',
+  'LastTriggerUSec=Mon 2025-01-01 00:00:00 UTC',
+  'RESULT=success',
+  'RENEWERR=',
 ].join('\n')
 
 describe('GET /projects/:name/cert-details', () => {
@@ -99,6 +103,8 @@ describe('GET /projects/:name/cert-details', () => {
       sans: string[]
       daysUntilExpiry: number
       renewTimerLastRan: string | null
+      renewalResult: string | null
+      renewalError: string | null
     }
     expect(data.issuer).toContain('Let\'s Encrypt')
     expect(data.subject).toContain('example.com')
@@ -106,6 +112,32 @@ describe('GET /projects/:name/cert-details', () => {
     expect(data.sans).toContain('example.com')
     expect(data.sans).toContain('www.example.com')
     expect(typeof data.daysUntilExpiry).toBe('number')
-    expect(data.renewTimerLastRan).not.toBeNull()
+    // Verified live against a real server: systemctl formats this as a
+    // human-readable timestamp, not raw microseconds — parsing it as one
+    // (the old behavior) always produced NaN and a silent null.
+    expect(data.renewTimerLastRan).toBe('2025-01-01T00:00:00.000Z')
+    expect(data.renewalResult).toBe('success')
+    expect(data.renewalError).toBeNull()
+  })
+
+  it('surfaces certbot\'s last renewal failure and error line', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    vi.mocked(sshExec).mockResolvedValue([
+      'issuer=C=US, O=Let\'s Encrypt, CN=R11',
+      'subject=CN=example.com',
+      'serial=03ABC12345DEF',
+      'notBefore=Jan  1 00:00:00 2025 GMT',
+      'notAfter=Apr  1 00:00:00 2025 GMT',
+      'LastTriggerUSec=Mon 2025-01-01 00:00:00 UTC',
+      'RESULT=exit-code',
+      'RENEWERR=Failed to renew certificate example.com with error: Could not bind TCP port 80.',
+    ].join('\n'))
+
+    const res = await app.inject({ method: 'GET', url: '/projects/myapp/cert-details' })
+
+    expect(res.statusCode).toBe(200)
+    const data = res.json() as { renewalResult: string | null; renewalError: string | null }
+    expect(data.renewalResult).toBe('exit-code')
+    expect(data.renewalError).toContain('Could not bind TCP port 80')
   })
 })

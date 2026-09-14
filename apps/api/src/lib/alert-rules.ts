@@ -8,9 +8,9 @@ export const AlertRuleSchema = z.object({
 })
 export type AlertRule = z.infer<typeof AlertRuleSchema>
 
-// 'certStatus' backs the built-in "no readable certificate" alert. It's never
-// user-configurable, so it lives outside AlertRuleSchema's metric enum.
-type Metric = AlertRule['metric'] | 'certStatus'
+// 'certStatus' and 'certRenewalFailing' back built-in cert alerts. Neither is
+// user-configurable, so they live outside AlertRuleSchema's metric enum.
+type Metric = AlertRule['metric'] | 'certStatus' | 'certRenewalFailing'
 
 interface EvaluatedRule {
   metric: Metric
@@ -31,6 +31,13 @@ export interface AlertMetrics {
   // Name of the soonest-expiring certificate — contextual only, never
   // evaluated against a rule threshold.
   certName?: string | undefined
+  // 1 when certbot's last run failed AND the soonest certificate is inside
+  // its 30-day renewal window; absent otherwise (including the stale case
+  // where the last run failed but no certificate is actually due yet).
+  certRenewalFailing?: number | undefined
+  // certbot's own error line for the last failed run — contextual only,
+  // never evaluated against a rule threshold.
+  certbotError?: string | undefined
 }
 
 export interface FiredAlert {
@@ -54,6 +61,10 @@ export const DEFAULT_CERT_RULES: EvaluatedRule[] = [
   { metric: 'certDays', op: 'lt', threshold: 21, enabled: true, cooldownSec: 24 * 3600 },
   { metric: 'certDays', op: 'lt', threshold: 7, enabled: true, cooldownSec: 6 * 3600 },
   { metric: 'certStatus', op: 'gt', threshold: 0, enabled: true, cooldownSec: 24 * 3600 },
+  // Catches renewal failing well before certDays would (day one of failure,
+  // not 21 days before expiry) — but only once a cert is actually due, so a
+  // stale failed-run result on a cert with weeks of slack stays silent.
+  { metric: 'certRenewalFailing', op: 'gt', threshold: 0, enabled: true, cooldownSec: 24 * 3600 },
 ]
 
 /**

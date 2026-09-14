@@ -15,16 +15,19 @@ import { sshKeyPath } from './project-helpers.js'
 import { sendToAll, type PushPayload } from './push.js'
 import { evaluateRules, resolveRules, type AlertMetrics, type AlertCooldownState, type FiredAlert } from './alert-rules.js'
 import { pruneAlertJsonl } from './prune-alerts.js'
-import { CERT_PROBE_CMD, extractCertSection, certSectionEndIndex, parseCertLines, soonestExpiring } from './cert-probe.js'
+import {
+  CERT_PROBE_CMD, extractCertSection, extractCertbotSection, probeBlockEndIndex,
+  parseCertLines, parseCertbotSection, soonestExpiring, classifyRenewalHealth,
+} from './cert-probe.js'
 
 const metricLabels: Record<string, string> = {
   diskPct: 'disk', memPct: 'memory', certDays: 'cert days', backupAgeHours: 'backup age (h)',
 }
 
-/** certDays/certStatus alerts get a human-readable detail instead of the
- *  generic "metric value op threshold" line — certbot's 30-day renewal
- *  window is the whole point of the notification. */
-function enrichFiredAlert(alert: FiredAlert, metrics: AlertMetrics): FiredAlert {
+/** certDays/certStatus/certRenewalFailing alerts get a human-readable detail
+ *  instead of the generic "metric value op threshold" line — certbot's
+ *  30-day renewal window is the whole point of the notification. */
+export function enrichFiredAlert(alert: FiredAlert, metrics: AlertMetrics): FiredAlert {
   if (alert.metric === 'certDays' && metrics.certName) {
     return {
       ...alert,
@@ -34,6 +37,10 @@ function enrichFiredAlert(alert: FiredAlert, metrics: AlertMetrics): FiredAlert 
   }
   if (alert.metric === 'certStatus') {
     return { ...alert, detail: 'No readable certificate found on this server — check certbot.' }
+  }
+  if (alert.metric === 'certRenewalFailing') {
+    const err = metrics.certbotError ?? 'no error line found in the certbot journal'
+    return { ...alert, detail: `certbot renewal is failing: ${err}` }
   }
   return alert
 }
@@ -117,7 +124,14 @@ async function probeProject(
       metrics.certStatus = 1
     }
 
-    const endIdx = certSectionEndIndex(lines)
+    const certbotStatus = parseCertbotSection(extractCertbotSection(lines))
+    const renewalHealth = classifyRenewalHealth(certbotStatus, certs)
+    if (renewalHealth === 'failing') {
+      metrics.certRenewalFailing = 1
+      metrics.certbotError = certbotStatus.errorLine ?? undefined
+    }
+
+    const endIdx = probeBlockEndIndex(lines)
     const backupLastRun = endIdx === -1 ? '' : (lines[endIdx + 1] ?? '')
     if (backupLastRun) {
       const lastRunMs = new Date(backupLastRun).getTime()

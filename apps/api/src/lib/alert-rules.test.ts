@@ -111,6 +111,21 @@ describe('evaluateRules', () => {
     expect(fired[0]).toMatchObject({ metric: 'certStatus', op: 'gt', threshold: 0, value: 1 })
   })
 
+  it('fires the certRenewalFailing default when renewal is actionably failing', () => {
+    const rules = resolveRules([])
+    const { fired } = evaluateRules('proj', rules, { certRenewalFailing: 1 }, {}, NOW)
+    expect(fired).toHaveLength(1)
+    expect(fired[0]).toMatchObject({ metric: 'certRenewalFailing', op: 'gt', threshold: 0, value: 1 })
+  })
+
+  it('does not fire certRenewalFailing on a stale-failure (metric absent)', () => {
+    const rules = resolveRules([])
+    // status-monitor only sets certRenewalFailing on the 'failing' classification —
+    // a stale-failure never sets it, so it's simply absent from metrics here.
+    const { fired } = evaluateRules('proj', rules, { certDays: 90 }, {}, NOW)
+    expect(fired.some(f => f.metric === 'certRenewalFailing')).toBe(false)
+  })
+
   it('applies a rule-specific cooldown shorter than the default', () => {
     const rules = resolveRules([])
     const prevState: AlertCooldownState = {
@@ -132,11 +147,12 @@ describe('evaluateRules', () => {
 })
 
 describe('resolveRules', () => {
-  it('applies both certDays defaults and the certStatus default when no project rules exist', () => {
+  it('applies certDays, certStatus and certRenewalFailing defaults when no project rules exist', () => {
     const rules = resolveRules([])
     expect(rules.map(r => `${r.metric}:${r.op}:${r.threshold}`).sort()).toEqual([
       'certDays:lt:21',
       'certDays:lt:7',
+      'certRenewalFailing:gt:0',
       'certStatus:gt:0',
     ])
   })
@@ -147,14 +163,15 @@ describe('resolveRules', () => {
     const certDaysRules = rules.filter(r => r.metric === 'certDays')
     expect(certDaysRules).toHaveLength(1)
     expect(certDaysRules[0]).toMatchObject({ threshold: 3 })
-    // certStatus default is unrelated to certDays and stays
+    // certStatus and certRenewalFailing defaults are unrelated to certDays and stay
     expect(rules.some(r => r.metric === 'certStatus')).toBe(true)
+    expect(rules.some(r => r.metric === 'certRenewalFailing')).toBe(true)
   })
 
   it("other metrics stay opt-in — a project's diskPct rule doesn't disturb cert defaults", () => {
     const ownRule: AlertRule = { metric: 'diskPct', op: 'gt', threshold: 90, enabled: true }
     const rules = resolveRules([ownRule])
-    expect(rules).toHaveLength(4) // 3 cert defaults + the project's own diskPct rule
+    expect(rules).toHaveLength(5) // 4 cert defaults + the project's own diskPct rule
     expect(rules.filter(r => r.metric === 'certDays')).toHaveLength(2)
   })
 

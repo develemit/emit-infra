@@ -83,22 +83,118 @@ Vitest beside source. No `check:affected` in this repo; the suite is `pnpm test`
 - `apps/api/src/routes/cert.ts` — expose the last renewal result and error
 
 ## Acceptance criteria
-- [ ] Last run failed with a certificate at 25 days → `failing`, and the
+- [x] Last run failed with a certificate at 25 days → `failing`, and the
       notification contains certbot's error line
-- [ ] Last run failed with every certificate beyond 30 days → `stale-failure`, no
+- [x] Last run failed with every certificate beyond 30 days → `stale-failure`, no
       notification
-- [ ] No certbot timer, or unreadable systemd state → `unknown`, never `ok`
-- [ ] Classification is based on the soonest certificate (reusing sprint 332's
+- [x] No certbot timer, or unreadable systemd state → `unknown`, never `ok`
+- [x] Classification is based on the soonest certificate (reusing sprint 332's
       enumeration), and the probe stays one SSH call per poll
-- [ ] `cert-details` returns the last renewal result and error
-- [ ] Live read-only check records every server's classification; diner-decider
+- [x] `cert-details` returns the last renewal result and error
+- [x] Live read-only check records every server's classification; diner-decider
       is not `failing` — quote its output
-- [ ] Coverage in `cert-probe.test.ts` for all four classifications, including the
+- [x] Coverage in `cert-probe.test.ts` for all four classifications, including the
       exact diner-decider stale case and an error line extracted from the journal
-- [ ] `pnpm test`, `pnpm typecheck` and `pnpm lint` pass (this repo has no `check:affected`)
+- [x] `pnpm test`, `pnpm typecheck` and `pnpm lint` pass (this repo has no `check:affected`)
 
 ## Out of scope
 - Fixing renewals automatically on servers — detection only.
 - The expiry-countdown alert itself — sprint 332.
 - Outage flapping and reminders — sprint 334.
 - Ansible provisioning — sprint 335.
+
+## Completed
+
+**Date:** 2026-09-14
+
+### Summary
+`cert-probe.ts`'s single SSH probe command now also captures certbot's last
+`Result`, `ExecMainExitTimestamp`, and its most recent journal error line —
+all inside the same command sprint 332 already makes, using a
+`printf 'KEY=%s\n' "$(...)"` pattern so each field is exactly one line
+regardless of whether the underlying command produced output (verified live:
+`systemctl show <nonexistent>.service -p Result --value` returns `success`,
+not empty — the misleading default that makes `Result` alone untrustworthy
+for "no timer" detection). A new `classifyRenewalHealth()` combines that
+status with the soonest certificate (reusing sprint 332's enumeration) into
+`failing` / `stale-failure` / `ok` / `unknown`: `failing` requires both a
+failed last run *and* a certificate inside certbot's 30-day renewal window;
+a failed run against a certificate with weeks of slack is `stale-failure` and
+deliberately doesn't notify. `unknown` fires whenever `ExecMainExitTimestamp`
+is empty — the one field that actually distinguishes "certbot never ran" from
+"succeeded," since `Result`'s default masks that distinction.
+
+`status-monitor.ts` sets a new `certRenewalFailing` metric only on the
+`failing` classification (mirroring how `certStatus` already worked), which
+plugs into a fourth built-in default rule in `alert-rules.ts`
+(`certRenewalFailing gt 0`, 24h cooldown, never user-configurable — same as
+`certStatus`). The fired alert's notification detail carries certbot's exact
+error line via a new contextual `certbotError` metric field.
+
+While extending `cert.ts`'s `cert-details` route with the same `Result`/error
+fields, found and fixed the bug backlog.md had flagged as unverified:
+`LastTriggerUSec` parsing assumed a raw microsecond epoch value
+(`parseInt(timerVal, 10) / 1000`), but `systemctl show` — with or without
+`--value` — formats timestamps as human-readable strings
+(`Mon 2026-09-14 17:36:20 UTC`), confirmed live on diner-decider. `parseInt`
+on that string is `NaN`, so `renewTimerLastRan` was silently `null` on every
+real server, always. Fixed to parse the value as a date string directly, same
+as the new `ExecMainExitTimestamp` handling.
+
+Live read-only verification against all 7 registered fleet projects (script
+run, then deleted — no artifact left in the tree) confirms diner-decider
+lands on `stale-failure`, not `failing`, exactly as the sprint's live test
+case requires: its certbot timer has been failing on a port-80 conflict
+across three separate runs (Sep 13 15:04, Sep 14 10:07, Sep 14 17:36 UTC) but
+its certificate isn't due — 89 days remaining, next expiry Dec 13 — so the
+30-day-window gate correctly suppresses the alert. Every other project came
+back `ok`.
+
+### Files changed
+- `apps/api/src/lib/cert-probe.ts` — extends `CERT_PROBE_CMD` with a
+  `RESULT=`/`LASTRAN=`/`RENEWERR=` block; adds `extractCertbotSection`,
+  `parseCertbotSection`, `CertbotStatus`, `RenewalHealth`,
+  `classifyRenewalHealth`; renames `certSectionEndIndex` →
+  `probeBlockEndIndex` to point past the new block
+- `apps/api/src/lib/cert-probe.test.ts` — classification coverage for all
+  four states, including the live diner-decider stale-failure case and a
+  real extracted error line
+- `apps/api/src/lib/status-monitor.ts` — feeds `certbotStatus`/
+  `classifyRenewalHealth` into `AlertMetrics.certRenewalFailing`/
+  `certbotError`; `enrichFiredAlert` (now exported) builds the
+  error-line detail; uses `probeBlockEndIndex` for the backup-age offset
+- `apps/api/src/lib/status-monitor.test.ts` — `enrichFiredAlert` coverage:
+  error-line detail, fallback text, non-cert alerts untouched
+- `apps/api/src/lib/alert-rules.ts` — `certRenewalFailing` metric and its
+  built-in default rule (24h cooldown, non-overridable)
+- `apps/api/src/lib/alert-rules.test.ts` — default-rule firing, stale case
+  stays silent, updated `resolveRules` counts for the fourth default
+- `apps/api/src/routes/cert.ts` — adds `renewalResult`/`renewalError` to
+  `CertDetails`; fixes `LastTriggerUSec` date parsing
+- `apps/api/src/routes/cert.test.ts` — realistic (not raw-microsecond) fixture
+  for `LastTriggerUSec`; new-field coverage; a renewal-failure case
+- `backlog.md` — strikes the now-fixed `LastTriggerUSec` item
+
+### Verification
+- `pnpm test`: 426/426 pass
+- `pnpm typecheck`: clean (5 projects)
+- `pnpm lint`: clean (5 projects)
+- Live read-only fleet check (real `CERT_PROBE_CMD`, all 7 registered
+  projects): `develemail ok`, `diner-decider stale-failure` (quoted above),
+  `emit-billing ok`, `emit-social ok`, `emit-vision ok`, `martialops ok`,
+  `tastease ok` — diner-decider never classified as `failing`
+- `cert-details`'s extended SSH fragment (`RESULT=`/`RENEWERR=`) verified
+  directly against both diner-decider (`exit-code` + the port-80 error line)
+  and emit-vision (`success`, empty error) before wiring it into the route
+
+### Follow-ups
+- `[defer]` diner-decider's certbot renewal itself is still failing (port 80
+  in use) as of this sprint's live check — out of scope here (detection
+  only), but worth a dedicated fix; it's currently masked from paging only
+  because the certificate has 89 days of slack.
+- `[defer]` `AlertMetrics`/`Metric` now carries two internal-only members
+  (`certStatus`, `certRenewalFailing`) alongside two contextual string
+  fields (`certName`, `certbotError`) that are never used as `rule.metric`.
+  Sprint 332 flagged revisiting this if a 6th metric arrived; still fine
+  structurally, but the next addition is a good point to split "evaluable
+  metric" from "notification context" into separate types.

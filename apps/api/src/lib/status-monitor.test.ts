@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { formatAlertNotification } from './status-monitor.js'
-import type { FiredAlert } from './alert-rules.js'
+import { formatAlertNotification, enrichFiredAlert } from './status-monitor.js'
+import type { FiredAlert, AlertMetrics } from './alert-rules.js'
 
 const NOW = 1_000_000
 
@@ -83,5 +83,28 @@ describe('formatAlertNotification', () => {
     ]
     const payload = formatAlertNotification(alerts)
     expect(payload.body).toBe('2 alerts: disk 92 > 90, No readable certificate found.')
+  })
+})
+
+describe('enrichFiredAlert', () => {
+  it('puts certbot\'s own error line into the certRenewalFailing detail', () => {
+    const alert = fired({ metric: 'certRenewalFailing', op: 'gt', threshold: 0, value: 1 })
+    const metrics: AlertMetrics = {
+      certbotError: 'Failed to renew certificate dinerdecider.com with error: Could not bind TCP port 80 ' +
+        'because it is already in use by another process on this system (such as a web server).',
+    }
+    const enriched = enrichFiredAlert(alert, metrics)
+    expect(enriched.detail).toContain('Could not bind TCP port 80')
+  })
+
+  it('falls back to a generic message when certRenewalFailing fires with no captured error line', () => {
+    const alert = fired({ metric: 'certRenewalFailing', op: 'gt', threshold: 0, value: 1 })
+    const enriched = enrichFiredAlert(alert, {})
+    expect(enriched.detail).toBe('certbot renewal is failing: no error line found in the certbot journal')
+  })
+
+  it('leaves non-cert alerts untouched', () => {
+    const alert = fired({ metric: 'diskPct', op: 'gt', threshold: 80, value: 92 })
+    expect(enrichFiredAlert(alert, {})).toBe(alert)
   })
 })

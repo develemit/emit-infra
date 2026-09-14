@@ -15,6 +15,8 @@ interface CertDetails {
   sans: string[]
   renewTimerLastRan: string | null
   daysUntilExpiry: number
+  renewalResult: string | null
+  renewalError: string | null
 }
 
 const certCache = createTtlCache<CertDetails | null>(CERT_TTL)
@@ -48,20 +50,29 @@ function parseOpenSslOutput(raw: string): CertDetails | null {
     ? 0
     : Math.round((notAfterDate.getTime() - Date.now()) / 86_400_000)
 
-  // LastTriggerUSec from systemctl show output
+  // LastTriggerUSec from systemctl show output. Despite the name, systemctl
+  // formats this as a human-readable timestamp ("Mon 2026-09-14 17:36:20
+  // UTC"), not a raw microsecond epoch value — verified live against a real
+  // server 2026-09-14; the previous parseInt(...)/1000 logic always produced
+  // NaN on real output and silently returned null.
   const timerLine = lines.find(l => l.startsWith('LastTriggerUSec=')) ?? ''
   const timerVal = timerLine.replace(/^LastTriggerUSec=/, '').trim()
   let renewTimerLastRan: string | null = null
   if (timerVal && timerVal !== '0' && timerVal !== 'timer-unavailable') {
-    const ms = parseInt(timerVal, 10) / 1000
-    if (!isNaN(ms) && ms > 0) {
-      const d = new Date(ms)
-      // If it resolves to 1970, treat as never
-      if (d.getFullYear() > 1970) {
-        renewTimerLastRan = d.toISOString()
-      }
+    const d = new Date(timerVal)
+    // If it resolves to 1970, treat as never
+    if (!isNaN(d.getTime()) && d.getFullYear() > 1970) {
+      renewTimerLastRan = d.toISOString()
     }
   }
+
+  // Last certbot.service run outcome, and its most recent 'error' journal
+  // line when that run failed.
+  const resultLine = lines.find(l => l.startsWith('RESULT=')) ?? ''
+  const renewalResult = resultLine.replace(/^RESULT=/, '').trim() || null
+
+  const errLine = lines.find(l => l.startsWith('RENEWERR=')) ?? ''
+  const renewalError = errLine.replace(/^RENEWERR=/, '').trim() || null
 
   return {
     issuer,
@@ -72,6 +83,8 @@ function parseOpenSslOutput(raw: string): CertDetails | null {
     sans,
     renewTimerLastRan,
     daysUntilExpiry,
+    renewalResult,
+    renewalError,
   }
 }
 
@@ -99,6 +112,8 @@ export async function certRoutes(app: FastifyInstance): Promise<void> {
         `openssl x509 -noout -issuer -subject -serial -startdate -enddate -ext subjectAltName` +
         ` -in /etc/letsencrypt/live/${domain}/cert.pem 2>/dev/null` +
         ` && systemctl show certbot.timer --property=LastTriggerUSec 2>/dev/null` +
+        ` && printf 'RESULT=%s\\n' "$(systemctl show certbot.service -p Result --value 2>/dev/null)"` +
+        ` && printf 'RENEWERR=%s\\n' "$(journalctl -u certbot -n 50 --no-pager 2>/dev/null | grep -i 'error' | tail -1)"` +
         ` || echo "timer-unavailable"`
 
       try {
