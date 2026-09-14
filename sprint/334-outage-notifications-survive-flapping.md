@@ -83,22 +83,97 @@ each project's `.incidents.jsonl`.
 - `apps/api/src/lib/status-monitor.ts` — delegate HTTP state handling
 
 ## Acceptance criteria
-- [ ] Replaying the exact diner-decider incident sequence above through the new
+- [x] Replaying the exact diner-decider incident sequence above through the new
       state machine yields **one** down notification, not four
-- [ ] A site that stays down produces reminders at 1 hour and then every 6 hours,
+- [x] A site that stays down produces reminders at 1 hour and then every 6 hours,
       each stating the duration
-- [ ] The down notification includes the HTTP status and cause — a 526 mentions
+- [x] The down notification includes the HTTP status and cause — a 526 mentions
       an invalid or expired origin certificate
-- [ ] After a simulated restart during an outage, the monitor still sends
+- [x] After a simulated restart during an outage, the monitor still sends
       reminders and a recovery notification
-- [ ] The cause of the mid-outage `up` events is recorded in the Completed section
-- [ ] Coverage in `http-health.test.ts` for the incident replay, reminders,
+- [x] The cause of the mid-outage `up` events is recorded in the Completed section
+- [x] Coverage in `http-health.test.ts` for the incident replay, reminders,
       status-to-cause mapping and restart seeding
-- [ ] `status-monitor.ts` stays under 300 lines
-- [ ] `pnpm test`, `pnpm typecheck` and `pnpm lint` pass (this repo has no `check:affected`)
+- [x] `status-monitor.ts` stays under 300 lines
+- [x] `pnpm test`, `pnpm typecheck` and `pnpm lint` pass (this repo has no `check:affected`)
 
 ## Out of scope
 - Certificate expiry and renewal alerts — sprints 332 and 333.
 - External uptime monitoring that works while this Mac is asleep (a separate
   backlog item).
 - Changing poll frequency or the dashboard incident timeline UI.
+
+## Completed
+
+**Date:** 2026-09-14
+
+### Summary
+Investigated the mid-outage `up` events first, since the debounce design depended
+on the answer. diner-decider's expired cert (`fullchain1.pem`, `notAfter=Sep 13
+15:49:54 2026 GMT`, confirmed from the letsencrypt archive) matches the incident
+window exactly — every logged transition on 2026-09-13 happened after that
+timestamp. SSH'd into the server and pulled nginx's access log for that exact
+window: **100% of requests to `/api/health` succeeded with 200** — the origin app
+was never actually unhealthy. That means the `down` events the monitor saw (526)
+never reached nginx at all; they were rejected at Cloudflare's edge, which
+returns 526 without proxying through when it can't validate the origin's TLS
+cert. The most plausible explanation for the flapping, given a cert that had
+unambiguously already expired and an origin serving 100% 2xx the whole time:
+Cloudflare pools persistent connections to the origin and doesn't necessarily
+re-validate the origin cert on every request over an already-open connection —
+only when establishing a new one. Connections opened before 15:49:54Z kept
+succeeding until they cycled out; new connections failed immediately. Recorded
+here per the sprint's "open question."
+
+Built `lib/http-health.ts` as a pure, protocol-agnostic debounced state machine
+(`stepHealth`) shared by both the HTTP and SSH probes — SSH just calls it with
+`{ ok: boolean }` and no status code, satisfying task 7's stretch goal at
+near-zero extra cost. It requires 3 consecutive failures before declaring
+`down` and 3 consecutive successes before declaring recovered, which is what
+makes the diner-decider replay collapse from 4 notifications to 1: none of the
+brief flaps reached 3 in a row, only the final sustained outage did. While
+down, it emits a `reminder` event at 1 hour and then every 6 hours
+(`FIRST_REMINDER_MS` / `REMINDER_INTERVAL_MS`), each carrying the down
+duration. `seedHealthState()` reconstructs state from the last `.incidents.jsonl`
+event so a monitor restart mid-outage resumes as `down` with `downSinceMs` from
+the recorded event — the restart no longer erases the outage.
+
+Split notification/formatting and file I/O out of `status-monitor.ts` into two
+new small modules to keep it under 300 lines: `lib/incidents.ts` (the
+`.incidents.jsonl` read/write, generic enough to seed both probes) and
+`lib/health-notify.ts` (turns `HealthEvent`s into push payloads — down/reminder
+share a push tag so a reminder replaces the stale "down" notification on the
+device instead of stacking). `status-monitor.ts` itself now just wires
+`probeProject`/`httpProbe` results through `stepHealth` and hands the resulting
+events to `handleHealthEvents`.
+
+### Files changed
+- (new) `apps/api/src/lib/http-health.ts` — debounced up/down state machine, cause text, duration formatting, restart seeding
+- (new) `apps/api/src/lib/http-health.test.ts` — incident replay, reminder timing, cause mapping, restart seeding
+- (new) `apps/api/src/lib/incidents.ts` — `.incidents.jsonl` read/write, extracted from status-monitor.ts
+- (new) `apps/api/src/lib/health-notify.ts` — push payload formatting for health events, state map seeding
+- `apps/api/src/lib/status-monitor.ts` — delegates ssh/http state handling to `http-health.ts` + `health-notify.ts`; `httpProbe` now returns a status code
+
+### Verification
+- `pnpm test`: 439/439 pass (13 new in `http-health.test.ts`)
+- `pnpm typecheck`: clean
+- `pnpm lint`: clean
+- `status-monitor.ts`: 248 lines (was 281, stayed under 300 despite the new debounce/seeding wiring)
+- Live: SSH'd into diner-decider and pulled its nginx access log + certbot journal
+  + letsencrypt archive to confirm the mid-outage `up` events' cause (see Summary)
+
+### Follow-ups
+- `[defer]` The reminder/seeding logic is currently exercised only via unit
+  tests on the pure state machine, not an integration test that drives
+  `status-monitor.ts`'s `poll()` end-to-end with a fake clock — would catch
+  wiring regressions the unit tests can't see.
+- `[defer]` `.incidents.jsonl` still grows unboundedly (same as before this
+  sprint) — no rotation/pruning, unlike `.alerts.jsonl` which has
+  `pruneAlertJsonl`.
+- `[defer]` diner-decider's certbot renewal is still failing via standalone
+  mode against port 80 as of 2026-09-14 17:36Z (confirmed live in this
+  sprint's investigation) — the webroot fix mentioned in project memory was
+  applied manually on the server, not in Ansible, so it isn't guaranteed to
+  survive reprovisioning. Sprint 335 covers Ansible rejecting standalone
+  renewal config.
+

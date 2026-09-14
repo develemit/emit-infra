@@ -1,9 +1,11 @@
 /**
- * Background SSH reachability monitor.
+ * Background SSH + HTTP reachability monitor.
  *
- * Polls every 60 s and fires a Web Push notification on up→down and down→up
- * transitions. Also evaluates per-project alertRules each cycle and persists
- * fired alerts to .alerts.jsonl when thresholds are breached.
+ * Polls every 60 s and fires a Web Push notification once an outage is
+ * confirmed (debounced — see lib/http-health.ts), with reminders while it
+ * stays down and a notification on recovery. Also evaluates per-project
+ * alertRules each cycle and persists fired alerts to .alerts.jsonl when
+ * thresholds are breached.
  */
 
 import { appendFile, readFile, writeFile } from 'node:fs/promises'
@@ -19,6 +21,8 @@ import {
   CERT_PROBE_CMD, extractCertSection, extractCertbotSection, probeBlockEndIndex,
   parseCertLines, parseCertbotSection, soonestExpiring, classifyRenewalHealth,
 } from './cert-probe.js'
+import { stepHealth, initialHealthState, type HealthState, type ProbeResult } from './http-health.js'
+import { handleHealthEvents, seedHealthMaps } from './health-notify.js'
 
 const metricLabels: Record<string, string> = {
   diskPct: 'disk', memPct: 'memory', certDays: 'cert days', backupAgeHours: 'backup age (h)',
@@ -75,21 +79,9 @@ export function formatAlertNotification(fired: FiredAlert[]): PushPayload {
   }
 }
 
-interface IncidentRecord {
-  type: 'ssh' | 'http'
-  projectName: string
-  event: 'down' | 'up'
-  t: number
-}
-
-function writeIncident(record: IncidentRecord): void {
-  const path = join(homedir(), 'projects', record.projectName, '.incidents.jsonl')
-  appendFile(path, JSON.stringify(record) + '\n').catch((err) => console.error('[status-monitor] writeIncident failed:', err))
-}
-
 const POLL_MS = 60_000
-const sshState = new Map<string, 'up' | 'down'>()
-const httpState = new Map<string, 'up' | 'down'>()
+let sshHealth = new Map<string, HealthState>()
+let httpHealth = new Map<string, HealthState>()
 const httpCircuit = new Map<string, { failures: number; skipUntil: number }>()
 
 async function probeProject(
@@ -156,23 +148,23 @@ function recordHttpFailure(url: string): void {
   httpCircuit.set(url, entry)
 }
 
-async function httpProbe(url: string): Promise<'up' | 'down'> {
+async function httpProbe(url: string): Promise<ProbeResult> {
   const circuit = httpCircuit.get(url)
   if (circuit && Date.now() < circuit.skipUntil) {
-    return 'down'
+    return { ok: false }
   }
 
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(10_000) })
     if (res.ok) {
       httpCircuit.delete(url)
-      return 'up'
+      return { ok: true, status: res.status }
     }
     recordHttpFailure(url)
-    return 'down'
+    return { ok: false, status: res.status }
   } catch {
     recordHttpFailure(url)
-    return 'down'
+    return { ok: false }
   }
 }
 
@@ -205,57 +197,24 @@ async function persistAlerts(name: string, fired: FiredAlert[], newState: AlertC
 
 async function poll(): Promise<void> {
   const projects = await discoverProjects().catch(() => [])
+  const now = Date.now()
 
   await Promise.allSettled(
     projects.map(async ({ config }) => {
       const host = config.serverIp ?? config.domain
       const key = sshKeyPath(config.sshKeyName)
-      const { state: next, metrics } = await probeProject(host, key, config.name)
-      const prev = sshState.get(config.name)
+      const { state: sshNext, metrics } = await probeProject(host, key, config.name)
 
-      if (prev === 'up' && next === 'down') {
-        await sendToAll({
-          title: config.name,
-          body: 'Service is down — SSH unreachable.',
-          url: `/projects/${encodeURIComponent(config.name)}`,
-          tag: `down:${config.name}`,
-        }).catch(() => {/* push failures are best-effort */})
-        writeIncident({ type: 'ssh', projectName: config.name, event: 'down', t: Math.floor(Date.now() / 1000) })
-      } else if (prev === 'down' && next === 'up') {
-        await sendToAll({
-          title: config.name,
-          body: 'Service is back online.',
-          url: `/projects/${encodeURIComponent(config.name)}`,
-          tag: `up:${config.name}`,
-        }).catch(() => {/* push failures are best-effort */})
-        writeIncident({ type: 'ssh', projectName: config.name, event: 'up', t: Math.floor(Date.now() / 1000) })
-      }
-
-      sshState.set(config.name, next)
+      const sshResult: ProbeResult = { ok: sshNext === 'up' }
+      const sshStep = stepHealth(sshHealth.get(config.name) ?? initialHealthState, sshResult, now)
+      sshHealth.set(config.name, sshStep.state)
+      await handleHealthEvents('ssh', config.name, sshStep.events)
 
       if (config.healthCheck?.url) {
-        const httpNext = await httpProbe(config.healthCheck.url)
-        const httpPrev = httpState.get(config.name)
-
-        if (httpPrev === 'up' && httpNext === 'down') {
-          await sendToAll({
-            title: config.name,
-            body: 'Health check failing — app may be down.',
-            url: `/projects/${encodeURIComponent(config.name)}`,
-            tag: `http-down:${config.name}`,
-          }).catch(() => {/* push failures are best-effort */})
-          writeIncident({ type: 'http', projectName: config.name, event: 'down', t: Math.floor(Date.now() / 1000) })
-        } else if (httpPrev === 'down' && httpNext === 'up') {
-          await sendToAll({
-            title: config.name,
-            body: 'Health check passing — app is back up.',
-            url: `/projects/${encodeURIComponent(config.name)}`,
-            tag: `http-up:${config.name}`,
-          }).catch(() => {/* push failures are best-effort */})
-          writeIncident({ type: 'http', projectName: config.name, event: 'up', t: Math.floor(Date.now() / 1000) })
-        }
-
-        httpState.set(config.name, httpNext)
+        const httpResult = await httpProbe(config.healthCheck.url)
+        const httpStep = stepHealth(httpHealth.get(config.name) ?? initialHealthState, httpResult, now)
+        httpHealth.set(config.name, httpStep.state)
+        await handleHealthEvents('http', config.name, httpStep.events)
       }
 
       if (metrics !== undefined) {
@@ -275,7 +234,15 @@ async function poll(): Promise<void> {
 export function startStatusMonitor(): void {
   // Delay first poll by 10 s to let the server finish booting.
   setTimeout(() => {
-    void poll()
-    setInterval(() => void poll(), POLL_MS)
+    void (async () => {
+      // Seed from the last recorded incident so a monitor restart mid-outage
+      // still sends reminders and a recovery notification instead of
+      // forgetting the outage was ever happening.
+      const seeded = await seedHealthMaps()
+      sshHealth = seeded.ssh
+      httpHealth = seeded.http
+      await poll()
+      setInterval(() => void poll(), POLL_MS)
+    })()
   }, 10_000)
 }
