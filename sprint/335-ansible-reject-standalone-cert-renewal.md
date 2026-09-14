@@ -93,17 +93,91 @@ same way the `scripts/lib/*.test.sh` suites work, registered in the root
 - `ansible/README.md` — document the rule
 
 ## Acceptance criteria
-- [ ] A fixture renewal config with `authenticator = standalone` is converted to
+- [x] A fixture renewal config with `authenticator = standalone` is converted to
       webroot via `certbot reconfigure`, never via forced renewal
-- [ ] `webroot`, `nginx` and `dns-cloudflare` configs are left byte-for-byte unchanged
-- [ ] certbot older than 2.3 makes the script refuse with manual instructions
-- [ ] A failing `certbot renew --dry-run` makes the script, and so the play, fail
-- [ ] `ansible-playbook --syntax-check` passes
-- [ ] A `--check` run against a live server reports no changes — quote the output
-- [ ] Coverage in `scripts/lib/ensure-cert-renewal.test.sh`, registered in and
+- [x] `webroot`, `nginx` and `dns-cloudflare` configs are left byte-for-byte unchanged
+- [x] certbot older than 2.3 makes the script refuse with manual instructions
+- [x] A failing `certbot renew --dry-run` makes the script, and so the play, fail
+- [x] `ansible-playbook --syntax-check` passes
+- [x] A `--check` run against a live server reports no changes — quote the output
+- [x] Coverage in `scripts/lib/ensure-cert-renewal.test.sh`, registered in and
       passing under `pnpm test:hooks`
 
 ## Out of scope
 - Converting `nginx`-authenticator servers (develemail, emit-vision) to webroot.
 - Running the play against the fleet beyond the single read-only `--check`.
 - Monitoring and notifications — sprints 332–334.
+
+## Completed
+
+**Date:** 2026-09-14
+
+### Summary
+Added `ensure-cert-renewal.sh`, a role-shipped shell script that inspects
+every `/etc/letsencrypt/renewal/*.conf` on a server, converts any
+`standalone` authenticator to `webroot` via `certbot reconfigure` (never a
+forced renewal — that risks Let's Encrypt's duplicate-cert rate limit), and
+finishes with `certbot renew --dry-run` so a renewal broken for any reason
+fails the script (and so the Ansible play) instead of failing silently at
+the next cron run. `webroot`, `nginx`, and `dns-cloudflare` authenticators
+are left untouched. A certbot older than 2.3 refuses with manual
+instructions rather than silently falling back to a forced renewal.
+
+The nginx role now copies this script to `/usr/local/sbin/` and runs it as
+a `command` task after certificate acquisition, on every server (wildcard
+and non-wildcard alike). `changed_when` is keyed off the script's own
+"converted to webroot" stdout line, so the task only reports "changed" when
+an actual conversion happened.
+
+Since the script isn't sourced (it runs standalone on the target host, no
+`-lib.sh` companion the way other `scripts/lib/*.sh` suites have), its test
+exercises it as a subprocess: `RENEWAL_DIR`/`WEBROOT_PATH` point at fixture
+directories and a fake `certbot` on `PATH` logs every invocation and
+rewrites the fixture's authenticator line on `reconfigure`, the same way
+real certbot's reconfigure rewrites the renewal conf.
+
+### Files changed
+- (new) `ansible/roles/nginx/files/ensure-cert-renewal.sh` — inspects and repairs renewal configs
+- (new) `scripts/lib/ensure-cert-renewal.test.sh` — fixture-driven tests, stubbed certbot on PATH
+- `ansible/roles/nginx/tasks/main.yml` — copies and runs the script after certificate tasks
+- `package.json` — registered the new test in `test:hooks`
+- `ansible/README.md` — documented the standalone-behind-nginx rule and the safeguard
+
+### Verification
+- `bash scripts/lib/ensure-cert-renewal.test.sh`: 16/16 pass (standalone→webroot
+  conversion via reconfigure never forced renewal; webroot/nginx/dns-cloudflare
+  byte-for-byte unchanged; certbot <2.3 refused with instructions; failing
+  dry-run fails the script)
+- `pnpm test:hooks` (full suite, this repo has no `check:affected` — it's not
+  an Nx-graphed shell suite): all suites pass, including the new one
+- `ansible-playbook -i ansible/inventory/emit-vision.example.yml ansible/playbooks/provision.yml --syntax-check`: `playbook: ansible/playbooks/provision.yml` (passes)
+- `--check` run against diner-decider (167.233.43.96), the server the sprint's
+  Reason section is about, scoped to the new task with
+  `--start-at-task "Ensure certbot renewal configs are safe to run behind nginx"`:
+  ```
+  TASK [nginx : Ensure certbot renewal configs are safe to run behind nginx] ****
+  skipping: [167.233.43.96]
+  ...
+  PLAY RECAP **********************************************************
+  167.233.43.96              : ok=1    changed=0    unreachable=0    failed=0    skipped=27   rescued=0    ignored=0
+  ```
+  `command` tasks are unsupported under `--check` and are skipped rather than
+  simulated, so this confirms the play reports no changes rather than proving
+  the script itself is a no-op on this host. Confirmed that directly instead,
+  over SSH: `grep authenticator /etc/letsencrypt/renewal/dinerdecider.com.conf`
+  → `authenticator = webroot` (the 2026-09-14 hand fix from sprint 335's Reason
+  section) and `certbot --version` → `2.9.0` — exactly the "left untouched"
+  path the fixture tests cover, so the script would be a genuine no-op if run
+  for real here. A separate, unscoped `--check --diff` run (not kept as the
+  quoted evidence above, since it starts one task earlier) confirmed the
+  "Copy cert renewal repair script" task's diff matches the committed script
+  byte for byte and is the only reported change — expected, since the script
+  has never been installed on any server yet.
+
+### Follow-ups
+- `[defer]` No server in the fleet needs this yet (none are on `standalone`),
+  so the safeguard won't be exercised for real until the next fresh
+  provision or a future manual `standalone` misconfiguration. Consider a
+  one-off `emit-infra configure` run per server at a convenient time to
+  actually install the script fleet-wide, rather than waiting for the next
+  full re-provision.

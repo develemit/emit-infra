@@ -159,3 +159,23 @@
     hour: "3"
     minute: "30"
     weekday: "1"
+
+- name: Copy cert renewal repair script
+  copy:
+    src: ensure-cert-renewal.sh
+    dest: /usr/local/sbin/ensure-cert-renewal.sh
+    owner: root
+    group: root
+    mode: "0755"
+
+# Converts any renewal config still using the `standalone` authenticator
+# (which fights nginx for port 80) to `webroot`, and proves every renewal
+# still works with `certbot renew --dry-run` — see sprint 335. No server in
+# the fleet is on `standalone` today, so this is normally a no-op that just
+# confirms renewal health.
+- name: Ensure certbot renewal configs are safe to run behind nginx
+  command: /usr/local/sbin/ensure-cert-renewal.sh
+  environment:
+    WEBROOT_PATH: /var/www/certbot
+  register: cert_renewal_check
+  changed_when: "'converted to webroot' in cert_renewal_check.stdout"

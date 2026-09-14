@@ -166,6 +166,24 @@ sudo crontab -l | grep certbot
 
 For wildcard certs (DNS-01), ensure the Cloudflare API token is valid and the cron environment has access to it.
 
+### Never use certbot's `standalone` authenticator behind nginx
+
+`standalone` starts its own listener on port 80 to answer the ACME
+challenge — which nginx already holds on every provisioned server, so every
+renewal using it fails silently until the certificate expires. This is
+exactly what happened to diner-decider on 2026-09-13: its renewal config
+dated from a 2021 manual setup and predated the nginx role. Always use
+`nginx`, `webroot`, or `dns-cloudflare` (for wildcard certs) instead — all
+three work alongside nginx on port 80.
+
+The nginx role guards against this: after certificates are obtained, it
+runs `ensure-cert-renewal.sh` on every server (`ansible/roles/nginx/files/`),
+which converts any `standalone` renewal config to `webroot` via
+`certbot reconfigure` (never a forced renewal — that risks Let's Encrypt's
+duplicate-certificate rate limit) and finishes with `certbot renew --dry-run`
+so a renewal broken for any reason fails the play instead of failing
+silently at the next cron run. See sprint 335.
+
 ## Further Reading
 
 - **Sprint 33**: Blue-green Ansible provisioning (dual-stack compose, deploy user, infra stack)
