@@ -68,4 +68,20 @@ describe('formatAlertNotification', () => {
     const payload = formatAlertNotification([fired({ value: 92.7, threshold: 80 })])
     expect(payload.body).toBe('disk 93 > 80')
   })
+
+  it('uses detail text when present, instead of the generic metric/op/threshold line', () => {
+    const payload = formatAlertNotification([
+      fired({ metric: 'certDays', op: 'lt', threshold: 21, value: 20, detail: 'tastease.app: 20d left — renewal is failing.' }),
+    ])
+    expect(payload.body).toBe('tastease.app: 20d left — renewal is failing.')
+  })
+
+  it('bundles detail text alongside generic lines for mixed alerts', () => {
+    const alerts = [
+      fired({ metric: 'diskPct', op: 'gt', threshold: 90, value: 92 }),
+      fired({ metric: 'certStatus', op: 'gt', threshold: 0, value: 1, detail: 'No readable certificate found.' }),
+    ]
+    const payload = formatAlertNotification(alerts)
+    expect(payload.body).toBe('2 alerts: disk 92 > 90, No readable certificate found.')
+  })
 })

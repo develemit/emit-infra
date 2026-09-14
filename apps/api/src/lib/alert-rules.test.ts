@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { evaluateRules, type AlertRule, type AlertMetrics, type AlertCooldownState } from './alert-rules.js'
+import { evaluateRules, resolveRules, type AlertRule, type AlertMetrics, type AlertCooldownState } from './alert-rules.js'
 
 const BASE_RULE: AlertRule = { metric: 'diskPct', op: 'gt', threshold: 80, enabled: true }
 const NOW = 1_000_000
@@ -96,5 +96,73 @@ describe('evaluateRules', () => {
     const { fired, newState } = evaluateRules('proj', [], { diskPct: 90 }, {}, NOW)
     expect(fired).toHaveLength(0)
     expect(newState).toEqual({})
+  })
+
+  it('default certDays rule: 20 days left notifies, 22 does not, with no alertRules configured', () => {
+    const rules = resolveRules([]) // no project alertRules — pure defaults
+    expect(evaluateRules('proj', rules, { certDays: 20 }, {}, NOW).fired).toHaveLength(1)
+    expect(evaluateRules('proj', rules, { certDays: 22 }, {}, NOW).fired).toHaveLength(0)
+  })
+
+  it('fires the certStatus default when no certificate is readable', () => {
+    const rules = resolveRules([])
+    const { fired } = evaluateRules('proj', rules, { certStatus: 1 }, {}, NOW)
+    expect(fired).toHaveLength(1)
+    expect(fired[0]).toMatchObject({ metric: 'certStatus', op: 'gt', threshold: 0, value: 1 })
+  })
+
+  it('applies a rule-specific cooldown shorter than the default', () => {
+    const rules = resolveRules([])
+    const prevState: AlertCooldownState = {
+      'certDays:lt:21': { firedAt: NOW - 3600, value: 5 }, // well within its 24h cooldown — stays quiet
+      'certDays:lt:7': { firedAt: NOW - 6 * 3600, value: 5 }, // exactly at its 6h cooldown — re-arms
+    }
+    const { fired } = evaluateRules('proj', rules, { certDays: 5 }, prevState, NOW)
+    expect(fired).toHaveLength(1)
+    expect(fired[0]!.threshold).toBe(7)
+  })
+
+  it('a rule-specific cooldown still blocks re-firing before it elapses', () => {
+    const rules = resolveRules([])
+    const prevState: AlertCooldownState = { 'certDays:lt:21': { firedAt: NOW - 3600, value: 20 } }
+    const { fired } = evaluateRules('proj', rules, { certDays: 20 }, prevState, NOW)
+    // lt:21 tier has a 24h cooldown — only 1h has passed
+    expect(fired).toHaveLength(0)
+  })
+})
+
+describe('resolveRules', () => {
+  it('applies both certDays defaults and the certStatus default when no project rules exist', () => {
+    const rules = resolveRules([])
+    expect(rules.map(r => `${r.metric}:${r.op}:${r.threshold}`).sort()).toEqual([
+      'certDays:lt:21',
+      'certDays:lt:7',
+      'certStatus:gt:0',
+    ])
+  })
+
+  it("a project's own certDays rule replaces both certDays defaults", () => {
+    const ownRule: AlertRule = { metric: 'certDays', op: 'lt', threshold: 3, enabled: true }
+    const rules = resolveRules([ownRule])
+    const certDaysRules = rules.filter(r => r.metric === 'certDays')
+    expect(certDaysRules).toHaveLength(1)
+    expect(certDaysRules[0]).toMatchObject({ threshold: 3 })
+    // certStatus default is unrelated to certDays and stays
+    expect(rules.some(r => r.metric === 'certStatus')).toBe(true)
+  })
+
+  it("other metrics stay opt-in — a project's diskPct rule doesn't disturb cert defaults", () => {
+    const ownRule: AlertRule = { metric: 'diskPct', op: 'gt', threshold: 90, enabled: true }
+    const rules = resolveRules([ownRule])
+    expect(rules).toHaveLength(4) // 3 cert defaults + the project's own diskPct rule
+    expect(rules.filter(r => r.metric === 'certDays')).toHaveLength(2)
+  })
+
+  it('default certDays rules use 24h/6h cooldowns, not the global default', () => {
+    const rules = resolveRules([])
+    const lt21 = rules.find(r => r.metric === 'certDays' && r.threshold === 21)
+    const lt7 = rules.find(r => r.metric === 'certDays' && r.threshold === 7)
+    expect(lt21?.cooldownSec).toBe(24 * 3600)
+    expect(lt7?.cooldownSec).toBe(6 * 3600)
   })
 })

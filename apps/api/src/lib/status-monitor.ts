@@ -11,13 +11,38 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { sshExec } from '@emit-infra/core'
 import { discoverProjects } from './discover-projects.js'
-import { sshKeyPath, SAFE_DOMAIN_RE } from './project-helpers.js'
+import { sshKeyPath } from './project-helpers.js'
 import { sendToAll, type PushPayload } from './push.js'
-import { evaluateRules, type AlertMetrics, type AlertCooldownState, type FiredAlert } from './alert-rules.js'
+import { evaluateRules, resolveRules, type AlertMetrics, type AlertCooldownState, type FiredAlert } from './alert-rules.js'
 import { pruneAlertJsonl } from './prune-alerts.js'
+import { CERT_PROBE_CMD, extractCertSection, certSectionEndIndex, parseCertLines, soonestExpiring } from './cert-probe.js'
 
 const metricLabels: Record<string, string> = {
   diskPct: 'disk', memPct: 'memory', certDays: 'cert days', backupAgeHours: 'backup age (h)',
+}
+
+/** certDays/certStatus alerts get a human-readable detail instead of the
+ *  generic "metric value op threshold" line — certbot's 30-day renewal
+ *  window is the whole point of the notification. */
+function enrichFiredAlert(alert: FiredAlert, metrics: AlertMetrics): FiredAlert {
+  if (alert.metric === 'certDays' && metrics.certName) {
+    return {
+      ...alert,
+      detail: `${metrics.certName}: ${Math.round(alert.value)}d left — certbot should have renewed it ` +
+        `at 30 days, so renewal is failing on this server.`,
+    }
+  }
+  if (alert.metric === 'certStatus') {
+    return { ...alert, detail: 'No readable certificate found on this server — check certbot.' }
+  }
+  return alert
+}
+
+function describeAlert(alert: FiredAlert): string {
+  if (alert.detail) return alert.detail
+  const label = metricLabels[alert.metric] ?? alert.metric
+  const opLabel = alert.op === 'gt' ? '>' : '<'
+  return `${label} ${Math.round(alert.value)} ${opLabel} ${alert.threshold}`
 }
 
 export function formatAlertNotification(fired: FiredAlert[]): PushPayload {
@@ -26,21 +51,15 @@ export function formatAlertNotification(fired: FiredAlert[]): PushPayload {
 
   if (fired.length === 1) {
     const alert = fired[0]!
-    const label = metricLabels[alert.metric] ?? alert.metric
-    const opLabel = alert.op === 'gt' ? '>' : '<'
     return {
       title: name,
-      body: `${label} ${Math.round(alert.value)} ${opLabel} ${alert.threshold}`,
+      body: describeAlert(alert),
       url,
       tag: `alert:${name}:${alert.metric}`,
     }
   }
 
-  const parts = fired.map(alert => {
-    const label = metricLabels[alert.metric] ?? alert.metric
-    const opLabel = alert.op === 'gt' ? '>' : '<'
-    return `${label} ${Math.round(alert.value)} ${opLabel} ${alert.threshold}`
-  })
+  const parts = fired.map(describeAlert)
   return {
     title: name,
     body: `${fired.length} alerts: ${parts.join(', ')}`,
@@ -70,15 +89,14 @@ async function probeProject(
   host: string,
   key: string,
   name: string,
-  domain: string,
 ): Promise<{ state: 'up' | 'down'; metrics?: AlertMetrics }> {
-  const certCmd = SAFE_DOMAIN_RE.test(domain)
-    ? `openssl x509 -enddate -noout -in /etc/letsencrypt/live/${domain}/fullchain.pem 2>/dev/null | sed 's/notAfter=//' || echo ""`
-    : 'echo ""'
   try {
     const raw = await sshExec(
       host,
-      `df -h / | tail -1 | awk '{print $5}' | tr -d '%'; free -m | awk 'NR==2{printf "%.0f\\n",$3/$2*100}'; ${certCmd}; grep -o '"lastRun":"[^"]*"' /opt/${name}/.backup-status.json 2>/dev/null | cut -d'"' -f4; echo ""`,
+      `df -h / | tail -1 | awk '{print $5}' | tr -d '%'; ` +
+        `free -m | awk 'NR==2{printf "%.0f\\n",$3/$2*100}'; ` +
+        `${CERT_PROBE_CMD}; ` +
+        `grep -o '"lastRun":"[^"]*"' /opt/${name}/.backup-status.json 2>/dev/null | cut -d'"' -f4; echo ""`,
       key,
     )
     const lines = raw.split('\n').map(l => l.trim())
@@ -90,15 +108,17 @@ async function probeProject(
     const mem = parseInt(lines[1] ?? '', 10)
     if (!isNaN(mem)) metrics.memPct = mem
 
-    const sslStr = lines[2] ?? ''
-    if (sslStr) {
-      const expiry = new Date(sslStr)
-      if (!isNaN(expiry.getTime())) {
-        metrics.certDays = Math.floor((expiry.getTime() - Date.now()) / 86400000)
-      }
+    const certs = parseCertLines(extractCertSection(lines))
+    const soonest = soonestExpiring(certs)
+    if (soonest) {
+      metrics.certDays = soonest.daysRemaining
+      metrics.certName = soonest.name
+    } else {
+      metrics.certStatus = 1
     }
 
-    const backupLastRun = lines[3] ?? ''
+    const endIdx = certSectionEndIndex(lines)
+    const backupLastRun = endIdx === -1 ? '' : (lines[endIdx + 1] ?? '')
     if (backupLastRun) {
       const lastRunMs = new Date(backupLastRun).getTime()
       if (!isNaN(lastRunMs)) {
@@ -176,7 +196,7 @@ async function poll(): Promise<void> {
     projects.map(async ({ config }) => {
       const host = config.serverIp ?? config.domain
       const key = sshKeyPath(config.sshKeyName)
-      const { state: next, metrics } = await probeProject(host, key, config.name, config.domain)
+      const { state: next, metrics } = await probeProject(host, key, config.name)
       const prev = sshState.get(config.name)
 
       if (prev === 'up' && next === 'down') {
@@ -224,13 +244,14 @@ async function poll(): Promise<void> {
         httpState.set(config.name, httpNext)
       }
 
-      const rules = config.alertRules ?? []
-      if (rules.length > 0 && metrics !== undefined) {
+      if (metrics !== undefined) {
+        const rules = resolveRules(config.alertRules ?? [])
         const prevState = await readAlertState(config.name)
         const { fired, newState } = evaluateRules(config.name, rules, metrics, prevState)
-        await persistAlerts(config.name, fired, newState)
-        if (fired.length > 0) {
-          await sendToAll(formatAlertNotification(fired)).catch(() => {/* best-effort */})
+        const enrichedFired = fired.map(alert => enrichFiredAlert(alert, metrics))
+        await persistAlerts(config.name, enrichedFired, newState)
+        if (enrichedFired.length > 0) {
+          await sendToAll(formatAlertNotification(enrichedFired)).catch(() => {/* best-effort */})
         }
       }
     }),
