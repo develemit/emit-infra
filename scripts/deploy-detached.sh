@@ -125,12 +125,22 @@ launch() {
   local sha="$1" base="$2"
   rm -f "${base}.rc"
   : > "${base}.log"
-  nohup bash -c '
-    cd "$1" || exit 1
-    env EMIT_DEPLOY_DETACHED=1 git push origin main
-    echo $? > "$2"
-  ' -- "$PROJECT_DIR" "${base}.rc" > "${base}.log" 2>&1 &
-  disown $! 2>/dev/null || true
+  # setsid, not nohup: agent harnesses (Claude Code) kill the whole process
+  # group at session teardown, which nohup/disown don't escape — two deploys
+  # died mid-Ansible this way on 2026-09-17. A new session survives both
+  # group kills and, once this script exits, process-tree walks.
+  python3 - "$PROJECT_DIR" "${base}.rc" "${base}.log" <<'PY'
+import subprocess, sys
+project_dir, rc_path, log_path = sys.argv[1:4]
+script = 'cd "$1" || exit 1\nenv EMIT_DEPLOY_DETACHED=1 git push origin main\necho $? > "$2"\n'
+with open(log_path, "wb") as log:
+    subprocess.Popen(
+        ["bash", "-c", script, "--", project_dir, rc_path],
+        stdout=log, stderr=subprocess.STDOUT,
+        stdin=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+PY
 
   echo "→ launched detached deploy for $(project_name "$PROJECT_DIR") @ ${sha:0:7}"
   echo "  log: ${base}.log"
