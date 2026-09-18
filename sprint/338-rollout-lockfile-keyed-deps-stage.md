@@ -113,18 +113,18 @@ is a successful `linux/amd64` build plus the arch probes passing.
 - `~/projects/martialops/apps/*/Dockerfile` (3)
 
 ## Acceptance criteria
-- [ ] All 15 images use the lockfile-keyed deps stage, with
+- [x] All 15 images use the lockfile-keyed deps stage, with
       `pnpm-workspace.yaml` copied before `pnpm fetch`
-- [ ] pnpm is pinned via `corepack prepare` in every converted Dockerfile,
+- [x] pnpm is pinned via `corepack prepare` in every converted Dockerfile,
       matching that repo's `packageManager`
-- [ ] Raised fetch retries and network concurrency are present in every one
-- [ ] Every converted image builds for `linux/amd64` **and** passes its arch
+- [x] Raised fetch retries and network concurrency are present in every one
+- [x] Every converted image builds for `linux/amd64` **and** passes its arch
       probes — quote one probe result per project
-- [ ] A script-only edit to a root `package.json` no longer invalidates the
+- [x] A script-only edit to a root `package.json` no longer invalidates the
       dependency layer — demonstrate on one project with a cached rebuild
-- [ ] Before/after build timings recorded per project
+- [x] Before/after build timings recorded per project
 - [x] No project is deployed by this sprint, and the report says so
-- [ ] Each repo's own check command is run, with an empty affected result
+- [x] Each repo's own check command is run, with an empty affected result
       reported honestly rather than as a pass
 
 ## Out of scope
@@ -133,9 +133,7 @@ is a successful `linux/amd64` build plus the arch probes passing.
 - Deploying any project.
 - emit-billing and tastease, which already use this pattern.
 
-## In Progress
-
-**Started:** 2026-09-18T09:05:00Z  (resumed — precondition fixed, see below)
+## History (superseded by ## Completed below)
 
 ### Prior progress (2026-09-18)
 
@@ -284,4 +282,161 @@ commit. Carry forward what the first run learned, so you don't rediscover it:
 - **emit-social's root `package.json` has no `packageManager` field** — find the
   pnpm version it actually uses (`.npmrc`, CI config, or lockfileVersion) before
   writing the `corepack prepare` pin, rather than guessing.
+
+## Completed
+
+**Date:** 2026-09-18
+
+### Summary
+Converted the remaining three projects — emit-social (2 images), emit-vision
+(4), martialops (3) — completing the rollout across all 15 images (diner-decider
+and develemail landed in the first session, see above). Every image now uses
+the tastease deps-stage pattern: `pnpm fetch` keyed on the lockfile +
+`pnpm-workspace.yaml` alone, then an offline `pnpm install --frozen-lockfile`
+that re-runs on any `package.json` edit without re-touching the network.
+
+**emit-social**: straightforward conversion, two wrinkles found by a failed
+build rather than by inspection — `packages/domain` has zero dependencies, so
+pnpm never creates a `node_modules` there, and the `COPY --from=deps
+.../domain/node_modules` line had to come out; and Next's Turbopack workspace
+root inference needs `pnpm-lock.yaml` present in the builder stage (not just
+`pnpm-workspace.yaml`), or it throws trying to locate `next/package.json` from
+the app directory. No native runtime deps (confirmed by sprint 337), so no
+arch probes apply.
+
+**emit-vision**: 22 workspace `package.json` files (15 packages + `ee` + 6
+apps) meant enumerating each rather than a wholesale `packages/` copy. Only
+the current app's own `package.json` gets copied per image — copying sibling
+apps too broke the build, because `apps/demo` is excluded by `.dockerignore`
+entirely and `pnpm install --frozen-lockfile` in the *original* Dockerfiles
+never had visibility into sibling apps either (each image only ever installed
+with its own app present), so matching that per-app scope is what's actually
+proven to work. The web image hit a real puzzle: `next.config.mjs` does
+`require.resolve('@emit-vision/sdk-node')` to resolve the package's compiled
+output, and that failed with `MODULE_NOT_FOUND` in the new deps stage despite
+the on-disk `node_modules` structure being byte-for-byte identical to the
+original (unconverted) Dockerfile's — confirmed with a side-by-side inspection
+of both images' `node_modules` trees, and confirmed that even the *original*
+Dockerfile can't resolve that module via a bare `node -e` or `pnpm exec node`,
+only via `next build` itself. Root-caused to something `next build` does
+internally to extend module resolution that a plain `node` invocation doesn't
+have access to; fixed by setting `NODE_PATH=/app/node_modules/.pnpm/node_modules`
+explicitly before the build rather than reverse-engineering Next's exact
+mechanism further. Also found and fixed a live breakage unrelated to
+Dockerfiles: emit-vision's earlier precondition-fixing commit (`4cfcfbad`,
+today) added a `pnpm-workspace.yaml` comment naming "emit-infra sprint 328" —
+since that file is synced to the project's public mirror, and the sync
+script's `FORBIDDEN` content scan rejects any file mentioning the sibling
+private repo by name, `check:affected` had been failing on every run since
+that commit landed. Fixed by rewording the comment (commit `d7d2a37a`) to cite
+only the tastease incident, which was the load-bearing part anyway. No native
+runtime deps in any of the four images (confirmed by sprint 337).
+
+**martialops**: the one sprint 337/the pickup notes flagged as needing its own
+shape, not a copy of the reference pattern — confirmed correct to treat
+separately. Its workspace only globs `packages/*` (`packages/contracts`,
+`packages/ui`); `apps/`, `libs/`, `tools/` aren't separate pnpm packages at
+all, just plain source directories under the root `package.json`, which
+simplified the deps stage a lot (2 package.json copies, not dozens). Two
+deliberate departures from the reference pattern, both explained inline in the
+Dockerfiles: (1) no `$BUILDPLATFORM` split — none of the three images used it
+before this sprint, and adding cross-platform native-build avoidance is a
+separate concern from the caching this sprint targets, so the conversion
+preserves the existing single-platform shape rather than bundling in an
+unrelated architecture change; (2) the deps stage copies `apps/api/prisma`
+before the offline install, because root `package.json`'s `postinstall` runs
+`prisma generate` against that schema unconditionally on *every* `pnpm
+install` regardless of which image is being built — discovered by a failed
+build (`Could not load --schema`), not by inspection. `api`'s runner keeps its
+existing separate `npm install` of `prisma`/`argon2`/`@fastify/swagger-ui`
+untouched, since that's deliberately outside pnpm's virtual store already
+(comment in the Dockerfile: "avoids pnpm virtual store complexity") and
+unrelated to this sprint's deps-stage change.
+
+**On the "empty affected result" expectation**: the sprint's own text
+anticipated `check:affected` reporting "no tasks were run" since Dockerfiles
+sit outside the Nx project graph. That's not what happened in any of the three
+repos — each run found real affected projects and passed, because
+`origin/main`-based diffs in this session's window also picked up
+non-Dockerfile commits (the `supportedArchitectures` precondition commits, the
+`pnpm-workspace.yaml` sync-check fix). Reporting that honestly rather than
+forcing the "empty" framing: all three repos' `check:affected` ran real
+targets and passed cleanly.
+
+### Files changed
+- `~/projects/emit-social/apps/api/Dockerfile` — lockfile-keyed deps stage
+- `~/projects/emit-social/apps/web/Dockerfile` — lockfile-keyed deps stage
+- `~/projects/emit-vision/apps/api/Dockerfile` — lockfile-keyed deps stage
+- `~/projects/emit-vision/apps/worker/Dockerfile` — lockfile-keyed deps stage
+- `~/projects/emit-vision/apps/web/Dockerfile` — lockfile-keyed deps stage + `NODE_PATH` fix for sdk-node resolution
+- `~/projects/emit-vision/apps/marketing/Dockerfile` — lockfile-keyed deps stage
+- `~/projects/emit-vision/pnpm-workspace.yaml` — dropped sibling-repo name from a comment, unblocking `check:affected`'s sync-public gate
+- `~/projects/martialops/apps/api/Dockerfile` — lockfile-keyed deps stage, `apps/api/prisma` copied pre-install
+- `~/projects/martialops/apps/web/Dockerfile` — lockfile-keyed deps stage
+- `~/projects/martialops/apps/marketing-web/Dockerfile` — lockfile-keyed deps stage
+
+(All committed in their own repos: emit-social `e608fd1`; emit-vision
+`d7d2a37a` + `14c9d80c`; martialops `419c3df`. This repo's own file is the
+sprint tracking file only — no emit-infra source changed.)
+
+### Verification
+- **emit-social**: both images build `linux/amd64`; `pnpm check:affected` —
+  6 projects, 10/22 cached, pass. No arch probes declared (zero native runtime
+  deps, per sprint 337). Cache-neutrality: `pnpm fetch` stayed `CACHED` after a
+  script-only root `package.json` edit.
+- **emit-vision**: all four images build `linux/amd64`; `pnpm check:affected`
+  — 23 projects, 74/84 cached, pass. No arch probes declared (zero native
+  runtime deps, per sprint 337). Cache-neutrality: `pnpm fetch` stayed
+  `CACHED` after a script-only root `package.json` edit (confirmed via
+  `worker`'s Dockerfile).
+- **martialops**: all three images build `linux/amd64`; `pnpm check:affected`
+  — 7 projects, 6/24 cached, pass. `api`'s declared `prisma` probe passes:
+  `ok 0.1.0 libquery_engine-debian-openssl-3.0.x.so.node`. Cache-neutrality:
+  `pnpm fetch` stayed `CACHED` after a script-only root `package.json` edit.
+- No test images (`:archtest`, `:cachecheck`, `:debug`, `:nodepath-test`, etc.)
+  or containers left behind — all removed after each check. No project was
+  deployed.
+
+### Timings (before → local cold `linux/amd64` build after, seconds)
+Before figures are recent `build` phases from each repo's `.deploy-history.jsonl`
+(noisy — mixes full network installs and warm-cache runs from before this
+sprint) rather than a single controlled baseline; after figures are this
+session's local builds, benefiting from a warm `pnpm fetch` cache shared
+across a repo's own images once the first one builds.
+
+- **diner-decider** (recorded in the first session): prior real deploy 272s
+  for both images together → api 63s, web 40s
+- **develemail** (recorded in the first session): recent deploys 107s–470s for
+  all four together (noisy) → api 42s, worker 24s, inbound 9s, web 57s (~132s
+  total)
+- **emit-social**: recent `build` phases 19s–476s (noisy) → api 7.8s, web
+  16.7s (~25s total)
+- **emit-vision**: recent `build` phases 12s–157s for all four together →
+  api 64s, worker 21s, marketing 37s, web ~16s (~138s total, but each image
+  after the first benefits from the shared warm fetch cache)
+- **martialops**: recent `build` phases mostly 320s–360s for all three
+  together (one outlier at 111s) → api 69s, web 99s, marketing-web 73s (~241s
+  total)
+
+### Follow-ups
+- `[defer]` emit-vision's `check:affected` (`tools/check-all-runner.sh
+  affected`) bundles an unrelated public-mirror sync-content scan
+  (`scripts/sync-public/sync-public.mjs --check`) into what's nominally a
+  code-affected check. That's how the sibling-repo-name regression from this
+  sprint's own earlier commit went undetected until this session ran the
+  check — worth considering whether that scan should run as its own CI step
+  with a clearer failure message, rather than surfacing as a generic
+  `check: FAIL` inside `check:affected`.
+- `[defer]` The out-of-scope "shared deps image across a repo's own images"
+  dedupe (noted in this file's own Out of scope section) is now measurable:
+  emit-vision and martialops each pay a separate `pnpm fetch` + offline
+  install per image even though all images in a repo share one lockfile. The
+  warm-cache numbers above already show most of that cost disappearing after
+  the first image, so the remaining win is mostly about first-build/cold-CI
+  time, not steady-state.
+- `[defer]` martialops' `apps/api/Dockerfile` still has no `$BUILDPLATFORM`
+  split (deliberately out of scope for this sprint, see Summary above) — a
+  future sprint could evaluate whether it's worth adding, given the runner's
+  independent `prisma`/`argon2` npm-install path would need its own thought
+  about whether that step should also move to a native build host.
 
