@@ -3,6 +3,21 @@
 # 1. Runs CI (ci.prePush targets via nx affected)
 # 2. On push to main: builds Docker images, pushes to GHCR, deploys via emit-infra
 # Reads all config from .emit-infra.json.
+
+# husky's generated wrapper (.husky/_/h) launches hooks with `sh -e "$s"`,
+# which ignores the shebang above. On macOS /bin/sh is bash in POSIX mode:
+# it still sets BASH_VERSION, so a `[ -z "$BASH_VERSION" ]` test does NOT
+# detect it — but POSIX mode disables process substitution, so the hook dies
+# at source time on image-arch-check.sh:177's `done < <(...)` (added by
+# emit-infra sprint 326, 2026-09-12). Every emit-infra lib sourced below is
+# bash, so re-exec unconditionally into a real, non-POSIX bash rather than
+# making five libraries POSIX. The sentinel makes it exactly one re-exec;
+# `exec` preserves argv and stdin, which the push-refs loop below reads.
+if [ -z "${EMIT_HOOK_REEXEC:-}" ]; then
+  export EMIT_HOOK_REEXEC=1
+  exec bash "$0" "$@"
+fi
+
 set -euo pipefail
 
 ROOT="$(git rev-parse --show-toplevel)"
