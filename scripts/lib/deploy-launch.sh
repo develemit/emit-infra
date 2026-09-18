@@ -18,6 +18,17 @@ _EMIT_DEPLOY_LAUNCH_LOADED=1
 # .deploy-status.json only holds the *latest* run, so any failed/interrupted
 # deploy leaves it in state "deploying" and hides the last known-good sha. Fall
 # back to the newest "deployed" entry in .deploy-history.jsonl before giving up.
+#
+# sprint 336: a record only counts as the smart-build baseline when it's
+# explicitly marked isBuildBaseline:true — meaning the deploy that wrote it
+# actually built or re-tagged images for that sha (ci-utils.sh's deploy_done
+# always does; a CLI-direct deploy (deploy-records.ts) only does once it has
+# verified the sha's images are really what's running). A record missing the
+# field — every deploy written before this sprint, plus the exact kind of
+# no-build CLI record that poisoned emit-billing on 2026-08-27 — fails safe as
+# NOT a baseline rather than being silently trusted; resolve_last_deployed_sha
+# keeps walking backward past it for an older verified one instead of handing
+# back a sha nothing ever built.
 resolve_last_deployed_sha() {
   local root="${1:-.}"
   python3 - "$root" <<'PY' 2>/dev/null || true
@@ -28,7 +39,7 @@ sha = ''
 
 try:
     d = json.load(open(os.path.join(root, '.deploy-status.json')))
-    if d.get('status') == 'deployed':
+    if d.get('status') == 'deployed' and d.get('isBuildBaseline') is True:
         sha = d.get('sha') or ''
 except Exception:
     pass
@@ -44,7 +55,7 @@ if not sha:
                     e = json.loads(line)
                 except Exception:
                     continue
-                if e.get('status') == 'deployed' and e.get('sha'):
+                if e.get('status') == 'deployed' and e.get('isBuildBaseline') is True and e.get('sha'):
                     sha = e['sha']
                     break
     except Exception:

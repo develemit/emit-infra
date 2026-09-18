@@ -184,12 +184,18 @@ deploy_done() {
   completed_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
   local duration=$(( $(date +%s) - _EMIT_STARTED_EPOCH ))
 
+  # isBuildBaseline is always true here: deploy_done only ever runs after the
+  # hook's build/retag phase for every declared service (pre-push:174-229) —
+  # unlike a CLI-direct deploy, this path can't reach "deployed" without
+  # having really built or re-tagged the images for $_EMIT_SHA. See sprint
+  # 336 / resolve_last_deployed_sha (deploy-launch.sh) for why this flag
+  # exists and what happens when it's absent.
   _emit_write_atomic \
-    "$(printf '{"status":"%s","sha":"%s","branch":"%s","completedAt":"%s","launch":{"mode":"%s","marker":"%s"}}' \
+    "$(printf '{"status":"%s","sha":"%s","branch":"%s","completedAt":"%s","launch":{"mode":"%s","marker":"%s"},"isBuildBaseline":true}' \
       "$1" "$_EMIT_SHA" "$_EMIT_BRANCH" "$completed_at" "$_EMIT_LAUNCH_MODE" "$_EMIT_LAUNCH_MARKER")" \
     .deploy-status.json
 
-  printf '{"status":"%s","sha":"%s","branch":"%s","startedAt":"%s","completedAt":"%s","durationSec":%d,"servicesBuilt":%s,"phases":%s,"launch":{"mode":"%s","marker":"%s"},"message":"%s"}\n' \
+  printf '{"status":"%s","sha":"%s","branch":"%s","startedAt":"%s","completedAt":"%s","durationSec":%d,"servicesBuilt":%s,"phases":%s,"launch":{"mode":"%s","marker":"%s"},"message":"%s","isBuildBaseline":true}\n' \
     "$1" "$_EMIT_SHA" "$_EMIT_BRANCH" "$_EMIT_STARTED" "$completed_at" "$duration" "$(_emit_services_json)" "$(_emit_phases_json)" "$_EMIT_LAUNCH_MODE" "$_EMIT_LAUNCH_MARKER" "$_EMIT_MSG" >> .deploy-history.jsonl
 
   _emit_truncate_history .deploy-history.jsonl

@@ -139,12 +139,13 @@ describe('deployRecordDone', () => {
 
     const statusRaw = await readFile(join(dir, '.deploy-status.json'), 'utf8')
     const status = JSON.parse(statusRaw)
-    expect(Object.keys(status)).toEqual(['status', 'sha', 'branch', 'completedAt', 'launch'])
+    expect(Object.keys(status)).toEqual(['status', 'sha', 'branch', 'completedAt', 'launch', 'isBuildBaseline'])
     expect(status.status).toBe('deployed')
     expect(status.sha).toBe('abc123')
     expect(status.branch).toBe('main')
     expect(status.writer).toBeUndefined()
     expect(status.launch).toEqual({ mode: 'interactive', marker: '' })
+    expect(status.isBuildBaseline).toBe(false)
 
     const historyRaw = await readFile(join(dir, '.deploy-history.jsonl'), 'utf8')
     const lines = historyRaw.trim().split('\n')
@@ -156,7 +157,7 @@ describe('deployRecordDone', () => {
     // a CLI-written record apart from a hook-written one.
     expect(Object.keys(entry)).toEqual([
       'status', 'sha', 'branch', 'startedAt', 'completedAt',
-      'durationSec', 'servicesBuilt', 'phases', 'launch', 'message',
+      'durationSec', 'servicesBuilt', 'phases', 'launch', 'message', 'isBuildBaseline',
     ])
     expect(entry.status).toBe('deployed')
     expect(entry.sha).toBe('abc123')
@@ -166,6 +167,23 @@ describe('deployRecordDone', () => {
     expect(entry.launch).toEqual({ mode: 'interactive', marker: '' })
     expect(entry.message).toBe('a commit')
     expect(typeof entry.durationSec).toBe('number')
+    // Default false: this CLI path never builds/retags, so a caller must
+    // explicitly prove the sha's images shipped before it counts as a
+    // baseline (sprint 336 — see resolve_last_deployed_sha).
+    expect(entry.isBuildBaseline).toBe(false)
+  })
+
+  it('records isBuildBaseline:true only when the caller explicitly verified the deploy', async () => {
+    mockGit('verified1', 'main', 'a commit')
+    const ctx = await deployRecordInit(dir)
+
+    await deployRecordDone(dir, ctx, 'deployed', { deploy: 5 }, true)
+
+    const status = JSON.parse(await readFile(join(dir, '.deploy-status.json'), 'utf8'))
+    expect(status.isBuildBaseline).toBe(true)
+
+    const entry = JSON.parse((await readFile(join(dir, '.deploy-history.jsonl'), 'utf8')).trim())
+    expect(entry.isBuildBaseline).toBe(true)
   })
 
   it('records a failed deploy without throwing (failure path)', async () => {

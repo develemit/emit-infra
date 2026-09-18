@@ -3,7 +3,7 @@ import { join, dirname } from 'node:path'
 import { readFileSync, existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import chalk from 'chalk'
-import { loadConfig, runAnsible, sshExec, deployRecordInit, deployRecordDone, redactSecrets, type ProjectConfig } from '@emit-infra/core'
+import { loadConfig, runAnsible, sshExec, deployRecordInit, deployRecordDone, redactSecrets, gitField, type ProjectConfig } from '@emit-infra/core'
 import { resolveInventoryPath } from './configure.js'
 import { parseKeyList, filterExcludedKeys } from './secrets-scaffold.js'
 import { parseEnvEntries } from '../lib/env-file.js'
@@ -274,6 +274,35 @@ export async function enforceEnvRemovalGuard(opts: {
   removed.forEach(k => console.warn(chalk.yellow(`  - ${k}`)))
 }
 
+// The hook derives BUILD_NUMBER the same way (scripts/hooks/pre-push:37) and
+// exports it before invoking this CLI, so this only ever runs for a
+// CLI-direct deploy that has no upstream build step. Deriving it here — same
+// formula, so it's identical to what a hook-driven deploy at this exact
+// commit would have used — means Ansible's existing "Set BUILD_NUMBER in
+// server .env" task (gated on `build_number is defined`) always fires, so a
+// CLI-direct deploy can no longer wipe the server's BUILD_NUMBER (sprint 336).
+export async function resolveBuildNumber(cwd: string, env: NodeJS.ProcessEnv): Promise<string> {
+  if (env.BUILD_NUMBER) return env.BUILD_NUMBER
+  return gitField(cwd, ['rev-list', '--count', 'HEAD'])
+}
+
+// Reads the build.number label baked into whatever image is actually running
+// after the deploy — the same fact ansible/roles/app-deploy/tasks/main.yml's
+// "Read deployed build number from container label" task already reads, just
+// on the CLI side so the result can gate whether this deploy is recorded as a
+// trustworthy build baseline (sprint 336). Errors surface as '' (caller
+// treats that as "couldn't verify", not as a hard mismatch).
+export async function readDeployedBuildNumber(
+  host: string,
+  sshKey: string,
+  projectName: string,
+  composeDest: string,
+): Promise<string> {
+  const cmd = `docker inspect --format '{{index .Config.Labels "build.number"}}' $(docker compose -f /opt/${projectName}/${composeDest} ps -q | head -1) 2>/dev/null || true`
+  const out = await sshExec(host, cmd, sshKey)
+  return out.trim()
+}
+
 export function registerDeploy(program: Command): void {
   program
     .command('deploy [name]')
@@ -296,7 +325,9 @@ export function registerDeploy(program: Command): void {
       }
 
       const inventory = opts.inventory ?? (await resolveInventoryPath(config.name, config))
-      const extraVars = buildDeployExtraVars(config, process.cwd(), process.env)
+      const buildNumber = await resolveBuildNumber(process.cwd(), process.env)
+      const envForVars = buildNumber ? { ...process.env, BUILD_NUMBER: buildNumber } : process.env
+      const extraVars = buildDeployExtraVars(config, process.cwd(), envForVars)
 
       if (!extraVars.ghcr_token) {
         console.warn(chalk.yellow('Warning: GHCR_TOKEN not set — docker pull may fail for private images'))
@@ -325,12 +356,42 @@ export function registerDeploy(program: Command): void {
       } catch (err) {
         await deployRecordDone(process.cwd(), deployCtx, 'failed', {
           deploy: Math.round((Date.now() - phaseStartedAt) / 1000),
-        })
+        }, false)
         throw err
       }
-      await deployRecordDone(process.cwd(), deployCtx, 'deployed', {
-        deploy: Math.round((Date.now() - phaseStartedAt) / 1000),
-      })
+
+      const host = config.serverIp ?? config.domain
+      const sshKey = join(homedir(), '.ssh', config.sshKeyName)
+      const composeDest = (extraVars.compose_dest as string | undefined) ?? 'docker-compose.yml'
+      const phases = { deploy: Math.round((Date.now() - phaseStartedAt) / 1000) }
+
+      // Ansible succeeding only proves the containers restarted — not that
+      // they're running images for *this* sha (the emit-billing 2026-08-27
+      // incident: a CLI-direct deploy with nothing built slot-flipped stale
+      // :latest images and still recorded "deployed"). Verify what's actually
+      // running before trusting this as the next push's diff baseline.
+      let isBuildBaseline = false
+      if (!buildNumber) {
+        console.warn(chalk.yellow('\nWarning: could not determine a build number to verify this deploy — recording deployed but not as a build baseline.'))
+      } else {
+        let deployedBuildNumber = ''
+        try {
+          deployedBuildNumber = await readDeployedBuildNumber(host, sshKey, config.name, composeDest)
+        } catch {
+          console.warn(chalk.yellow('\nWarning: could not verify the deployed build number over SSH — recording deployed but not as a build baseline.'))
+        }
+        if (deployedBuildNumber === buildNumber) {
+          isBuildBaseline = true
+        } else if (deployedBuildNumber) {
+          await deployRecordDone(process.cwd(), deployCtx, 'failed', phases, false)
+          console.error(chalk.red(`\nRefusing to record this deploy as shipped: expected build ${buildNumber} but the server reports build ${deployedBuildNumber}.`))
+          console.error(chalk.red(`This means no image was ever built for ${deployCtx.sha.slice(0, 7)} — build and push it first, or deploy via the pre-push hook.`))
+          process.exit(1)
+          return
+        }
+      }
+
+      await deployRecordDone(process.cwd(), deployCtx, 'deployed', phases, isBuildBaseline)
 
       console.log(chalk.green(`\nDeployed successfully.`))
     })

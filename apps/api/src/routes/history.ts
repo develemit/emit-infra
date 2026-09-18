@@ -35,6 +35,8 @@ interface DeployHistoryEntry {
   phases?: Record<string, number>
   message?: string
   launch?: DeployLaunchInfo
+  /** sprint 336: true only when this deploy proved the sha's images are what's running. Absent on pre-336 entries. */
+  isBuildBaseline?: boolean
 }
 
 interface CiHistoryEntry {

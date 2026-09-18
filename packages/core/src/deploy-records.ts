@@ -114,18 +114,26 @@ export async function deployRecordInit(cwd: string): Promise<DeployContext> {
   return ctx
 }
 
+// isBuildBaseline defaults to false: unlike the bash hook writer (ci-utils.sh
+// deploy_done), this CLI path never builds or retags images itself — it
+// deploys whatever tags already exist. A caller must explicitly prove the
+// sha's images are what's actually running before claiming true; see
+// deploy.ts's post-deploy verification (sprint 336) and
+// resolve_last_deployed_sha (scripts/lib/deploy-launch.sh), which skips any
+// record that isn't explicitly marked true.
 export async function deployRecordDone(
   cwd: string,
   ctx: DeployContext,
   status: 'deployed' | 'failed',
   phases: Record<string, number> = {},
+  isBuildBaseline = false,
 ): Promise<void> {
   const completedAt = isoSeconds(Date.now())
   const durationSec = Math.round((Date.now() - ctx.startedEpochMs) / 1000)
 
   await writeAtomic(
     join(cwd, '.deploy-status.json'),
-    JSON.stringify({ status, sha: ctx.sha, branch: ctx.branch, completedAt, launch: ctx.launch }) + '\n',
+    JSON.stringify({ status, sha: ctx.sha, branch: ctx.branch, completedAt, launch: ctx.launch, isBuildBaseline }) + '\n',
   )
 
   const historyPath = join(cwd, '.deploy-history.jsonl')
@@ -140,6 +148,7 @@ export async function deployRecordDone(
     phases,
     launch: ctx.launch,
     message: ctx.message,
+    isBuildBaseline,
   })
   await appendFile(historyPath, line + '\n')
   await truncateHistory(historyPath)

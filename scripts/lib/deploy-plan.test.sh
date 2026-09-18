@@ -31,26 +31,38 @@ echo "resolve_last_deployed_sha"
 
 check "no files -> empty" "$(resolve_last_deployed_sha "$WORK")" ""
 
-printf '{"status":"deployed","sha":"aaa111"}\n' > .deploy-status.json
-check "status deployed -> its sha" "$(resolve_last_deployed_sha "$WORK")" "aaa111"
+printf '{"status":"deployed","sha":"aaa111","isBuildBaseline":true}\n' > .deploy-status.json
+check "status deployed + isBuildBaseline:true -> its sha" "$(resolve_last_deployed_sha "$WORK")" "aaa111"
+
+# sprint 336: a record missing isBuildBaseline (every deploy written before
+# this sprint, plus the exact no-build CLI record that poisoned emit-billing
+# on 2026-08-27) must fail safe as NOT a baseline rather than being silently
+# trusted just because status is "deployed".
+printf '{"status":"deployed","sha":"nobaseline1"}\n' > .deploy-status.json
+check "status deployed but isBuildBaseline missing -> not trusted (empty)" \
+  "$(resolve_last_deployed_sha "$WORK")" ""
+
+printf '{"status":"deployed","sha":"unverified1","isBuildBaseline":false}\n' > .deploy-status.json
+check "status deployed but isBuildBaseline:false -> not trusted (empty)" \
+  "$(resolve_last_deployed_sha "$WORK")" ""
 
 # The bug: an interrupted deploy leaves status "deploying" and used to yield ''.
 printf '{"status":"deploying","sha":"bbb222"}\n' > .deploy-status.json
 check "status deploying, no history -> empty" "$(resolve_last_deployed_sha "$WORK")" ""
 
 {
-  printf '{"status":"deployed","sha":"old000"}\n'
-  printf '{"status":"deployed","sha":"good999"}\n'
+  printf '{"status":"deployed","sha":"old000","isBuildBaseline":true}\n'
+  printf '{"status":"deployed","sha":"good999","isBuildBaseline":true}\n'
   printf '{"status":"failed","sha":"bad888"}\n'
 } > .deploy-history.jsonl
-check "status deploying -> newest deployed from history" \
+check "status deploying -> newest deployed baseline from history" \
   "$(resolve_last_deployed_sha "$WORK")" "good999"
 
-printf '{"status":"deployed","sha":"ccc333"}\n' > .deploy-status.json
+printf '{"status":"deployed","sha":"ccc333","isBuildBaseline":true}\n' > .deploy-status.json
 check "status file wins over history" "$(resolve_last_deployed_sha "$WORK")" "ccc333"
 
 printf '{"status":"deploying","sha":"x"}\n' > .deploy-status.json
-{ printf 'not json\n'; printf '{"status":"deployed","sha":"survivor"}\n'; } > .deploy-history.jsonl
+{ printf 'not json\n'; printf '{"status":"deployed","sha":"survivor","isBuildBaseline":true}\n'; } > .deploy-history.jsonl
 check "corrupt history lines skipped" "$(resolve_last_deployed_sha "$WORK")" "survivor"
 
 : > .deploy-history.jsonl
@@ -60,12 +72,30 @@ check "no successful deploy on record -> empty (full rebuild)" \
 
 # sprint 269: a CLI deploy (packages/core/src/deploy-records.ts) writes the
 # same shape ci-utils.sh's deploy_done does, so the reader can't tell them
-# apart — this is a fixture line shaped like deployRecordDone's output.
+# apart — this is a fixture line shaped like deployRecordDone's output for a
+# deploy the CLI *did* verify (isBuildBaseline:true).
 : > .deploy-status.json
-printf '{"status":"deployed","sha":"cli9876","branch":"main","startedAt":"2026-08-02T00:00:00Z","completedAt":"2026-08-02T00:00:12Z","durationSec":12,"servicesBuilt":[],"phases":{"deploy":12},"message":"cli deploy"}\n' \
+printf '{"status":"deployed","sha":"cli9876","branch":"main","startedAt":"2026-08-02T00:00:00Z","completedAt":"2026-08-02T00:00:12Z","durationSec":12,"servicesBuilt":[],"phases":{"deploy":12},"message":"cli deploy","isBuildBaseline":true}\n' \
   > .deploy-history.jsonl
-check "CLI-written history line resolves like a hook-written one" \
+check "verified CLI-written history line resolves like a hook-written one" \
   "$(resolve_last_deployed_sha "$WORK")" "cli9876"
+
+# sprint 336 regression — reproduces the emit-billing 2026-08-27 incident: a
+# CLI-direct `emit-infra deploy` slot-flipped stale :latest images and
+# recorded "deployed" at the local HEAD sha even though nothing was ever
+# built for it. That record then became LAST_SHA for the *next* real push,
+# which diffed against it, found nothing changed, and shipped nothing. Fixed
+# behavior: an unverified record (isBuildBaseline:false) must be skipped in
+# favor of the last verified baseline, not returned and not treated as "no
+# baseline at all" (either of those would still leave the next push worse off
+# than finding the real one).
+: > .deploy-status.json
+{
+  printf '{"status":"deployed","sha":"realbuild001","isBuildBaseline":true}\n'
+  printf '{"status":"deployed","sha":"emit-billing-bad-sha","branch":"main","servicesBuilt":[],"isBuildBaseline":false,"message":"CLI-direct deploy, no images ever built for this sha"}\n'
+} > .deploy-history.jsonl
+check "unverified CLI-direct record is skipped for the last verified baseline (emit-billing regression)" \
+  "$(resolve_last_deployed_sha "$WORK")" "realbuild001"
 
 rm -f .deploy-status.json .deploy-history.jsonl
 

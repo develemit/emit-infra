@@ -38,6 +38,8 @@ export interface DeployStatusRecord {
   progress?: { step: number; total: number; pct: number; label: string }
   writer?: DeployWriterInfo
   launch?: DeployLaunchInfo
+  /** sprint 336: true only when this deploy proved the sha's images are what's running — see resolve_last_deployed_sha. Absent on pre-336 records. */
+  isBuildBaseline?: boolean
 }
 
 export type RunState = 'idle' | 'running' | 'orphaned' | 'unknown'

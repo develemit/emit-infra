@@ -195,7 +195,11 @@ case "$DRYRUN_OUT" in
 esac
 
 LAST_DEPLOYED_SHA=$(cd "$GATE_REPO" && git rev-parse HEAD)
-printf '{"status":"deployed","sha":"%s"}\n' "$LAST_DEPLOYED_SHA" > "$GATE_REPO/.deploy-status.json"
+# isBuildBaseline:true — sprint 336's resolve_last_deployed_sha fails safe
+# (treats as no baseline) on a record missing this field, which would make
+# LAST_SHA empty here and defeat the ignored-paths-only regression this
+# fixture exists to prove.
+printf '{"status":"deployed","sha":"%s","isBuildBaseline":true}\n' "$LAST_DEPLOYED_SHA" > "$GATE_REPO/.deploy-status.json"
 ( cd "$GATE_REPO" && mkdir -p sprint && echo x > sprint/note.md && git add -A && git commit -qm sprint-note )
 IGNORED_OUT=$(_gate_push CLAUDECODE=1 -- HEAD:refs/heads/main)
 IGNORED_RC=$?

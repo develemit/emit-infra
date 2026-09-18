@@ -3,7 +3,7 @@ import { Command } from 'commander'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { buildDeployExtraVars, checkBackupEnv, computeEnvRemoval, enforceEnvRemovalGuard, parseEnvFile, printDryRunPlan, registerDeploy } from './deploy.js'
+import { buildDeployExtraVars, checkBackupEnv, computeEnvRemoval, enforceEnvRemovalGuard, parseEnvFile, printDryRunPlan, registerDeploy, resolveBuildNumber, readDeployedBuildNumber } from './deploy.js'
 
 vi.mock('@emit-infra/core', async () => {
   const actual = await vi.importActual<typeof import('@emit-infra/core')>('@emit-infra/core')
@@ -11,8 +11,12 @@ vi.mock('@emit-infra/core', async () => {
     loadConfig: vi.fn(),
     runAnsible: vi.fn(),
     sshExec: vi.fn(),
-    deployRecordInit: vi.fn().mockResolvedValue({ sha: '', branch: '', message: '', startedAt: '', startedEpochMs: 0 }),
+    deployRecordInit: vi.fn().mockResolvedValue({ sha: 'abc1234', branch: '', message: '', startedAt: '', startedEpochMs: 0 }),
     deployRecordDone: vi.fn().mockResolvedValue(undefined),
+    // Real git calls would be slow/flaky in tests and aren't what these
+    // tests are about — default to "couldn't derive a build number" so the
+    // action takes its no-verification warning path unless a test opts in.
+    gitField: vi.fn().mockResolvedValue(''),
     redactSecrets: actual.redactSecrets,
   }
 })
@@ -21,7 +25,7 @@ vi.mock('./configure.js', () => ({
   resolveInventoryPath: vi.fn().mockResolvedValue('/fake/inventory.ini'),
 }))
 
-import { loadConfig, runAnsible, sshExec } from '@emit-infra/core'
+import { loadConfig, runAnsible, sshExec, deployRecordDone, gitField } from '@emit-infra/core'
 
 const baseConfig = {
   name: 'test-project',
@@ -420,6 +424,125 @@ describe('deploy command --dry-run', () => {
 
     expect(runAnsible).toHaveBeenCalledOnce()
     expect(runAnsible).toHaveBeenCalledWith('deploy', '/inv.ini', expect.objectContaining({ project_name: 'test-project' }))
+  })
+})
+
+describe('resolveBuildNumber', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('prefers an explicit BUILD_NUMBER over deriving one', async () => {
+    const result = await resolveBuildNumber('/cwd', { BUILD_NUMBER: '42' })
+
+    expect(result).toBe('42')
+    expect(gitField).not.toHaveBeenCalled()
+  })
+
+  it('derives one via git rev-list --count HEAD when unset — same formula the pre-push hook uses', async () => {
+    vi.mocked(gitField).mockResolvedValue('530')
+
+    const result = await resolveBuildNumber('/cwd', {})
+
+    expect(result).toBe('530')
+    expect(gitField).toHaveBeenCalledWith('/cwd', ['rev-list', '--count', 'HEAD'])
+  })
+})
+
+describe('readDeployedBuildNumber', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('reads the running container\'s build.number label over SSH and trims it', async () => {
+    vi.mocked(sshExec).mockResolvedValue('530\n')
+
+    const result = await readDeployedBuildNumber('1.2.3.4', '/key', 'test-project', 'docker-compose.yml')
+
+    expect(result).toBe('530')
+    expect(sshExec).toHaveBeenCalledWith(
+      '1.2.3.4',
+      expect.stringContaining('docker compose -f /opt/test-project/docker-compose.yml ps -q'),
+      '/key',
+    )
+  })
+})
+
+describe('deploy command — build baseline verification', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    // The action reads process.env.BUILD_NUMBER directly (same as the
+    // pre-push hook exports it) — stub it out so an ambient shell var can't
+    // make resolveBuildNumber skip the gitField fallback these tests exercise.
+    vi.stubEnv('BUILD_NUMBER', '')
+    vi.mocked(loadConfig).mockReturnValue(baseConfig as ReturnType<typeof loadConfig>)
+    vi.mocked(runAnsible).mockResolvedValue(undefined)
+    vi.mocked(gitField).mockResolvedValue('530')
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('records isBuildBaseline:true when the server reports the expected build number', async () => {
+    vi.mocked(sshExec).mockResolvedValue('530')
+    const program = new Command()
+    program.exitOverride()
+    registerDeploy(program)
+
+    await program.parseAsync(['node', 'cli', 'deploy', '--inventory', '/inv.ini'])
+
+    expect(deployRecordDone).toHaveBeenLastCalledWith(
+      expect.any(String), expect.anything(), 'deployed', expect.any(Object), true,
+    )
+  })
+
+  it('refuses to record deployed and exits 1 when the server reports a different build number', async () => {
+    vi.mocked(sshExec).mockResolvedValue('402')
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('process.exit') })
+    const program = new Command()
+    program.exitOverride()
+    registerDeploy(program)
+
+    await expect(
+      program.parseAsync(['node', 'cli', 'deploy', '--inventory', '/inv.ini']),
+    ).rejects.toThrow('process.exit')
+
+    expect(deployRecordDone).toHaveBeenCalledWith(
+      expect.any(String), expect.anything(), 'failed', expect.any(Object), false,
+    )
+    expect(deployRecordDone).not.toHaveBeenCalledWith(
+      expect.any(String), expect.anything(), 'deployed', expect.any(Object), expect.anything(),
+    )
+    expect(exitSpy).toHaveBeenCalledWith(1)
+    exitSpy.mockRestore()
+  })
+
+  it('records isBuildBaseline:false without blocking when the SSH check itself fails', async () => {
+    vi.mocked(sshExec).mockRejectedValue(new Error('connection refused'))
+    const program = new Command()
+    program.exitOverride()
+    registerDeploy(program)
+
+    await program.parseAsync(['node', 'cli', 'deploy', '--inventory', '/inv.ini'])
+
+    expect(deployRecordDone).toHaveBeenLastCalledWith(
+      expect.any(String), expect.anything(), 'deployed', expect.any(Object), false,
+    )
+  })
+
+  it('records isBuildBaseline:false when no build number can be derived at all', async () => {
+    vi.mocked(gitField).mockResolvedValue('')
+    const program = new Command()
+    program.exitOverride()
+    registerDeploy(program)
+
+    await program.parseAsync(['node', 'cli', 'deploy', '--inventory', '/inv.ini'])
+
+    expect(sshExec).not.toHaveBeenCalled()
+    expect(deployRecordDone).toHaveBeenLastCalledWith(
+      expect.any(String), expect.anything(), 'deployed', expect.any(Object), false,
+    )
   })
 })
 
