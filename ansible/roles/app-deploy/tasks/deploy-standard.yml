@@ -22,15 +22,39 @@
   when: rollback_enabled | default(true)
 
 # ── Pull and deploy ──────────────────────────────────────────────
-- name: Login to GHCR
-  shell: echo "{{ ghcr_token }}" | docker login ghcr.io -u "{{ ghcr_actor }}" --password-stdin
-  when: ghcr_token is defined
-  no_log: true
+- name: Compute ephemeral GHCR docker config path
+  set_fact:
+    ghcr_config_dir: "/root/.docker-ghcr-{{ project_name }}"
 
-- name: Pull latest images
-  command: docker compose -f {{ compose_dest | default('docker-compose.yml') }} pull
-  args:
-    chdir: "{{ app_dir }}"
+# The login writes to a per-deploy config dir instead of the default
+# /root/.docker/config.json so no credential is left at rest once the pull
+# finishes — success or failure. block/always (not a trailing logout task)
+# so a deploy that dies mid-pull still cleans up. Mirrors
+# deploy-blue-green.yml's ephemeral login.
+- block:
+    - name: Create ephemeral GHCR docker config directory
+      file:
+        path: "{{ ghcr_config_dir }}"
+        state: directory
+        mode: "0700"
+      when: ghcr_token is defined
+
+    - name: Login to GHCR
+      shell: echo "{{ ghcr_token }}" | docker --config "{{ ghcr_config_dir }}" login ghcr.io -u "{{ ghcr_actor }}" --password-stdin
+      when: ghcr_token is defined
+      no_log: true
+
+    - name: Pull latest images
+      command: docker compose -f {{ compose_dest | default('docker-compose.yml') }} pull
+      args:
+        chdir: "{{ app_dir }}"
+      environment: "{{ {'DOCKER_CONFIG': ghcr_config_dir} if ghcr_token is defined else {} }}"
+  always:
+    - name: Remove ephemeral GHCR docker config directory
+      file:
+        path: "{{ ghcr_config_dir }}"
+        state: absent
+      when: ghcr_token is defined
 
 - name: Start or restart app stack
   command: docker compose -f {{ compose_dest | default('docker-compose.yml') }} up -d --remove-orphans

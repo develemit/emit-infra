@@ -40,8 +40,9 @@
 # most. Everything else is split into narrower-footprint files this sources
 # internally; every consumer that used to source this file alone still gets
 # all of them transitively. See ci-log-capture.sh, ci-atomic-write.sh,
-# ci-phase-tracking.sh, ci-heartbeat.sh, and ci-signals.sh for the rest of
-# the functions historically documented here (split in sprint 301).
+# ci-phase-tracking.sh, ci-heartbeat.sh, ci-signals.sh, and
+# log-secret-scan.sh for the rest of the functions historically documented
+# here (split in sprint 301).
 
 # Guard against double-sourcing without resetting in-flight state
 [[ -n "${_EMIT_CI_UTILS_LOADED:-}" ]] && return 0
@@ -53,6 +54,7 @@ source "$_EMIT_CI_UTILS_DIR/ci-atomic-write.sh"
 source "$_EMIT_CI_UTILS_DIR/ci-phase-tracking.sh"
 source "$_EMIT_CI_UTILS_DIR/ci-heartbeat.sh"
 source "$_EMIT_CI_UTILS_DIR/ci-signals.sh"
+source "$_EMIT_CI_UTILS_DIR/log-secret-scan.sh"
 
 _EMIT_SHA=""
 _EMIT_BRANCH=""
@@ -138,6 +140,9 @@ ci_done() {
   _emit_truncate_history .ci-history.jsonl
   [[ -d ".ci-logs" ]] && _emit_rotate_logs .ci-logs
   _emit_flush_log
+  if [[ -n "$_EMIT_LOG_FILE" ]]; then
+    emit_scan_log_for_secrets "$_EMIT_LOG_FILE"
+  fi
 }
 
 deploy_init() {
@@ -223,4 +228,7 @@ deploy_done() {
   _emit_truncate_history .deploy-history.jsonl
   [[ -d ".deploy-logs" ]] && _emit_rotate_logs .deploy-logs
   _emit_flush_log
+  if [[ -n "$_EMIT_DEPLOY_LOG_FILE" ]]; then
+    emit_scan_log_for_secrets "$_EMIT_DEPLOY_LOG_FILE"
+  fi
 }

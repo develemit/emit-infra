@@ -94,19 +94,104 @@ Shell libs under `scripts/lib/` with sibling `*.test.sh` registered in
 - `backlog.md` — strike the two stale items
 
 ## Acceptance criteria
-- [ ] A fleet-wide scan of `.deploy-logs`/`.ci-logs` finds zero token matches —
+- [x] A fleet-wide scan of `.deploy-logs`/`.ci-logs` finds zero token matches —
       quote the count before and after, never a token
-- [ ] No token value appears in any commit message, sprint file or test fixture
+- [x] No token value appears in any commit message, sprint file or test fixture
       produced by this sprint
-- [ ] The new guard fails on a fixture log containing a fake token and passes on
+- [x] The new guard fails on a fixture log containing a fake token and passes on
       a clean one, covered by a registered test
-- [ ] `deploy-standard.yml` uses an ephemeral Docker config and cleans up, with
+- [x] `deploy-standard.yml` uses an ephemeral Docker config and cleans up, with
       no persistent `docker login` left behind
-- [ ] The two stale backlog items are struck with the fixing sprint noted
-- [ ] `pnpm test:hooks` passes
+- [x] The two stale backlog items are struck with the fixing sprint noted
+- [x] `pnpm test:hooks` passes
 
 ## Out of scope
 - Revoking or rotating the older GitHub tokens — that's a human action on
   GitHub; flag it in the report instead.
 - The `[someday]` GitHub App token item, which is an explicit user decision.
 - Rewriting git history — nothing is committed, so none is needed.
+
+## Completed
+
+**Date:** 2026-09-18
+
+### Summary
+Purged the eight leftover `gho_`-token log files (fleet-wide scan: 8 files
+before → 0 after) and added a guard so a captured log can't hold a token
+again undetected. The two files the original backlog item also counted from
+`emit-vision` had already aged out through `_emit_rotate_logs`'s normal
+100-log cap before this sprint started — the fleet's real residue was 8
+files across 5 projects (develemail, diner-decider, emit-billing,
+emit-social, martialops), not 10 across 6. Deleted rather than scrubbed:
+these are disposable build logs, none is tracked by git or gitignored-out of
+history, so deletion is strictly simpler and loses nothing worth keeping.
+
+The guard is `scripts/lib/log-secret-scan.sh` (`emit_scan_log_for_secrets`),
+matching `gh[oprsu]_` and `github_pat_` token shapes. It's wired into
+`ci_done`/`deploy_done` in `ci-utils.sh`, run right after `_emit_flush_log`
+against the just-finished `.ci-logs`/`.deploy-logs` file. Both call sites run
+under `set -euo pipefail` in `scripts/hooks/pre-push`, and both functions
+return the scan's exit code as their own — so a token reappearing in a
+captured log now fails the hook loudly (via the existing `ERR` trap) instead
+of sitting on disk silently, mirroring the fail-loudly posture sprint 330.1
+applied to GHCR prune.
+
+`deploy-standard.yml` now uses the same ephemeral-login shape as
+`deploy-blue-green.yml`: a per-deploy `/root/.docker-ghcr-<project>` config
+dir, `DOCKER_CONFIG` scoped only to the `pull` task (each Ansible task is a
+separate process, so this can't live on the login task), and `always`-block
+cleanup so a failed pull still removes the credential. `ansible-playbook
+--syntax-check` passes. A live exercise against the `test-smoke` fixture
+(the only project on the standard path) wasn't possible — its
+`.emit-infra.json` domain is `192.0.2.1`, an RFC 5737 documentation address
+with no real server behind it — so this was verified by syntax-check plus
+mirroring blue-green's already-battle-tested task shape task-for-task,
+not by a live run.
+
+Struck four now-resolved backlog items, not the two named in the sprint's
+own context section: the two it named (`printDryRunPlan` secret redaction,
+317.2; the related `runAnsible` argv leak, 317.1 — the latter was never its
+own backlog line, only referenced inline inside the former's text) plus two
+more from sprint 317.3 that this sprint's own tasks 1 and 3 directly
+resolved (the token-residue item, and the `deploy-standard.yml` drift item).
+Leaving those two accurate-when-filed-but-now-stale entries unstruck would
+have left backlog.md contradicting work done in this same sprint.
+
+### Files changed
+- `scripts/lib/ci-utils.sh` — sources `log-secret-scan.sh`; `ci_done`/
+  `deploy_done` scan the finished log and propagate a failure
+- `ansible/roles/app-deploy/tasks/deploy-standard.yml` — ephemeral GHCR
+  docker config dir + `DOCKER_CONFIG`-scoped pull + `always`-block cleanup,
+  replacing the bare persistent `docker login`
+- `backlog.md` — struck 4 resolved items (see Summary) with the fixing
+  sprint noted on each
+- `package.json` — registered `log-secret-scan.test.sh` in `test:hooks`
+- (new) `scripts/lib/log-secret-scan.sh` — `emit_scan_log_for_secrets <file>`,
+  fails loudly on a GitHub token pattern
+- (new) `scripts/lib/log-secret-scan.test.sh` — 5 cases: clean log, `gho_`
+  token, `github_pat_` token, error text never echoes the fake token, and a
+  missing file
+- Deleted (outside this repo, all untracked by git): 2
+  `develemail/.deploy-logs/*.log`, 1 `diner-decider/.deploy-logs/*.log`, 1
+  `emit-billing/.deploy-logs/*.log`, 2 `emit-social/.deploy-logs/*.log`, 2
+  `martialops/.deploy-logs/*.log`
+
+### Verification
+- Fleet-wide token scan: 8 files before → 0 after (`grep -rlE
+  'gho_[A-Za-z0-9]{20,}' */.deploy-logs */.ci-logs` from `~/projects`)
+- `pnpm test:hooks`: all suites pass, including the new 5/5
+  `log-secret-scan.test.sh`
+- `pnpm test`: 439/439 pass
+- `pnpm typecheck`: clean (5 projects)
+- `pnpm lint`: clean (5 projects)
+- `ansible-playbook --syntax-check playbooks/deploy.yml`: passes
+- Confirmed the 8 deleted files were untracked in every source repo
+  (`git status --porcelain -- .deploy-logs` empty in each)
+
+### Follow-ups
+- `[defer]` Revoke/rotate the older `gho_` tokens that were in the deleted
+  logs — verified 2026-09-17 none matches the current `gh` token and none
+  appears in git history, so this is cleanup, not an active leak, but it's a
+  human action on github.com that nothing here can do.
+- `[defer]` The `[someday]` GitHub App token item remains an explicit user
+  decision, untouched by this sprint.
