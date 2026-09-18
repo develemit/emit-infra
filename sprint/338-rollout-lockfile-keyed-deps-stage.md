@@ -19,9 +19,16 @@ every deploy.
 This rollout was deliberately blocked until an architecture guard existed,
 because `pnpm fetch` ignores `package.json` and so never sees a
 `supportedArchitectures` block placed there — exactly what shipped arm64-only
-binaries to an x64 server in tastease build 1247. Both preconditions now hold:
-every project keeps the setting in `pnpm-workspace.yaml` (verified 2026-09-17),
-and sprint 337 declares probes for the remaining projects.
+binaries to an x64 server in tastease build 1247.
+
+**Correction (2026-09-18):** this file originally claimed every project kept
+that setting in `pnpm-workspace.yaml`, "verified 2026-09-17". That was wrong —
+the verifying command had a shell bug (`grep -c` prints `0` *and* exits
+non-zero, so a `|| echo 0` fallback produced `"0\n0"`, which compared as
+non-zero) and reported all seven as safe when only three were. The first run of
+this sprint caught it and stopped. The setting has since been added to
+emit-social, emit-vision and martialops (one commit each, 2026-09-18), so the
+precondition now genuinely holds for every project.
 
 ## Context
 
@@ -62,10 +69,15 @@ Non-obvious properties to carry over:
 
 ### Preconditions — verify, don't assume
 - Every project must keep `supportedArchitectures` in `pnpm-workspace.yaml`,
-  never `package.json`. Confirmed for all seven on 2026-09-17; re-check each
-  repo before converting it.
-- The project must declare `ci.imageArchProbes` (sprint 337). Converting a
-  project with no probe removes the only safety net for this exact change.
+  never `package.json`. **Re-check each repo yourself before converting it** —
+  do not trust this file's word for it. Use an unambiguous test, e.g.
+  `grep -q '^supportedArchitectures:' <repo>/pnpm-workspace.yaml && echo yes || echo no`.
+- The project should declare `ci.imageArchProbes` **if it has any native
+  runtime dependency**. Sprint 337 investigated all four and found emit-social
+  and emit-vision ship *zero* native runtime deps (esbuild/tsup bundles with
+  everything inlined; no real `next/image` usage), so they correctly declare
+  none — that is not a missing safety net, it is nothing to protect. martialops
+  declares a `prisma` probe on `api`, which is the one real case.
 
 ### Measuring
 `.deploy-history.jsonl` in each repo records `durationSec` and `phases`. Capture
@@ -111,7 +123,7 @@ is a successful `linux/amd64` build plus the arch probes passing.
 - [ ] A script-only edit to a root `package.json` no longer invalidates the
       dependency layer — demonstrate on one project with a cached rebuild
 - [ ] Before/after build timings recorded per project
-- [ ] No project is deployed by this sprint, and the report says so
+- [x] No project is deployed by this sprint, and the report says so
 - [ ] Each repo's own check command is run, with an empty affected result
       reported honestly rather than as a pass
 
@@ -120,3 +132,156 @@ is a successful `linux/amd64` build plus the arch probes passing.
   dedupe win) — replan that once these numbers land.
 - Deploying any project.
 - emit-billing and tastease, which already use this pattern.
+
+## In Progress
+
+**Started:** 2026-09-18T09:05:00Z  (resumed — precondition fixed, see below)
+
+### Prior progress (2026-09-18)
+
+### Done so far
+
+**diner-decider (pilot, 2/2 images) — converted and committed** (`c7c6bc7`).
+Both `apps/api` and `apps/web` Dockerfiles now split a `base`/`deps`/`builder`
+stage: `deps` copies `pnpm-lock.yaml` + `pnpm-workspace.yaml` + `patches/`
+(the lockfile's `patchedDependencies` entry for `next@16.3.4` needs the patch
+file present *at fetch time*, not just install time — discovered by a failed
+build, `ERR_PNPM_PATCH_NOT_FOUND`), runs `pnpm fetch`, then copies
+`package.json` files and runs `pnpm install --offline --frozen-lockfile`.
+`builder` copies the whole `/app` dir from `deps` (this repo already uses
+`node-linker=hoisted`, so node_modules is one flat copyable directory — no
+per-package `COPY --from=deps` needed, unlike tastease's non-hoisted layout).
+- Both images build for `linux/amd64`.
+- `api`'s declared `sharp` probe passes: `ok 0.35.4`.
+- Cache-neutrality demonstrated (this sprint's one required demo): added a
+  harmless script to root `package.json`, rebuilt — `pnpm fetch` step showed
+  `CACHED`, only the offline install (9.9s) re-ran.
+- Timings: prior real deploy (`367de26`) spent 272s of its build phase on
+  both images together. Local cold `linux/amd64` builds after conversion:
+  api 63s, web 40s (web's fetch layer was already warm from api's build in
+  the same session — same lockfile/workspace/patches key).
+- `pnpm check:affected` passed (8 projects, 17/21 cached).
+
+**develemail (4/4 images) — converted and committed** (`3230fea`). Same
+`deps` split across `api`, `worker`, `inbound`, `web` — this repo's `deps`
+stage also needed `.npmrc` copied before `fetch` (records
+`minimum-release-age=0`, `shamefully-hoist=true`).
+- **New wrinkle, not in the reference pattern**: `pnpm fetch` always writes
+  `node_modules/.modules.yaml` with `hoistPattern: []` regardless of
+  `.npmrc`, since fetch never actually links anything. With
+  `shamefully-hoist=true` in effect, the later `pnpm install --offline`
+  reads that recorded state as a structure change and wants to
+  interactively confirm wiping `node_modules` —
+  `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`, which aborts with no TTY in
+  a Docker build. Fixed by running the offline install with `CI=true`
+  (pnpm's own documented auto-confirm), added with a comment explaining why
+  in all four Dockerfiles. This will bite **any** project in this rollout
+  that sets `shamefully-hoist=true` — worth a note in the reference doc.
+- All four images build for `linux/amd64`.
+- `api`'s `-migrate` variant `drizzle-kit` probe passes: `ok 0.25.12`.
+  `worker`/`inbound`/`web` have no declared probes (correct per sprint 337 —
+  no native runtime deps).
+- Timings: recent deploys of all four together range 107s–470s (noisy —
+  server-side cache state varies). Local cold-ish `linux/amd64` builds after
+  conversion: api 42s, worker 24s, inbound 9s, web 57s (~132s total, fetch
+  cache warm across images after the first).
+- `pnpm check:affected` passed (20 projects, 39/56 cached) — had to move an
+  untracked ambient `.alert-state.json` aside first; `nx format:check --all`
+  fails on any untracked file in the tree and this one isn't gitignored.
+  Restored immediately after. Not this sprint's concern to fix, but worth a
+  `[defer]`.
+
+### Blocked on
+
+**The sprint's stated precondition ("every project keeps `supportedArchitectures`
+in `pnpm-workspace.yaml`... confirmed for all seven on 2026-09-17") does not
+hold for 3 of the 4 remaining projects.** Checked each directly:
+
+| project | `supportedArchitectures` in `pnpm-workspace.yaml`? |
+|---|---|
+| diner-decider | yes (converted) |
+| develemail | yes (converted) |
+| emit-social | **no** — not in `pnpm-workspace.yaml`, not in `package.json`'s `pnpm` field, not anywhere in the repo |
+| emit-vision | **no** — same |
+| martialops | **no** — same |
+
+Per this sprint's own task 3 ("confirm... stop and report if not"), I did not
+convert these three. What I found reading each repo's Dockerfiles, to size
+the actual risk for whoever picks this up next:
+
+- **emit-social**: zero runtime native deps (matches sprint 337's finding —
+  `api`'s runner never copies `node_modules` at all, just self-contained
+  esbuild bundles; `web`'s standalone output has no `next/image` usage).
+  Nothing pnpm-fetch would arch-select ever crosses into the runner. Low
+  actual risk, but the precondition as written doesn't hold, so I stopped
+  per the letter of task 3 rather than judge it safe unilaterally.
+- **emit-vision**: same shape — `api`/`worker` ship single `.cjs` bundles
+  via tsup (`noExternal`), the only non-code file copied into any runner is
+  `geoip-lite`'s static data directory (not a binary); `marketing`/`web` use
+  Next standalone output, and marketing's only `next/image` usage is an SVG
+  (per sprint 337, `sharp` isn't even built — blocked by
+  `onlyBuiltDependencies`). Same conclusion: precondition missing, actual
+  risk low, stopped anyway.
+- **martialops**: **this one is the real thing the precondition exists for.**
+  `apps/api/Dockerfile` has an actual native runtime dependency crossing
+  stages — `prisma`/`@prisma/client`'s query engine, which sprint 337 built
+  a probe for specifically because of this risk. It's also structurally
+  unlike the reference pattern: none of its three Dockerfiles use
+  `--platform=$BUILDPLATFORM` at all (sprint 337 called this out as the
+  "COPY+install, no BUILDPLATFORM split" pattern), and the runner stage does
+  its *own* separate `npm install` of `@prisma/client`/`prisma`/`argon2`
+  rather than copying `node_modules` from the builder. Converting this one
+  needs more than the mechanical deps-stage swap the other repos got — it
+  needs a `supportedArchitectures` declaration first, and then a design
+  decision about whether/how the `$BUILDPLATFORM` split applies given the
+  runner does its own independent install. Did not attempt it.
+
+### Pickup notes
+Add `supportedArchitectures` to `pnpm-workspace.yaml` in emit-social,
+emit-vision, and martialops (copy the block from diner-decider's or
+develemail's, with the same comment explaining why it must live there and
+not in `package.json`). Once that's in place: emit-social and emit-vision
+should convert mechanically the same way develemail did (watch for the same
+`shamefully-hoist`/`CI=true` wrinkle if either uses it — neither does
+currently, checked). martialops needs its own look at the `$BUILDPLATFORM`
+question before converting, given the runner's independent prisma/argon2
+install path.
+
+No test images or containers were left behind; all `:new`/`:new-*`/`:debug*`
+tags used for verification were removed after each check. No project was
+deployed.
+
+### Resume note (2026-09-18)
+
+The blocker is cleared. `supportedArchitectures` was added to emit-social,
+emit-vision and martialops' `pnpm-workspace.yaml` (one commit each), matching
+develemail's block, and `pnpm` parses all three. All five projects now satisfy
+the precondition.
+
+**Remaining: emit-social (2 images), emit-vision (4), martialops (3).** Convert
+them per the tasks above, then finish the sprint's acceptance criteria and
+commit. Carry forward what the first run learned, so you don't rediscover it:
+
+- **Copy `patches/` before `pnpm fetch`** if the lockfile has
+  `patchedDependencies` — fetch needs the patch files present, not just the
+  install (`ERR_PNPM_PATCH_NOT_FOUND`, hit on diner-decider). emit-vision has
+  `patchedDependencies: next@16.2.7` and so needs this.
+- **Add `CI=true` to the offline install** where `.npmrc` sets
+  `shamefully-hoist=true`: `pnpm fetch` records `hoistPattern: []`, and the
+  later `pnpm install --offline` reads that as a structure change and tries to
+  interactively confirm wiping `node_modules`, which aborts with no TTY
+  (`ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`, hit on develemail). Check each
+  repo's `.npmrc` and copy it into `deps` before the fetch if it exists.
+- **A hoisted repo can `COPY --from=deps /app` wholesale** instead of
+  per-package copies (diner-decider uses `node-linker=hoisted`).
+- **martialops is structurally unlike the reference**: none of its three
+  Dockerfiles use `--platform=$BUILDPLATFORM`, and its `api` runner does its own
+  separate `npm install` of `@prisma/client`/`prisma`/`argon2` rather than
+  copying `node_modules` from the builder. Treat it as its own design problem,
+  not a copy of the tastease pattern; its `prisma` probe must pass afterwards.
+  If converting it cleanly turns out to need a different shape than the other
+  four, stop and report rather than forcing the pattern.
+- **emit-social's root `package.json` has no `packageManager` field** — find the
+  pnpm version it actually uses (`.npmrc`, CI config, or lockfileVersion) before
+  writing the `corepack prepare` pin, rather than guessing.
+
