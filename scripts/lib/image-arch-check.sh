@@ -71,6 +71,33 @@ console.log('ok', createRequire(nextPkg)('sharp').versions.sharp)\""
       # indirection needed, since sharp isn't buried in another package's dir.
       printf '%s' "node -e \"console.log('ok', require('sharp').versions.sharp)\""
       ;;
+    prisma)
+      # The query engine (libquery_engine-<platform>.{so,dylib}.node) is a
+      # native N-API addon `prisma generate` writes into node_modules/.prisma/
+      # client, one file, for whichever platform was detected (or declared via
+      # `binaryTargets`) at generate time — same install-time-selection shape
+      # as sharp/esbuild, just a different package. `new PrismaClient()`
+      # proves nothing: engine startup is lazy, deferred to the first query,
+      # which also needs a live DB to reach cleanly (same problem drizzle-kit
+      # has). Resolve the engine file next to the generated client and
+      # require it directly — dlopen fails immediately on a wrong-platform
+      # binary ("invalid ELF header" for a Mach-O file on Linux), no DB
+      # needed. Verified against a real wrong-arch build (martialops sprint
+      # 337): binaryTargets = ["darwin-arm64"] on an amd64 target produces
+      # exactly this dlopen failure.
+      printf '%s' "node -e \"
+const {createRequire}=require('module');
+const req=createRequire(process.cwd()+'/');
+const fs=require('fs');
+const path=require('path');
+const pkgPath=req.resolve('@prisma/client/package.json');
+const nodeModules=path.join(path.dirname(pkgPath), '..', '..');
+const dir=path.join(nodeModules, '.prisma', 'client');
+const engineFile=fs.readdirSync(dir).find(f=>f.startsWith('libquery_engine-')&&f.endsWith('.node'));
+if(!engineFile) throw new Error('no query engine binary in '+dir);
+const engine=require(path.join(dir, engineFile));
+console.log('ok', engine.version().version, engineFile);\""
+      ;;
     drizzle-kit)
       # drizzle-kit's own `--version` does not exercise esbuild — verified by
       # running it against a build with the wrong-arch esbuild binary and

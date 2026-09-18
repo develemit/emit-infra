@@ -150,6 +150,23 @@ OUT=$(run_image_arch_checks api); RC=$?
 check "sharp: nonzero exit on broken image" "$RC" "1"
 check_contains "sharp: shows the module's own error" "$OUT" "Could not load"
 
+echo "prisma probe (martialops api: dlopen the query engine directly, no DB needed)"
+
+IMAGE_ARCH_PROBES_JSON='{"api":[{"kind":"prisma"}]}'
+GHCR_ORG="good"
+INSPECT_OK_REFS="ghcr.io/good/api:42"
+reset_calls
+OUT=$(run_image_arch_checks api); RC=$?
+check "prisma: exit 0 on good image" "$RC" "0"
+check_contains "prisma: names the kind" "$OUT" "prisma"
+
+GHCR_ORG="broken"
+INSPECT_OK_REFS="ghcr.io/broken/api:42"
+reset_calls
+OUT=$(run_image_arch_checks api); RC=$?
+check "prisma: nonzero exit on broken image" "$RC" "1"
+check_contains "prisma: shows the module's own error" "$OUT" "needs the"
+
 echo "drizzle-kit probe (develemail migrate: --version doesn't exercise esbuild, transformSync does)"
 
 IMAGE_ARCH_PROBES_JSON='{"api":[{"kind":"drizzle-kit","variant":"-migrate"}]}'

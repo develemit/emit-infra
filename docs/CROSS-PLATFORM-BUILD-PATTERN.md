@@ -127,6 +127,21 @@ build phase (-40%) with no install tax paid anywhere. Don't reach for
 `supportedArchitectures` by default — grep first; plenty of workspaces have
 nothing that needs it.
 
+Sprint 337's probe-coverage sweep confirmed the same for two more fleet
+projects: emit-billing (`api`/`worker` ship a `pnpm deploy --prod` bundle with
+zero native prod dependencies; `web` imports no `next/image`) and emit-social
+(`api` ships a fully-bundled `esbuild --external []` output; `web` imports no
+`next/image` either — its one `next/image` string match was a route matcher
+literal, `_next/image`, not an import). Neither declares an `imageArchProbes`
+entry anywhere. That sweep also caught a case that looks like the trap but
+isn't: emit-vision's `marketing` imports `next/image`, but its only usage is
+a static `.svg` source, which Next's optimizer serves unoptimized by design
+(`dangerouslyAllowSVG` defaults false) — sharp is never called. Confirmed by
+building the real image: `sharp`'s install script is blocked workspace-wide
+(`pnpm.onlyBuiltDependencies` doesn't list it), so a `next-sharp` probe would
+fail *every* deploy for a code path production never executes — exactly the
+false-positive this guard must not become.
+
 **Both sub-cases confirmed in practice.** diner-decider (sprint 267) hit the
 **ships-to-runtime** sub-case: its `api` shipped `sharp` for the R2 photo
 pipeline, so the runner stage needed the target platform's `sharp` binary
@@ -148,6 +163,20 @@ its own plain `FROM node:22-alpine` stage (matching develemail's reference
 for `tsx` to pick the right one from at runtime. (It was originally put in
 tastease's root `package.json`; it moved to `pnpm-workspace.yaml` on
 2026-09-11 after the `pnpm fetch` failure described above.)
+
+**A native-module trap outside the sharp/esbuild family.** martialops's `api`
+(sprint 337) doesn't use the `$BUILDPLATFORM` split at all — its single-stage
+`COPY apps ./apps; RUN pnpm install --frozen-lockfile` runs everything under
+the requested `--platform` — but the same install-time-selection risk shows
+up through `@prisma/client`: `prisma generate`'s query engine binary is
+chosen by `binaryTargets` (default `"native"`, detected from whatever
+environment `generate` ran in), not by pnpm's optional-dependency machinery,
+so `supportedArchitectures` doesn't touch it at all. `argon2` sits in the
+same image but isn't in this risk class: it bundles prebuilt binaries for
+every published platform inside one npm package (`prebuildify`) and picks
+one via `node-gyp-build` at `require` time based on the actual running
+process's arch — there is no install-time selection to get wrong, so it was
+deliberately left unprobed. See the `prisma` probe kind below.
 
 **Verify before shipping**, every time this pattern touches a service with
 native dependencies: `docker buildx build --platform linux/amd64 ... --load`,
@@ -198,7 +227,7 @@ via `ci.buildVariants`):
 }
 ```
 
-Four named `kind`s exist today. All load the module rather than checking for
+Five named `kind`s exist today. All load the module rather than checking for
 its presence, for the dangling-symlink reason above:
 
 - `tsx` — transforms a one-line `.ts` file with `npx tsx`.
@@ -216,3 +245,17 @@ its presence, for the dangling-symlink reason above:
   cleanly needs a live database. The probe instead resolves the exact esbuild
   instance `drizzle-kit` depends on and calls `transformSync` directly,
   exercising the same native binary without needing a database.
+- `prisma` — for a service shipping `@prisma/client` (martialops's `api`,
+  sprint 337): the query engine is a native N-API addon
+  (`libquery_engine-<platform>.{so,dylib}.node`) `prisma generate` writes
+  next to the generated client, selected at *generate* time — the same
+  install-time-selection shape as `sharp`/esbuild, just triggered by
+  `binaryTargets` (default `"native"`) instead of an npm optional-dependency
+  fetch. `new PrismaClient()` proves nothing: engine startup is lazy, and
+  exercising it for real needs a live database, same problem `drizzle-kit`
+  has. The probe resolves the engine file next to `.prisma/client` and
+  `require`s it directly — `dlopen` fails immediately on a wrong-platform
+  binary, no DB needed. Verified against a real wrong-arch build: setting
+  `binaryTargets = ["darwin-arm64"]` on an image built and run as
+  `linux/amd64` produces `Error: .../libquery_engine-darwin-arm64.dylib.node:
+  invalid ELF header` — the exact silent-mismatch this guard exists for.

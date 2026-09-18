@@ -96,17 +96,143 @@ through the shared runner (`pnpm check:affected` in that repo).
 - `scripts/lib/image-arch-check.test.sh` — coverage for any new kind
 
 ## Acceptance criteria
-- [ ] All four projects declare probes for every image with a native dependency
-- [ ] Each new probe is demonstrated **both ways** — passing on a good image,
+- [x] All four projects declare probes for every image with a native dependency
+- [x] Each new probe is demonstrated **both ways** — passing on a good image,
       failing on one built without the architecture setting. Quote both.
-- [ ] Any service deliberately left unprobed is named with its reason
-- [ ] Variant images are probed via their tag suffix, not the service image
-- [ ] Any new probe kind is covered in `scripts/lib/image-arch-check.test.sh`
-- [ ] `pnpm test:hooks` passes in emit-infra; each touched repo's own check
+- [x] Any service deliberately left unprobed is named with its reason
+- [x] Variant images are probed via their tag suffix, not the service image
+- [x] Any new probe kind is covered in `scripts/lib/image-arch-check.test.sh`
+- [x] `pnpm test:hooks` passes in emit-infra; each touched repo's own check
       command passes (its `.emit-infra.json` changed)
-- [ ] **No project is deployed by this sprint** — say so in the report
+- [x] **No project is deployed by this sprint** — say so in the report
 
 ## Out of scope
 - Changing any Dockerfile — sprint 338 does the deps-stage rollout.
 - Deploying any project; probes take effect on the next ordinary deploy.
 - Re-probing images built before the guard existed.
+
+## Completed
+
+**Date:** 2026-09-18
+
+### Summary
+Investigated all four projects' actual production dependency surfaces before
+declaring anything — per the sprint's own instruction to read the code, not
+assume from the "pnpm fetch vs COPY+install" table. The result diverges
+sharply from the sprint's framing: **three of the four projects have zero
+native runtime dependencies anywhere**, and get no probes at all. Only
+martialops needed one, and it's for a native module the sprint's own probe
+catalog (`tsx`/`next-sharp`/`sharp`/`drizzle-kit`) didn't cover, so this
+sprint adds a fifth kind: `prisma`.
+
+**emit-billing** (`api`, `web`, `worker`) — despite using the exact
+lockfile-keyed `pnpm fetch` pattern flagged as "the pressing one": `api`/
+`worker` deploy via `pnpm --filter=... deploy --prod --legacy` from
+dependency trees (`drizzle-orm`, `pg`, `stripe`, `fastify`) that are 100% pure
+JS; `web` imports no `next/image` anywhere. No `supportedArchitectures`
+setting exists, consistent with there being nothing that would need one.
+
+**emit-social** — `api`'s runtime is `main.mjs`/`migrate.mjs`, esbuild-bundled
+with `external: []` (everything inlined, no `node_modules` even copied into
+the runner); its DB/domain packages are pure JS. `web`'s one `next/image`
+string hit was `proxy.ts`'s route matcher literal `_next/image`, not an
+import — verified by reading the file. Zero native runtime deps, zero probes.
+
+**emit-vision** — `api`/`worker` ship a single `tsup --bundle` `.cjs` with
+`noExternal: [/.+/]` (only `pg-native` external, and it's never installed);
+`web` has no `next/image` usage. `marketing` **does** import `next/image`
+(`Brand.tsx`), which looked like a clean `next-sharp` case — until actually
+building the image and running the probe against it: it failed, but not for
+an arch reason. `pnpm.onlyBuiltDependencies` doesn't list `sharp` workspace-
+wide, so its install script is blocked (`Ignored build scripts: ... sharp@
+0.34.5`) on *every* build regardless of platform. More importantly, the only
+usage is a static `.svg` import — Next's optimizer serves SVGs unoptimized by
+design (`dangerouslyAllowSVG` defaults false), so sharp is never called in
+production. A `next-sharp` probe here would fail every deploy over a code
+path that never runs — exactly the false-positive the sprint warned against.
+Left unprobed, with this evidence.
+
+**martialops** — `web`/`marketing-web` have no `next/image` usage (no probe).
+`api` runs the "COPY+install" pattern (single-stage, no `$BUILDPLATFORM`
+split) and genuinely ships two native modules:
+- `argon2` (password hashing, `libs/backend/users/.../password-hash.ts`) —
+  investigated and **deliberately left unprobed**: it uses `prebuildify`,
+  which bundles prebuilt binaries for every published platform inside one
+  npm package; `node-gyp-build` picks one at `require` time based on the
+  actual running process's arch. There is no install-time "which platform's
+  binary did we fetch" decision to get wrong — the exact bug class this
+  guard exists for structurally cannot happen here.
+- `@prisma/client` — the query engine (`libquery_engine-<platform>.node`) is
+  selected by `binaryTargets` (default `"native"`, detected at `prisma
+  generate` time) — the same install-time-selection risk as `sharp`/esbuild,
+  just via a different mechanism. This is new: none of the four existing
+  probe kinds fit, so this sprint adds a fifth, `prisma`, to
+  `scripts/lib/image-arch-check.sh`.
+
+Declared `"api": [{ "kind": "prisma" }]` in martialops's `.emit-infra.json`
+(no variant — `prisma generate` runs in the `api` image's own build, not a
+separate migrate stage).
+
+### Both-ways proof (prisma probe)
+Built the real martialops `api` image twice via
+`docker buildx build --platform linux/amd64 -f apps/api/Dockerfile --load .`:
+
+- **Good** (schema unmodified, `binaryTargets` defaults to `"native"`):
+  `docker run --platform linux/amd64 ... martialops-api-test:good` running
+  the probe command printed:
+  `ok 0.1.0 libquery_engine-debian-openssl-3.0.x.so.node`
+- **Broken** (temporarily added `binaryTargets = ["darwin-arm64"]` to
+  `apps/api/prisma/schema.prisma`, built, ran the same probe, then
+  `git checkout --` to revert — no permanent change):
+  ```
+  Error: /app/node_modules/.prisma/client/libquery_engine-darwin-arm64.dylib.node: invalid ELF header
+      at Object..node (node:internal/modules/cjs/loader:1939:18)
+  ```
+  Prisma even printed its own warning during `generate`: "Your current
+  platform `debian-openssl-3.0.x` is not included in your generator's
+  `binaryTargets` configuration" — the build succeeds anyway, which is
+  exactly the silent-failure shape this guard exists to catch before deploy.
+
+Both test images and the schema.prisma edit were cleaned up; martialops's
+working tree has only the intended `.emit-infra.json` change.
+
+### Files changed
+- `scripts/lib/image-arch-check.sh` — new `prisma` probe kind
+- `scripts/lib/image-arch-check.test.sh` — passing/failing `prisma` probe
+  test cases (mocked docker, matching existing style)
+- `docs/CROSS-PLATFORM-BUILD-PATTERN.md` — documents the `prisma` kind, the
+  martialops native-module-trap discovery (and why `argon2` doesn't share
+  it), and the emit-billing/emit-social/emit-vision-marketing clean-sweep
+  findings
+- `~/projects/martialops/.emit-infra.json` — adds
+  `ci.imageArchProbes.api = [{ "kind": "prisma" }]`
+- emit-billing, emit-social, emit-vision `.emit-infra.json` — **unchanged**;
+  investigated and found to need no probes (see Summary)
+
+### Verification
+- `bash scripts/lib/image-arch-check.test.sh`: 38/38 pass (was 30/30 before
+  the 8 new `prisma` cases)
+- `pnpm test:hooks` (emit-infra): pass, exit 0 (ran three times while
+  iterating; all clean)
+- `pnpm typecheck` / `pnpm lint` / `pnpm test` (emit-infra): pass (255 tests,
+  no source touched — cache-served for typecheck/lint)
+- `pnpm check:affected` (martialops, the touched repo): `✓ check-all
+  (affected) passed` — 7 projects, including a fresh 1048-test run for
+  `tools`
+- No project deployed. Probes take effect on martialops's next ordinary
+  deploy of `api`.
+
+### Follow-ups
+- `[defer]` emit-vision's `pnpm.onlyBuiltDependencies` doesn't list `sharp`
+  workspace-wide, so its install script is silently skipped on every build.
+  Currently harmless (nothing calls it), but if a future PR adds a raster
+  `next/image` usage anywhere in `marketing` or `web`, image optimization
+  will break — the "Ignored build scripts" warning is easy to miss in normal
+  build output. Worth either adding `sharp` to `onlyBuiltDependencies` now
+  (cheap, matches the other three fleet projects) or leaving a comment
+  where the risk would land.
+- `[defer]` martialops's root `package.json` still lists `sharp` in both
+  `onlyBuiltDependencies` and `overrides`, but no image in the fleet
+  (`web`, `marketing-web`) uses `next/image`. Looks like leftover
+  configuration from a removed feature or an unshipped app; worth confirming
+  it's truly dead before the next dependency audit.
