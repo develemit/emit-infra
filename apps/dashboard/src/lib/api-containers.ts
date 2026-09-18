@@ -18,11 +18,23 @@ export interface DockerUsageRow {
   reclaimable: string
 }
 
+// `image` (sprint 339) names the image currently building/retagging within
+// the step, and its position among the real build units (services + tagged
+// variants). Absent on older records and on non-build/retag steps — readers
+// must fall back cleanly to the coarse step label.
+export interface CiImageProgress {
+  name: string
+  index: number
+  total: number
+  action: 'building' | 'retagging'
+}
+
 export interface CiProgress {
   step: number
   total: number
   pct: number
   label: string
+  image?: CiImageProgress | null
 }
 
 // Mirrors packages/core's classifyRunState output (sprint 284). The API's

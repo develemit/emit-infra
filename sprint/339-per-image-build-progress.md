@@ -67,16 +67,16 @@ No `check:affected` in this repo; the suite is `pnpm test:hooks` plus
 - `apps/dashboard/src/components/detail/` — render the current image; degrade gracefully
 
 ## Acceptance criteria
-- [ ] The progress record names the image currently building and its position
+- [x] The progress record names the image currently building and its position
       within the total, counting build variants
-- [ ] A deploy that only re-tags shows that, rather than an unchanging step
-- [ ] Records written before this sprint still render — verify against a real
+- [x] A deploy that only re-tags shows that, rather than an unchanging step
+- [x] Records written before this sprint still render — verify against a real
       entry in an existing `.deploy-history.jsonl`
-- [ ] Progress is emitted from the fan-out, so a parallel build
+- [x] Progress is emitted from the fan-out, so a parallel build
       (`EMIT_BUILD_PARALLEL` > 1) doesn't produce misleading positions
-- [ ] Coverage in `scripts/lib/deploy-plan.test.sh` including a variant-producing
+- [x] Coverage in `scripts/lib/deploy-plan.test.sh` including a variant-producing
       service
-- [ ] `pnpm test:hooks`, `pnpm test`, `pnpm typecheck` and `pnpm lint` pass
+- [x] `pnpm test:hooks`, `pnpm test`, `pnpm typecheck` and `pnpm lint` pass
       (this repo has no `check:affected`)
 
 ## Out of scope
@@ -84,3 +84,77 @@ No `check:affected` in this repo; the suite is `pnpm test:hooks` plus
 - Streaming Docker layer output into the dashboard (the backlog's separate
   "docker layer progress is noisy" item).
 - Changing `MAX_PARALLEL`'s default.
+
+## Completed
+
+**Date:** 2026-09-18
+
+### Summary
+Added a `deploy_image_progress` writer to `scripts/lib/ci-utils.sh` that adds
+an `image: {name, index, total, action}` field to `.deploy-status.json`'s
+`progress` object without advancing the phase-level step/pct — the build or
+retag phase is still one step in the budget, this just names which image is
+in flight within it. `run_build_fanout` (`scripts/lib/deploy-plan.sh`) counts
+real build units up front (services plus their tagged `buildVariants`, via a
+new `_deploy_plan_unit_count`/`_deploy_plan_variant_count` pair) and calls the
+writer once per service as it's launched — from the main loop, not from
+inside the backgrounded `build_image`, so a parallel fan-out
+(`EMIT_BUILD_PARALLEL>1`) gets accurate start-order positions instead of
+several subshells racing to claim "current." The call is guarded with
+`declare -F deploy_image_progress` so `deploy-plan.sh` stays callable without
+`ci-utils.sh` sourced (matches how the existing tests stub `build_image`
+directly). `pre-push`'s re-tag loop got the same treatment directly (it
+already sources `ci-utils.sh`), so an all-retag deploy now names which
+service is being re-tagged instead of sitting on one static label.
+
+On the dashboard side, `CiProgress` gained an optional `image` field
+(`apps/dashboard/src/lib/api-containers.ts`) and `pipeline-progress-card.tsx`
+renders it as an extra line under the existing label/pct row when present.
+The API routes already spread the raw status JSON through unchanged
+(`withRunState` in `project-status.ts`), so no backend passthrough work was
+needed. Terminal `.deploy-history.jsonl` records never carry `progress` at
+all (verified against tastease's real history file), and in-flight records
+without the new `image` key render exactly as before via `progress?.image`
+optional chaining — covered by the pre-existing "renders a live deploy
+exactly as today" test, which passes unmodified.
+
+### Files changed
+- `scripts/lib/ci-utils.sh` — added `deploy_image_progress`, storage of the
+  last step label (`_EMIT_DEPLOY_LABEL`) so the new writer can echo it
+- `scripts/lib/deploy-plan.sh` — `_deploy_plan_variant_count` /
+  `_deploy_plan_unit_count` helpers; `run_build_fanout` now emits per-service
+  start progress with a variant-aware denominator
+- `scripts/hooks/pre-push` — re-tag loop now emits `deploy_image_progress`
+  per service (action `retagging`)
+- `scripts/lib/deploy-plan.test.sh` — coverage for unit counting (including a
+  variant-producing service) and the progress-emission sequence for both
+  sequential and parallel fan-out
+- `apps/dashboard/src/lib/api-containers.ts` — `CiImageProgress` type,
+  `CiProgress.image?`
+- `apps/dashboard/src/components/detail/pipeline-progress-card.tsx` —
+  renders the current image + position when present
+
+### Verification
+- `pnpm test:hooks`: full suite, exit 0, 0 failures across all 16 lib test
+  files (deploy-plan.test.sh: 59/59, docker-build.test.sh: 12/12 unaffected)
+- `pnpm test`: 24 test files / 255 tests (root) + 24 files / 224 tests
+  (dashboard), all passing, including `pipeline-progress-card.test.tsx`
+  unmodified
+- `pnpm typecheck`: clean across all 5 projects
+- `pnpm lint`: clean across all 5 projects
+- `bash -n scripts/hooks/pre-push`: syntax OK
+- Backward compat: inspected a real terminal record in
+  `~/projects/tastease/.deploy-history.jsonl` — no `progress` field at all,
+  confirming the new `image` field only ever appears on in-flight
+  `.deploy-status.json` records and terminal history is unaffected
+
+### Follow-ups
+- `[defer]` Variant builds within a single service (e.g. tastease's
+  `api`/`api-migrate`) don't get their own intermediate progress tick — the
+  position only advances when the next service starts. Emitting from inside
+  `build_image` for this would need a locking/handoff strategy for the
+  parallel case; not worth it for what's normally a fast second build sharing
+  cached layers.
+- `[defer]` No automated test exercises the `pre-push` re-tag loop directly
+  (no test harness exists for `pre-push` itself, consistent with the rest of
+  the codebase) — covered by syntax check + code inspection only.

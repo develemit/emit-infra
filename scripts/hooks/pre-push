@@ -225,7 +225,13 @@ fi
 if [[ ${#TO_RETAG[@]} -gt 0 ]]; then
   deploy_phase retag
   deploy_step "Re-tagging unchanged images"
-  for svc in "${TO_RETAG[@]}"; do retag_image "$svc"; done
+  RETAG_TOTAL=${#TO_RETAG[@]}
+  RETAG_IDX=0
+  for svc in "${TO_RETAG[@]}"; do
+    RETAG_IDX=$((RETAG_IDX + 1))
+    deploy_image_progress "$svc" "$RETAG_IDX" "$RETAG_TOTAL" retagging
+    retag_image "$svc"
+  done
 fi
 
 # ── pre-deploy commands (migrations etc.) ──────────────────────────────────────

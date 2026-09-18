@@ -183,6 +183,47 @@ check_true "buildTriggerPaths %s expands to service name" \
 check_false "buildTriggerPaths %s does not match other services" \
   service_needs_build web "$B4" "$ALL" "" "deploy/%s.yml"
 
+echo "build unit counting (sprint 339)"
+
+check "variant count defaults to 0 when BUILD_VARIANTS_JSON is unset" \
+  "$(_deploy_plan_variant_count api)" "0"
+
+BUILD_VARIANTS_JSON='{"api":[{"target":"migrate","tagSuffix":"-migrate"}]}'
+check "service with no variants counts 0" "$(_deploy_plan_variant_count web)" "0"
+check "service with one variant counts 1" "$(_deploy_plan_variant_count api)" "1"
+check "unit count sums services + variants" \
+  "$(_deploy_plan_unit_count web api worker)" "4"
+unset BUILD_VARIANTS_JSON
+
+echo "run_build_fanout image progress (sprint 339)"
+
+# A spy standing in for ci-utils.sh's real writer (not sourced by this test
+# file) — run_build_fanout must call it only if it's defined (declare -F
+# guard), which the earlier run_build_fanout tests above rely on implicitly
+# by never defining it at all.
+PROGRESS_LOG=()
+deploy_image_progress() { PROGRESS_LOG+=("$1 $2/$3 $4"); }
+build_image() { return 0; }
+BUILD_VARIANTS_JSON='{"api":[{"target":"migrate","tagSuffix":"-migrate"}]}'
+
+PROGRESS_LOG=()
+run_build_fanout 1 true web api worker
+check "sequential fan-out emits one progress event per service" "${#PROGRESS_LOG[@]}" "3"
+check "first service starts at position 1 of the variant-counted total" \
+  "${PROGRESS_LOG[0]}" "web 1/4 building"
+check "variant-producing service still gets a single start event" \
+  "${PROGRESS_LOG[1]}" "api 2/4 building"
+check "next service's position skips ahead across the variant unit" \
+  "${PROGRESS_LOG[2]}" "worker 4/4 building"
+
+PROGRESS_LOG=()
+run_build_fanout 3 true web api worker
+check "parallel fan-out (max_parallel>1) emits the same start-order positions, not misleading ones" \
+  "${PROGRESS_LOG[*]}" "web 1/4 building api 2/4 building worker 4/4 building"
+
+unset BUILD_VARIANTS_JSON
+unset -f deploy_image_progress build_image
+
 echo "run_build_fanout"
 
 FAIL_COUNT=0

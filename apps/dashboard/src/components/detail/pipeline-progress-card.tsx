@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { Icon } from '@/components/icon'
 import { usePipelineStatus, runStateOf } from '@/lib/use-pipeline-status'
 import { formatDuration } from '@/lib/format-duration'
-import type { CiStatus, DeployStatus, RunState } from '@/lib/api-containers'
+import type { CiImageProgress, CiStatus, DeployStatus, RunState } from '@/lib/api-containers'
 
 type Phase = 'ci' | 'deploy'
 type PipelineRecord = CiStatus | DeployStatus
@@ -74,6 +74,19 @@ function ShaLine({ status }: { status: PipelineRecord }) {
   )
 }
 
+// Names the image currently building/retagging and its position among the
+// real build units (sprint 339) — falls back to nothing (the coarse step
+// label above still renders) for records with no `image` field, so pre-339
+// history keeps rendering exactly as before.
+function ImageProgressLine({ image }: { image: CiImageProgress }) {
+  const verb = image.action === 'retagging' ? 'Re-tagging' : 'Building'
+  return (
+    <div className="mt-1 text-[11px] font-mono text-subtle truncate">
+      {verb} {image.name} ({image.index}/{image.total})
+    </div>
+  )
+}
+
 function RunningCard({ phase, status, href }: { phase: Phase; status: PipelineRecord; href: string }) {
   const progress = status.progress
   const pct = progress?.pct ?? 0
@@ -104,6 +117,7 @@ function RunningCard({ phase, status, href }: { phase: Phase; status: PipelineRe
         </span>
         <span className="text-[12px] font-mono font-medium" style={{ color: 'var(--accent)' }}>{pct}%</span>
       </div>
+      {progress?.image && <ImageProgressLine image={progress.image} />}
 
       <ShaLine status={status} />
     </CardShell>

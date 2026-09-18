@@ -12,6 +12,7 @@
 #   deploy_init <total_steps> [launch_mode] [launch_marker]
 #   deploy_set_services web api worker  # record which services are being built
 #   deploy_step "label"
+#   deploy_image_progress <name> <index> <total> <action>  # which image is building/retagging (sprint 339)
 #   deploy_phase <name>                 # start timing a phase (closes the previous one)
 #   deploy_record_phase <name> <sec>    # record a phase timed elsewhere (e.g. ci)
 #   deploy_done deployed|failed|interrupted  # write final status + append to history
@@ -62,6 +63,7 @@ _EMIT_CI_STEP=0
 _EMIT_CI_TOTAL=0
 _EMIT_DEPLOY_STEP=0
 _EMIT_DEPLOY_TOTAL=0
+_EMIT_DEPLOY_LABEL=""
 _EMIT_LAUNCH_MODE="interactive"
 _EMIT_LAUNCH_MARKER=""
 _EMIT_SERVICES_BUILT=""
@@ -164,11 +166,31 @@ deploy_init() {
 
 deploy_step() {
   _EMIT_DEPLOY_STEP=$((_EMIT_DEPLOY_STEP + 1))
+  _EMIT_DEPLOY_LABEL="$1"
   local pct=$((_EMIT_DEPLOY_STEP * 100 / _EMIT_DEPLOY_TOTAL))
   _emit_write_atomic \
     "$(printf '{"status":"deploying","sha":"%s","branch":"%s","startedAt":"%s","progress":{"step":%d,"total":%d,"pct":%d,"label":"%s"},"launch":{"mode":"%s","marker":"%s"},"writer":{"pid":%d,"host":"%s","heartbeatAt":"%s"}}' \
       "$_EMIT_SHA" "$_EMIT_BRANCH" "$_EMIT_STARTED" \
       "$_EMIT_DEPLOY_STEP" "$_EMIT_DEPLOY_TOTAL" "$pct" "$1" \
+      "$_EMIT_LAUNCH_MODE" "$_EMIT_LAUNCH_MARKER" \
+      "$_EMIT_WRITER_PID" "$_EMIT_WRITER_HOST" "$(date -u +"%Y-%m-%dT%H:%M:%SZ")")" \
+    .deploy-status.json
+}
+
+# Per-image progress within the current step (sprint 339). A build/retag step
+# can sit unchanged for tens of minutes while several images build one after
+# another (a tastease deploy sat at "Building + pushing images" for ~38min
+# across 4 images with no way to tell progress from a stall) — this doesn't
+# advance _EMIT_DEPLOY_STEP itself, it just names which image is in flight and
+# its position within the step so the dashboard can show that instead.
+deploy_image_progress() {
+  local name="$1" index="$2" total="$3" action="$4"
+  local pct=$((_EMIT_DEPLOY_STEP * 100 / _EMIT_DEPLOY_TOTAL))
+  _emit_write_atomic \
+    "$(printf '{"status":"deploying","sha":"%s","branch":"%s","startedAt":"%s","progress":{"step":%d,"total":%d,"pct":%d,"label":"%s","image":{"name":"%s","index":%d,"total":%d,"action":"%s"}},"launch":{"mode":"%s","marker":"%s"},"writer":{"pid":%d,"host":"%s","heartbeatAt":"%s"}}' \
+      "$_EMIT_SHA" "$_EMIT_BRANCH" "$_EMIT_STARTED" \
+      "$_EMIT_DEPLOY_STEP" "$_EMIT_DEPLOY_TOTAL" "$pct" "$_EMIT_DEPLOY_LABEL" \
+      "$name" "$index" "$total" "$action" \
       "$_EMIT_LAUNCH_MODE" "$_EMIT_LAUNCH_MARKER" \
       "$_EMIT_WRITER_PID" "$_EMIT_WRITER_HOST" "$(date -u +"%Y-%m-%dT%H:%M:%SZ")")" \
     .deploy-status.json
