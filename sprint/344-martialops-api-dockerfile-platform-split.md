@@ -83,20 +83,58 @@ probe via emit-infra's `scripts/lib/image-arch-check.sh`, the same way sprint
 - `~/projects/martialops/apps/api/Dockerfile` — platform split, or a comment explaining its absence
 
 ## Acceptance criteria
-- [ ] Before/after cold `linux/amd64` build times are recorded, whichever way
+- [x] Before/after cold `linux/amd64` build times are recorded, whichever way
       the decision goes
-- [ ] If changed: the image builds for `linux/amd64` and the `prisma` arch probe
+- [x] If changed: the image builds for `linux/amd64` and the `prisma` arch probe
       passes — quote the probe output
-- [ ] If unchanged: the reason is written into the sprint's Completed section
+- [x] If unchanged: the reason is written into the sprint's Completed section
       **and** as a comment in the Dockerfile
-- [ ] The runner's separate `prisma`/`argon2` install is explained in a comment
+- [x] The runner's separate `prisma`/`argon2` install is explained in a comment
       either way
-- [ ] `pnpm check:affected` run in martialops, with an empty affected result
+- [x] `pnpm check:affected` run in martialops, with an empty affected result
       reported honestly rather than as a pass
-- [ ] martialops is not deployed, and the report says so
+- [x] martialops is not deployed, and the report says so
 
 ## Out of scope
 - The other two martialops images (`web`, `marketing-web`) unless the same
   change is trivially identical — say so if you skip them.
 - Changing how Prisma is generated at the application level.
 - Deploying martialops.
+
+## Completed
+
+**Date:** 2026-09-19
+
+### Summary
+Decided by measurement: **not worth adopting the platform split.** Cold
+`docker build --no-cache --platform linux/amd64` on an arm64 Mac took 194s as-is
+and 185s with `base` pinned to `--platform=$BUILDPLATFORM` (~5%). Per-stage
+timings show why: the network `pnpm fetch` is ~110s in both runs and emulation
+doesn't slow it; the runner's npm install (27.7s) is identical either way. The
+second run also had a warm pnpm cache mount, so even the 5% overstates the gain.
+The Dockerfile's build shape is left unchanged.
+
+The split itself was feasible: `runner` is its own `FROM` and already runs
+`prisma generate` in the target platform, so engine selection wouldn't have
+moved. That is now documented. Two comments were added to
+`apps/api/Dockerfile`: the measurement/reason for not pinning `$BUILDPLATFORM`,
+and why the runner installs `prisma`/`argon2` itself instead of copying
+`node_modules` (right binaries + platform-correct `prisma generate`).
+
+A first baseline attempt failed after 61s with `DeadlineExceeded` resolving the
+base image (transient Docker Desktop/registry issue); a re-pull succeeded and
+the rerun is what's recorded. `web` and `marketing-web` were not touched.
+**martialops was not deployed.**
+
+### Files changed
+- `~/projects/martialops/apps/api/Dockerfile` — comments only (measurement rationale; runner install rationale). Left **uncommitted** in martialops, whose tree already holds unrelated sprint 356 changes.
+- `sprint/344-martialops-api-dockerfile-platform-split.md` — this record
+
+### Verification
+- Baseline cold amd64 build: 194s (rc=0). With `$BUILDPLATFORM` split: 185s (rc=0). Final (comments-only) Dockerfile builds for amd64, rc=0.
+- `prisma` arch probe (same command as `scripts/lib/image-arch-check.sh`, run on the final amd64 image): `ok 0.1.0 libquery_engine-debian-openssl-3.0.x.so.node`
+- `pnpm check:affected` in martialops: passed, 7 projects (lint/typecheck/test/build; api 1166/1166). Note: the affected set was NOT empty — but only because of sprint 356's uncommitted source changes. The Dockerfile itself is outside the Nx graph and contributed nothing.
+
+### Follow-ups
+- `[defer]` martialops has uncommitted `apps/api/Dockerfile` comment changes alongside sprint 356's dirty files; commit them with or after 356.
+
