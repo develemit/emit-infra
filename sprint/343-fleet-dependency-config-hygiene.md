@@ -78,17 +78,48 @@ signal.
 - `~/projects/martialops/package.json` — drop the dead `sharp` entries
 
 ## Acceptance criteria
-- [ ] emit-vision lists only packages it genuinely depends on that have install
+- [x] emit-vision lists only packages it genuinely depends on that have install
       scripts, with the before/after `Ignored build scripts` output quoted
-- [ ] martialops's `sharp` entries are removed, or kept with a stated reason if
+- [x] martialops's `sharp` entries are removed, or kept with a stated reason if
       the override pins something real
-- [ ] `pnpm install --frozen-lockfile` passes in both repos with no lockfile change
+- [x] `pnpm install --frozen-lockfile` passes in both repos with no lockfile change
 - [ ] Each repo's own check command is run, with an empty affected result
       reported honestly rather than as a pass
-- [ ] Neither project is deployed, and the report says so
+- [x] Neither project is deployed, and the report says so
 
 ## Out of scope
 - Auditing every fleet project's `onlyBuiltDependencies` — these two were found
   with evidence; a general audit is its own sprint.
 - Adding a raster `next/image` usage to emit-vision, or any app change.
 - Deploying either project.
+
+## In Progress
+**Started:** 2026-09-18 (resumed by /start-sprint-auto)
+
+### Done so far
+- emit-vision: added `pnpm.onlyBuiltDependencies: ["sharp"]` only (sharp is the sole one the sprint's evidence covers), committed as `ee222bb5`. Before: `Ignored build scripts` listed `@swc/core, esbuild, unrs-resolver, msgpackr-extract, sharp, protobufjs, @parcel/watcher, nx`. After: same list minus `sharp`. Lockfile unchanged; `pnpm check:affected` passed (23 projects; a root package.json edit affects all).
+- martialops: the `sharp` override is NOT dead config. `pnpm why sharp` shows it is next's optional peer (via next and next-intl), and the override pins it to `>=0.35.0` (resolves 0.35.3; next's default would be 0.34.x). Kept the override. Removed only the `onlyBuiltDependencies` `sharp` entry: a clean `pnpm install --frozen-lockfile` prints no ignored-build warning and leaves the lockfile unchanged (sharp 0.35 has no install script).
+- No deploys.
+
+### Blocked on
+- martialops commit: the pre-commit hook fails on `api:lint` (import/order warning in `apps/api/prisma/seed-north-river.ts`) from another sprint's uncommitted work (sprint 355) in the same tree. Not mine, and I did not bypass the hook with `--no-verify`. The one-line `package.json` edit is left uncommitted and unstaged.
+- `pnpm check:affected` in martialops fails for the same reason (`api:lint`), so the check criterion there is not a clean pass.
+
+### Pickup notes
+Once sprint 355 lands or its lint warning is fixed, commit martialops `package.json` alone: `chore: drop sharp from onlyBuiltDependencies`. Then rerun `pnpm check:affected` there. Follow-up for backlog: emit-vision still ignores build scripts for esbuild, @swc/core, nx, @parcel/watcher, unrs-resolver, msgpackr-extract, protobufjs (general audit was out of scope).
+
+### Auto-loop diagnosis (attempt 1)
+**Auto-retry:** 1
+- Blocked by: martialops' pre-commit hook failing `api:lint` on sprint 355's
+  uncommitted files. **That blocker is now cleared** — martialops' tree is clean
+  and sprint 355 has landed (`a267b00`).
+- Evidence: `martialops$ git status --porcelain` is empty; `git log -1` is
+  `a267b00 chore: plan sprint 356 — portal shows cancelled events`.
+- Also note: the previous child's uncommitted martialops `package.json` edit did
+  NOT survive. Verified 2026-09-18 — `pnpm.onlyBuiltDependencies` still contains
+  `sharp`. **Redo that one-line removal**; do not assume it is already applied.
+- Keep the previous child's finding: the `overrides` `sharp: ">=0.35.0"` entry is
+  real (it pins next's optional peer to 0.35.3) — leave it in place and say so.
+- Do: redo the martialops `onlyBuiltDependencies` removal, commit it there,
+  re-run `pnpm check:affected` in martialops now that it can pass, then complete
+  this sprint's remaining criteria as written.
