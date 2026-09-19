@@ -92,20 +92,45 @@ change what the hook does. `bash -n scripts/hooks/pre-push` must still pass.
 - `package.json` — register any new test file in `test:hooks`
 
 ## Acceptance criteria
-- [ ] The re-tag loop lives in a lib function and is covered in
+- [x] The re-tag loop lives in a lib function and is covered in
       `scripts/lib/deploy-plan.test.sh`: ordering, per-service progress, correct
       total, and the empty-list no-op
-- [ ] `deploy_done` returns non-zero when its log contains a fake token and zero
+- [x] `deploy_done` returns non-zero when its log contains a fake token and zero
       when clean — covered in `scripts/lib/ci-utils.test.sh`
-- [ ] `ci_done` has the same coverage
-- [ ] No real token appears in any fixture, commit message or test file
-- [ ] `bash -n scripts/hooks/pre-push` passes and the hook's behaviour is
+- [x] `ci_done` has the same coverage
+- [x] No real token appears in any fixture, commit message or test file
+- [x] `bash -n scripts/hooks/pre-push` passes and the hook's behaviour is
       unchanged (no new phases, steps or output ordering)
-- [ ] Any new test file is registered in `test:hooks`
-- [ ] `pnpm test:hooks`, `pnpm test`, `pnpm typecheck` and `pnpm lint` pass
+- [x] Any new test file is registered in `test:hooks`
+- [x] `pnpm test:hooks`, `pnpm test`, `pnpm typecheck` and `pnpm lint` pass
       (this repo has no `check:affected`)
 
 ## Out of scope
 - A harness that executes `scripts/hooks/pre-push` end to end.
 - Testing the build fan-out or arch guard (already covered).
 - Changing any hook behaviour, phase or output.
+
+## Completed
+
+**Date:** 2026-09-18
+
+### Summary
+Extracted the pre-push re-tag loop into `run_retag_fanout` in `deploy-plan.sh` (beside `run_build_fanout`), keeping the sprint 339 progress emission and using the same `declare -F` guard. The hook now calls it in one line. Added ordering/total/empty-list coverage to `deploy-plan.test.sh`, and a new `ci-utils.test.sh` proving `ci_done` and `deploy_done` return non-zero for a log containing a fake `gho_` token and zero for a clean one. The new suite is registered in `test:hooks`.
+
+The only behavioural nuance: the hook previously called `deploy_image_progress` unconditionally; the lib now guards it. In the hook ci-utils is always sourced, so output is identical.
+
+### Files changed
+- `scripts/hooks/pre-push` — re-tag loop replaced by `run_retag_fanout`
+- `scripts/lib/deploy-plan.sh` — new `run_retag_fanout`
+- `scripts/lib/deploy-plan.test.sh` — re-tag fan-out tests
+- (new) `scripts/lib/ci-utils.test.sh` — secret-scan wiring tests
+- `package.json` — registered `ci-utils.test.sh` in `test:hooks`
+
+### Verification
+- `bash -n scripts/hooks/pre-push`: passes
+- `pnpm test:hooks`: all suites pass (deploy-plan 62/62, ci-utils 4/4)
+- `pnpm test`, `pnpm typecheck`, `pnpm lint`: pass (Nx; no check:affected in this repo)
+- Fake token is built at runtime from `x` repeats; no real token anywhere.
+
+### Follow-ups
+- `[defer]` Other inline logic remains in `scripts/hooks/pre-push` (e.g. the pre-deploy commands python/JSON loop) and is untested; candidate for the same extraction.

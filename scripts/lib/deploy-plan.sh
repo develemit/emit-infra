@@ -3,6 +3,7 @@
 # helpers that don't obviously belong to any of them.
 #
 #   run_build_fanout <max_parallel> <on_fail> <svc...>  -> builds services in parallel
+#   run_retag_fanout <svc...>                           -> re-tags unchanged images, one progress event each
 #   push_payload_summary <remote_sha> <local_sha>       -> echoes a "shipping N commits" line
 #
 # See deploy-path-filter.sh, deploy-smart-build.sh, and deploy-launch.sh for
@@ -77,6 +78,20 @@ run_build_fanout() {
     fi
   done
   for pid in ${pids[@]+"${pids[@]}"}; do wait "$pid" || "$on_fail"; done
+}
+
+# Re-tag loop extracted from scripts/hooks/pre-push (sprint 341) so it can be
+# tested with retag_image / deploy_image_progress stubbed. Same declare -F
+# guard as run_build_fanout: the progress writer lives in ci-utils.sh.
+run_retag_fanout() {
+  local total=$# idx=0 svc
+  for svc in "$@"; do
+    idx=$((idx + 1))
+    if declare -F deploy_image_progress >/dev/null; then
+      deploy_image_progress "$svc" "$idx" "$total" retagging
+    fi
+    retag_image "$svc"
+  done
 }
 
 # ── fix 6: surface what a push to main is about to ship ──────────────────────

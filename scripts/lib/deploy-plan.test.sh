@@ -224,6 +224,27 @@ check "parallel fan-out (max_parallel>1) emits the same start-order positions, n
 unset BUILD_VARIANTS_JSON
 unset -f deploy_image_progress build_image
 
+echo "run_retag_fanout (sprint 341)"
+
+EVENTS=()
+deploy_image_progress() { EVENTS+=("progress:$1 $2/$3 $4"); }
+retag_image() { EVENTS+=("retag:$1"); }
+
+run_retag_fanout web api worker
+check "each service is re-tagged once, progress first, in order" \
+  "${EVENTS[*]}" \
+  "progress:web 1/3 retagging retag:web progress:api 2/3 retagging retag:api progress:worker 3/3 retagging retag:worker"
+
+EVENTS=()
+run_retag_fanout
+check "empty list is a no-op" "${#EVENTS[@]}" "0"
+
+unset -f deploy_image_progress
+EVENTS=()
+run_retag_fanout web
+check "still re-tags when the progress writer is not loaded" "${EVENTS[*]}" "retag:web"
+unset -f retag_image
+
 echo "run_build_fanout"
 
 FAIL_COUNT=0
