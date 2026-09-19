@@ -3,7 +3,7 @@ import { Command } from 'commander'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { buildDeployExtraVars, checkBackupEnv, computeEnvRemoval, enforceEnvRemovalGuard, parseEnvFile, printDryRunPlan, registerDeploy, resolveBuildNumber, readDeployedBuildNumber } from './deploy.js'
+import { buildDeployExtraVars, checkBackupEnv, computeEnvRemoval, enforceEnvRemovalGuard, parseEnvFile, printDryRunPlan, registerDeploy, resolveBuildNumber, readDeployedBuildNumber, findMissingImages } from './deploy.js'
 
 vi.mock('@emit-infra/core', async () => {
   const actual = await vi.importActual<typeof import('@emit-infra/core')>('@emit-infra/core')
@@ -21,11 +21,16 @@ vi.mock('@emit-infra/core', async () => {
   }
 })
 
+vi.mock('../lib/image-preflight.js', () => ({
+  checkImagesExist: vi.fn().mockResolvedValue({ status: 'ok' }),
+}))
+
 vi.mock('./configure.js', () => ({
   resolveInventoryPath: vi.fn().mockResolvedValue('/fake/inventory.ini'),
 }))
 
 import { loadConfig, runAnsible, sshExec, deployRecordDone, gitField } from '@emit-infra/core'
+import { checkImagesExist } from '../lib/image-preflight.js'
 
 const baseConfig = {
   name: 'test-project',
@@ -543,6 +548,106 @@ describe('deploy command — build baseline verification', () => {
     expect(deployRecordDone).toHaveBeenLastCalledWith(
       expect.any(String), expect.anything(), 'deployed', expect.any(Object), false,
     )
+  })
+})
+
+describe('deploy command — build.number label absent', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.stubEnv('BUILD_NUMBER', '')
+    vi.mocked(loadConfig).mockReturnValue(baseConfig as ReturnType<typeof loadConfig>)
+    vi.mocked(runAnsible).mockResolvedValue(undefined)
+    vi.mocked(gitField).mockResolvedValue('530')
+  })
+  afterEach(() => vi.unstubAllEnvs())
+
+  it('warns explicitly and records a non-baseline deploy when the image has no label', async () => {
+    vi.mocked(sshExec).mockResolvedValue('')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const program = new Command()
+    program.exitOverride()
+    registerDeploy(program)
+
+    await program.parseAsync(['node', 'cli', 'deploy', '--inventory', '/inv.ini'])
+
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('no build.number label'))
+    expect(deployRecordDone).toHaveBeenLastCalledWith(
+      expect.any(String), expect.anything(), 'deployed', expect.any(Object), false,
+    )
+    warn.mockRestore()
+  })
+})
+
+describe('deploy command — image pre-flight', () => {
+  const bgConfig = {
+    ...baseConfig,
+    ci: { ghcrOrg: 'develemit', imagePrefix: 'test-' },
+    blueGreen: {
+      composeStructure: 'separate' as const,
+      services: [{ name: 'web', bluePort: 3000, greenPort: 3001 }, { name: 'api', bluePort: 4000, greenPort: 4001 }],
+    },
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.stubEnv('BUILD_NUMBER', '')
+    vi.mocked(loadConfig).mockReturnValue(bgConfig as unknown as ReturnType<typeof loadConfig>)
+    vi.mocked(runAnsible).mockResolvedValue(undefined)
+    vi.mocked(gitField).mockResolvedValue('530')
+    vi.mocked(sshExec).mockResolvedValue('530')
+    vi.mocked(checkImagesExist).mockResolvedValue({ status: 'ok' })
+  })
+  afterEach(() => vi.unstubAllEnvs())
+
+  it('refuses before runAnsible, naming the missing images', async () => {
+    vi.mocked(checkImagesExist).mockResolvedValue({ status: 'missing', missing: ['ghcr.io/develemit/test-api:abc1234'] })
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('process.exit') })
+    const program = new Command()
+    program.exitOverride()
+    registerDeploy(program)
+
+    await expect(
+      program.parseAsync(['node', 'cli', 'deploy', '--inventory', '/inv.ini']),
+    ).rejects.toThrow('process.exit')
+
+    expect(runAnsible).not.toHaveBeenCalled()
+    expect(err).toHaveBeenCalledWith(expect.stringContaining('ghcr.io/develemit/test-api:abc1234'))
+    expect(deployRecordDone).toHaveBeenCalledWith(expect.any(String), expect.anything(), 'failed', expect.any(Object), false)
+    expect(exitSpy).toHaveBeenCalledWith(1)
+    exitSpy.mockRestore()
+    err.mockRestore()
+  })
+
+  it('proceeds unchanged when every image exists', async () => {
+    const program = new Command()
+    program.exitOverride()
+    registerDeploy(program)
+
+    await program.parseAsync(['node', 'cli', 'deploy', '--inventory', '/inv.ini'])
+
+    expect(checkImagesExist).toHaveBeenCalledWith(['ghcr.io/develemit/test-web', 'ghcr.io/develemit/test-api'], 'abc1234')
+    expect(runAnsible).toHaveBeenCalled()
+    expect(deployRecordDone).toHaveBeenLastCalledWith(expect.any(String), expect.anything(), 'deployed', expect.any(Object), true)
+  })
+
+  it('warns and does not block when the registry cannot be queried (unauthenticated)', async () => {
+    vi.mocked(checkImagesExist).mockResolvedValue({ status: 'skipped', reason: 'not logged in to ghcr.io' })
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const program = new Command()
+    program.exitOverride()
+    registerDeploy(program)
+
+    await program.parseAsync(['node', 'cli', 'deploy', '--inventory', '/inv.ini'])
+
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('skipping the image pre-flight check'))
+    expect(runAnsible).toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
+  it('does not probe for a project without blue-green services', async () => {
+    expect(await findMissingImages(baseConfig as ReturnType<typeof loadConfig>, 'abc')).toEqual([])
+    expect(checkImagesExist).not.toHaveBeenCalled()
   })
 })
 

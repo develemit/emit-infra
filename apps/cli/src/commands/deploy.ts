@@ -7,6 +7,8 @@ import { loadConfig, runAnsible, sshExec, deployRecordInit, deployRecordDone, re
 import { resolveInventoryPath } from './configure.js'
 import { parseKeyList, filterExcludedKeys } from './secrets-scaffold.js'
 import { parseEnvEntries } from '../lib/env-file.js'
+import { resolveImageName } from '../lib/image-name.js'
+import { checkImagesExist } from '../lib/image-preflight.js'
 
 const BACKUP_ENV_KEYS = ['CF_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY'] as const
 
@@ -303,6 +305,20 @@ export async function readDeployedBuildNumber(
   return out.trim()
 }
 
+// Runs before runAnsible so a deploy that would slot-flip onto images that were
+// never built for this sha is refused rather than detected afterwards. Returns
+// the missing image refs ([] = proceed); an inconclusive registry probe warns
+// and proceeds — the post-hoc build-number check below still backstops it.
+export async function findMissingImages(config: ProjectConfig, sha: string): Promise<string[]> {
+  if (!config.blueGreen) return []
+  const images = config.blueGreen.services.map((s) => resolveImageName(config, s.name))
+  const result = await checkImagesExist(images, sha)
+  if (result.status === 'skipped') {
+    console.warn(chalk.yellow(`\nWarning: skipping the image pre-flight check — ${result.reason}`))
+  }
+  return result.status === 'missing' ? result.missing : []
+}
+
 export function registerDeploy(program: Command): void {
   program
     .command('deploy [name]')
@@ -351,6 +367,17 @@ export function registerDeploy(program: Command): void {
 
       const deployCtx = await deployRecordInit(process.cwd())
       const phaseStartedAt = Date.now()
+
+      const missingImages = await findMissingImages(config, deployCtx.sha)
+      if (missingImages.length > 0) {
+        await deployRecordDone(process.cwd(), deployCtx, 'failed', { deploy: 0 }, false)
+        console.error(chalk.red(`\nRefusing to deploy: no image exists for ${deployCtx.sha.slice(0, 7)} —`))
+        missingImages.forEach((ref) => console.error(chalk.red(`  - ${ref}`)))
+        console.error(chalk.red('Build and push them first, or deploy via the pre-push hook. Nothing was changed on the server.'))
+        process.exit(1)
+        return
+      }
+
       try {
         await runAnsible('deploy', inventory, extraVars)
       } catch (err) {
@@ -375,10 +402,18 @@ export function registerDeploy(program: Command): void {
         console.warn(chalk.yellow('\nWarning: could not determine a build number to verify this deploy — recording deployed but not as a build baseline.'))
       } else {
         let deployedBuildNumber = ''
+        let sshFailed = false
         try {
           deployedBuildNumber = await readDeployedBuildNumber(host, sshKey, config.name, composeDest)
         } catch {
+          sshFailed = true
           console.warn(chalk.yellow('\nWarning: could not verify the deployed build number over SSH — recording deployed but not as a build baseline.'))
+        }
+        // Most fleet Dockerfiles don't bake a build.number label (only
+        // emit-billing's do, checked 2026-09-19), so this is expected — say so
+        // rather than degrading silently, but don't fail the deploy over it.
+        if (!sshFailed && !deployedBuildNumber) {
+          console.warn(chalk.yellow('\nWarning: the running image has no build.number label, so this deploy can\'t be verified — recording deployed but not as a build baseline. Add `LABEL build.number=$BUILD_NUMBER` to the Dockerfile to enable verification.'))
         }
         if (deployedBuildNumber === buildNumber) {
           isBuildBaseline = true

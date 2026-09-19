@@ -95,21 +95,54 @@ the suite is `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm test:hooks`.
 - `apps/cli/src/commands/deploy.test.ts` — gate, refusal, and skip-when-unauthenticated
 
 ## Acceptance criteria
-- [ ] The resolver reproduces `image_name()` for all three branches — prefix,
+- [x] The resolver reproduces `image_name()` for all three branches — prefix,
       ghcrRepo, and bare — proven against tastease, develemail and martialops shapes
-- [ ] A deploy whose target sha has no image for some service is refused
+- [x] A deploy whose target sha has no image for some service is refused
       **before** `runAnsible` is called, naming the missing images
-- [ ] A deploy whose images all exist proceeds unchanged
-- [ ] The unauthenticated-docker case skips the check with a visible warning and
+- [x] A deploy whose images all exist proceeds unchanged
+- [x] The unauthenticated-docker case skips the check with a visible warning and
       does not block the deploy — covered by a test
-- [ ] The `build.number` label decision is implemented and recorded, with the
+- [x] The `build.number` label decision is implemented and recorded, with the
       fleet checked rather than assumed
-- [ ] Sprint 336's post-hoc verification still runs and still records
+- [x] Sprint 336's post-hoc verification still runs and still records
       `isBuildBaseline` correctly — its existing tests still pass unmodified
-- [ ] Coverage in `apps/cli/src/commands/deploy.test.ts` and the resolver's test
-- [ ] `pnpm test`, `pnpm typecheck`, `pnpm lint` and `pnpm test:hooks` pass
+- [x] Coverage in `apps/cli/src/commands/deploy.test.ts` and the resolver's test
+- [x] `pnpm test`, `pnpm typecheck`, `pnpm lint` and `pnpm test:hooks` pass
 
 ## Out of scope
 - Deploying anything to verify it — sprint 345 does the real deploy.
 - Changing the blue-green slot-flip or Ansible roles.
 - Non-blue-green projects (only `test-smoke` uses the standard path).
+
+## Completed
+
+**Date:** 2026-09-18
+
+### Summary
+`emit-infra deploy` now probes `docker manifest inspect <image>:<sha>` for every blue-green service before `runAnsible`. A definitive "no such manifest" refuses the deploy (exit 1, records `failed`, names each missing ref, nothing touched on the server). Any inconclusive probe (not logged in to ghcr.io, docker missing, network) skips loudly with a warning and proceeds — sprint 336's post-hoc check still backstops it. Non-blue-green projects are not probed.
+
+A new `resolveImageName` mirrors bash `image_name()` (including the `GHCR_REPO` fallback to the last segment of `github.repo` from `pre-push-config.sh`). The duplication is deliberate and noted in a comment: bash builds/pushes, TS only reads, and sharing one implementation isn't practical.
+
+**build.number decision: (a) detect and say so, not (b) require.** Fleet checked 2026-09-19: only emit-billing's Dockerfiles bake a `build.number` label; develemail, diner-decider, emit-social, emit-vision, martialops and tastease do not. Requiring it would have made 6 of 7 fleet projects unverifiable-and-failing. The post-hoc check now warns explicitly (distinguishing "label absent" from "SSH failed") and records a non-baseline deploy.
+
+### Files changed
+- (new) `apps/cli/src/lib/image-name.ts` — TS mirror of `image_name()`
+- (new) `apps/cli/src/lib/image-name.test.ts` — prefix / ghcrRepo / github.repo fallback / bare, using develemail, martialops, tastease shapes
+- (new) `apps/cli/src/lib/image-preflight.ts` — `checkImagesExist` + docker manifest probe (ok / missing / skipped)
+- (new) `apps/cli/src/lib/image-preflight.test.ts` — probe result classification
+- `apps/cli/src/commands/deploy.ts` — `findMissingImages`, gate before `runAnsible`, explicit absent-label warning
+- `apps/cli/src/commands/deploy.test.ts` — refusal-before-ansible, proceed, unauthenticated skip, non-blue-green, absent-label tests
+- `sprint/342-preflight-image-check-before-slot-flip.md` — this record
+
+### Verification
+- `pnpm test`: all pass (cli 270/270; core 163, others green); existing sprint 336 tests unmodified and passing
+- `pnpm typecheck`: clean (5 projects)
+- `pnpm lint`: clean (5 projects)
+- `pnpm test:hooks`: 4 passed, 0 failed (last suite shown)
+- Not exercised against the real registry — sprint 345 does the real deploy.
+
+### Follow-ups
+- `[defer]` `apps/cli/src/commands/deploy.ts` (433 lines) and `deploy.test.ts` (892 lines) are well over the 300-line target; split (e.g. build-baseline verification into its own module).
+- `[defer]` Add `LABEL build.number=$BUILD_NUMBER` to the six fleet Dockerfiles lacking it so their deploys can earn a verified baseline.
+- `[defer]` The probe classifies "not found" stderr as missing; verify the exact ghcr.io wording during sprint 345's real deploy.
+
