@@ -3,12 +3,14 @@ import { join, dirname } from 'node:path'
 import { readFileSync, existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import chalk from 'chalk'
-import { loadConfig, runAnsible, sshExec, deployRecordInit, deployRecordDone, redactSecrets, gitField, type ProjectConfig } from '@emit-infra/core'
+import { loadConfig, runAnsible, sshExec, redactSecrets, gitField, type ProjectConfig } from '@emit-infra/core'
 import { resolveInventoryPath } from './configure.js'
 import { parseKeyList, filterExcludedKeys } from './secrets-scaffold.js'
 import { parseEnvEntries } from '../lib/env-file.js'
 import { resolveImageName } from '../lib/image-name.js'
 import { checkImagesExist } from '../lib/image-preflight.js'
+import { beginDeployRecord } from '../lib/deploy-record-owner.js'
+import { verifyDeployedImages } from '../lib/deploy-verification-run.js'
 
 const BACKUP_ENV_KEYS = ['CF_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY'] as const
 
@@ -288,23 +290,6 @@ export async function resolveBuildNumber(cwd: string, env: NodeJS.ProcessEnv): P
   return gitField(cwd, ['rev-list', '--count', 'HEAD'])
 }
 
-// Reads the build.number label baked into whatever image is actually running
-// after the deploy — the same fact ansible/roles/app-deploy/tasks/main.yml's
-// "Read deployed build number from container label" task already reads, just
-// on the CLI side so the result can gate whether this deploy is recorded as a
-// trustworthy build baseline (sprint 336). Errors surface as '' (caller
-// treats that as "couldn't verify", not as a hard mismatch).
-export async function readDeployedBuildNumber(
-  host: string,
-  sshKey: string,
-  projectName: string,
-  composeDest: string,
-): Promise<string> {
-  const cmd = `docker inspect --format '{{index .Config.Labels "build.number"}}' $(docker compose -f /opt/${projectName}/${composeDest} ps -q | head -1) 2>/dev/null || true`
-  const out = await sshExec(host, cmd, sshKey)
-  return out.trim()
-}
-
 // Runs before runAnsible so a deploy that would slot-flip onto images that were
 // never built for this sha is refused rather than detected afterwards. Returns
 // the missing image refs ([] = proceed); an inconclusive registry probe warns
@@ -365,13 +350,13 @@ export function registerDeploy(program: Command): void {
         })
       }
 
-      const deployCtx = await deployRecordInit(process.cwd())
+      const record = await beginDeployRecord(process.cwd())
       const phaseStartedAt = Date.now()
 
-      const missingImages = await findMissingImages(config, deployCtx.sha)
+      const missingImages = await findMissingImages(config, record.sha)
       if (missingImages.length > 0) {
-        await deployRecordDone(process.cwd(), deployCtx, 'failed', { deploy: 0 }, false)
-        console.error(chalk.red(`\nRefusing to deploy: no image exists for ${deployCtx.sha.slice(0, 7)} —`))
+        await record.finish('failed', { deploy: 0 }, false)
+        console.error(chalk.red(`\nRefusing to deploy: no image exists for ${record.sha.slice(0, 7)} —`))
         missingImages.forEach((ref) => console.error(chalk.red(`  - ${ref}`)))
         console.error(chalk.red('Build and push them first, or deploy via the pre-push hook. Nothing was changed on the server.'))
         process.exit(1)
@@ -381,9 +366,7 @@ export function registerDeploy(program: Command): void {
       try {
         await runAnsible('deploy', inventory, extraVars)
       } catch (err) {
-        await deployRecordDone(process.cwd(), deployCtx, 'failed', {
-          deploy: Math.round((Date.now() - phaseStartedAt) / 1000),
-        }, false)
+        await record.finish('failed', { deploy: Math.round((Date.now() - phaseStartedAt) / 1000) }, false)
         throw err
       }
 
@@ -397,36 +380,20 @@ export function registerDeploy(program: Command): void {
       // incident: a CLI-direct deploy with nothing built slot-flipped stale
       // :latest images and still recorded "deployed"). Verify what's actually
       // running before trusting this as the next push's diff baseline.
-      let isBuildBaseline = false
-      if (!buildNumber) {
-        console.warn(chalk.yellow('\nWarning: could not determine a build number to verify this deploy — recording deployed but not as a build baseline.'))
-      } else {
-        let deployedBuildNumber = ''
-        let sshFailed = false
-        try {
-          deployedBuildNumber = await readDeployedBuildNumber(host, sshKey, config.name, composeDest)
-        } catch {
-          sshFailed = true
-          console.warn(chalk.yellow('\nWarning: could not verify the deployed build number over SSH — recording deployed but not as a build baseline.'))
-        }
-        // Most fleet Dockerfiles don't bake a build.number label (only
-        // emit-billing's do, checked 2026-09-19), so this is expected — say so
-        // rather than degrading silently, but don't fail the deploy over it.
-        if (!sshFailed && !deployedBuildNumber) {
-          console.warn(chalk.yellow('\nWarning: the running image has no build.number label, so this deploy can\'t be verified — recording deployed but not as a build baseline. Add `LABEL build.number=$BUILD_NUMBER` to the Dockerfile to enable verification.'))
-        }
-        if (deployedBuildNumber === buildNumber) {
-          isBuildBaseline = true
-        } else if (deployedBuildNumber) {
-          await deployRecordDone(process.cwd(), deployCtx, 'failed', phases, false)
-          console.error(chalk.red(`\nRefusing to record this deploy as shipped: expected build ${buildNumber} but the server reports build ${deployedBuildNumber}.`))
-          console.error(chalk.red(`This means no image was ever built for ${deployCtx.sha.slice(0, 7)} — build and push it first, or deploy via the pre-push hook.`))
-          process.exit(1)
-          return
-        }
+      const verification = await verifyDeployedImages(config, host, sshKey, composeDest, record.sha)
+      if (verification.status === 'mismatch') {
+        await record.finish('failed', phases, false)
+        console.error(chalk.red(`\nRefusing to record this deploy as shipped: running image(s) are not the ones pushed for ${record.sha.slice(0, 7)} —`))
+        verification.mismatched.forEach((image) => console.error(chalk.red(`  - ${image}`)))
+        console.error(chalk.red('Build and push them first, or deploy via the pre-push hook.'))
+        process.exit(1)
+        return
+      }
+      if (verification.status === 'unverified') {
+        console.warn(chalk.yellow(`\nWarning: could not verify this deploy (${verification.reason}) — recording deployed but not as a build baseline.`))
       }
 
-      await deployRecordDone(process.cwd(), deployCtx, 'deployed', phases, isBuildBaseline)
+      await record.finish('deployed', phases, verification.status === 'verified')
 
       console.log(chalk.green(`\nDeployed successfully.`))
     })

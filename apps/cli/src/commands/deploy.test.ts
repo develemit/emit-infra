@@ -3,7 +3,7 @@ import { Command } from 'commander'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { buildDeployExtraVars, checkBackupEnv, computeEnvRemoval, enforceEnvRemovalGuard, parseEnvFile, printDryRunPlan, registerDeploy, resolveBuildNumber, readDeployedBuildNumber, findMissingImages } from './deploy.js'
+import { buildDeployExtraVars, checkBackupEnv, computeEnvRemoval, enforceEnvRemovalGuard, parseEnvFile, printDryRunPlan, registerDeploy, resolveBuildNumber, findMissingImages } from './deploy.js'
 
 vi.mock('@emit-infra/core', async () => {
   const actual = await vi.importActual<typeof import('@emit-infra/core')>('@emit-infra/core')
@@ -25,12 +25,17 @@ vi.mock('../lib/image-preflight.js', () => ({
   checkImagesExist: vi.fn().mockResolvedValue({ status: 'ok' }),
 }))
 
+vi.mock('../lib/deploy-verification-run.js', () => ({
+  verifyDeployedImages: vi.fn().mockResolvedValue({ status: 'verified' }),
+}))
+
 vi.mock('./configure.js', () => ({
   resolveInventoryPath: vi.fn().mockResolvedValue('/fake/inventory.ini'),
 }))
 
-import { loadConfig, runAnsible, sshExec, deployRecordDone, gitField } from '@emit-infra/core'
+import { loadConfig, runAnsible, sshExec, deployRecordInit, deployRecordDone, gitField } from '@emit-infra/core'
 import { checkImagesExist } from '../lib/image-preflight.js'
+import { verifyDeployedImages } from '../lib/deploy-verification-run.js'
 
 const baseConfig = {
   name: 'test-project',
@@ -454,65 +459,45 @@ describe('resolveBuildNumber', () => {
   })
 })
 
-describe('readDeployedBuildNumber', () => {
+describe('deploy command — running-image verification', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-  })
-
-  it('reads the running container\'s build.number label over SSH and trims it', async () => {
-    vi.mocked(sshExec).mockResolvedValue('530\n')
-
-    const result = await readDeployedBuildNumber('1.2.3.4', '/key', 'test-project', 'docker-compose.yml')
-
-    expect(result).toBe('530')
-    expect(sshExec).toHaveBeenCalledWith(
-      '1.2.3.4',
-      expect.stringContaining('docker compose -f /opt/test-project/docker-compose.yml ps -q'),
-      '/key',
-    )
-  })
-})
-
-describe('deploy command — build baseline verification', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    // The action reads process.env.BUILD_NUMBER directly (same as the
-    // pre-push hook exports it) — stub it out so an ambient shell var can't
-    // make resolveBuildNumber skip the gitField fallback these tests exercise.
     vi.stubEnv('BUILD_NUMBER', '')
+    vi.stubEnv('EMIT_DEPLOY_RECORD_OWNER', '')
     vi.mocked(loadConfig).mockReturnValue(baseConfig as ReturnType<typeof loadConfig>)
     vi.mocked(runAnsible).mockResolvedValue(undefined)
     vi.mocked(gitField).mockResolvedValue('530')
+    vi.mocked(verifyDeployedImages).mockResolvedValue({ status: 'verified' })
   })
 
   afterEach(() => {
     vi.unstubAllEnvs()
   })
 
-  it('records isBuildBaseline:true when the server reports the expected build number', async () => {
-    vi.mocked(sshExec).mockResolvedValue('530')
+  async function runDeploy() {
     const program = new Command()
     program.exitOverride()
     registerDeploy(program)
-
     await program.parseAsync(['node', 'cli', 'deploy', '--inventory', '/inv.ini'])
+  }
 
+  it('records isBuildBaseline:true when every running image matches the sha', async () => {
+    await runDeploy()
+
+    expect(verifyDeployedImages).toHaveBeenCalledWith(baseConfig, expect.any(String), expect.any(String), 'docker-compose.yml', 'abc1234')
     expect(deployRecordDone).toHaveBeenLastCalledWith(
       expect.any(String), expect.anything(), 'deployed', expect.any(Object), true,
     )
   })
 
-  it('refuses to record deployed and exits 1 when the server reports a different build number', async () => {
-    vi.mocked(sshExec).mockResolvedValue('402')
+  it('refuses to record deployed and exits 1 when a running image is not the one pushed for the sha', async () => {
+    vi.mocked(verifyDeployedImages).mockResolvedValue({ status: 'mismatch', mismatched: ['ghcr.io/develemit/test-api'] })
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('process.exit') })
-    const program = new Command()
-    program.exitOverride()
-    registerDeploy(program)
 
-    await expect(
-      program.parseAsync(['node', 'cli', 'deploy', '--inventory', '/inv.ini']),
-    ).rejects.toThrow('process.exit')
+    await expect(runDeploy()).rejects.toThrow('process.exit')
 
+    expect(err).toHaveBeenCalledWith(expect.stringContaining('ghcr.io/develemit/test-api'))
     expect(deployRecordDone).toHaveBeenCalledWith(
       expect.any(String), expect.anything(), 'failed', expect.any(Object), false,
     )
@@ -521,60 +506,30 @@ describe('deploy command — build baseline verification', () => {
     )
     expect(exitSpy).toHaveBeenCalledWith(1)
     exitSpy.mockRestore()
+    err.mockRestore()
   })
 
-  it('records isBuildBaseline:false without blocking when the SSH check itself fails', async () => {
-    vi.mocked(sshExec).mockRejectedValue(new Error('connection refused'))
-    const program = new Command()
-    program.exitOverride()
-    registerDeploy(program)
-
-    await program.parseAsync(['node', 'cli', 'deploy', '--inventory', '/inv.ini'])
-
-    expect(deployRecordDone).toHaveBeenLastCalledWith(
-      expect.any(String), expect.anything(), 'deployed', expect.any(Object), false,
-    )
-  })
-
-  it('records isBuildBaseline:false when no build number can be derived at all', async () => {
-    vi.mocked(gitField).mockResolvedValue('')
-    const program = new Command()
-    program.exitOverride()
-    registerDeploy(program)
-
-    await program.parseAsync(['node', 'cli', 'deploy', '--inventory', '/inv.ini'])
-
-    expect(sshExec).not.toHaveBeenCalled()
-    expect(deployRecordDone).toHaveBeenLastCalledWith(
-      expect.any(String), expect.anything(), 'deployed', expect.any(Object), false,
-    )
-  })
-})
-
-describe('deploy command — build.number label absent', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    vi.stubEnv('BUILD_NUMBER', '')
-    vi.mocked(loadConfig).mockReturnValue(baseConfig as ReturnType<typeof loadConfig>)
-    vi.mocked(runAnsible).mockResolvedValue(undefined)
-    vi.mocked(gitField).mockResolvedValue('530')
-  })
-  afterEach(() => vi.unstubAllEnvs())
-
-  it('warns explicitly and records a non-baseline deploy when the image has no label', async () => {
-    vi.mocked(sshExec).mockResolvedValue('')
+  it('warns and records a non-baseline deploy when verification is inconclusive', async () => {
+    vi.mocked(verifyDeployedImages).mockResolvedValue({ status: 'unverified', reason: 'could not read the running images over SSH' })
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const program = new Command()
-    program.exitOverride()
-    registerDeploy(program)
 
-    await program.parseAsync(['node', 'cli', 'deploy', '--inventory', '/inv.ini'])
+    await runDeploy()
 
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('no build.number label'))
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('could not read the running images over SSH'))
     expect(deployRecordDone).toHaveBeenLastCalledWith(
       expect.any(String), expect.anything(), 'deployed', expect.any(Object), false,
     )
     warn.mockRestore()
+  })
+
+  it('writes no record of its own when the pre-push hook owns the push', async () => {
+    vi.stubEnv('EMIT_DEPLOY_RECORD_OWNER', 'hook')
+
+    await runDeploy()
+
+    expect(deployRecordInit).not.toHaveBeenCalled()
+    expect(deployRecordDone).not.toHaveBeenCalled()
+    expect(verifyDeployedImages).toHaveBeenCalled()
   })
 })
 

@@ -354,6 +354,17 @@ check "--dry-run push flagged" "$DRY" "HOOK:DRYRUN"
 DRYN=$(git push -n origin HEAD:refs/heads/other2 2>&1 | grep -o 'HOOK:[A-Z]*' | head -1)
 check "-n push flagged" "$DRYN" "HOOK:DRYRUN"
 
+echo "one record per push (sprint 345.1)"
+HOOK_FILE="$(cd "$(dirname "$LIB")/../hooks" && pwd)/pre-push"
+check_true "hook tells the CLI it owns the push's record" \
+  grep -q '^EMIT_DEPLOY_RECORD_OWNER=hook node .*apps/cli/dist/index.js" deploy' "$HOOK_FILE"
+
+REC=$(mktemp -d)
+echo '{"status":"deployed","sha":"hooksha","isBuildBaseline":true}' > "$REC/.deploy-status.json"
+echo '{"status":"deployed","sha":"hooksha","isBuildBaseline":true}' > "$REC/.deploy-history.jsonl"
+check "hook-only record for a push resolves to that sha" "$(resolve_last_deployed_sha "$REC")" "hooksha"
+rm -rf "$REC"
+
 echo
 echo "$PASS passed, $FAIL failed"
 [[ $FAIL -eq 0 ]]

@@ -264,7 +264,7 @@ deploy_step "Deploying via emit-infra"
 echo "→ running emit-infra deploy"
 export GHCR_TOKEN="$TOKEN"
 export GHCR_ACTOR="${GHCR_USER:-$GHCR_ORG}"
-node "$EMIT_INFRA_DIR/apps/cli/dist/index.js" deploy
+EMIT_DEPLOY_RECORD_OWNER=hook node "$EMIT_INFRA_DIR/apps/cli/dist/index.js" deploy
 
 deploy_done deployed
 _emit_untrap_signals
