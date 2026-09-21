@@ -93,17 +93,54 @@ it in this sprint, and file it as a `[blocker]` follow-up.
   `## Completed` section.
 
 ## Acceptance criteria
-- [ ] The deploy was explicitly authorised, or the sprint halted as `blocked`
-- [ ] The chosen project and its unpushed range are stated, with the contents reviewed
-- [ ] Every row of the verification table is answered with quoted real output,
+- [x] The deploy was explicitly authorised, or the sprint halted as `blocked`
+- [x] The chosen project and its unpushed range are stated, with the contents reviewed
+- [x] Every row of the verification table is answered with quoted real output,
       or explicitly marked not-observable with the reason
-- [ ] The deploy is confirmed live independently of `.deploy-status.json`
-- [ ] Build timing is compared against a pre-338 deploy of the same project
-- [ ] Any deviation from what sprints 336-344 claimed is filed as a `[blocker]`
+- [x] The deploy is confirmed live independently of `.deploy-status.json`
+- [x] Build timing is compared against a pre-338 deploy of the same project
+- [x] Any deviation from what sprints 336-344 claimed is filed as a `[blocker]`
       follow-up, quoted exactly
-- [ ] No source change is made in this sprint — it verifies, it doesn't fix
+- [x] No source change is made in this sprint — it verifies, it doesn't fix
 
 ## Out of scope
 - Fixing anything the verification uncovers — that becomes its own sprint.
 - Deploying more than one project.
 - Re-running the full fleet's deploys.
+
+## Completed
+
+**Date:** 2026-09-20
+
+### Summary
+Deployed **emit-vision** (authorised in the invoking prompt; nothing else deployed). Chosen from a prior fleet survey: deployed `3fcaa909` -> HEAD `9ecd8e36`, 8 commits / 25 files, all `apps/web` UI + `apps/web-e2e` + sprint docs, no migrations (reviewed via `git diff --stat`). Deploy succeeded: `✓ deployed 9ecd8e36532d66dec87f30fcde61a0fa356ffbbf (build 1528)`, log `/tmp/emit-deploy-emit-vision-9ecd8e3.log`. Path-filtered as predicted: `→ services to build: web`, `→ services unchanged (re-tag only): api worker marketing`.
+
+**Verification table**
+| Claim | Result |
+|---|---|
+| Build ran | `→ services to build: web` / `==> Building web...` |
+| Arch probe | Not observable (no `ci.imageArchProbes`). Guard ran: `→ image-arch-check: no probes declared for built services, skipping` |
+| Per-image progress | Captured live. Build: `"label":"Building + pushing images","image":{"name":"web","index":1,"total":1,"action":"building"}` (04:05:29-04:06:31). Retag: `"label":"Re-tagging unchanged images","image":{"name":"api","index":1,"total":3,"action":"retagging"}` -> `worker` 2/3 -> `marketing` 3/3 (04:06:39-47). Note the deploy phase then reset the file to `{"step":0,"total":1,"label":"starting"}` under a new writer pid (5494 -> 15871) and held there ~1m45s with no image/step progress until terminal. |
+| pnpm fetch layer CACHED | Not observable: the log holds no docker build output (0 `CACHED` matches); `pnpm fetch` present in api/worker/web Dockerfiles. Web build phase was 70s. |
+| Build faster | Not conclusively. Pre-338 web-only deploy `69e08e1` (2026-09-17): build 12s, ci 27, total 117s. Pre-338 all-4 build `31686d5`: build 157s, total 260s. Pre-338 api+worker `d07b397`: build 43s, total 147s. Post: web-only build **70s**, ci 33, retag 11, deploy 110, total **192s**. Web-only build is slower than the 12s pre-338 sample (likely that one hit a warm layer cache; 3fcaa909's web+api build was 230s). No like-for-like speedup evidence. |
+| isBuildBaseline | Long record: `"servicesBuilt":["web"],"phases":{"ci":33,"auth":1,"build":70,"archCheck":0,"retag":11,"deploy":110},...,"isBuildBaseline":true`. Short record (same sha): `"durationSec":109,"servicesBuilt":[],"phases":{"deploy":108},...,"isBuildBaseline":false`. Two records per push, as known; not touched. Terminal `.deploy-status.json` said `"isBuildBaseline":true`. |
+| BUILD_NUMBER preserved | Server `/opt/emit-vision/.env`: `BUILD_NUMBER=1528` (was 1520). |
+| Token guard silent | Yes: `→ check-tokens` passed, deploy succeeded, no secret-scan failure. |
+| One-time rebuild | Not observable, already occurred: emit-vision record `ee222bb5` (2026-09-19) `"servicesBuilt":["web","api","worker","marketing"],...,"isBuildBaseline":true`. |
+| Sprint 342 pre-flight | Silent on success: `apps/cli/src/lib/image-preflight.ts` prints only for missing/inconclusive images, so the log has no pre-flight line to quote. ghcr.io "not found" wording not observable (no image missing). |
+
+**Landed independently:** ssh to 46.225.249.8: slot flipped blue -> green, all four containers `Up 49 seconds (healthy)` (previously blue `Up 27 hours`); image digests of green api/worker/marketing match the pushed re-tag digests (`7ac3ce13…`, `e6de39c2…`, `4e4ce586…`); `https://emitvision.com/` returns 200.
+
+### Files changed
+- `sprint/345-end-to-end-verification-deploy.md` — this evidence (no source changes)
+
+### Verification
+- Deploy: succeeded, build 1528, sha 9ecd8e36.
+- Tests: CI phase inside the deploy passed (`✓ CI passed`); no local suite run — no source change.
+
+### Follow-ups
+- `[blocker]` Baseline-flag contradiction on emit-vision: CLI printed `Warning: the running image has no build.number label, so this deploy can't be verified — recording deployed but not as a build baseline. Add `LABEL build.number=$BUILD_NUMBER` to the Dockerfile to enable verification.` Yet the long history record and terminal `.deploy-status.json` say `isBuildBaseline:true` (only the short record is false), and all four running containers have an empty `build.number` label — emit-vision's Dockerfiles set only `org.opencontainers.image.revision`/`.version`. So `readDeployedBuildNumber` (`apps/cli/src/commands/deploy.ts:297`) can never verify this project, and the baseline flag is not trustworthy for it. Decide: emit-vision adds the label, or the CLI reads `org.opencontainers.image.version`, and reconcile which record carries the flag.
+- `[defer]` Status file regresses to `step 0/1 "starting"` for the ~1m45s ansible phase (writer pid changes), so progress is invisible during the longest phase.
+- `[defer]` Deploy log lacks docker build output, so the lockfile-keyed `pnpm fetch` `CACHED` claim and build speedup can't be checked from `/tmp/emit-deploy-*.log`; verify on a project with an arch probe and a cached repeat build.
+- `[defer]` Sprint 342 pre-flight is silent on success; consider a one-line `✓ registry pre-flight: N images present`.
+- `[defer]` The new-sha `deploy-detached.sh` leaves the prior terminal record in `.deploy-status.json` for ~35s after launch, so a poller keying on `status:deployed` exits early (hit this).
