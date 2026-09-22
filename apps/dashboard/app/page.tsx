@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { getProjects, getStatus, type ProjectSummary, type ProjectStatus } from '@/lib/api'
 import { usePipelineRunningCount } from '@/lib/use-pipeline-running-count'
+import { fleetStatusSummary } from '@/lib/health'
 import { ProjectCard } from '@/components/project-card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Icon } from '@/components/icon'
@@ -71,10 +72,12 @@ export default function HomePage() {
     (p) => !search || p.config.name.includes(search) || p.config.domain.includes(search),
   )
 
-  const statusesLoaded = projects !== null && Object.keys(statuses).length > 0
-  const total = projects?.length ?? 0
-  const healthy = projects?.filter(p => statuses[p.config.name] && !statuses[p.config.name].error).length ?? 0
-  const healthColor = healthy === total ? 'var(--ok, #22c55e)' : healthy >= total * 0.5 ? '#f59e0b' : 'var(--err)'
+  const statusSummary =
+    projects !== null ? fleetStatusSummary(projects.map(p => p.config.name), statuses) : null
+  const statusesLoaded = statusSummary?.loaded ?? false
+  const total = statusSummary?.total ?? 0
+  const healthy = statusSummary?.healthy ?? 0
+  const healthColor = statusSummary?.color ?? 'var(--fg-muted)'
   const summaryParts: string[] = [`${healthy} / ${total} healthy`]
   if (ciRunning > 0) summaryParts.push(`${ciRunning} CI running`)
   if (deployRunning > 0) summaryParts.push(`${deployRunning} deploying`)

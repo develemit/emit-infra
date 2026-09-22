@@ -43,10 +43,23 @@ export function sslDaysLeft(expiry: string | null | undefined): SslDaysResult {
   return { value: `${days}d`, color: 'var(--ok, #22c55e)', days }
 }
 
+/**
+ * Parses either a Unix-seconds string (the API's `deployedAt` shape) or an
+ * ISO date string. Returns null for anything unparseable rather than NaN, so
+ * callers can't silently render "just now" for garbage input.
+ */
+export function parseTimestampMs(value: string): number | null {
+  if (/^\d+$/.test(value)) return parseInt(value, 10) * 1000
+  const ms = new Date(value).getTime()
+  return isNaN(ms) ? null : ms
+}
+
 export function deployedAgo(epoch: string | null | undefined): string {
   if (!epoch) return '—'
-  const secs = Math.floor(Date.now() / 1000) - parseInt(epoch, 10)
-  if (isNaN(secs) || secs < 0) return '—'
+  const ms = parseTimestampMs(epoch)
+  if (ms === null) return '—'
+  const secs = Math.floor((Date.now() - ms) / 1000)
+  if (secs < 0) return '—'
   if (secs < 60) return 'just now'
   if (secs < 3600) return `${Math.floor(secs / 60)}m ago`
   if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`

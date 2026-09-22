@@ -21,6 +21,7 @@ import {
   backupLabel,
   deployAge,
   rowLevel,
+  matchesLevelFilter,
   httpColor,
 } from './helpers'
 import { FilterTabs } from '@/components/ui/filter-tabs'
@@ -92,8 +93,8 @@ export default function FleetHealthPage() {
         <FilterTabs
           tabs={[
             { value: 'all', label: 'All', count: rows?.length },
-            { value: 'warn', label: 'Warning', count: rows ? rows.filter(r => rowLevel(r) !== 'ok' && rowLevel(r) !== 'fail').length : undefined },
-            { value: 'fail', label: 'Failing', count: rows ? rows.filter(r => rowLevel(r) === 'fail').length : undefined },
+            { value: 'warn', label: 'Warning', count: rows ? rows.filter(r => matchesLevelFilter(rowLevel(r), 'warn')).length : undefined },
+            { value: 'fail', label: 'Failing', count: rows ? rows.filter(r => matchesLevelFilter(rowLevel(r), 'fail')).length : undefined },
           ]}
           value={filter}
           onChange={v => setFilter(v as 'all' | 'warn' | 'fail')}
@@ -113,7 +114,7 @@ export default function FleetHealthPage() {
             <tbody>
               {rows === null ? (
                 <><SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow /></>
-              ) : rows.filter(r => filter === 'all' || (filter === 'fail' ? rowLevel(r) === 'fail' : rowLevel(r) !== 'ok')).map(r => (
+              ) : rows.filter(r => matchesLevelFilter(rowLevel(r), filter)).map(r => (
                 <tr key={r.name} className="border-t border-border hover:bg-card-hover transition-colors">
                   <td className="py-3 pr-4">
                     <Link href={`/projects/${encodeURIComponent(r.name)}`} className="font-mono text-[13px] font-medium text-fg hover:underline">
@@ -156,7 +157,7 @@ export default function FleetHealthPage() {
                 <div className="w-full h-3 rounded bg-card-2 animate-pulse" />
               </div>
             ))
-          ) : rows.filter(r => filter === 'all' || (filter === 'fail' ? rowLevel(r) === 'fail' : rowLevel(r) !== 'ok')).map(r => (
+          ) : rows.filter(r => matchesLevelFilter(rowLevel(r), filter)).map(r => (
             <div key={r.name} className="rounded-xl border border-border bg-card p-4">
               <div className="flex items-center justify-between mb-2">
                 <Link href={`/projects/${encodeURIComponent(r.name)}`} className="font-mono text-[13px] font-medium text-fg hover:underline">

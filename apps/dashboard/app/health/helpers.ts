@@ -1,4 +1,5 @@
 import type { ProjectStatus, BackupStatus } from '@/lib/api'
+import { parseTimestampMs } from '@/lib/date-helpers'
 
 export interface FleetRow {
   name: string
@@ -63,7 +64,10 @@ export function backupLabel(lastRun: string | undefined, status: string | undefi
 
 export function deployAge(deployedAt: string | null | undefined): string {
   if (!deployedAt) return '—'
-  const h = (Date.now() - new Date(deployedAt).getTime()) / 3600000
+  const ms = parseTimestampMs(deployedAt)
+  if (ms === null) return '—'
+  const h = (Date.now() - ms) / 3600000
+  if (h < 0) return '—'
   const d = Math.floor(h / 24)
   if (d > 0) return `${d}d ago`
   if (h >= 1) return `${Math.floor(h)}h ago`
@@ -89,6 +93,12 @@ export function rowLevel(r: FleetRow): 'fail' | 'warn' | 'ok' {
   if (bh !== null && bh > 25) return 'warn'
   if (ssl !== null && ssl < 30) return 'warn'
   return 'ok'
+}
+
+export type Level = 'fail' | 'warn' | 'ok'
+
+export function matchesLevelFilter(level: Level, filter: 'all' | 'warn' | 'fail'): boolean {
+  return filter === 'all' || level === filter
 }
 
 export function httpColor(code: number | null | undefined): string {

@@ -30,3 +30,29 @@ export function deriveHealth(
 
   return { variant: 'ok', label: 'Healthy' }
 }
+
+export interface FleetStatusSummary {
+  loaded: boolean
+  healthy: number
+  total: number
+  color: string
+}
+
+/**
+ * Waits for every project's status to resolve before reporting a count.
+ * Reporting partial counts mid-load makes a healthy fleet look like it's
+ * half down for the second or two it takes statuses to trickle in.
+ */
+export function fleetStatusSummary(
+  names: string[],
+  statuses: Record<string, ProjectStatus>,
+): FleetStatusSummary {
+  const total = names.length
+  const loaded = names.every(name => statuses[name] !== undefined)
+  if (!loaded) return { loaded: false, healthy: 0, total, color: 'var(--fg-muted)' }
+
+  const healthy = names.filter(name => !statuses[name].error).length
+  const color =
+    healthy === total ? 'var(--ok, #22c55e)' : healthy >= total * 0.5 ? '#f59e0b' : 'var(--err)'
+  return { loaded: true, healthy, total, color }
+}

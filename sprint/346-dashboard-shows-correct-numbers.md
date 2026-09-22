@@ -86,19 +86,67 @@ per-day average. Pick one, and make the label say what the number is.
 - new file: `apps/dashboard/app/health/helpers.test.ts` (or extend an existing one)
 
 ## Acceptance criteria
-- [ ] `deployAge('1790047707')` returns an hours/days string, not "just now";
+- [x] `deployAge('1790047707')` returns an hours/days string, not "just now";
       `deployAge` of an ISO string still works; garbage returns `'—'` —
       covered in `app/health/helpers.test.ts`
-- [ ] The Warning tab and its badge agree on `/health` and `/ci` (a fixture
+- [x] The Warning tab and its badge agree on `/health` and `/ci` (a fixture
       with 2 warn + 1 fail rows shows 2 under Warning) — covered by a unit test
       of the shared predicate
-- [ ] Cost panel never renders "null" — covered by a test, or by a unit test
+- [x] Cost panel never renders "null" — covered by a test, or by a unit test
       of the extracted formatter
-- [ ] Overview doesn't show a partial healthy count while statuses load —
+- [x] Overview doesn't show a partial healthy count while statuses load —
       covered by a test of the count helper
-- [ ] Nginx error counts are integers or explicitly labelled averages
-- [ ] `pnpm test`, `pnpm typecheck` and `pnpm lint` pass
+- [x] Nginx error counts are integers or explicitly labelled averages
+- [x] `pnpm test`, `pnpm typecheck` and `pnpm lint` pass
 
 ## Out of scope
 - API changes to `deployedAt`'s format — fix the reader, not the producer.
 - Error-vs-empty states (sprints 347-348).
+
+## Completed
+
+**Date:** 2026-09-22
+
+### Summary
+Fixed all five wrong-number findings from the UI audit. UI-01: `deployAge` was
+calling `new Date()` directly on the API's Unix-seconds string, which is
+Invalid Date and always fell through to "just now". Added a shared
+`parseTimestampMs` helper in `date-helpers.ts` (regex-detects an all-digit
+epoch-seconds string, otherwise falls back to `new Date`) and used it in both
+`deployedAgo` (existing, now also ISO-safe) and `deployAge`, so there's one
+parser instead of two. UI-05: extracted a `matchesLevelFilter(level, filter)`
+predicate into `health/helpers.ts` and used it for both the Warning/Failing
+badge counts and the table filter on `/health` and `/ci` — they were
+computing "warn" two different ways before, which is exactly how they drifted.
+UI-06: `cost.storage.totalBytes` can be `null` at runtime even though it was
+typed `number`; widened the type and guarded the render to show "No backups
+stored" instead of "null B stored". UI-12: added `fleetStatusSummary` to
+`lib/health.ts`, a pure helper that only reports a healthy/total count once
+every project's status has resolved (previously it counted "loaded" as soon
+as the first status came back, so early polls under-counted). UI-24: rounded
+the nginx 4xx/5xx stat-tile values with `Math.round` — `HealthCard` has no
+`range` prop, so it can't distinguish 24h counts from 7d/30d averages; rounding
+was the simplest fix that doesn't require threading a new prop through.
+
+### Files changed
+- `apps/dashboard/src/lib/date-helpers.ts` — added `parseTimestampMs`; `deployedAgo` now uses it (also fixes ISO input)
+- `apps/dashboard/app/health/helpers.ts` — `deployAge` now uses `parseTimestampMs`; added `matchesLevelFilter`
+- `apps/dashboard/app/health/page.tsx` — badge counts and table filter both use `matchesLevelFilter`
+- `apps/dashboard/app/ci/page.tsx` — same fix for `statsLevel`, imports the shared predicate
+- `apps/dashboard/src/components/detail/cost-panel.tsx` — guards `totalBytes === null`, shows "No backups stored"
+- `apps/dashboard/src/lib/api-infra.ts` — `ProjectCost.storage.totalBytes` typed `number | null`
+- `apps/dashboard/src/lib/health.ts` — added `fleetStatusSummary`
+- `apps/dashboard/app/page.tsx` — uses `fleetStatusSummary` instead of inline partial-count logic
+- `apps/dashboard/src/components/detail/health-card.tsx` — rounds nginx4xx/5xx with `Math.round`
+- (new) `apps/dashboard/app/health/helpers.test.ts` — `deployAge` and `matchesLevelFilter` coverage
+- (new) `apps/dashboard/src/components/detail/cost-panel.test.tsx` — null-totalBytes render coverage
+- (new) `apps/dashboard/src/lib/health.test.ts` — `deriveHealth` and `fleetStatusSummary` coverage
+
+### Verification
+- `pnpm exec nx run dashboard:test`: 240/240 pass (27 files)
+- `pnpm test` (full workspace, 5 projects): 439/439 pass (dashboard + api + cli + core + types)
+- `pnpm typecheck` (full workspace): clean
+- `pnpm lint` (full workspace): clean
+
+### Follow-ups
+none

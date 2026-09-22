@@ -7,6 +7,7 @@ import { getProjects, getCiHistory } from '@/lib/api'
 import { formatDuration } from '@/lib/format-duration'
 import type { ProjectSummary, CiHistoryEntry } from '@/lib/api'
 import { FilterTabs } from '@/components/ui/filter-tabs'
+import { matchesLevelFilter } from '../health/helpers'
 
 interface ProjectCiStats {
   name: string
@@ -124,8 +125,8 @@ export default function CiPage() {
         <FilterTabs
           tabs={[
             { value: 'all', label: 'All', count: stats?.length },
-            { value: 'warn', label: 'Warning', count: stats ? stats.filter(s => statsLevel(s) !== 'ok' && statsLevel(s) !== 'fail').length : undefined },
-            { value: 'fail', label: 'Failing', count: stats ? stats.filter(s => statsLevel(s) === 'fail').length : undefined },
+            { value: 'warn', label: 'Warning', count: stats ? stats.filter(s => matchesLevelFilter(statsLevel(s), 'warn')).length : undefined },
+            { value: 'fail', label: 'Failing', count: stats ? stats.filter(s => matchesLevelFilter(statsLevel(s), 'fail')).length : undefined },
           ]}
           value={filter}
           onChange={v => setFilter(v as 'all' | 'warn' | 'fail')}
@@ -148,7 +149,7 @@ export default function CiPage() {
               <SkeletonRow />
             </>
           ) : (
-            stats.filter(s => filter === 'all' || (filter === 'fail' ? statsLevel(s) === 'fail' : statsLevel(s) !== 'ok')).map(s => (
+            stats.filter(s => matchesLevelFilter(statsLevel(s), filter)).map(s => (
               <div
                 key={s.name}
                 className="flex items-center gap-4 py-3 border-t border-border"
@@ -195,7 +196,7 @@ export default function CiPage() {
               ))}
             </>
           ) : (
-            stats.filter(s => filter === 'all' || (filter === 'fail' ? statsLevel(s) === 'fail' : statsLevel(s) !== 'ok')).map(s => (
+            stats.filter(s => matchesLevelFilter(statsLevel(s), filter)).map(s => (
               <div key={s.name} className="rounded-xl border border-border bg-card p-4">
                 <div className="flex items-center justify-between mb-2">
                   <Link href={`/projects/${encodeURIComponent(s.name)}`} className="text-[13px] font-medium text-fg hover:underline">{s.name}</Link>

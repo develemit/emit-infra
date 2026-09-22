@@ -80,8 +80,8 @@ export function HealthCard({ project, status, polledAgo, onRefresh, uptimePct, l
   const deployed = deployedAgo(status.deployedAt)
   const activeSlot = status.activeSlot ?? null
   const slotColor = activeSlot === 'blue' ? '#3b82f6' : activeSlot === 'green' ? '#22c55e' : undefined
-  const nginx4xx = latestMetric?.nginx4xx ?? 0
-  const nginx5xx = latestMetric?.nginx5xx ?? 0
+  const nginx4xx = Math.round(latestMetric?.nginx4xx ?? 0)
+  const nginx5xx = Math.round(latestMetric?.nginx5xx ?? 0)
   const hasNginxErrors = nginx4xx > 0 || nginx5xx > 0
 
   return (

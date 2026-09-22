@@ -63,7 +63,7 @@ export interface ProjectCost {
   } | null
   storage: {
     usdPerMonth: number | null
-    totalBytes: number
+    totalBytes: number | null
     bucketName: string
   } | null
 }

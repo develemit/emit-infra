@@ -82,7 +82,11 @@ export function CostPanel({ name }: CostPanelProps) {
   const serverSubtitle = cost?.server ? `${cost.server.type} · ${cost.server.region}` : '—'
 
   const storageValue = cost?.storage?.usdPerMonth != null ? `$${cost.storage.usdPerMonth.toFixed(3)}/mo` : '—'
-  const storageSubtitle = cost?.storage ? `${formatBytes(cost.storage.totalBytes)} stored` : '—'
+  const storageSubtitle = !cost?.storage
+    ? '—'
+    : cost.storage.totalBytes != null
+      ? `${formatBytes(cost.storage.totalBytes)} stored`
+      : 'No backups stored'
 
   return (
     <div className="rounded-xl border border-border bg-card" style={{ padding: 18 }}>
