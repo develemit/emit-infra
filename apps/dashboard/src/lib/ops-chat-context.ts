@@ -6,6 +6,14 @@ export function genId() {
   return Math.random().toString(36).slice(2)
 }
 
+export function friendlyErrorMessage(err: unknown): string {
+  if (err instanceof TypeError) {
+    return "Couldn't reach the emit-infra API. Is the dev stack running?"
+  }
+  const message = err instanceof Error ? err.message : String(err)
+  return `Something went wrong: ${message || 'unknown error'}`
+}
+
 export function getConfirmText(toolName: string, projectName: string) {
   if (toolName === 'destroy') return {
     subtitle: `Destroy ${projectName}`,

@@ -71,7 +71,7 @@ export function MobileContainerRow({
         </div>
       </div>
       <div className="flex items-center gap-2">
-        <div className="font-mono text-[11px] text-subtle truncate flex-1">{c.image}</div>
+        <div className="font-mono text-[11px] text-subtle truncate flex-1" title={c.image}>{c.image}</div>
         <span className="font-mono text-[11px] text-faint shrink-0">{buildLabel(c)}</span>
       </div>
       <div className="font-mono text-[11px] text-faint">{c.status}</div>

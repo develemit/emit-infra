@@ -40,4 +40,13 @@ describe('CronPanel', () => {
 
     await waitFor(() => expect(screen.getByText('echo hi')).toBeTruthy())
   })
+
+  it('states the panel is read-only and where jobs are managed', async () => {
+    vi.mocked(getCronJobs).mockResolvedValue({ ok: true, data: [] })
+
+    render(<CronPanel name="myapp" />)
+
+    await waitFor(() => expect(screen.getByText(/Read-only/)).toBeTruthy())
+    expect(screen.getByText(/ansible\/roles/)).toBeTruthy()
+  })
 })

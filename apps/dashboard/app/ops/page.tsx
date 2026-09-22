@@ -13,7 +13,7 @@ function OpsPageInner() {
   const {
     messages, loading, resetting,
     contextProject, statusContext, contextBuildLabel,
-    submit, handleCancel, handleNewConversation, clearContext,
+    submit, handleRetry, handleCancel, handleNewConversation, clearContext,
   } = useOpsChat(projectName)
 
   return (
@@ -55,7 +55,7 @@ function OpsPageInner() {
                 </button>
               </div>
             )}
-            <ChatThread messages={messages} loading={loading} onCancel={handleCancel} />
+            <ChatThread messages={messages} loading={loading} onCancel={handleCancel} onRetry={text => void handleRetry(text)} />
           </div>
         </div>
 

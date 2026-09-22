@@ -1,7 +1,7 @@
 'use client'
 import { useRef, useEffect } from 'react'
 import { Icon } from '@/components/icon'
-import { UserMessage, ClaudeMessage } from './message'
+import { UserMessage, ClaudeMessage, ErrorMessage } from './message'
 import { ToolBlock } from './tool-block'
 import { ConfirmCard } from './confirm-card'
 import type { ChatMessage } from './types'
@@ -39,9 +39,10 @@ interface Props {
   messages: ChatMessage[]
   loading: boolean
   onCancel: () => void
+  onRetry: (text: string) => void
 }
 
-export function ChatThread({ messages, loading, onCancel }: Props) {
+export function ChatThread({ messages, loading, onCancel, onRetry }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -69,6 +70,9 @@ export function ChatThread({ messages, loading, onCancel }: Props) {
       {messages.map(msg => {
         if (msg.type === 'user') return <UserMessage key={msg.id} text={msg.text} />
         if (msg.type === 'claude') return <ClaudeMessage key={msg.id}>{msg.text}</ClaudeMessage>
+        if (msg.type === 'error') return (
+          <ErrorMessage key={msg.id} text={msg.text} onRetry={() => onRetry(msg.retryText)} />
+        )
         if (msg.type === 'tool') return (
           <ToolBlock key={msg.id} toolName={msg.toolName} target={msg.target} result={msg.result} />
         )

@@ -49,6 +49,11 @@ export function CronPanel({ name }: CronPanelProps) {
         </button>
       </div>
 
+      <div className="flex items-center gap-1.5 mb-3 text-[11px]" style={{ color: 'var(--fg-faint)' }}>
+        <Icon name="lock" size={11} style={{ flexShrink: 0 }} />
+        <span>Read-only — scheduled by Ansible (ansible/roles/postgres-backup, ansible/roles/nginx)</span>
+      </div>
+
       {loading && jobs.length === 0 && !errorKind ? (
         <div className="text-[12px] text-subtle font-mono">Loading…</div>
       ) : errorKind ? (

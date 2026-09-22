@@ -4,7 +4,7 @@ import { getApiBase } from '@/lib/api-auth'
 import { getStatus, getProjects } from '@/lib/api-projects'
 import { getDeployHistory, getCiHistory } from '@/lib/api-history'
 import type { ChatMessage, ChatResponse, ConfirmType } from '@/components/ops/types'
-import { genId, getConfirmText, buildContextString } from '@/lib/ops-chat-context'
+import { genId, getConfirmText, buildContextString, friendlyErrorMessage } from '@/lib/ops-chat-context'
 import { useOpsSession } from '@/lib/use-ops-session'
 
 export function useOpsChat(initialContextProject: string | null) {
@@ -45,10 +45,10 @@ export function useOpsChat(initialContextProject: string | null) {
     setMessages(prev => [...prev, msg])
   }, [])
 
-  const submit = useCallback(async (text: string) => {
-    if (!sessionId || !text.trim() || loading) return
+  const sendMessage = useCallback(async (text: string, opts?: { skipUserPush?: boolean }) => {
+    if (!sessionId || loading) return
     setLoading(true)
-    push({ id: genId(), type: 'user', text })
+    if (!opts?.skipUserPush) push({ id: genId(), type: 'user', text })
 
     const isFirstMessage = messages.length === 0
     const body: Record<string, unknown> = { sessionId, message: text }
@@ -89,11 +89,26 @@ export function useOpsChat(initialContextProject: string | null) {
         push({ id: genId(), type: 'claude', text: data.reply })
       }
     } catch (err) {
-      push({ id: genId(), type: 'claude', text: `Error: ${String(err)}` })
+      push({ id: genId(), type: 'error', text: friendlyErrorMessage(err), retryText: text })
     } finally {
       setLoading(false)
     }
   }, [sessionId, apiBase, loading, push, messages.length, statusContext])
+
+  const submit = useCallback(async (text: string) => {
+    if (!text.trim()) return
+    await sendMessage(text)
+  }, [sendMessage])
+
+  const handleRetry = useCallback(async (text: string) => {
+    setMessages(prev => {
+      const idx = [...prev].reverse().findIndex(m => m.type === 'error')
+      if (idx === -1) return prev
+      const realIdx = prev.length - 1 - idx
+      return prev.filter((_, i) => i !== realIdx)
+    })
+    await sendMessage(text, { skipUserPush: true })
+  }, [sendMessage])
 
   function handleCancel() {
     setMessages(prev => {
@@ -122,6 +137,7 @@ export function useOpsChat(initialContextProject: string | null) {
     statusContext,
     contextBuildLabel,
     submit,
+    handleRetry,
     handleCancel,
     handleNewConversation,
     clearContext,

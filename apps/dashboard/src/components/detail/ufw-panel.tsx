@@ -60,6 +60,11 @@ export function UfwPanel({ name }: UfwPanelProps) {
         </button>
       </div>
 
+      <div className="flex items-center gap-1.5 mb-3 text-[11px]" style={{ color: 'var(--fg-faint)' }}>
+        <Icon name="lock" size={11} style={{ flexShrink: 0 }} />
+        <span>Read-only — managed by Ansible (ansible/roles/common)</span>
+      </div>
+
       {loading && status.rules.length === 0 && !errorKind ? (
         <div className="text-[12px] text-subtle font-mono">Loading…</div>
       ) : errorKind ? (

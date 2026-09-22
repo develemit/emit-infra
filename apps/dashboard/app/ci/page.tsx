@@ -148,6 +148,10 @@ export default function CiPage() {
               <SkeletonRow />
               <SkeletonRow />
             </>
+          ) : stats.filter(s => matchesLevelFilter(statsLevel(s), filter)).length === 0 ? (
+            <div className="flex items-center justify-center py-10 text-subtle text-[12px] font-mono">
+              No projects match this filter
+            </div>
           ) : (
             stats.filter(s => matchesLevelFilter(statsLevel(s), filter)).map(s => (
               <div
@@ -195,6 +199,10 @@ export default function CiPage() {
                 </div>
               ))}
             </>
+          ) : stats.filter(s => matchesLevelFilter(statsLevel(s), filter)).length === 0 ? (
+            <div className="flex items-center justify-center py-10 text-subtle text-[12px] font-mono">
+              No projects match this filter
+            </div>
           ) : (
             stats.filter(s => matchesLevelFilter(statsLevel(s), filter)).map(s => (
               <div key={s.name} className="rounded-xl border border-border bg-card p-4">

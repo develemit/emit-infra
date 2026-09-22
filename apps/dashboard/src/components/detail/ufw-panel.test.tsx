@@ -42,4 +42,13 @@ describe('UfwPanel', () => {
 
     await waitFor(() => expect(screen.getByText('22/tcp')).toBeTruthy())
   })
+
+  it('states the panel is read-only and where the firewall is managed', async () => {
+    vi.mocked(getUfwRules).mockResolvedValue({ ok: true, data: { status: 'active', rules: [] } })
+
+    render(<UfwPanel name="myapp" />)
+
+    await waitFor(() => expect(screen.getByText(/Read-only/)).toBeTruthy())
+    expect(screen.getByText(/ansible\/roles\/common/)).toBeTruthy()
+  })
 })

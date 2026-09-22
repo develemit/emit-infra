@@ -63,6 +63,7 @@ export function DesktopContainerRow({
       <td
         className="font-mono text-[12px] text-subtle py-3 pr-3 truncate"
         style={{ maxWidth: 200 }}
+        title={c.image}
       >
         {c.image}
       </td>

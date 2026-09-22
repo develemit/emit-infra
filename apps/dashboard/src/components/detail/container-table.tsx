@@ -7,6 +7,7 @@ import type { MetricPoint } from '@/lib/api-metrics'
 import { useContainerRestarts } from '@/lib/use-container-restarts'
 import { useToast } from '@/components/ui/toast'
 import { MobileContainerRow, DesktopContainerRow, type ContainerMetrics } from './container-row'
+import { shortContainerName } from './container-row-utils'
 import { ContainerLogViewer } from './container-log-viewer'
 
 function stateOrder(state: string): number {
@@ -106,7 +107,8 @@ export function ContainerTable({ containers, projectName, onRefetch, latestMetri
                 {sorted.map(c => {
                   const href = `${logsBase}?service=${encodeURIComponent(c.name)}`
                   const isRestarting = restartingSet.has(c.name)
-                  const cm = cMetrics.get(c.name)
+                  const shortName = shortContainerName(c.name)
+                  const cm = cMetrics.get(shortName)
                   return (
                     <DesktopContainerRow
                       key={c.name}
@@ -118,7 +120,7 @@ export function ContainerTable({ containers, projectName, onRefetch, latestMetri
                       isConfirming={confirmRestart === c.name}
                       onCancelRestart={() => setConfirmRestart(null)}
                       metrics={cm}
-                      restartSeries={restartSeries[c.name]}
+                      restartSeries={restartSeries[shortName]}
                       isLogsActive={activeLogsContainer === c.name}
                       onViewLogs={() => setActiveLogsContainer(activeLogsContainer === c.name ? null : c.name)}
                     />
@@ -148,7 +150,7 @@ export function ContainerTable({ containers, projectName, onRefetch, latestMetri
                   logsHref={`${logsBase}?service=${encodeURIComponent(c.name)}`}
                   projectName={projectName}
                   onRefetch={onRefetch}
-                  metrics={cMetrics.get(c.name)}
+                  metrics={cMetrics.get(shortContainerName(c.name))}
                 />
               ))
             )}

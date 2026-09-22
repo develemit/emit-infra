@@ -3,6 +3,7 @@ export type ConfirmType = 'deploy' | 'provision' | 'destroy'
 export type ChatMessage =
   | { id: string; type: 'user'; text: string }
   | { id: string; type: 'claude'; text: string }
+  | { id: string; type: 'error'; text: string; retryText: string }
   | { id: string; type: 'tool'; toolName: string; target: string; result: unknown }
   | {
       id: string

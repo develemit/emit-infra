@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { RestartSparkline, MobileContainerRow, DesktopContainerRow, type ContainerMetrics } from './container-row'
+import { shortContainerName } from './container-row-utils'
 import type { Container } from '@/lib/api-containers'
 
 vi.mock('@/lib/api-containers', () => ({
@@ -41,6 +42,20 @@ const mockMetrics: ContainerMetrics = {
   memMb: 512,
   restarts: 2,
 }
+
+describe('shortContainerName', () => {
+  it('strips a trailing replica number and takes the last segment', () => {
+    expect(shortContainerName('myapp-api-1')).toBe('api')
+  })
+
+  it('leaves a name with no replica suffix or dashes alone', () => {
+    expect(shortContainerName('redis')).toBe('redis')
+  })
+
+  it('takes the last segment when there is no replica suffix', () => {
+    expect(shortContainerName('myapp-worker')).toBe('worker')
+  })
+})
 
 describe('RestartSparkline', () => {
   it('returns null when fewer than 2 points', () => {
@@ -284,6 +299,23 @@ describe('DesktopContainerRow', () => {
     )
     expect(screen.getByText('myapp:abc1234')).toBeTruthy()
     expect(screen.getByText('abc1234')).toBeTruthy()
+  })
+
+  it('sets a title attribute with the full image ref on the truncated cell', () => {
+    render(
+      <table>
+        <tbody>
+          <DesktopContainerRow
+            c={mockContainer}
+            logsHref="/logs"
+            projectName="myapp"
+            isRestarting={false}
+            onRestart={vi.fn()}
+          />
+        </tbody>
+      </table>
+    )
+    expect(screen.getByText('myapp:abc1234').getAttribute('title')).toBe('myapp:abc1234')
   })
 
   it('calls onRestart when restart button is clicked', async () => {
