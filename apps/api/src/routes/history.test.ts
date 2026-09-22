@@ -370,6 +370,45 @@ describe('GET /projects/:name/ci-log/:sha', () => {
     expect(res.headers['content-type']).toContain('text/plain')
     expect(res.body).toBe('Build log content here\nLine 2')
   })
+
+  it('flags predates-capture for a sha that ran before log capture began', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    vi.mocked(readFile).mockRejectedValue(new Error('ENOENT'))
+    const line = JSON.stringify({ sha: 'abc1234567', startedAt: '2026-01-01T00:00:00Z' })
+    vi.mocked(existsSync).mockReturnValueOnce(true)
+    vi.mocked(open).mockResolvedValue(mockFileHandle(line + '\n') as never)
+
+    const res = await app.inject({ method: 'GET', url: '/projects/myapp/ci-log/abc1234567' })
+
+    expect(res.statusCode).toBe(404)
+    expect(res.json()).toEqual({ error: 'log not found', known: true, predatesCapture: true })
+  })
+
+  it('does not claim predates-capture for a known sha after log capture began', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    vi.mocked(readFile).mockRejectedValue(new Error('ENOENT'))
+    const line = JSON.stringify({ sha: 'abc1234567', startedAt: '2026-08-01T00:00:00Z' })
+    vi.mocked(existsSync).mockReturnValueOnce(true)
+    vi.mocked(open).mockResolvedValue(mockFileHandle(line + '\n') as never)
+
+    const res = await app.inject({ method: 'GET', url: '/projects/myapp/ci-log/abc1234567' })
+
+    expect(res.statusCode).toBe(404)
+    expect(res.json()).toEqual({ error: 'log not found', known: true, predatesCapture: false })
+  })
+
+  it('does not claim predates-capture for a sha with no history entry at all', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    vi.mocked(readFile).mockRejectedValue(new Error('ENOENT'))
+    const line = JSON.stringify({ sha: 'zzzzzzzzzz', startedAt: '2026-01-01T00:00:00Z' })
+    vi.mocked(existsSync).mockReturnValueOnce(true)
+    vi.mocked(open).mockResolvedValue(mockFileHandle(line + '\n') as never)
+
+    const res = await app.inject({ method: 'GET', url: '/projects/myapp/ci-log/0000000000' })
+
+    expect(res.statusCode).toBe(404)
+    expect(res.json()).toEqual({ error: 'log not found', known: false, predatesCapture: false })
+  })
 })
 
 describe('GET /projects/:name/deploy-log/:sha', () => {
@@ -420,6 +459,32 @@ describe('GET /projects/:name/deploy-log/:sha', () => {
     expect(res.statusCode).toBe(200)
     expect(res.headers['content-type']).toContain('text/plain')
     expect(res.body).toBe('Deploy log content\nSuccess')
+  })
+
+  it('flags predates-capture for a sha that ran before log capture began', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    vi.mocked(readFile).mockRejectedValue(new Error('ENOENT'))
+    const line = JSON.stringify({ sha: 'abc1234567', startedAt: '2026-01-01T00:00:00Z' })
+    vi.mocked(existsSync).mockReturnValueOnce(true)
+    vi.mocked(open).mockResolvedValue(mockFileHandle(line + '\n') as never)
+
+    const res = await app.inject({ method: 'GET', url: '/projects/myapp/deploy-log/abc1234567' })
+
+    expect(res.statusCode).toBe(404)
+    expect(res.json()).toEqual({ error: 'log not found', known: true, predatesCapture: true })
+  })
+
+  it('does not claim predates-capture for a sha with no history entry at all', async () => {
+    vi.mocked(discoverProjects).mockResolvedValue([mockProject])
+    vi.mocked(readFile).mockRejectedValue(new Error('ENOENT'))
+    const line = JSON.stringify({ sha: 'zzzzzzzzzz', startedAt: '2026-01-01T00:00:00Z' })
+    vi.mocked(existsSync).mockReturnValueOnce(true)
+    vi.mocked(open).mockResolvedValue(mockFileHandle(line + '\n') as never)
+
+    const res = await app.inject({ method: 'GET', url: '/projects/myapp/deploy-log/0000000000' })
+
+    expect(res.statusCode).toBe(404)
+    expect(res.json()).toEqual({ error: 'log not found', known: false, predatesCapture: false })
   })
 })
 

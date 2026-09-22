@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { nextLogStreamStatus } from './log-stream-status'
+import { nextLogStreamStatus, showsWaitingPlaceholder } from './log-stream-status'
 
 describe('nextLogStreamStatus', () => {
   it('starts connecting', () => {
@@ -28,5 +28,24 @@ describe('nextLogStreamStatus', () => {
 
   it('a stray line after an error does not revert to live', () => {
     expect(nextLogStreamStatus('error', { type: 'line' })).toBe('error')
+  })
+})
+
+describe('showsWaitingPlaceholder', () => {
+  it('shows while connecting with no lines yet', () => {
+    expect(showsWaitingPlaceholder(0, 'connecting')).toBe(true)
+  })
+
+  it('shows when live but between lines (e.g. right after a filter reset)', () => {
+    expect(showsWaitingPlaceholder(0, 'live')).toBe(true)
+  })
+
+  it('hides once at least one line has arrived', () => {
+    expect(showsWaitingPlaceholder(1, 'live')).toBe(false)
+    expect(showsWaitingPlaceholder(5, 'connecting')).toBe(false)
+  })
+
+  it('never shows over a dead connection, even with zero lines', () => {
+    expect(showsWaitingPlaceholder(0, 'error')).toBe(false)
   })
 })

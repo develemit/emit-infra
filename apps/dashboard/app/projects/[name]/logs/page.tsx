@@ -6,7 +6,7 @@ import AnsiToHtml from 'ansi-to-html'
 import { getContainers, openSseStream } from '@/lib/api'
 import { Terminal } from '@/components/ui/terminal'
 import { Icon } from '@/components/icon'
-import { nextLogStreamStatus, type LogStreamStatus } from '@/lib/log-stream-status'
+import { nextLogStreamStatus, showsWaitingPlaceholder, type LogStreamStatus } from '@/lib/log-stream-status'
 
 const ansi = new AnsiToHtml({ escapeXML: true })
 
@@ -167,17 +167,23 @@ export default function LogsPage() {
     </>
   )
 
-  const termLines = lines.map((l, i) => (
-    <div key={i} className="ec-ln">
-      {l.svc && (
-        <>
-          <span style={{ color: l.svcColor, minWidth: 108, display: 'inline-block', fontWeight: 500 }}>{l.svc}</span>
-          <span style={{ color: 'var(--term-dim)', margin: '0 10px' }}>│</span>
-        </>
-      )}
-      <span style={{ flex: 1 }} dangerouslySetInnerHTML={{ __html: ansi.toHtml(l.text) }} />
-    </div>
-  ))
+  const termLines = showsWaitingPlaceholder(lines.length, status)
+    ? [
+      <div key="waiting" className="ec-ln" style={{ color: 'var(--term-dim)' }}>
+        waiting for output…
+      </div>,
+    ]
+    : lines.map((l, i) => (
+      <div key={i} className="ec-ln">
+        {l.svc && (
+          <>
+            <span style={{ color: l.svcColor, minWidth: 108, display: 'inline-block', fontWeight: 500 }}>{l.svc}</span>
+            <span style={{ color: 'var(--term-dim)', margin: '0 10px' }}>│</span>
+          </>
+        )}
+        <span style={{ flex: 1 }} dangerouslySetInnerHTML={{ __html: ansi.toHtml(l.text) }} />
+      </div>
+    ))
 
   return (
     <div className="flex flex-col h-full">

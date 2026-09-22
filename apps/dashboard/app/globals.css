@@ -160,10 +160,12 @@ body {
   text-shadow: 0 0 3px rgba(120,255,190,0.08);
   padding: 14px;
   overflow-y: auto;
+  overflow-x: auto;
   flex: 1;
 }
-.ec-ln { display: flex; }
+.ec-ln { display: flex; white-space: pre; width: max-content; min-width: 100%; }
 .ec-ts { color: var(--term-dim); margin-right: 10px; white-space: nowrap; }
+.ec-log-mark { background: var(--accent-soft); color: var(--accent); border-radius: 2px; }
 .ec-exit {
   display: inline-flex; align-items: center; gap: 6px;
   font-family: var(--font-mono); font-size: 11.5px;

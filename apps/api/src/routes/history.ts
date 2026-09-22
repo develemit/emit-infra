@@ -15,6 +15,21 @@ const ShaParam = z.object({
 const HoursQuery = z.object({ hours: z.coerce.number().int().min(1).max(720).default(24) })
 const LimitQuery = z.object({ limit: z.coerce.number().int().min(1).max(200).default(50) })
 
+// Sprint 76 wired up per-sha log capture (.ci-logs/.deploy-logs); runs
+// started before this can't have a log file no matter what, so a 404 for
+// one of those is expected, not a genuine miss.
+const LOG_CAPTURE_STARTED_AT = '2026-06-20T00:00:00Z'
+
+async function findMissingLogDetail(
+  historyFile: string,
+  sha: string,
+): Promise<{ known: boolean; predatesCapture: boolean }> {
+  const all = await readJsonl<{ sha: string; startedAt: string }>(historyFile, undefined, { tail: 50_000 })
+  const entry = all.find((e) => e.sha.startsWith(sha))
+  if (!entry) return { known: false, predatesCapture: false }
+  return { known: true, predatesCapture: entry.startedAt < LOG_CAPTURE_STARTED_AT }
+}
+
 // Sprint 305: typed so it round-trips through this route's `return { deploys }`
 // — deploy-records.ts (deployRecordDone) has written this on every history
 // line since sprint 290; the type just hadn't caught up.
@@ -154,7 +169,9 @@ export async function historyRoutes(app: FastifyInstance) {
         const content = await readFile(filePath, 'utf8')
         return reply.type('text/plain').send(content)
       } catch {
-        return reply.status(404).send({ error: 'log not found' })
+        const historyFile = join(homedir(), 'projects', params.data.name, '.ci-history.jsonl')
+        const detail = await findMissingLogDetail(historyFile, params.data.sha)
+        return reply.status(404).send({ error: 'log not found', ...detail })
       }
     },
   )
@@ -171,7 +188,9 @@ export async function historyRoutes(app: FastifyInstance) {
         const content = await readFile(filePath, 'utf8')
         return reply.type('text/plain').send(content)
       } catch {
-        return reply.status(404).send({ error: 'log not found' })
+        const historyFile = join(homedir(), 'projects', params.data.name, '.deploy-history.jsonl')
+        const detail = await findMissingLogDetail(historyFile, params.data.sha)
+        return reply.status(404).send({ error: 'log not found', ...detail })
       }
     },
   )

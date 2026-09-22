@@ -90,18 +90,28 @@ export function getServerDeaths(name: string, limit?: number): Promise<ServerDea
   return apiFetch<ServerDeathsResponse>(`/projects/${encodeURIComponent(name)}/server-deaths${qs}`)
 }
 
-export async function getCiLog(name: string, sha: string): Promise<string> {
-  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/ci-log/${encodeURIComponent(sha)}`, { cache: 'no-store', headers: authHeaders() })
-  if (res.status === 404) return ''
-  if (!res.ok) throw new Error(`getCiLog failed: ${res.status}`)
-  return res.text()
+export interface LogResult {
+  /** null means the log file doesn't exist — see predatesCapture for why. */
+  content: string | null
+  predatesCapture: boolean
 }
 
-export async function getDeployLog(name: string, sha: string): Promise<string> {
-  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/deploy-log/${encodeURIComponent(sha)}`, { cache: 'no-store', headers: authHeaders() })
-  if (res.status === 404) return ''
-  if (!res.ok) throw new Error(`getDeployLog failed: ${res.status}`)
-  return res.text()
+async function fetchLog(url: string, label: string): Promise<LogResult> {
+  const res = await fetch(url, { cache: 'no-store', headers: authHeaders() })
+  if (res.status === 404) {
+    const body = (await res.json().catch(() => ({}))) as { predatesCapture?: boolean }
+    return { content: null, predatesCapture: Boolean(body.predatesCapture) }
+  }
+  if (!res.ok) throw new Error(`${label} failed: ${res.status}`)
+  return { content: await res.text(), predatesCapture: false }
+}
+
+export function getCiLog(name: string, sha: string): Promise<LogResult> {
+  return fetchLog(`${API_BASE}/projects/${encodeURIComponent(name)}/ci-log/${encodeURIComponent(sha)}`, 'getCiLog')
+}
+
+export function getDeployLog(name: string, sha: string): Promise<LogResult> {
+  return fetchLog(`${API_BASE}/projects/${encodeURIComponent(name)}/deploy-log/${encodeURIComponent(sha)}`, 'getDeployLog')
 }
 
 export async function getIncidents(name: string): Promise<IncidentsResponse> {
