@@ -42,7 +42,6 @@ export default function HomePage() {
   const fetchAll = useCallback(async () => {
     const ps = await getProjects()
     setProjects(ps)
-    window.dispatchEvent(new Event('emit:ready'))
 
     await Promise.allSettled(
       ps.map((p) =>

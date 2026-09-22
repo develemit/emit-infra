@@ -104,23 +104,36 @@ export interface SplashGateProps {
   minDuration?: number
 }
 
+// Set once per browsing session so the splash only shows on a true cold
+// start — a hard reload or deep link that reuses the tab skips it entirely.
+const BOOTED_SESSION_KEY = 'emit:booted'
+
+function isColdStart(): boolean {
+  if (typeof window === 'undefined') return true
+  if (window.sessionStorage.getItem(BOOTED_SESSION_KEY)) return false
+  window.sessionStorage.setItem(BOOTED_SESSION_KEY, '1')
+  return true
+}
+
 /**
- * Overlays <SplashScreen/> on first load and removes it once the app is ready.
+ * Overlays <SplashScreen/> on a cold start and removes it once the app is
+ * ready. On any later hard navigation in the same browsing session, it skips
+ * rendering entirely (no minDuration wait).
  *
- * "Ready" = `window` load event has fired AND `minDuration` has elapsed.
- * To dismiss it on REAL data readiness instead (e.g. after the first project
- * fetch resolves), dispatch a custom event from anywhere in the app:
- *
- *     window.dispatchEvent(new Event('emit:ready'))
- *
- * The gate listens for it and begins the fade immediately (still respecting
- * minDuration).
+ * "Ready" = `emit:ready` was dispatched (the shell fires it once hydrated)
+ * OR, as a fallback with no such signal, the `window` load event has fired —
+ * whichever comes first, still respecting `minDuration`.
  */
 export function SplashGate({ minDuration = 1600 }: SplashGateProps) {
   const [mounted, setMounted] = useState(true)
   const [leaving, setLeaving] = useState(false)
 
   useEffect(() => {
+    if (!isColdStart()) {
+      setMounted(false)
+      return
+    }
+
     const start = performance.now()
     let done = false
 
@@ -134,10 +147,9 @@ export function SplashGate({ minDuration = 1600 }: SplashGateProps) {
       }, wait)
     }
 
-    // Real-readiness signal (optional) — fires the moment your data lands.
     window.addEventListener('emit:ready', dismiss, { once: true })
 
-    // Fallback: window load (covers the app-shell case with no manual signal).
+    // Fallback: window load (covers the case with no manual signal).
     if (document.readyState === 'complete') dismiss()
     else window.addEventListener('load', dismiss, { once: true })
 

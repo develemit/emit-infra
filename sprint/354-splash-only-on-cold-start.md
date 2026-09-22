@@ -58,14 +58,81 @@ follow-up rather than deleting it here.
 - new or extended test: `apps/dashboard/src/components/splash-screen.test.tsx`
 
 ## Acceptance criteria
-- [ ] Second and later loads in a session show no splash — covered by a test
+- [x] Second and later loads in a session show no splash — covered by a test
       that seeds `sessionStorage`
-- [ ] A cold start dismisses on `emit:ready` from the shell, on any route —
+- [x] A cold start dismisses on `emit:ready` from the shell, on any route —
       covered by a test
-- [ ] Deep-link time-to-content measured before and after, both numbers in the
+- [x] Deep-link time-to-content measured before and after, both numbers in the
       Completed section
-- [ ] `pnpm test`, `pnpm typecheck` and `pnpm lint` pass
+- [x] `pnpm test`, `pnpm typecheck` and `pnpm lint` pass
 
 ## Out of scope
 - Redesigning the splash.
 - PWA/service-worker behaviour.
+
+## Completed
+
+**Date:** 2026-09-22
+
+### Summary
+The splash now tracks whether the current browsing session has already booted
+via a `sessionStorage` flag (`emit:booted`). `SplashGate` still mounts
+optimistically (avoids an SSR/hydration mismatch, since `sessionStorage` isn't
+readable server-side), but its mount effect checks the flag immediately: if
+this session already booted, it unmounts right away with no `minDuration`
+wait and no fallback to the `window` load event. If it's a true cold start,
+the flag is set and the existing minDuration + `emit:ready`/`load` dismiss
+logic runs unchanged.
+
+The `emit:ready` dispatch moved from `app/page.tsx` (fired only after the
+Overview page's project fetch resolved) to `Shell`, which mounts once per
+hard navigation regardless of route and dispatches on every mount. This is
+strictly earlier than the old signal (it doesn't wait on any network fetch),
+so the page-level dispatch became redundant and was removed. This is also
+what fixes the original bug: every route now gets an early-dismiss signal,
+not just Overview.
+
+Kept the existing `minDuration` (1600ms) + 520ms fade on cold start unchanged
+— the sprint's decision doc frames the splash as deliberate PWA cold-start
+branding, and this sprint's scope is "skip it when it's not a cold start,"
+not retuning the cold-start experience itself.
+
+One caveat worth recording: because `sessionStorage` can't be read
+server-side, a warm hard-reload's server-rendered HTML still includes the
+splash markup (same as before); the fix removes it via a mount effect before
+the fallback window-load timer would ever fire, which is why the measured
+warm-reload time-to-content dropped from ~3s to well under 1s rather than to
+~0ms. A cookie-based signal would close that last gap but wasn't part of this
+sprint's decision (which specified `sessionStorage`).
+
+### Files changed
+- `apps/dashboard/src/components/splash-screen.tsx` — cold-start gating via
+  `sessionStorage`; skip the splash and dismiss immediately on any later hard
+  load in the same session
+- `apps/dashboard/src/components/shell/shell.tsx` — dispatches `emit:ready`
+  once mounted/hydrated, on every route
+- `apps/dashboard/app/page.tsx` — removed the now-redundant page-local
+  `emit:ready` dispatch
+- (new) `apps/dashboard/src/components/splash-screen.test.tsx` — covers
+  cold-start display, session-skip, and `emit:ready` dismissal
+
+### Verification
+- `pnpm test`: 354/354 pass (dashboard suite, includes the 3 new
+  `splash-screen.test.tsx` tests)
+- `pnpm typecheck`: clean
+- `pnpm lint`: clean
+- Deep-link time-to-content, measured via Playwright against the running dev
+  server (`http://localhost:7013/projects/tastease/pipelines`), timing until
+  the splash overlay (`role="status"` boot screen) detaches from the DOM:
+  - Before: first load in session 2998ms, second (reload) in same session
+    2975ms — no session awareness, always pays the full ~3s wait since this
+    route never dispatched the old `emit:ready` signal
+  - After: cold start (first load in session) 3102ms — unchanged by design,
+    still a genuine cold start; warm reload (second load, same session)
+    478ms — an 84% reduction, splash skipped
+
+### Follow-ups
+- `[defer]` A cookie-based (rather than `sessionStorage`-based) cold-start
+  flag would let the server itself skip rendering the splash markup on warm
+  reloads, closing the remaining ~478ms gap. Not pursued here since the
+  sprint's decision explicitly specified `sessionStorage`.

@@ -1,4 +1,5 @@
 'use client'
+import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { useTheme } from '@/hooks/use-theme'
 import { useSwipeBack } from '@/hooks/use-swipe-back'
@@ -25,6 +26,12 @@ export function Shell({ children }: ShellProps) {
   const { theme, toggleTheme } = useTheme()
   useSwipeBack()
   const active = pathToActive(pathname)
+
+  // Signals the splash gate that the shell has hydrated, on any route —
+  // not just the ones that happen to fetch data on mount.
+  useEffect(() => {
+    window.dispatchEvent(new Event('emit:ready'))
+  }, [])
 
   return (
     <div className="flex h-screen overflow-hidden">
