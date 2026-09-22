@@ -10,6 +10,7 @@ interface ProjectHeaderProps {
   base: string
   deploying: boolean
   unreachable: boolean
+  sheetOpen: boolean
   onDeployClick: () => void
   onRollbackClick: () => void
   onSecretsSyncClick: () => void
@@ -26,6 +27,7 @@ export function ProjectHeader({
   base,
   deploying,
   unreachable,
+  sheetOpen,
   onDeployClick,
   onRollbackClick,
   onSecretsSyncClick,
@@ -66,7 +68,7 @@ export function ProjectHeader({
         </Link>
         <button
           onClick={onSecretsSyncClick}
-          disabled={unreachable}
+          disabled={sheetOpen || unreachable}
           title={unreachable ? UNREACHABLE_REASON : undefined}
           className="inline-flex items-center gap-1.5 px-3 h-[32px] rounded-lg text-[12px] font-medium text-fg border border-border hover:bg-card-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
@@ -75,7 +77,7 @@ export function ProjectHeader({
         </button>
         <button
           onClick={onRollbackClick}
-          disabled={unreachable}
+          disabled={sheetOpen || unreachable}
           title={unreachable ? UNREACHABLE_REASON : undefined}
           className="inline-flex items-center gap-1.5 px-3 h-[32px] rounded-lg text-[12px] font-medium text-fg border border-border hover:bg-card-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
@@ -84,7 +86,7 @@ export function ProjectHeader({
         </button>
         <button
           onClick={onDeployClick}
-          disabled={deploying || unreachable}
+          disabled={sheetOpen || unreachable}
           title={unreachable ? UNREACHABLE_REASON : undefined}
           className="inline-flex items-center gap-1.5 px-3 h-[32px] rounded-lg text-[12px] font-medium text-accent-fg bg-accent hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
         >

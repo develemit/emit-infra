@@ -76,3 +76,24 @@ describe('DeployPanel confirm step', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('DeployPanel running step', () => {
+  it('opens the deploy output in an action sheet immediately after confirming', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ body: makeStream() } as Response))
+    render(<DeployPanel url="http://x/deploy" name="myapp" onClose={vi.fn()} />)
+
+    await user.click(screen.getByRole('button', { name: 'Deploy' }))
+    expect(screen.getByRole('dialog', { name: 'Deploying myapp' })).toBeTruthy()
+  })
+
+  it('hides the close control while the deploy is still running', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ body: new ReadableStream({ start() {} }) } as Response))
+    render(<DeployPanel url="http://x/deploy" name="myapp" onClose={vi.fn()} />)
+
+    await user.click(screen.getByRole('button', { name: 'Deploy' }))
+    const dialog = screen.getByRole('dialog')
+    expect(dialog.querySelector('button')).toBeNull()
+  })
+})

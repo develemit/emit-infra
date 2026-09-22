@@ -21,6 +21,7 @@ function baseProps() {
     base: '/projects/myapp',
     deploying: false,
     unreachable: false,
+    sheetOpen: false,
     onDeployClick: vi.fn(),
     onRollbackClick: vi.fn(),
     onSecretsSyncClick: vi.fn(),
@@ -66,5 +67,17 @@ describe('ProjectHeader', () => {
     render(<ProjectHeader {...baseProps()} unreachable onDeployClick={onDeployClick} />)
     await user.click(screen.getByText('Deploy').closest('button')!)
     expect(onDeployClick).not.toHaveBeenCalled()
+  })
+
+  it('disables Deploy, Rollback and Sync Secrets while another action sheet is open', () => {
+    render(<ProjectHeader {...baseProps()} sheetOpen />)
+    expect((screen.getByText('Deploy').closest('button') as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByText('Rollback').closest('button') as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByText('Sync Secrets').closest('button') as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('leaves Destroy enabled while another action sheet is open', () => {
+    render(<ProjectHeader {...baseProps()} sheetOpen />)
+    expect((screen.getByText('Destroy').closest('button') as HTMLButtonElement).disabled).toBe(false)
   })
 })

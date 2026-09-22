@@ -1,10 +1,10 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { Terminal } from '@/components/ui/terminal'
-import { Icon } from '@/components/icon'
 import { syncSecrets } from '@/lib/api-secrets'
 import { useToast } from '@/components/ui/toast'
 import { useSseStream } from '@/lib/use-sse-stream'
+import { ActionSheet } from '@/components/detail/action-sheet'
 
 interface SecretsSyncPanelProps {
   name: string
@@ -44,71 +44,16 @@ export function SecretsSyncPanel({ name, onClose }: SecretsSyncPanelProps) {
     <div key={i} className="ec-ln">{l}</div>
   ))
 
-  const footer = !running && (
-    <div className="flex flex-col gap-2 mt-3">
+  return (
+    <ActionSheet title={`Sync Secrets — ${name}`} icon="lock" onClose={onClose} closeDisabled={running}>
+      <Terminal title={title} running={running} exit={exit} style={{ minHeight: 200 }}>
+        {termContent}
+      </Terminal>
       {failed && (
         <p className="text-[12px] text-err">
           Sync failed — make sure <code className="font-mono">gh</code> is installed and authenticated.
         </p>
       )}
-      <button
-        onClick={onClose}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-fg border border-border hover:bg-card-hover transition-colors self-start"
-      >
-        <Icon name="x" size={12} />Close
-      </button>
-    </div>
-  )
-
-  return (
-    <>
-      {/* Desktop: inline */}
-      <div className="hidden lg:flex flex-col gap-2">
-        <div className="text-[11px] font-semibold uppercase tracking-wide text-subtle flex items-center gap-1.5">
-          <Icon name="lock" size={13} />Sync Secrets
-        </div>
-        <Terminal title={title} running={running} exit={exit} style={{ minHeight: 200 }}>
-          {termContent}
-        </Terminal>
-        {footer}
-      </div>
-
-      {/* Mobile: bottom sheet */}
-      <div className="lg:hidden fixed inset-0 z-50">
-        <div
-          className="absolute inset-x-0 bottom-0 flex flex-col rounded-t-2xl border-t border-strong bg-card"
-          style={{ top: '25%', boxShadow: '0 -20px 50px rgba(0,0,0,.4)' }}
-        >
-          <div className="flex justify-center pt-3 pb-2">
-            <div className="rounded-full" style={{ width: 36, height: 4, background: 'var(--border-strong)' }} />
-          </div>
-          <div className="flex items-center gap-2 px-4 pb-3 border-b border-border">
-            <Icon name="lock" size={15} style={{ color: 'var(--accent-bright)' }} />
-            <span className="text-[14px] font-semibold text-fg">Sync Secrets — {name}</span>
-            <div className="flex-1" />
-            {!running && (
-              <button onClick={onClose} className="text-subtle hover:text-fg">
-                <Icon name="x" size={16} />
-              </button>
-            )}
-          </div>
-          <Terminal
-            title={title}
-            running={running}
-            exit={exit}
-            bar={false}
-            style={{ flex: 1, minHeight: 0 }}
-            bodyStyle={{ flex: 1, minHeight: 0, fontSize: 11 }}
-          >
-            {termContent}
-          </Terminal>
-          {failed && (
-            <p className="px-4 py-2 text-[12px] text-err">
-              Sync failed — make sure <code className="font-mono">gh</code> is installed and authenticated.
-            </p>
-          )}
-        </div>
-      </div>
-    </>
+    </ActionSheet>
   )
 }

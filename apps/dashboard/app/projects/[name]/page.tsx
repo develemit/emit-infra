@@ -1,9 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
-import Link from 'next/link'
 import { getApiBase, getSla, getScaleAdvice, type SlaData, type ScaleAdvice } from '@/lib/api'
-import { Icon } from '@/components/icon'
 import { Skeleton } from '@/components/ui/skeleton'
 import { HealthCard } from '@/components/detail/health-card'
 import { ContainerTable } from '@/components/detail/container-table'
@@ -17,6 +15,7 @@ import { DestroyModal } from '@/components/destroy-modal'
 import { useProjectDetail } from '@/lib/use-project-detail'
 import { PipelineProgressCard } from '@/components/detail/pipeline-progress-card'
 import { ProjectHeader } from '@/components/detail/project-header'
+import { MobileActionBar } from '@/components/detail/mobile-action-bar'
 import { AlertBanners } from '@/components/detail/alert-banners'
 import { SummaryCardsGrid } from '@/components/detail/summary-cards-grid'
 import { UnreachableState } from '@/components/detail/unreachable-state'
@@ -55,6 +54,7 @@ export default function ProjectDetailPage() {
   }, [name])
 
   const isUnreachable = !!status?.error
+  const sheetOpen = deploying || showRollback || showSecretsSync
 
   function handleDeployClick() {
     if (isUnreachable) return
@@ -75,11 +75,36 @@ export default function ProjectDetailPage() {
         base={base}
         deploying={deploying}
         unreachable={isUnreachable}
+        sheetOpen={sheetOpen}
         onDeployClick={handleDeployClick}
         onRollbackClick={() => setShowRollback(true)}
         onSecretsSyncClick={() => setShowSecretsSync(true)}
         onDestroyClick={() => setShowDestroy(true)}
       />
+
+      {deploying && (
+        <DeployPanel
+          url={deployUrl}
+          name={name}
+          buildNumber={status?.buildNumber}
+          disk={status?.disk}
+          memory={status?.memory}
+          onClose={() => setDeploying(false)}
+        />
+      )}
+      {showRollback && (
+        <RollbackPanel
+          name={name}
+          onClose={() => setShowRollback(false)}
+        />
+      )}
+      {showSecretsSync && (
+        <SecretsSyncPanel
+          name={name}
+          onClose={() => setShowSecretsSync(false)}
+        />
+      )}
+
       <div className="flex-1 p-4 lg:p-6 pb-[160px] lg:pb-6">
         <div className="flex flex-col gap-4 max-w-[1000px]">
           {loading ? (
@@ -134,80 +159,22 @@ export default function ProjectDetailPage() {
                 backupStatus={backupStatus}
                 project={project}
               />
-
-              {deploying && (
-                <DeployPanel
-                  url={deployUrl}
-                  name={name}
-                  buildNumber={status?.buildNumber}
-                  disk={status?.disk}
-                  memory={status?.memory}
-                  onClose={() => setDeploying(false)}
-                />
-              )}
-              {showRollback && (
-                <RollbackPanel
-                  name={name}
-                  onClose={() => setShowRollback(false)}
-                />
-              )}
-              {showSecretsSync && (
-                <SecretsSyncPanel
-                  name={name}
-                  onClose={() => setShowSecretsSync(false)}
-                />
-              )}
             </>
           )}
         </div>
       </div>
-      <div
-        className="lg:hidden fixed bottom-16 left-0 right-0 z-40 flex flex-col gap-2 px-4 py-3 border-t border-border bg-elev"
-      >
-        <button
-          onClick={handleDeployClick}
-          disabled={deploying || isUnreachable}
-          title={isUnreachable ? "Can't reach the server over SSH" : undefined}
-          className="flex w-full items-center justify-center gap-2 rounded-xl text-[14px] font-medium text-accent-fg bg-accent hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
-          style={{ height: 48 }}
-        >
-          <Icon name="deploy" size={16} />{deploying ? 'Running…' : 'Deploy'}
-        </button>
-        <div className="flex gap-2">
-          <Link
-            href={`${base}/logs`}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl text-[13px] font-medium text-fg border border-border hover:bg-card-hover transition-colors"
-            style={{ height: 44 }}
-          >
-            <Icon name="file" size={14} />Logs
-          </Link>
-          <button
-            onClick={() => setShowSecretsSync(true)}
-            disabled={isUnreachable}
-            title={isUnreachable ? "Can't reach the server over SSH" : undefined}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl text-[13px] font-medium text-fg border border-border hover:bg-card-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            style={{ height: 44 }}
-          >
-            <Icon name="lock" size={14} />Secrets
-          </button>
-          <button
-            onClick={() => setShowRollback(true)}
-            disabled={isUnreachable}
-            title={isUnreachable ? "Can't reach the server over SSH" : undefined}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl text-[13px] font-medium text-fg border border-border hover:bg-card-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            style={{ height: 44 }}
-          >
-            <Icon name="refresh" size={14} />Rollback
-          </button>
-          <button
-            onClick={() => setShowDestroy(true)}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl text-[13px] font-medium text-err border border-err-line hover:bg-err-soft transition-colors"
-            style={{ height: 44 }}
-          >
-            <Icon name="trash" size={14} />Destroy
-          </button>
-        </div>
-      </div>
+
+      <MobileActionBar
+        name={name}
+        base={base}
+        deploying={deploying}
+        unreachable={isUnreachable}
+        sheetOpen={sheetOpen}
+        onDeployClick={handleDeployClick}
+        onSecretsSyncClick={() => setShowSecretsSync(true)}
+        onRollbackClick={() => setShowRollback(true)}
+        onDestroyClick={() => setShowDestroy(true)}
+      />
 
       {showDestroy && (
         <DestroyModal

@@ -5,6 +5,7 @@ import { Icon } from '@/components/icon'
 import { getRollbackSnapshots, rollbackProject } from '@/lib/api-projects'
 import { useToast } from '@/components/ui/toast'
 import { useSseStream } from '@/lib/use-sse-stream'
+import { ActionSheet } from '@/components/detail/action-sheet'
 
 interface RollbackPanelProps {
   name: string
@@ -48,7 +49,6 @@ export function RollbackPanel({ name, onClose }: RollbackPanelProps) {
   const { showToast } = useToast()
   const { lines, exit } = useRollbackSse(sseUrl, sseBody, active)
   const running = active && exit === undefined
-  const done = active && exit !== undefined
 
   useEffect(() => {
     if (exit === undefined) return
@@ -73,15 +73,6 @@ export function RollbackPanel({ name, onClose }: RollbackPanelProps) {
   const termContent = lines.map((l, i) => (
     <div key={i} className="ec-ln">{l}</div>
   ))
-
-  const closeDoneBtn = done && (
-    <button
-      onClick={onClose}
-      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-fg border border-border hover:bg-card-hover transition-colors mt-3"
-    >
-      <Icon name="x" size={12} />Close
-    </button>
-  )
 
   const snapshotSelect = !active && (
     snapshots === null ? (
@@ -127,58 +118,13 @@ export function RollbackPanel({ name, onClose }: RollbackPanelProps) {
   )
 
   return (
-    <>
-      {/* Desktop: inline below containers */}
-      <div className="hidden lg:flex flex-col gap-2">
-        <div className="text-[11px] font-semibold uppercase tracking-wide text-subtle flex items-center gap-1.5">
-          <Icon name="refresh" size={13} />Rollback
-        </div>
-        {snapshotSelect}
-        {active && (
-          <Terminal title={`rollback · ${name}`} running={running} exit={exit} style={{ minHeight: 200 }}>
-            {termContent}
-          </Terminal>
-        )}
-        {closeDoneBtn}
-      </div>
-
-      {/* Mobile: bottom sheet */}
-      <div className="lg:hidden fixed inset-0 z-50">
-        <div
-          className="absolute inset-x-0 bottom-0 flex flex-col rounded-t-2xl border-t border-strong bg-card"
-          style={{ top: '25%', boxShadow: '0 -20px 50px rgba(0,0,0,.4)' }}
-        >
-          <div className="flex justify-center pt-3 pb-2">
-            <div className="rounded-full" style={{ width: 36, height: 4, background: 'var(--border-strong)' }} />
-          </div>
-          <div className="flex items-center gap-2 px-4 pb-3 border-b border-border">
-            <Icon name="refresh" size={15} style={{ color: 'var(--accent-bright)' }} />
-            <span className="text-[14px] font-semibold text-fg">Rollback {name}</span>
-            <div className="flex-1" />
-            {!running && (
-              <button onClick={onClose} className="text-subtle hover:text-fg">
-                <Icon name="x" size={16} />
-              </button>
-            )}
-          </div>
-          <div className="px-4 py-3">
-            {snapshotSelect}
-          </div>
-          {active && (
-            <Terminal
-              title={`rollback · ${name}`}
-              running={running}
-              exit={exit}
-              bar={false}
-              style={{ flex: 1, minHeight: 0 }}
-              bodyStyle={{ flex: 1, minHeight: 0, fontSize: 11 }}
-            >
-              {termContent}
-            </Terminal>
-          )}
-          {closeDoneBtn && <div className="px-4 pb-4">{closeDoneBtn}</div>}
-        </div>
-      </div>
-    </>
+    <ActionSheet title={`Rollback ${name}`} icon="refresh" onClose={onClose} closeDisabled={running}>
+      {snapshotSelect}
+      {active && (
+        <Terminal title={`rollback · ${name}`} running={running} exit={exit} style={{ minHeight: 200 }}>
+          {termContent}
+        </Terminal>
+      )}
+    </ActionSheet>
   )
 }
