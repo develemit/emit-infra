@@ -78,19 +78,73 @@ re-push. One bounded retry of only the failing service is cheap by comparison.
 - `scripts/lib/docker-build.test.sh` — new cases
 
 ## Acceptance criteria
-- [ ] A build that fails once with a transient message and then succeeds
+- [x] A build that fails once with a transient message and then succeeds
       completes successfully, and the retry line is printed — covered in
       `docker-build.test.sh`
-- [ ] A build that fails with a non-transient error (e.g. `error TS2322`) is not
+- [x] A build that fails with a non-transient error (e.g. `error TS2322`) is not
       retried and fails — covered
-- [ ] A build that fails transiently twice fails after exactly one retry — covered
-- [ ] The classifier only reads the failing attempt's output — covered by a test
+- [x] A build that fails transiently twice fails after exactly one retry — covered
+- [x] The classifier only reads the failing attempt's output — covered by a test
       where an earlier attempt's transient text is already in the log file
-- [ ] Unlogged mode is unchanged (no retry) — covered
-- [ ] `pnpm test:hooks`, `pnpm test`, `pnpm typecheck`, `pnpm lint` pass and
+- [x] Unlogged mode is unchanged (no retry) — covered
+- [x] `pnpm test:hooks`, `pnpm test`, `pnpm typecheck`, `pnpm lint` pass and
       `bash -n scripts/hooks/pre-push` is clean
 
 ## Out of scope
 - Retrying `retag_image`, `docker push` or Ansible steps.
 - Retrying at the whole-deploy level.
 - Changing parallelism in `run_build_fanout`.
+
+## Completed
+
+**Date:** 2026-09-22
+
+### Summary
+Added a single classified retry for transient registry/network failures in
+`scripts/lib/docker-build.sh`'s `_buildx_logged` — the one function every
+build invocation (main image + each variant) already funnels through, so no
+caller changes were needed. `_build_failure_is_transient <logfile> [start_line]`
+greps a pattern list (`FetchError`, `socket hang up`, `ECONNRESET`,
+`ETIMEDOUT`, `EAI_AGAIN`, 5xx registry errors, TLS/i-o timeouts, etc.) against
+only the lines appended since `start_line`, so a stale transient message from
+an earlier attempt in the same shared per-service log can't trigger a retry
+forever. On a transient failure, `_buildx_logged` prints `↻ <svc> build hit a
+transient network error — retrying once`, sleeps
+`${_EMIT_BUILD_RETRY_DELAY:-10}` seconds (overridable so tests run at 0), and
+re-runs the exact same `docker buildx build` invocation once. A non-transient
+failure, or a second transient failure, falls through to the existing
+`✗ ... build failed` banner unchanged. Unlogged mode (no `_EMIT_DEPLOY_LOG_FILE`)
+has no log to classify against, so it still runs once with no retry, as before.
+
+Confirmed (per Task 3) that `build_image`'s pipeline `while read` loop over
+variants returns 0 when a service has no variants at all, regardless of
+whether the main (non-variant) build succeeded — a pre-existing quirk, not
+something this sprint's retry touches or fixes, since the retry lives entirely
+inside `_buildx_logged` and its own return code is unaffected by how the
+caller's loop later propagates it. Noted as a follow-up below rather than
+fixed, since it's outside this sprint's stated scope.
+
+### Files changed
+- `scripts/lib/docker-build.sh` — added `_EMIT_TRANSIENT_BUILD_PATTERN`,
+  `_build_failure_is_transient`, and a single classified retry inside
+  `_buildx_logged`
+- `scripts/lib/docker-build.test.sh` — added a `_build_failure_is_transient /
+  retry` section: transient-then-success, non-transient-fails-immediately,
+  transient-twice-fails-after-one-retry, and classifier-scoped-to-this-attempt
+
+### Verification
+- `bash scripts/lib/docker-build.test.sh`: 24/24 pass
+- `pnpm test:hooks`: full chain (18 suites) exits 0
+- `pnpm test`: 280/280 pass (28 test files)
+- `pnpm typecheck`: clean (5 projects)
+- `pnpm lint`: clean (5 projects)
+- `bash -n scripts/hooks/pre-push`: clean
+
+### Follow-ups
+- `[defer]` `build_image` in `scripts/lib/docker-build.sh` doesn't check the
+  main (non-variant) build's exit code before proceeding to the variants
+  loop, and when a service has no variants, the trailing
+  `get_build_variants | while read` pipeline always returns 0 — so a failed
+  main build with no variants is silently treated as success by
+  `run_build_fanout`. Pre-existing, unrelated to this sprint's retry logic;
+  worth its own sprint since it's a real correctness gap in failure detection.

@@ -70,6 +70,20 @@ cache_flags() {
   printf -- '--cache-from type=registry,ref=%s --cache-to type=inline' "$ref"
 }
 
+# tastease deploy post-mortem (2026-08-27): two consecutive deploys died at
+# `pnpm install` on FetchError/socket-hang-up, different package each time,
+# with host-to-registry otherwise healthy. Retrying once on a *transient*
+# registry/network error is cheap; a real build error (type error, missing
+# file, OOM) should still fail immediately.
+_EMIT_TRANSIENT_BUILD_PATTERN='ERR_PNPM_FETCH|FetchError|socket hang up|ECONNRESET|ETIMEDOUT|EAI_AGAIN|ERR_SOCKET_TIMEOUT|5[0-9][0-9] (Bad Gateway|Service Unavailable|Gateway Timeout)|TLS handshake timeout|i/o timeout'
+
+# Checks only the lines appended from line <start_line> on, so a caller can
+# scope the check to a single attempt within a log file shared across retries.
+_build_failure_is_transient() {
+  local logfile="$1" start="${2:-0}"
+  tail -n "+$((start + 1))" "$logfile" | grep -qE "$_EMIT_TRANSIENT_BUILD_PATTERN"
+}
+
 # --quiet suppressed buildx's whole progress stream — including the failing
 # step's output — so a dead build left .deploy-logs/<sha>.log ending at the
 # previous digest with no error to read (tastease build 1056: the failure had
@@ -82,11 +96,23 @@ _buildx_logged() {
   local log=""
   [[ -n "${_EMIT_DEPLOY_LOG_FILE:-}" ]] && log="${_EMIT_DEPLOY_LOG_FILE%.log}-${svc}.log"
   if [[ -z "$log" ]]; then
+    # No per-service log to classify a failure against here, so no retry in
+    # unlogged mode — just run once, same as before this sprint.
     docker buildx build --progress=plain "$@"
     return
   fi
-  local rc=0
+  local rc=0 attempt_start=0
+  [[ -f "$log" ]] && attempt_start=$(wc -l < "$log")
   docker buildx build --progress=plain "$@" >> "$log" 2>&1 || rc=$?
+  # Check only the lines this attempt just appended — the log is shared across
+  # every call for this service (main image + variants), so checking the whole
+  # file would let an earlier attempt's transient text trigger a retry forever.
+  if [[ $rc -ne 0 ]] && _build_failure_is_transient "$log" "$attempt_start"; then
+    echo "↻ $svc build hit a transient network error — retrying once"
+    sleep "${_EMIT_BUILD_RETRY_DELAY:-10}"
+    rc=0
+    docker buildx build --progress=plain "$@" >> "$log" 2>&1 || rc=$?
+  fi
   if [[ $rc -ne 0 ]]; then
     echo "✗ $svc build failed (exit $rc) — full log: $log"
     tail -n 25 "$log"
