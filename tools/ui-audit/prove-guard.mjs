@@ -90,8 +90,9 @@ async function stageRealDeploy(browser) {
   await page.goto(`${APP}/projects/test-smoke`, { waitUntil: 'networkidle' })
   const button = page.getByRole('button', { name: 'Deploy', exact: true }).first()
   await button.click()
-  const anyway = page.getByRole('button', { name: 'Deploy anyway' })
-  if (await anyway.isVisible().catch(() => false)) await anyway.click()
+  // Deploy click always opens a confirm dialog now (sprint 349); its own
+  // "Deploy" button is the second match on the page.
+  await page.getByRole('button', { name: 'Deploy', exact: true }).last().click()
 
   let leaked = false
   for (let i = 0; i < 10; i++) { if (deployProcessRunning()) leaked = true; await page.waitForTimeout(1000) }

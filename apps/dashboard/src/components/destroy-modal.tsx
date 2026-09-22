@@ -42,7 +42,7 @@ export function DestroyModal({ projectName, apiBase, onClose }: Props) {
   const canConfirm = input === projectName
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-4">
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/60 p-4 pb-[calc(4rem+env(safe-area-inset-bottom)+1rem)] sm:pb-4">
       <div
         className="w-full flex flex-col rounded-2xl border overflow-hidden"
         style={{

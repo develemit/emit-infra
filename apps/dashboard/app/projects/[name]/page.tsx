@@ -43,7 +43,6 @@ export default function ProjectDetailPage() {
     uptimePct, fetchData, deployUrl,
   } = useProjectDetail(name)
 
-  const [deployWarning, setDeployWarning] = useState<string | null>(null)
   const [sla, setSla] = useState<SlaData | null>(null)
   const [scaleAdvice, setScaleAdvice] = useState<ScaleAdvice | null>(null)
 
@@ -59,13 +58,6 @@ export default function ProjectDetailPage() {
 
   function handleDeployClick() {
     if (isUnreachable) return
-    setDeployWarning(null)
-    if ((status?.disk ?? 0) >= 80 || (status?.memory ?? 0) >= 80) {
-      setDeployWarning(
-        `Disk at ${status?.disk ?? '?'}%, memory at ${status?.memory ?? '?'}% — server may be under pressure.`
-      )
-      return
-    }
     setDeploying(true)
   }
 
@@ -143,28 +135,14 @@ export default function ProjectDetailPage() {
                 project={project}
               />
 
-              {deployWarning && !deploying && (
-                <div className="rounded-lg border border-warn bg-card p-3 flex items-center gap-3">
-                  <span className="text-[12px] text-warn font-mono flex-1">{deployWarning}</span>
-                  <button
-                    onClick={() => { setDeployWarning(null); setDeploying(true) }}
-                    className="px-3 h-[28px] rounded-lg text-[12px] font-medium text-warn border border-warn hover:bg-warn/10 transition-colors shrink-0"
-                  >
-                    Deploy anyway
-                  </button>
-                  <button
-                    onClick={() => setDeployWarning(null)}
-                    className="text-subtle hover:text-fg shrink-0 text-[12px]"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              )}
               {deploying && (
                 <DeployPanel
                   url={deployUrl}
                   name={name}
-                  onClose={() => { setDeploying(false); setDeployWarning(null) }}
+                  buildNumber={status?.buildNumber}
+                  disk={status?.disk}
+                  memory={status?.memory}
+                  onClose={() => setDeploying(false)}
                 />
               )}
               {showRollback && (

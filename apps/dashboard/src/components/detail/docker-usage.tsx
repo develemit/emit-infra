@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Icon } from '@/components/icon'
 import { getDockerUsage, pruneDocker, type DockerUsageRow } from '@/lib/api-containers'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 
 function isReclaimable(s: string): boolean {
   const trimmed = s.trim()
@@ -47,6 +48,7 @@ export function DockerUsage({ projectName, onPrune }: Props) {
   const [rows, setRows] = useState<DockerUsageRow[] | null>(null)
   const [pruning, setPruning] = useState(false)
   const [pruneResult, setPruneResult] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState(false)
 
   const fetchUsage = useCallback(async () => {
     try {
@@ -59,6 +61,7 @@ export function DockerUsage({ projectName, onPrune }: Props) {
   useEffect(() => { void fetchUsage() }, [fetchUsage])
 
   const handlePrune = async () => {
+    setConfirming(false)
     setPruning(true)
     setPruneResult(null)
     try {
@@ -73,7 +76,8 @@ export function DockerUsage({ projectName, onPrune }: Props) {
     }
   }
 
-  const hasReclaimable = rows?.some(r => isReclaimable(r.reclaimable))
+  const reclaimableRows = rows?.filter(r => isReclaimable(r.reclaimable)) ?? []
+  const hasReclaimable = reclaimableRows.length > 0
 
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden" style={{ padding: 18 }}>
@@ -83,7 +87,7 @@ export function DockerUsage({ projectName, onPrune }: Props) {
         <div className="flex-1" />
         {hasReclaimable && (
           <button
-            onClick={handlePrune}
+            onClick={() => setConfirming(true)}
             disabled={pruning}
             className="inline-flex items-center gap-1.5 px-2.5 h-[28px] rounded-lg text-[11px] font-medium text-warn border border-warn-line hover:bg-warn-soft disabled:opacity-50 transition-colors"
           >
@@ -92,6 +96,28 @@ export function DockerUsage({ projectName, onPrune }: Props) {
           </button>
         )}
       </div>
+
+      {confirming && (
+        <ConfirmDialog
+          title="Prune Docker resources?"
+          icon="trash"
+          tone="warn"
+          confirmLabel={pruning ? 'Pruning…' : 'Prune'}
+          busy={pruning}
+          onConfirm={handlePrune}
+          onCancel={() => setConfirming(false)}
+        >
+          <p>This removes unused Docker resources for <strong>{projectName}</strong>:</p>
+          <ul className="flex flex-col gap-1">
+            {reclaimableRows.map(r => (
+              <li key={r.type} className="flex items-center justify-between text-[12px] font-mono">
+                <span>{r.type}</span>
+                <span className="text-warn">{reclaimableLabel(r.reclaimable)}</span>
+              </li>
+            ))}
+          </ul>
+        </ConfirmDialog>
+      )}
 
       {rows === null ? (
         <p className="text-sm text-subtle py-2">Could not load Docker usage.</p>

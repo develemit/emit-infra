@@ -4,12 +4,18 @@ import { Terminal } from '@/components/ui/terminal'
 import { Icon } from '@/components/icon'
 import { useToast } from '@/components/ui/toast'
 import { useSseStream } from '@/lib/use-sse-stream'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 
 interface DeployPanelProps {
   url: string
   name: string
+  buildNumber?: string | null
+  disk?: number
+  memory?: number
   onClose: () => void
 }
+
+type Step = 'confirm' | 'running'
 
 type SseEvent =
   | { type: 'line'; stream: string; text: string }
@@ -17,11 +23,12 @@ type SseEvent =
   | { type: 'error'; message: string }
   | { type: 'backup'; status: 'started' | 'ok' | 'warn'; message: string }
 
-function useDeploySse(url: string) {
+function useDeploySse(url: string, active: boolean) {
   const [lines, setLines] = useState<{ text: string; color?: string }[]>([])
   const [exit, setExit] = useState<number | undefined>()
 
   useSseStream<SseEvent>(url, {
+    enabled: active,
     onEvent(ev) {
       if (ev.type === 'line') setLines(p => [...p, { text: ev.text }])
       else if (ev.type === 'done') setExit(ev.exitCode)
@@ -37,10 +44,11 @@ function useDeploySse(url: string) {
   return { lines, exit }
 }
 
-export function DeployPanel({ url, name, onClose }: DeployPanelProps) {
+export function DeployPanel({ url, name, buildNumber, disk, memory, onClose }: DeployPanelProps) {
+  const [step, setStep] = useState<Step>('confirm')
   const { showToast } = useToast()
-  const { lines, exit } = useDeploySse(url)
-  const running = exit === undefined
+  const { lines, exit } = useDeploySse(url, step === 'running')
+  const running = step === 'running' && exit === undefined
   const title = `deploy · ${name}`
 
   useEffect(() => {
@@ -48,6 +56,27 @@ export function DeployPanel({ url, name, onClose }: DeployPanelProps) {
     if (exit === 0) showToast(`Deployed ${name}`, 'success')
     else showToast(`Deploy failed for ${name}`, 'error')
   }, [exit, name, showToast])
+
+  if (step === 'confirm') {
+    const pressureWarning = (disk ?? 0) >= 80 || (memory ?? 0) >= 80
+      ? `Disk at ${disk ?? '?'}%, memory at ${memory ?? '?'}% — server may be under pressure.`
+      : null
+
+    return (
+      <ConfirmDialog
+        title={`Deploy ${name}?`}
+        subtitle={buildNumber ? `current build ${buildNumber}` : undefined}
+        icon="deploy"
+        tone={pressureWarning ? 'warn' : 'default'}
+        confirmLabel="Deploy"
+        onConfirm={() => setStep('running')}
+        onCancel={onClose}
+      >
+        <p>This starts a new deploy for <strong>{name}</strong>.</p>
+        {pressureWarning && <p className="text-warn">{pressureWarning}</p>}
+      </ConfirmDialog>
+    )
+  }
 
   const termContent = lines.map((l, i) => (
     <div key={i} className="ec-ln" style={l.color ? { color: l.color } : undefined}>{l.text}</div>
