@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react'
 import { Icon } from '@/components/icon'
 import { getUfwRules, type UfwStatus } from '@/lib/api-ops'
+import { PanelState } from '@/components/ui/panel-state'
+import type { FetchErrorKind } from '@/lib/fetch-result'
 
 interface UfwPanelProps {
   name: string
@@ -10,17 +12,19 @@ interface UfwPanelProps {
 export function UfwPanel({ name }: UfwPanelProps) {
   const [status, setStatus] = useState<UfwStatus>({ status: 'inactive', rules: [] })
   const [loading, setLoading] = useState(false)
+  const [errorKind, setErrorKind] = useState<FetchErrorKind | null>(null)
 
   const fetchRules = async () => {
     setLoading(true)
-    try {
-      const data = await getUfwRules(name)
-      setStatus(data)
-    } catch {
+    const result = await getUfwRules(name)
+    if (result.ok) {
+      setStatus(result.data)
+      setErrorKind(null)
+    } else {
       setStatus({ status: 'inactive', rules: [] })
-    } finally {
-      setLoading(false)
+      setErrorKind(result.kind)
     }
+    setLoading(false)
   }
 
   useEffect(() => {
@@ -36,12 +40,14 @@ export function UfwPanel({ name }: UfwPanelProps) {
         <Icon name="shield" size={16} style={{ color: 'var(--fg-muted)' }} />
         <span className="text-[13.5px] font-semibold text-fg">Firewall</span>
         <div className="flex-1" />
-        <span
-          className="text-[11px] font-medium px-2 py-1 rounded"
-          style={{ color: statusColor, backgroundColor: 'var(--elev)' }}
-        >
-          {statusLabel}
-        </span>
+        {!errorKind && (
+          <span
+            className="text-[11px] font-medium px-2 py-1 rounded"
+            style={{ color: statusColor, backgroundColor: 'var(--elev)' }}
+          >
+            {statusLabel}
+          </span>
+        )}
         <button
           onClick={() => void fetchRules()}
           disabled={loading}
@@ -54,10 +60,12 @@ export function UfwPanel({ name }: UfwPanelProps) {
         </button>
       </div>
 
-      {loading && status.rules.length === 0 ? (
+      {loading && status.rules.length === 0 && !errorKind ? (
         <div className="text-[12px] text-subtle font-mono">Loading…</div>
+      ) : errorKind ? (
+        <PanelState kind={errorKind} />
       ) : status.rules.length === 0 ? (
-        <div className="text-[12px] text-subtle font-mono">No rules configured</div>
+        <PanelState kind="empty" />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-[12px] font-mono">

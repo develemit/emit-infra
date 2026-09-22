@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react'
 import { Icon } from '@/components/icon'
 import { getCronJobs, type CronJob } from '@/lib/api-ops'
+import { PanelState } from '@/components/ui/panel-state'
+import type { FetchErrorKind } from '@/lib/fetch-result'
 
 interface CronPanelProps {
   name: string
@@ -10,17 +12,19 @@ interface CronPanelProps {
 export function CronPanel({ name }: CronPanelProps) {
   const [jobs, setJobs] = useState<CronJob[]>([])
   const [loading, setLoading] = useState(false)
+  const [errorKind, setErrorKind] = useState<FetchErrorKind | null>(null)
 
   const fetchJobs = async () => {
     setLoading(true)
-    try {
-      const data = await getCronJobs(name)
-      setJobs(data)
-    } catch {
+    const result = await getCronJobs(name)
+    if (result.ok) {
+      setJobs(result.data)
+      setErrorKind(null)
+    } else {
       setJobs([])
-    } finally {
-      setLoading(false)
+      setErrorKind(result.kind)
     }
+    setLoading(false)
   }
 
   useEffect(() => {
@@ -45,10 +49,12 @@ export function CronPanel({ name }: CronPanelProps) {
         </button>
       </div>
 
-      {loading && jobs.length === 0 ? (
+      {loading && jobs.length === 0 && !errorKind ? (
         <div className="text-[12px] text-subtle font-mono">Loading…</div>
+      ) : errorKind ? (
+        <PanelState kind={errorKind} />
       ) : jobs.length === 0 ? (
-        <div className="text-[12px] text-subtle font-mono">No cron jobs found</div>
+        <PanelState kind="empty" />
       ) : (
         <div className="flex flex-col divide-y divide-border">
           {jobs.map((job, idx) => (

@@ -33,13 +33,15 @@ export function useBackups(name: string) {
 
   async function deleteBackup(key: string) {
     setDeleteError(null)
-    setBackups(prev => prev.filter(b => b.key !== key))
-    const result = await apiDeleteBackup(name, key)
-    if (result.ok) {
-      void fetchBackups()
-    } else {
+    try {
+      const result = await apiDeleteBackup(name, key)
+      if (result.ok) {
+        void fetchBackups()
+      } else {
+        setDeleteError('Delete failed — check server logs')
+      }
+    } catch {
       setDeleteError('Delete failed — check server logs')
-      void fetchBackups()
     }
   }
 

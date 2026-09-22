@@ -1,4 +1,5 @@
 import { authHeaders, getApiBase } from './api-auth'
+import { fetchResult, type FetchResult } from './fetch-result'
 
 const API_BASE = getApiBase()
 
@@ -91,11 +92,11 @@ export async function getDiskBreakdown(name: string): Promise<DiskBreakdown> {
   return res.json() as Promise<DiskBreakdown>
 }
 
-export async function getPgTableSizes(name: string): Promise<PgTable[]> {
-  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/pg-table-sizes`, { cache: 'no-store', headers: authHeaders() })
-  if (!res.ok) return []
-  const body = await res.json() as { tables: PgTable[] }
-  return body.tables
+export async function getPgTableSizes(name: string): Promise<FetchResult<PgTable[]>> {
+  const result = await fetchResult<{ tables: PgTable[] }>(
+    fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/pg-table-sizes`, { cache: 'no-store', headers: authHeaders() }),
+  )
+  return result.ok ? { ok: true, data: result.data.tables } : result
 }
 
 export async function getNginxEndpoints(name: string): Promise<NginxEndpointsData> {

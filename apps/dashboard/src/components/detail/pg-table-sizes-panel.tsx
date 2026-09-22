@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react'
 import { Icon } from '@/components/icon'
 import { getPgTableSizes, type PgTable } from '@/lib/api-infra'
+import { PanelState } from '@/components/ui/panel-state'
+import type { FetchErrorKind } from '@/lib/fetch-result'
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`
@@ -23,19 +25,19 @@ interface PgTableSizesPanelProps {
 export function PgTableSizesPanel({ name }: PgTableSizesPanelProps) {
   const [tables, setTables] = useState<PgTable[]>([])
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [errorKind, setErrorKind] = useState<FetchErrorKind | null>(null)
 
   const fetchTables = async () => {
     setLoading(true)
-    setError(null)
-    try {
-      const data = await getPgTableSizes(name)
-      setTables(data.slice(0, 10))
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch table sizes')
-    } finally {
-      setLoading(false)
+    const result = await getPgTableSizes(name)
+    if (result.ok) {
+      setTables(result.data.slice(0, 10))
+      setErrorKind(null)
+    } else {
+      setTables([])
+      setErrorKind(result.kind)
     }
+    setLoading(false)
   }
 
   useEffect(() => {
@@ -60,14 +62,12 @@ export function PgTableSizesPanel({ name }: PgTableSizesPanelProps) {
         </button>
       </div>
 
-      {error && (
-        <div className="text-[12px] text-err font-mono mb-3">{error}</div>
-      )}
-
-      {loading && tables.length === 0 ? (
+      {loading && tables.length === 0 && !errorKind ? (
         <div className="text-[12px] text-subtle font-mono">Loading…</div>
+      ) : errorKind ? (
+        <PanelState kind={errorKind} />
       ) : tables.length === 0 ? (
-        <div className="text-[12px] text-subtle font-mono">No tables found</div>
+        <PanelState kind="empty" />
       ) : (
         <div className="flex flex-col divide-y divide-border">
           <div className="grid grid-cols-3 gap-3 py-2 px-0 text-[11px] text-subtle font-medium mb-1">

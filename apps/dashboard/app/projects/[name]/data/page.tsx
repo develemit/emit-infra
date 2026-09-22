@@ -6,6 +6,8 @@ import { useBackups } from '@/lib/use-backups'
 import { SubPageShell } from '@/components/detail/sub-page-shell'
 import { BackupPanel } from '@/components/detail/backup-panel'
 import { SecretsPanel } from '@/components/detail/secrets-panel'
+import { Icon } from '@/components/icon'
+import { PanelState } from '@/components/ui/panel-state'
 
 export default function DataPage() {
   const params = useParams()
@@ -20,8 +22,18 @@ export default function DataPage() {
 
   return (
     <SubPageShell name={name} title="Data &amp; Secrets">
-      {project?.config.postgres?.backupBucket && (
-        <BackupPanel project={project} backups={backupsHook} />
+      {project && (
+        project.config.postgres?.backupBucket ? (
+          <BackupPanel project={project} backups={backupsHook} />
+        ) : (
+          <div className="rounded-xl border border-border bg-card" style={{ padding: 18 }}>
+            <div className="flex items-center gap-2 mb-4">
+              <Icon name="database" size={16} style={{ color: 'var(--fg-muted)' }} />
+              <span className="text-[13.5px] font-semibold text-fg">Backups</span>
+            </div>
+            <PanelState kind="not-configured" />
+          </div>
+        )
       )}
       {project?.config.requiredEnvKeys != null && (
         <SecretsPanel name={name} />

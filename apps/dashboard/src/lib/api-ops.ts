@@ -1,4 +1,5 @@
 import { authHeaders, getApiBase } from './api-auth'
+import { fetchResult, type FetchResult } from './fetch-result'
 
 const API_BASE = getApiBase()
 
@@ -80,15 +81,15 @@ export async function updateBackupRetainDays(name: string, days: number): Promis
   }
 }
 
-export async function getCronJobs(name: string): Promise<CronJob[]> {
-  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/cron-jobs`, { cache: 'no-store', headers: authHeaders() })
-  if (!res.ok) return []
-  const body = await res.json() as { jobs: CronJob[] }
-  return body.jobs
+export async function getCronJobs(name: string): Promise<FetchResult<CronJob[]>> {
+  const result = await fetchResult<{ jobs: CronJob[] }>(
+    fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/cron-jobs`, { cache: 'no-store', headers: authHeaders() }),
+  )
+  return result.ok ? { ok: true, data: result.data.jobs } : result
 }
 
-export async function getUfwRules(name: string): Promise<UfwStatus> {
-  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/ufw-rules`, { cache: 'no-store', headers: authHeaders() })
-  if (!res.ok) return { status: 'inactive', rules: [] }
-  return res.json() as Promise<UfwStatus>
+export async function getUfwRules(name: string): Promise<FetchResult<UfwStatus>> {
+  return fetchResult<UfwStatus>(
+    fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/ufw-rules`, { cache: 'no-store', headers: authHeaders() }),
+  )
 }
