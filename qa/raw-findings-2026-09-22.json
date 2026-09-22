@@ -1,0 +1,559 @@
+[
+ {
+  "track": "data-admin",
+  "page": "/projects/[name]/data",
+  "url": "http://localhost:7013/projects/tastease/data",
+  "dimension": "empty-state",
+  "severity": "degraded",
+  "summary": "Backup panel never renders when a project has no backupBucket configured (true for every real project) \u2014 the page shows only the Secrets panel with no mention of backups at all, not even the API's 'no backup bucket configured' error or a CTA to set one up.",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/data-admin-tastease-data-real-desktop-dark.png"
+  ],
+  "suggestion": "Render a small empty-state card ('Backups not configured \u2014 set postgres.backupBucket in Settings') instead of omitting the panel entirely, so operators know backups genuinely aren't set up vs. the page being broken.",
+  "objective": true
+ },
+ {
+  "track": "data-admin",
+  "page": "/projects/[name]/admin",
+  "url": "http://localhost:7013/projects/tastease/admin",
+  "dimension": "wording",
+  "severity": "broken",
+  "summary": "Cost panel's Backups stat tile prints the literal string 'null B stored' whenever storage.totalBytes is null (true for every project today, since none have a backup bucket) \u2014 formatBytes(null) coerces null to 0 and interpolates it directly into the template string instead of guarding for null.",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/data-admin-tastease-cost-panel-crop-desktop-dark.png"
+  ],
+  "suggestion": "Guard formatBytes for null/undefined totalBytes and show '\u2014' like the usdPerMonth field already does, in apps/dashboard/src/components/detail/cost-panel.tsx.",
+  "objective": true
+ },
+ {
+  "track": "data-admin",
+  "page": "/projects/[name]/admin",
+  "url": "http://localhost:7013/projects/test-smoke/admin",
+  "dimension": "error-state",
+  "severity": "broken",
+  "summary": "On an unreachable project (SSH/503), the Cron Jobs panel shows 'No cron jobs found' and the Firewall panel shows status 'Inactive' + 'No rules configured' \u2014 identical to a genuinely empty/healthy-but-unconfigured state. getCronJobs/getUfwRules in api-ops.ts swallow non-ok responses (503) into empty arrays with no error flag, so there is no way to tell 'couldn't reach the server' from 'nothing is configured'. An operator could wrongly conclude the firewall is actually off.",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/data-admin-testsmoke-admin-real-unreachable-desktop-dark.png"
+  ],
+  "suggestion": "Surface the 503/unreachable distinctly (e.g. 'Server unreachable \u2014 status unknown') instead of collapsing it into the empty-list render path.",
+  "objective": true
+ },
+ {
+  "track": "data-admin",
+  "page": "/projects/[name]/admin",
+  "url": "http://localhost:7013/projects/tastease/admin",
+  "dimension": "quality-of-life",
+  "severity": "polish",
+  "summary": "Cron Jobs and Firewall panels are read-only (view + Refresh only) \u2014 there is no add/delete affordance in the UI for either, despite this being how the page is described in docs/qa-page-inventory.md and the track brief. Confirmed by reading cron-panel.tsx and ufw-panel.tsx: no add/delete handlers exist anywhere in the dashboard source.",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/data-admin-tastease-admin-real-desktop-dark-top.png"
+  ],
+  "suggestion": "Either build the add/delete cron and UFW rule UI the docs describe, or update docs/qa-page-inventory.md so it stops listing actions that don't exist yet.",
+  "objective": true
+ },
+ {
+  "track": "data-admin",
+  "page": "/projects/[name]/admin",
+  "url": "http://localhost:7013/projects/tastease/admin",
+  "dimension": "layout",
+  "severity": "polish",
+  "summary": "Settings panel's 'Required env keys' textarea is a fixed 3 rows (resize-none) with no scroll affordance shown; for tastease's real 37 required keys the comma list is clipped mid-word at the visible boundary with no visual cue that more content exists below.",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/data-admin-tastease-admin-real-desktop-dark-scrolled.png"
+  ],
+  "suggestion": "Grow the textarea (or switch to a scrollable chip list like the Secrets panel uses) so the full key set is either visible or obviously scrollable.",
+  "objective": true
+ },
+ {
+  "track": "data-admin",
+  "page": "/projects/[name]/data",
+  "url": "http://localhost:7013/projects/test-smoke/data",
+  "dimension": "interaction",
+  "severity": "broken",
+  "summary": "Delete-backup optimistically removes the item from the list before the DELETE request resolves (setBackups filter in use-backups.ts), but deleteBackup() there awaits apiDeleteBackup() with no try/catch. When the request fails (confirmed here via the guard blocking it, but this reproduces for any real network/API failure), the fetch rejection becomes an unhandled promise rejection (captured as a Playwright pageerror 'Failed to fetch', visible on-page as Next dev's '1 Issue' badge) instead of surfacing deleteError. The backup silently disappears from the UI with zero error feedback and stays gone until a manual refresh.",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/data-admin-testsmoke-data-delete-confirm-armed-desktop-dark.png",
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/data-admin-testsmoke-data-delete-backup-clicked-desktop-dark.png",
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/data-admin-testsmoke-data-delete-issue-badge-crop.png"
+  ],
+  "suggestion": "Wrap the deleteBackup body in try/catch in apps/dashboard/src/lib/use-backups.ts, set deleteError on failure, and restore the optimistically-removed item (or refetch) so a failed delete never silently loses a backup from the list.",
+  "objective": true
+ },
+ {
+  "track": "fleet-health",
+  "page": "/health/incidents",
+  "url": "http://localhost:7013/health/incidents",
+  "dimension": "contrast",
+  "severity": "degraded",
+  "summary": "Fleet incident timeline's alternating row bands keep a hardcoded near-black background in light theme, making project name labels (dark gray on black) nearly unreadable for diner-decider, emit-social, martialops rows",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/fleet-health-incidents-real-desktop-light.png",
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/fleet-health-incidents-light-contrast-crop.png"
+  ],
+  "suggestion": "Use a theme-aware alternating-row background (e.g. a light gray tint in light mode instead of the dark-mode track color) so row labels stay legible in both themes",
+  "objective": true
+ },
+ {
+  "track": "fleet-health",
+  "page": "/health",
+  "url": "http://localhost:7013/health",
+  "dimension": "interaction",
+  "severity": "broken",
+  "summary": "Selecting the 'Warning (2)' filter tab shows 3 rows, not 2 \u2014 it also includes the failing row (emit-billing, HTTP 401), because the table filter checks 'not ok' instead of 'exactly warn' while the tab's own badge count is computed separately as strictly warn-level. Same filter logic is duplicated in /ci.",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/fleet-health-health-filter-warn-desktop-dark.png",
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/fleet-health-health-filter-fail-desktop-dark.png",
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/fleet-health-health-real-desktop-dark.png"
+  ],
+  "suggestion": "Filter the Warning tab to rowLevel(r) === 'warn' (not !== 'ok') so the row count always matches the tab's own badge, in both apps/dashboard/app/health/page.tsx and apps/dashboard/app/ci/page.tsx",
+  "objective": true
+ },
+ {
+  "track": "fleet-health",
+  "page": "/ci",
+  "url": "http://localhost:7013/ci",
+  "dimension": "empty-state",
+  "severity": "polish",
+  "summary": "Selecting a filter tab with zero matches (e.g. Failing (0)) shows only the table header row with a blank void underneath \u2014 no 'No projects match this filter' message, unlike the incidents page's clear empty-state text",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/fleet-health-ci-filter-fail-desktop-dark.png"
+  ],
+  "suggestion": "Add a short empty-state row/message when the active filter has zero matches, consistent with the 'No incidents or deploys in this range' pattern already used on /health/incidents",
+  "objective": true
+ },
+ {
+  "track": "fleet-health",
+  "page": "/logs",
+  "url": "http://localhost:7013/logs",
+  "dimension": "plainness",
+  "severity": "polish",
+  "summary": "Fleet log entry point is a plain, undifferentiated list of project name + domain \u2014 no health/reachability indicator, so an unreachable project (e.g. test-smoke) looks identical to a healthy one until you click in and the SSH tail fails silently",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/fleet-health-logs-real-desktop-dark.png"
+  ],
+  "suggestion": "Reuse the HTTP/health dot already computed on /health to badge each row here, so users can tell before clicking whether a project's logs are reachable",
+  "objective": false
+ },
+ {
+  "track": "fleet-health",
+  "page": "sidebar (shared chrome, seen on /health, /health/incidents, /ci, /logs)",
+  "url": "http://localhost:7013/health",
+  "dimension": "layout",
+  "severity": "degraded",
+  "summary": "Sidebar footer status widget: the circular 'N' avatar icon overlaps the 'Tailscale' text label instead of sitting beside it with padding, so the label reads as '...ilscale' with the first letters hidden under the icon",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/fleet-health-health-real-desktop-dark.png"
+  ],
+  "suggestion": "Add left padding/margin to the label so it doesn't sit under the avatar circle, or shrink the icon container so it doesn't overlap the flex sibling",
+  "objective": true
+ },
+ {
+  "track": "ops-provision",
+  "page": "/ops",
+  "url": "http://localhost:7013/ops",
+  "dimension": "layout",
+  "severity": "polish",
+  "summary": "Sidebar bottom-left status pill: the avatar circle overlaps the 'Tailscale' label, clipping it to read 'ilscale'. Present in both dark and light desktop.",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/ops-provision-ops-sidebar-tailscale-crop.png",
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/ops-provision-ops-empty-desktop-dark.png"
+  ],
+  "suggestion": "Add left padding/margin to the status label so it clears the avatar circle, or reduce circle size, in the sidebar footer component.",
+  "objective": true
+ },
+ {
+  "track": "ops-provision",
+  "page": "/ops",
+  "url": "http://localhost:7013/ops",
+  "dimension": "wording",
+  "severity": "wording",
+  "summary": "When a chat send fails, the bubble shows the raw JS exception verbatim: 'Error: TypeError: Failed to fetch'. No friendly message, no retry affordance, no hint of what to do next.",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/ops-provision-ops-sent-pending-desktop-dark.png"
+  ],
+  "suggestion": "Catch fetch/network errors in the ops chat and render a human message ('Couldn't reach Claude \u2014 try again') with a retry button, reserving the raw error text for a details/expand affordance.",
+  "objective": true
+ },
+ {
+  "track": "ops-provision",
+  "page": "/provision",
+  "url": "http://localhost:7013/provision",
+  "dimension": "clipping",
+  "severity": "degraded",
+  "summary": "Review step's Postgres summary row is CSS-truncated with an ellipsis to 'enabled \u00b7 backup \u2192 (no bucket \u2026', hiding the actual caveat text 'enabled \u00b7 backup \u2192 (no bucket set)'. The clipped part is exactly the warning that backups have nowhere to go, shown right before the user clicks Provision on real billable infra.",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/ops-provision-provision-step3-review-desktop-dark.png"
+  ],
+  "suggestion": "Let the value wrap to a second line (or widen the value column) instead of truncating with an ellipsis, at least for rows carrying a warning/caveat.",
+  "objective": true
+ },
+ {
+  "track": "ops-provision",
+  "page": "/provision",
+  "url": "http://localhost:7013/provision",
+  "dimension": "mobile parity",
+  "severity": "polish",
+  "summary": "On mobile (390px), the cx42 server-type spec line wraps mid-unit: '8 vCPU \u00b7 16 GB \u00b7 160' then an orphaned 'GB' alone on the next line, while cx22/cx32 rows fit on one line. Harder to scan and visually inconsistent between the three radio rows.",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/ops-provision-provision-cx42-crop-mobile-dark.png",
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/ops-provision-provision-step2-mobile-dark.png"
+  ],
+  "suggestion": "Use a non-breaking space between '160' and 'GB' (and generally between number/unit pairs in the spec string), or shrink font/reflow the row on narrow viewports.",
+  "objective": true
+ },
+ {
+  "track": "overview",
+  "page": "/",
+  "url": "http://localhost:7013/",
+  "dimension": "contrast",
+  "severity": "broken",
+  "summary": "Light theme toggle does not restyle the app: sidebar, header, project cards and page background all remain dark after switching to Light (both via localStorage preset and via clicking the Dark/Light control in the sidebar). Only the underlying <body> background-color token flips to a light value (rgb(250,250,249)), which is invisible because it's fully covered by dark-styled chrome. The Light/Dark selector itself does visibly toggle its own highlighted state.",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/overview-root-desktop-light.png",
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/overview-root-desktop-light-clicked.png",
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/overview-theme-light-broken-crop.png"
+  ],
+  "suggestion": "Audit which surfaces (sidebar, cards, header) use hardcoded dark Tailwind classes instead of theme-aware tokens tied to the ec-theme class/variable; the toggle's own state proves the preference is read correctly, so this is a styling-coverage gap, not a broken read.",
+  "objective": true
+ },
+ {
+  "track": "overview",
+  "page": "/",
+  "url": "http://localhost:7013/",
+  "dimension": "quality-of-life",
+  "severity": "degraded",
+  "summary": "During the per-card progressive-loading window (list resolves, then each card's status/health loads independently), the header summary reads '2 / 8 healthy' \u2014 counting only the cards that happen to have resolved so far, not the true fleet health. Cards still show a 'Loading' badge at that same moment, so the low number reads as a real health signal rather than an in-progress count. Someone glancing at the page mid-load could misread a fleet outage.",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/overview-root-desktop-dark-loading-settled.png",
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/overview-header-count-loading-crop.png"
+  ],
+  "suggestion": "Exclude the header healthy-count from rendering (or show 'x/8 checked' framing) until every card's per-project status has resolved, or derive it only from cards not in a loading state.",
+  "objective": true
+ },
+ {
+  "track": "overview",
+  "page": "/",
+  "url": "http://localhost:7013/",
+  "dimension": "layout breakage",
+  "severity": "broken",
+  "summary": "The 'Add Project' dropdown's UNREGISTERED PROJECTS list has no scroll and its panel background/border does not grow to contain the full list. With ~20 unregistered local folders detected in this dev environment, only the first 7 rows (down through 'emit-infra') are inside the panel's visible chrome; the remaining rows (env-tactics, garage-sailor, garage-sailor-prime, handwriting-helper, immigration-app, jfrc-group, math-problemizer, media-scratch, mlx_env, sss-readiness, tmp, ...) are laid out below that point with no background of their own, so the project cards underneath (e.g. martialops) render on top of/behind them. A sighted user has no way to see or click those later entries \u2014 no scrollbar, no 'more' affordance, no truncation message. Confirmed via elementFromPoint at the coordinate of one such row: it resolves to the martialops card's text, not the dropdown item, even though the item is still present in the DOM with real (but visually unpainted) layout coordinates.",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/overview-add-project-dropdown-open-desktop-dark.png",
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/overview-dropdown-overflow-crop.png"
+  ],
+  "suggestion": "Give the unregistered-projects list a bounded max-height with overflow-y:auto (and a scroll affordance), or paginate/filter it, so the panel's own background always contains every row it lays out.",
+  "objective": true
+ },
+ {
+  "track": "overview",
+  "page": "/",
+  "url": "http://localhost:7013/",
+  "dimension": "wording",
+  "severity": "polish",
+  "summary": "test-smoke's unreachable-project card reads 'SSH unreachable \u2014 last seen \u2014', with a dangling em dash where a timestamp should be (the project has never been reachable, so there is no last-seen value). The phrase reads as truncated/broken rather than clearly saying 'never seen' or omitting the clause.",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/overview-test-smoke-crop.png"
+  ],
+  "suggestion": "When there is no last-seen timestamp, render 'SSH unreachable \u2014 never seen' (or drop the clause entirely) instead of leaving a bare trailing em dash.",
+  "objective": true
+ },
+ {
+  "track": "pipelines-logs",
+  "page": "/projects/[name]/pipelines",
+  "url": "http://localhost:7013/projects/tastease/pipelines",
+  "dimension": "layout",
+  "severity": "degraded",
+  "summary": "Deploy Cadence chart's leftmost x-axis date label is clipped by the card edge on both desktop and mobile, in both themes ('Aug 24' renders as 'ug 24')",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/pipelines-logs-tastease-cadence-label-crop.png",
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/pipelines-logs-tastease-pipelines-desktop-dark.png",
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/pipelines-logs-tastease-pipelines-mobile-dark.png"
+  ],
+  "suggestion": "Add left padding/margin to the chart's x-axis label layer, or shift the first tick inward so the full date text stays inside the card",
+  "objective": true
+ },
+ {
+  "track": "pipelines-logs",
+  "page": "/projects/[name]/deploy-log/[sha]",
+  "url": "http://localhost:7013/projects/tastease/deploy-log/165b2c2646b0fca3671342198a3e832580e2307c",
+  "dimension": "quality-of-life",
+  "severity": "polish",
+  "summary": "Deploy log viewer has no copy, download, or search/filter affordance anywhere on the page (only nav/theme buttons present) \u2014 retrieving a snippet means manual text-select from a long fixed-width Ansible dump",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/pipelines-logs-tastease-deploylog-real-desktop-dark.png"
+  ],
+  "suggestion": "Add a 'Copy log' button and simple text filter/search above the terminal panel, matching what ops engineers expect from a log viewer",
+  "objective": true
+ },
+ {
+  "track": "pipelines-logs",
+  "page": "/projects/[name]/deploy-log/[sha]",
+  "url": "http://localhost:7013/projects/tastease/deploy-log/165b2c2646b0fca3671342198a3e832580e2307c",
+  "dimension": "mobile parity",
+  "severity": "degraded",
+  "summary": "On mobile (390px) the fixed-width Ansible log text wraps mid-line, breaking the dotted-leader column alignment (task name / timing) into a ragged, hard-to-parse mess. Desktop keeps it readable because the terminal panel is wide enough",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/pipelines-logs-tastease-deploylog-real-mobile-dark.png",
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/pipelines-logs-tastease-deploylog-real-desktop-dark.png"
+  ],
+  "suggestion": "Let the terminal panel scroll horizontally on narrow viewports instead of wrapping, or drop to a smaller monospace size before wrapping kicks in",
+  "objective": true
+ },
+ {
+  "track": "pipelines-logs",
+  "page": "/projects/[name]/deploy-log/[sha] and ci-log/[sha]",
+  "url": "http://localhost:7013/projects/tastease/deploy-log/0000000000000000000000000000000000000000",
+  "dimension": "wording",
+  "severity": "wording",
+  "summary": "Missing-log empty state always reads 'Log not available \u2014 this run predates log capture', even for a sha that never existed (e.g. all-zeros). The message asserts a specific cause (an old run) that isn't true for an invalid/unknown sha, which could mislead an operator into thinking a real deploy ran but wasn't logged",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/pipelines-logs-tastease-deploylog-missing-desktop-dark.png",
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/pipelines-logs-tastease-cilog-missing-desktop-dark.png"
+  ],
+  "suggestion": "Distinguish 'sha not found in history' from 'log predates capture' with different copy, or use a neutral 'No log available for this run' message",
+  "objective": true
+ },
+ {
+  "track": "pipelines-logs",
+  "page": "/projects/[name]/logs",
+  "url": "http://localhost:7013/projects/test-smoke/logs",
+  "dimension": "empty/error state",
+  "severity": "degraded",
+  "summary": "On the unreachable test-smoke project, /logs shows a green 'live' badge and an empty terminal with just a bare '$' prompt for 8+ seconds, with no error surfaced \u2014 even though the underlying GET /api/projects/test-smoke/containers returns 503. There is no visible indication the SSH connection/container list failed; it just looks like a quiet live tail",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/pipelines-logs-testsmoke-logs-error-desktop-dark-v2.png"
+  ],
+  "suggestion": "When the containers/status fetch for the log stream fails (e.g. 503 unreachable), replace the 'live' badge with an explicit error state ('server unreachable') instead of leaving an empty terminal that looks identical to a healthy quiet log",
+  "objective": true
+ },
+ {
+  "track": "pipelines-logs",
+  "page": "/projects/[name]/logs",
+  "url": "http://localhost:7013/projects/tastease/logs",
+  "dimension": "quality-of-life",
+  "severity": "polish",
+  "summary": "Live log tail for a healthy project (tastease) shows only a bare '$' prompt with no lines across two separate ~5-7s observation windows, even though GET /api/projects/tastease/logs (the SSE stream) returned 200. Could be a genuinely quiet moment, but there's no initial backlog/scrollback shown on connect, so the viewer can look identical to a broken stream for however long the service stays quiet",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/pipelines-logs-tastease-logs-live-desktop-dark.png",
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/pipelines-logs-tastease-logs-live-desktop-dark-v2.png"
+  ],
+  "suggestion": "On connect, seed the terminal with the last N lines of existing docker compose log output (like a real `docker compose logs -f` does) so the panel never opens fully blank",
+  "objective": false
+ },
+ {
+  "track": "project-detail",
+  "page": "/projects/[name]",
+  "url": "http://localhost:7013/projects/tastease",
+  "dimension": "mobile parity",
+  "severity": "degraded",
+  "summary": "Mobile fixed bottom action bar drops the 'Ask Claude' action entirely. Desktop header shows 6 actions (Logs, Ask Claude, Sync Secrets, Rollback, Deploy, Destroy); mobile bar shows only Deploy (full-width) + Logs, Secrets, Rollback, Destroy \u2014 no overflow menu to reach the missing action.",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/project-detail-tastease-mobile-dark-top.png"
+  ],
+  "suggestion": "Add Ask Claude to the mobile action bar (or a '...' overflow menu) so mobile parity matches desktop's action set.",
+  "objective": true
+ },
+ {
+  "track": "project-detail",
+  "page": "/projects/[name]",
+  "url": "http://localhost:7013/projects/tastease",
+  "dimension": "wording",
+  "severity": "polish",
+  "summary": "'Nginx Errors' stat shows fractional counts on the 7d/30d ranges (e.g. '4xx: 12.25 \u00b7 5xx: 0', '4xx: 10.73') while the 24h range shows a clean integer ('4xx: 13'). A fractional error count reads like an averaged/per-day rate mislabeled as a raw total, which is confusing for an at-a-glance health stat.",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/project-detail-tastease-range-7d-desktop-dark.png",
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/project-detail-tastease-range-30d-desktop-dark.png"
+  ],
+  "suggestion": "Either round to a whole-number total for the selected range, or relabel as 'avg/day' when showing a non-24h range.",
+  "objective": true
+ },
+ {
+  "track": "project-detail",
+  "page": "/projects/[name]",
+  "url": "http://localhost:7013/projects/test-smoke",
+  "dimension": "empty/error state",
+  "severity": "degraded",
+  "summary": "Unreachable project detail shows only a thin red 'SSH unreachable' banner at the top of an otherwise completely empty page (no health card, no containers, no charts, no guidance). All header action buttons (Deploy, Destroy, Rollback, Sync Secrets, Ask Claude, Sync Secrets) remain fully enabled even though the project is unreachable, with no visual distinction that they are likely to fail.",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/project-detail-test-smoke-unreachable-desktop-dark.png",
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/project-detail-test-smoke-unreachable-mobile-dark.png"
+  ],
+  "suggestion": "Disable or visually de-emphasize actions that require SSH when the project is unreachable, and give the empty state a next step (retry SSH, check Tailscale, view last known state).",
+  "objective": true
+ },
+ {
+  "track": "project-detail",
+  "page": "/projects/[name]",
+  "url": "http://localhost:7013/projects/test-smoke",
+  "dimension": "interaction feel",
+  "severity": "broken",
+  "summary": "CONFIRMS known issue #2. Clicking Deploy on the truly-unreachable test-smoke (no stub) flips the button to 'Running\u2026' with zero network requests sent (guard's blocked-request log stayed at 1, i.e. only the pre-flight canary probe \u2014 the Deploy click itself never reached fetch/XHR). The page's SSH-unreachable branch doesn't mount the deploy panel, so the click sets local 'deploying' state with no request, no stream, and no way to clear it short of leaving the page.",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/project-detail-test-smoke-deploy-click-unreachable-desktop-dark.png"
+  ],
+  "suggestion": "Disable Deploy (and other SSH-dependent actions) when status is 'unreachable', or guard the click handler so it can't set 'deploying' without an actual in-flight request.",
+  "objective": true
+ },
+ {
+  "track": "project-detail",
+  "page": "/projects/[name]",
+  "url": "http://localhost:7013/projects/test-smoke",
+  "dimension": "layout breakage/quality-of-life",
+  "severity": "degraded",
+  "summary": "The disk/memory-pressure 'Deploy anyway' warning banner ('Disk at 85%, memory at 20% \u2014 server may be under pressure') renders at the very bottom of the page content, below Networking/Storage/Pipelines/Reliability/Administration cards, while the Deploy button that triggers it sits fixed in the header. On a project with a tall page (containers, charts, summary cards) the banner is completely below the fold with no scroll-into-view, toast, or indicator near the header button \u2014 a user who clicks Deploy sees the button do nothing (no request, no panel) and must scroll the full page length to discover the one safety interstitial standing between them and a disk-pressure production deploy.",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/project-detail-test-smoke-deploy-anyway-banner-desktop-dark.png",
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/project-detail-test-smoke-deploy-click-healthy-stub-desktop-dark.png"
+  ],
+  "suggestion": "Scroll the warning banner into view (or show it as a toast/modal near the header) the moment Deploy is clicked with disk/memory pressure, instead of relying on the user to notice it in normal document flow.",
+  "objective": true
+ },
+ {
+  "track": "project-detail",
+  "page": "/projects/[name]",
+  "url": "http://localhost:7013/projects/test-smoke",
+  "dimension": "interaction feel",
+  "severity": "degraded",
+  "summary": "CONFIRMS known issue #3 with fresh evidence. A single Deploy click on the healthy-stubbed test-smoke fired POST /api/projects/test-smoke/deploy twice, 1ms apart (per the guard's blocked-request log: two identical blocked POST entries for one click). Consistent with a React dev-mode double-invoked effect/stream starting the deploy panel. The API's 409-on-concurrent-deploy likely absorbs it, but a production write action firing twice from one click is worth fixing at the source rather than relying on the API to dedupe.",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/project-detail-test-smoke-deploy-click-healthy-stub-desktop-dark.png"
+  ],
+  "suggestion": "Find why the deploy stream/effect double-fires (likely StrictMode double-invoke or a POST triggered both on click and in a mount effect) and dedupe at the single click-handler level.",
+  "objective": true
+ },
+ {
+  "track": "project-detail",
+  "page": "/projects/[name]",
+  "url": "http://localhost:7013/projects/test-smoke",
+  "dimension": "risky action lacking confirmation",
+  "severity": "degraded",
+  "summary": "CONFIRMS known issue #1. Clicking Deploy on a healthy-stubbed project fires immediately with zero confirmation step \u2014 the button instantly flips to 'Running\u2026' with no modal, no 'are you sure', nothing. The only interstitial in the whole flow is the disk/memory >=80% warning (see separate finding on that banner's placement); a normal-health deploy to production has literally one click between idle and in-flight. Destroy, by contrast, opens a full confirmation modal.",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/project-detail-test-smoke-healthy-stub-before-desktop-dark.png",
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/project-detail-test-smoke-deploy-click-healthy-stub-desktop-dark.png"
+  ],
+  "suggestion": "Add a lightweight confirm step to Deploy (even a single 'Deploy to production?' inline confirm like Destroy's modal, not necessarily as heavy) so a misclick doesn't ship to prod.",
+  "objective": true
+ },
+ {
+  "track": "project-detail",
+  "page": "/projects/[name]",
+  "url": "http://localhost:7013/projects/test-smoke",
+  "dimension": "quality-of-life gap",
+  "severity": "degraded",
+  "summary": "Pattern-wide, not just Deploy: clicking Rollback or Sync Secrets in the header also mounts its panel at the very bottom of the page content (below Networking/Storage/Pipelines/Reliability/Administration), not near the header buttons that opened them and not as an overlay/modal. Every header action except Destroy (which opens a real modal) requires a full-page scroll to see any feedback after clicking.",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/project-detail-test-smoke-rollback-panel-desktop-dark.png",
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/project-detail-test-smoke-sync-secrets-panel-desktop-dark.png"
+  ],
+  "suggestion": "Either scroll the newly-opened panel into view automatically, or render these action panels as a modal/drawer like Destroy already does, so header-button feedback is never below the fold.",
+  "objective": true
+ },
+ {
+  "track": "project-detail",
+  "page": "/projects/[name]",
+  "url": "http://localhost:7013/projects/test-smoke",
+  "dimension": "mobile parity / touch targets",
+  "severity": "broken",
+  "summary": "On mobile (390x844), the Destroy confirmation modal's Cancel/Continue button row is rendered underneath the app's fixed bottom tab bar (Overview/Projects/Logs/CI/Ops/Fleet). Playwright's real click on the 'Continue' button timed out (actionability check failed because another element intercepts pointer events); document.elementFromPoint at the button's exact screen coordinates resolved to the 'Ops' nav tab link, not the Continue button. The button's DOM bounding box (y 773.5-811) is technically inside the 844px viewport, but visually and interactively it is covered by the nav bar drawn on top. A user on mobile cannot tap Continue to confirm \u2014 or reliably tap Cancel \u2014 on the single most destructive action in the app; a mis-tap in that zone instead navigates to the Ops page.",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/project-detail-test-smoke-destroy-modal-mobile-dark.png",
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/project-detail-test-smoke-destroy-modal-mobile-after-click-dark.png"
+  ],
+  "suggestion": "Give the Destroy modal its own top-level stacking context above the fixed bottom tab bar (e.g. render in a portal with a higher z-index, or hide the tab bar while any modal is open), and make the modal's own content scrollable within the viewport so its action row is always reachable.",
+  "objective": true
+ },
+ {
+  "track": "project-detail",
+  "page": "/projects/[name]",
+  "url": "http://localhost:7013/projects/tastease",
+  "dimension": "clipped/truncated content",
+  "severity": "polish",
+  "summary": "Containers table IMAGE column truncates the full image tag with CSS ellipsis (e.g. shows 'ghcr.io/develemit/easylivin\u2026' for the real value 'ghcr.io/develemit/easyliving/web:1358') and the truncated element has no title attribute or other hover affordance \u2014 confirmed via DOM inspection (getAttribute('title') returns null on the cell and its parent). The full image reference, which includes the build tag, is unreachable without opening dev tools.",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/project-detail-tastease-containers-desktop-dark-crop.png"
+  ],
+  "suggestion": "Add a title attribute or hover tooltip with the full image string, or widen the column / wrap on hover.",
+  "objective": true
+ },
+ {
+  "track": "project-detail",
+  "page": "/projects/[name]",
+  "url": "http://localhost:7013/projects/tastease",
+  "dimension": "quality-of-life gap",
+  "severity": "polish",
+  "summary": "Containers table has CPU, MEM and RESTARTS columns but every row shows only a dash ('\u2013') for all three, for all 6 running containers on a healthy long-running project (tastease, up 15 hours). The columns exist and take up header width but carry no data and no explanation (no 'not available' label, no tooltip) \u2014 reads as either a broken data source or dead UI.",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/project-detail-tastease-containers-desktop-dark-crop.png"
+  ],
+  "suggestion": "Either wire up real per-container CPU/mem/restart-count stats (likely available from `docker stats`/`docker inspect` over the same SSH connection already used for containers), or remove the columns until the data exists.",
+  "objective": true
+ },
+ {
+  "track": "reliability-network-storage",
+  "page": "[name]/storage",
+  "url": "http://localhost:7013/projects/develemail/storage",
+  "dimension": "quality-of-life gap",
+  "severity": "degraded",
+  "summary": "Prune (Docker system prune) fires with a single click and zero confirmation \u2014 no modal, no 'are you sure', no summary of what will be removed beyond the ambient 'reclaimable' figures shown above it. Destroy has a confirmation modal for a comparably destructive action; Prune does not.",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/reliability-network-storage-develemail-storage-prune-crop.png",
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/reliability-network-storage-tastease-storage-desktop-light.png"
+  ],
+  "suggestion": "Add a confirm step (modal or inline 'Prune anyway?') listing what will be removed (dangling images, stopped containers, unused volumes, build cache) before firing pruneDocker(), matching the Destroy flow's pattern.",
+  "objective": true
+ },
+ {
+  "track": "reliability-network-storage",
+  "page": "[name]/networking",
+  "url": "http://localhost:7013/projects/test-smoke/networking",
+  "dimension": "empty/error state",
+  "severity": "degraded",
+  "summary": "On an unreachable project (test-smoke), the Networking page renders only the 'Top Endpoints' card; Response Times, Nginx Config, SSL Certificate and the Network Bandwidth chart all silently render nothing (ResponseTimePanel and CertPanel return null on failure; NginxConfigPanel only shows 'Unreachable' text when status isn't literally 'unconfigured', and nginx-drift returned status:unconfigured here so it also renders null). The page ends up mostly blank with a large empty void and zero indication the project is unreachable, unlike the project Detail page's explicit SSH-unreachable banner.",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/reliability-network-storage-test-smoke-networking-desktop-dark.png"
+  ],
+  "suggestion": "Show a single 'project unreachable / cannot collect network data' banner (like the Detail page) when the underlying calls fail, instead of each panel silently vanishing.",
+  "objective": true
+ },
+ {
+  "track": "reliability-network-storage",
+  "page": "[name]/storage",
+  "url": "http://localhost:7013/projects/develemail/storage",
+  "dimension": "wording",
+  "severity": "polish",
+  "summary": "Table Sizes shows the generic 'No tables found' for develemail even though the API actually returned 404 'postgres not configured' \u2014 the UI can't distinguish 'Postgres not configured for this project' from 'Postgres configured but genuinely empty'. Also test-smoke/storage shows three differently-worded empty states for the same root cause (SSH unreachable): 'No directory data yet', 'No tables found', 'Could not load Docker usage.' \u2014 one reads as an error, two read as empty, though the underlying cause is identical.",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/reliability-network-storage-develemail-storage-desktop-dark.png",
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/reliability-network-storage-test-smoke-storage-desktop-dark-before-prune.png"
+  ],
+  "suggestion": "Surface the API's actual error/reason string (e.g. 'Postgres not configured', 'SSH unreachable') instead of a generic empty-state label, and use consistent phrasing across the three storage panels for the same failure mode.",
+  "objective": true
+ },
+ {
+  "track": "reliability-network-storage",
+  "page": "[name]/reliability",
+  "url": "http://localhost:7013/projects/tastease/reliability",
+  "dimension": "touch target",
+  "severity": "polish",
+  "summary": "The per-incident 'Annotate' icon button measures 13x13 CSS px (no padding around the SVG), versus the adjacent 'Export incidents' button at 29x28px in the same panel header. 13x13 is below any usable touch-target minimum (WCAG 2.5.8's 24x24 floor, Apple/Material's 44/48). Same markup renders identically on mobile viewport (390x844).",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/reliability-network-storage-tastease-reliability-touch-target-crop.png"
+  ],
+  "suggestion": "Wrap the Annotate icon button with the same sizing classes as the export button (e.g. px-2 h-[28px]) so it's consistent and tappable.",
+  "objective": true
+ },
+ {
+  "track": "reliability-network-storage",
+  "page": "fleet-wide (affects all sub-pages)",
+  "url": "http://localhost:7013/projects/tastease/reliability",
+  "dimension": "interaction feel",
+  "severity": "degraded",
+  "summary": "The boot splash (app/layout.tsx SplashGate) re-triggers on every hard navigation/reload/direct link, not just true cold start, and always displays for a minimum ~1.6s plus a 0.5s fade (~2.1s total) before real content appears. The component supports an early-dismiss 'emit:ready' event for real data-readiness, but nothing in the app ever dispatches it, so every deep link (e.g. an incident link straight to a project's reliability page) pays the full fake 'connecting to tailnet / authenticating / fetching projects' animation even though the app is already authenticated and running locally.",
+  "evidence": [
+   "/Users/emitdutcher/projects/emit-infra/.ui-audit/runs/2026-09-22/reliability-network-storage-tastease-reliability-splash-stuck-evidence.png"
+  ],
+  "suggestion": "Dispatch window.dispatchEvent(new Event('emit:ready')) once the first real data (e.g. project list or the current page's data) resolves, so the splash can dismiss as soon as data is ready instead of always waiting out the fixed minimum \u2014 this matters most for deep links opened during an active incident.",
+  "objective": false
+ }
+]

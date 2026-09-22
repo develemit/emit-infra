@@ -47,6 +47,12 @@ warnings, wording and layout of the flow are all fair game.
   open: `/projects/[name]/logs` holds an SSH connection for as long as it's open.
 - The app runs as `next dev` under launchd, so expect a one-time compile delay
   on the first visit to each route. Wait it out rather than reporting it.
+- **Dev-only artifacts are not findings:** the circular "N" at bottom-left
+  (overlapping the Tailscale pill) and the "N Issues" badge are Next.js's dev
+  indicator, absent from production builds.
+- A ~2 s boot splash covers every hard navigation; wait ≥2.5 s after load
+  before shooting. Project detail scrolls inside `main.overflow-auto`, not
+  `document.body`.
 
 ## App
 
@@ -105,7 +111,7 @@ the flow, expect the request to fail.
 | `/ci` | CI runs across the fleet, filter tabs | each tab; a failed run if one exists | — |
 | `/logs` | fleet log entry point | as found | — |
 | `/ops` | **"Ask Claude" ops chat: an AI operator that can act on servers** | empty thread; typed-but-unsent input | Send (POST `/ops/chat`, blocked); session DELETE on unload (blocked) |
-| `/provision` | multi-step wizard for a new server | each step (basics → infrastructure → review) with valid and invalid input, desktop and mobile stepper | final submit (POST `/provision`). Walking the steps is client-side and safe |
+| `/provision` | 4-step wizard for a new server | each step (basics → infrastructure → review → provision terminal) with valid and invalid input, desktop and mobile stepper | final submit (POST `/provision`). Walking the steps is client-side and safe |
 | `/offline` | PWA offline fallback | direct visit | — |
 
 ### Per project — `/projects/[name]/…`
@@ -125,6 +131,10 @@ unless a row says otherwise.
 | `[name]/data` | backups and secrets | real; the **secrets panel shows key presence only, never values** (verified in the API) | trigger backup (POST), **delete backup** (DELETE), download (blocked GET), retain-days (PATCH), apply secrets (POST) |
 | `[name]/admin` | cron, UFW firewall, cost, project settings | real | add/delete cron (POST/DELETE), add/delete UFW rule (POST/DELETE), settings save (PATCH) |
 | `[name]/logs` | live log tail via SSE (**read-only GET, holds an SSH connection**) | a few seconds of real output, then close; `test-smoke` error state | — |
+
+## Audit runs
+
+- 2026-09-22 — `qa/ui-audit-2026-09-22.md` (31 findings: 8 broken, 10 degraded, 3 wording, 10 polish).
 
 ## Known issues found while building the guard (2026-09-22)
 
