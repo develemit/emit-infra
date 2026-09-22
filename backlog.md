@@ -296,6 +296,8 @@ fleet-clean criterion was amended to expect exactly these two.
 
 - (sprint 353, 2026-09-22) The container-stats fix assumes container names use `-` as the compose separator (matching `collect-metrics.sh`'s own assumption). If any project's compose file uses underscore-separated names, both the collector and this mapping fix would need updating together.
 
+- (sprint 354, 2026-09-22) A cookie-based (rather than `sessionStorage`-based) cold-start flag would let the server itself skip rendering the splash markup on warm reloads, closing the remaining ~478ms gap. Not pursued here since the sprint's decision explicitly specified `sessionStorage`.
+
 ## ✅ Converted to Sprints
 - ~~(sprint 342, 2026-09-18) Add `LABEL build.number=$BUILD_NUMBER` to the six fleet Dockerfiles lacking it so their deploys can earn a verified baseline.~~ → superseded by sprint-345.1 (2026-09-20): emit-billing already bakes the label and still has 0/1 verified CLI baselines; re-tagged images carry older build numbers by design.
 - ~~(fleet survey, 2026-09-20) Every fleet project deployed a paired record for one push — a long `isBuildBaseline: true` deploy followed 2-5 minutes later by a short `isBuildBaseline: false` deploy of the same sha (e.g. martialops 441s then 133s; tastease 202s then 114s). Consistent across all 7 projects, so it is systematic rather than a one-off. Work out whether that second record is expected (a verify/re-tag pass) or a duplicate that sprint 336's baseline logic should collapse.~~ → sprint-345.1 (2026-09-20): explained — hook record + CLI record; CLI verification is 0/18 fleet-wide.
