@@ -19,6 +19,7 @@ import { PipelineProgressCard } from '@/components/detail/pipeline-progress-card
 import { ProjectHeader } from '@/components/detail/project-header'
 import { AlertBanners } from '@/components/detail/alert-banners'
 import { SummaryCardsGrid } from '@/components/detail/summary-cards-grid'
+import { UnreachableState } from '@/components/detail/unreachable-state'
 import { getSslDaysLeft } from '@/lib/project-detail-helpers'
 
 export default function ProjectDetailPage() {
@@ -54,7 +55,10 @@ export default function ProjectDetailPage() {
     getScaleAdvice(name).then(setScaleAdvice).catch(() => {})
   }, [name])
 
+  const isUnreachable = !!status?.error
+
   function handleDeployClick() {
+    if (isUnreachable) return
     setDeployWarning(null)
     if ((status?.disk ?? 0) >= 80 || (status?.memory ?? 0) >= 80) {
       setDeployWarning(
@@ -78,6 +82,7 @@ export default function ProjectDetailPage() {
         label={label}
         base={base}
         deploying={deploying}
+        unreachable={isUnreachable}
         onDeployClick={handleDeployClick}
         onRollbackClick={() => setShowRollback(true)}
         onSecretsSyncClick={() => setShowSecretsSync(true)}
@@ -91,10 +96,7 @@ export default function ProjectDetailPage() {
               <Skeleton className="h-[220px]" />
             </>
           ) : status?.error ? (
-            <div className="flex items-center gap-2 rounded-xl px-4 py-3 text-sm text-err border border-err-line bg-err-soft">
-              <Icon name="alert" size={16} />
-              SSH unreachable — the server did not respond
-            </div>
+            <UnreachableState project={project} deploys={deploys} onRetry={fetchData} />
           ) : (
             <>
               {project && status && (
@@ -186,8 +188,9 @@ export default function ProjectDetailPage() {
       >
         <button
           onClick={handleDeployClick}
-          disabled={deploying}
-          className="flex w-full items-center justify-center gap-2 rounded-xl text-[14px] font-medium text-accent-fg bg-accent hover:opacity-90 disabled:opacity-50 transition-opacity"
+          disabled={deploying || isUnreachable}
+          title={isUnreachable ? "Can't reach the server over SSH" : undefined}
+          className="flex w-full items-center justify-center gap-2 rounded-xl text-[14px] font-medium text-accent-fg bg-accent hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
           style={{ height: 48 }}
         >
           <Icon name="deploy" size={16} />{deploying ? 'Running…' : 'Deploy'}
@@ -202,14 +205,18 @@ export default function ProjectDetailPage() {
           </Link>
           <button
             onClick={() => setShowSecretsSync(true)}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl text-[13px] font-medium text-fg border border-border hover:bg-card-hover transition-colors"
+            disabled={isUnreachable}
+            title={isUnreachable ? "Can't reach the server over SSH" : undefined}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl text-[13px] font-medium text-fg border border-border hover:bg-card-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             style={{ height: 44 }}
           >
             <Icon name="lock" size={14} />Secrets
           </button>
           <button
             onClick={() => setShowRollback(true)}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl text-[13px] font-medium text-fg border border-border hover:bg-card-hover transition-colors"
+            disabled={isUnreachable}
+            title={isUnreachable ? "Can't reach the server over SSH" : undefined}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl text-[13px] font-medium text-fg border border-border hover:bg-card-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             style={{ height: 44 }}
           >
             <Icon name="refresh" size={14} />Rollback

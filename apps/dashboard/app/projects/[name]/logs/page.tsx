@@ -1,11 +1,12 @@
 'use client'
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, useReducer } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import AnsiToHtml from 'ansi-to-html'
 import { getContainers, openSseStream } from '@/lib/api'
 import { Terminal } from '@/components/ui/terminal'
 import { Icon } from '@/components/icon'
+import { nextLogStreamStatus, type LogStreamStatus } from '@/lib/log-stream-status'
 
 const ansi = new AnsiToHtml({ escapeXML: true })
 
@@ -20,8 +21,20 @@ type LogLine = { svc: string; svcColor: string; text: string }
 
 type SseParsed =
   | { type: 'line'; stream: string; text: string }
-  | { type: 'done' }
+  | { type: 'done'; exitCode?: number }
   | { type: 'error'; message: string }
+
+const STATUS_LABEL: Record<LogStreamStatus, string> = {
+  connecting: 'connecting…',
+  live: '● live',
+  error: 'stream error',
+}
+
+const STATUS_COLOR: Record<LogStreamStatus, string> = {
+  connecting: 'var(--subtle)',
+  live: 'var(--t-green)',
+  error: 'var(--err)',
+}
 
 export default function LogsPage() {
   const params = useParams()
@@ -29,6 +42,7 @@ export default function LogsPage() {
 
   const [lines, setLines] = useState<LogLine[]>([])
   const [running, setRunning] = useState(false)
+  const [status, dispatch] = useReducer(nextLogStreamStatus, 'connecting')
   const [follow, setFollow] = useState(true)
   const [service, setService] = useState('')
   const [services, setServices] = useState<string[]>([])
@@ -63,6 +77,7 @@ export default function LogsPage() {
     const es = openSseStream(path)
     esRef.current = es
     setRunning(true)
+    dispatch({ type: 'start' })
     es.onmessage = (e: MessageEvent<string>) => {
       const ev = JSON.parse(e.data) as SseParsed
       if (ev.type === 'line') {
@@ -74,11 +89,19 @@ export default function LogsPage() {
           const next = [...prev, { svc, svcColor: svc ? svcColor(svc) : 'var(--term-fg)', text }]
           return next.length > MAX_LOG_LINES ? next.slice(-MAX_LOG_LINES) : next
         })
+        dispatch({ type: 'line' })
+      } else if (ev.type === 'error') {
+        dispatch({ type: 'stream-error' })
+        stop()
       } else {
+        dispatch({ type: 'done', exitCode: ev.exitCode ?? 0 })
         stop()
       }
     }
-    es.onerror = () => stop()
+    es.onerror = () => {
+      dispatch({ type: 'stream-error' })
+      stop()
+    }
   }, [name, service, stop])
 
   useEffect(() => {
@@ -166,6 +189,9 @@ export default function LogsPage() {
         <span className="text-[15px] font-semibold text-fg">Logs</span>
         <span className="text-[12px] font-mono text-subtle">{name} · docker compose</span>
         <div className="flex-1" />
+        <span className="font-mono text-[11px]" style={{ color: STATUS_COLOR[status] }}>
+          {STATUS_LABEL[status]}
+        </span>
         {controls}
       </div>
 
@@ -174,7 +200,9 @@ export default function LogsPage() {
         <Link href={`/projects/${encodeURIComponent(name)}`} className="text-subtle"><Icon name="arrowLeft" size={18} /></Link>
         <span className="text-[15px] font-semibold text-fg">Logs</span>
         <div className="flex-1" />
-        {running && <span className="font-mono text-[11px] text-t-green">● live</span>}
+        <span className="font-mono text-[11px]" style={{ color: STATUS_COLOR[status] }}>
+          {STATUS_LABEL[status]}
+        </span>
       </div>
 
       {/* Mobile controls */}
@@ -186,14 +214,14 @@ export default function LogsPage() {
       <div ref={termWrapperRef} className="flex-1 min-h-0 p-3 lg:p-4 relative">
         <Terminal
           title={`${name} · tail -f`}
-          running={running && follow}
+          running={status === 'live' && follow}
           footer={false}
           style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
           bodyStyle={{ flex: 1, minHeight: 0 }}
         >
           {termLines}
         </Terminal>
-        {!isFollowing && running && (
+        {!isFollowing && status === 'live' && (
           <div className="absolute bottom-6 left-1/2 -translate-x-1/2 pointer-events-none">
             <span
               className="text-[11px] font-mono px-3 py-1.5 rounded-full"

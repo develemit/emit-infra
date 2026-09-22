@@ -1,7 +1,10 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { Icon } from '@/components/icon'
-import { getResponseTimes, type ResponseTimes } from '@/lib/api-infra'
+import { getResponseTimes } from '@/lib/api-infra'
+import { PanelState } from '@/components/ui/panel-state'
+import type { FetchResult } from '@/lib/fetch-result'
+import type { ResponseTimes } from '@/lib/api-infra'
 
 interface StatTileProps {
   icon: string
@@ -34,24 +37,30 @@ function formatMs(ms: number): string {
 }
 
 export function ResponseTimePanel({ name }: { name: string }) {
-  const [data, setData] = useState<ResponseTimes | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [result, setResult] = useState<FetchResult<ResponseTimes> | null>(null)
 
   useEffect(() => {
-    const fetch = async () => {
-      try {
-        const result = await getResponseTimes(name)
-        setData(result)
-      } catch {
-        setData({ available: false })
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetch()
+    let cancelled = false
+    getResponseTimes(name).then(r => { if (!cancelled) setResult(r) })
+    return () => { cancelled = true }
   }, [name])
 
-  if (loading || !data || !data.available) return null
+  if (!result) return null
+
+  if (!result.ok) {
+    return (
+      <div className="flex flex-col gap-3 rounded-xl px-4 py-3 border border-border bg-card-2">
+        <div className="flex items-center gap-2">
+          <Icon name="activity" size={16} />
+          <span className="text-[13px] font-semibold text-fg">Response Times (24h)</span>
+        </div>
+        <PanelState kind={result.kind} message={result.message} />
+      </div>
+    )
+  }
+
+  const data = result.data
+  if (!data.available) return null
 
   const getP99Color = (ms: number): string => {
     if (ms > 2000) return 'var(--err)'

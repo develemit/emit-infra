@@ -9,11 +9,14 @@ interface ProjectHeaderProps {
   label: string
   base: string
   deploying: boolean
+  unreachable: boolean
   onDeployClick: () => void
   onRollbackClick: () => void
   onSecretsSyncClick: () => void
   onDestroyClick: () => void
 }
+
+const UNREACHABLE_REASON = "Can't reach the server over SSH"
 
 export function ProjectHeader({
   name,
@@ -22,6 +25,7 @@ export function ProjectHeader({
   label,
   base,
   deploying,
+  unreachable,
   onDeployClick,
   onRollbackClick,
   onSecretsSyncClick,
@@ -62,22 +66,27 @@ export function ProjectHeader({
         </Link>
         <button
           onClick={onSecretsSyncClick}
-          className="inline-flex items-center gap-1.5 px-3 h-[32px] rounded-lg text-[12px] font-medium text-fg border border-border hover:bg-card-hover transition-colors"
+          disabled={unreachable}
+          title={unreachable ? UNREACHABLE_REASON : undefined}
+          className="inline-flex items-center gap-1.5 px-3 h-[32px] rounded-lg text-[12px] font-medium text-fg border border-border hover:bg-card-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           <Icon name="lock" size={13} />
           Sync Secrets
         </button>
         <button
           onClick={onRollbackClick}
-          className="inline-flex items-center gap-1.5 px-3 h-[32px] rounded-lg text-[12px] font-medium text-fg border border-border hover:bg-card-hover transition-colors"
+          disabled={unreachable}
+          title={unreachable ? UNREACHABLE_REASON : undefined}
+          className="inline-flex items-center gap-1.5 px-3 h-[32px] rounded-lg text-[12px] font-medium text-fg border border-border hover:bg-card-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           <Icon name="refresh" size={13} />
           Rollback
         </button>
         <button
           onClick={onDeployClick}
-          disabled={deploying}
-          className="inline-flex items-center gap-1.5 px-3 h-[32px] rounded-lg text-[12px] font-medium text-accent-fg bg-accent hover:opacity-90 disabled:opacity-50 transition-opacity"
+          disabled={deploying || unreachable}
+          title={unreachable ? UNREACHABLE_REASON : undefined}
+          className="inline-flex items-center gap-1.5 px-3 h-[32px] rounded-lg text-[12px] font-medium text-accent-fg bg-accent hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
         >
           <Icon name="deploy" size={13} />
           {deploying ? 'Running…' : 'Deploy'}

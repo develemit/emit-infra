@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react'
 import { Icon } from '@/components/icon'
 import { Badge } from '@/components/ui/badge'
 import { getNginxDrift, type NginxDrift } from '@/lib/api-infra'
+import { PanelState } from '@/components/ui/panel-state'
+import type { FetchErrorKind } from '@/lib/fetch-result'
 
 interface NginxConfigPanelProps {
   name: string
@@ -43,23 +45,18 @@ function DiffViewer({ diff }: { diff: string[] }) {
 export function NginxConfigPanel({ name }: NginxConfigPanelProps) {
   const [drift, setDrift] = useState<NginxDrift | null>(null)
   const [loading, setLoading] = useState(false)
-  const [unreachable, setUnreachable] = useState(false)
+  const [errorKind, setErrorKind] = useState<FetchErrorKind | null>(null)
 
   const fetchDrift = async () => {
     setLoading(true)
-    setUnreachable(false)
-    try {
-      const data = await getNginxDrift(name)
-      if (data === null) {
-        setUnreachable(true)
-      } else {
-        setDrift(data)
-      }
-    } catch {
-      setUnreachable(true)
-    } finally {
-      setLoading(false)
+    const result = await getNginxDrift(name)
+    if (result.ok) {
+      setDrift(result.data)
+      setErrorKind(null)
+    } else {
+      setErrorKind(result.kind)
     }
+    setLoading(false)
   }
 
   useEffect(() => {
@@ -85,9 +82,6 @@ export function NginxConfigPanel({ name }: NginxConfigPanelProps) {
   }
 
   const getStatusMessage = () => {
-    if (unreachable) {
-      return 'Unreachable'
-    }
     if (loading) {
       return 'Loading…'
     }
@@ -115,7 +109,7 @@ export function NginxConfigPanel({ name }: NginxConfigPanelProps) {
         <Icon name="globe" size={16} style={{ color: 'var(--fg-muted)' }} />
         <span className="text-[13.5px] font-semibold text-fg">Nginx Config</span>
         <div className="flex-1" />
-        {getStatusBadge()}
+        {!errorKind && getStatusBadge()}
         <button
           onClick={() => void fetchDrift()}
           disabled={loading}
@@ -128,12 +122,18 @@ export function NginxConfigPanel({ name }: NginxConfigPanelProps) {
         </button>
       </div>
 
-      <div className="text-[12px] text-fg font-mono mb-3">
-        {getStatusMessage()}
-      </div>
+      {errorKind ? (
+        <PanelState kind={errorKind} />
+      ) : (
+        <>
+          <div className="text-[12px] text-fg font-mono mb-3">
+            {getStatusMessage()}
+          </div>
 
-      {drift?.status === 'drift' && 'diff' in drift && (
-        <DiffViewer diff={drift.diff} />
+          {drift?.status === 'drift' && 'diff' in drift && (
+            <DiffViewer diff={drift.diff} />
+          )}
+        </>
       )}
     </div>
   )

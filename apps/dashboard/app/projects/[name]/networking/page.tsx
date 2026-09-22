@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import { getNginxEndpoints, type NginxEndpointsData } from '@/lib/api-infra'
+import { getStatus } from '@/lib/api-projects'
 import { useServerMetrics } from '@/lib/use-server-metrics'
 import { useDeployMarkers } from '@/lib/use-deploy-markers'
 import type { DeployMarker } from '@/components/detail/resource-chart'
@@ -12,6 +13,7 @@ import { NginxConfigPanel } from '@/components/detail/nginx-config-panel'
 import { CertPanel } from '@/components/detail/cert-panel'
 import { NetworkChart } from '@/components/detail/network-chart'
 import { QueueChart } from '@/components/detail/queue-chart'
+import { PanelState } from '@/components/ui/panel-state'
 
 export default function NetworkingPage() {
   const params = useParams()
@@ -21,12 +23,19 @@ export default function NetworkingPage() {
   const { deploys } = useDeployMarkers(name)
   const [nginxEndpoints, setNginxEndpoints] = useState<NginxEndpointsData | null>(null)
   const [nginxSettled, setNginxSettled] = useState(false)
+  const [unreachable, setUnreachable] = useState(false)
 
   useEffect(() => {
     getNginxEndpoints(name)
       .then(setNginxEndpoints)
       .catch(() => {})
       .finally(() => setNginxSettled(true))
+  }, [name])
+
+  useEffect(() => {
+    getStatus(name)
+      .then(s => setUnreachable(!!s.error))
+      .catch(() => setUnreachable(true))
   }, [name])
 
   const loading = metricsLoading || !nginxSettled
@@ -58,9 +67,13 @@ export default function NetworkingPage() {
       )}
       <NginxConfigPanel name={name} />
       <CertPanel name={name} />
-      {networkPoints.length >= 2 && (
+      {networkPoints.length >= 2 ? (
         <NetworkChart points={networkPoints} deploys={deployMarkers} hours={24} />
-      )}
+      ) : unreachable ? (
+        <div className="rounded-xl border border-border bg-card" style={{ padding: 18 }}>
+          <PanelState kind="unreachable" />
+        </div>
+      ) : null}
       {serverPoints.some(p => p.queueFailed != null) && (
         <QueueChart points={serverPoints} />
       )}

@@ -1,7 +1,10 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { Icon } from '@/components/icon'
-import { getCertDetails, type CertDetails } from '@/lib/api-infra'
+import { getCertDetails } from '@/lib/api-infra'
+import { PanelState } from '@/components/ui/panel-state'
+import type { FetchResult } from '@/lib/fetch-result'
+import type { CertDetails } from '@/lib/api-infra'
 
 interface StatTileProps {
   icon: string
@@ -63,25 +66,29 @@ function getLastRenewedText(isoStr: string | null): string {
 }
 
 export function CertPanel({ name }: { name: string }) {
-  const [data, setData] = useState<CertDetails | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [result, setResult] = useState<FetchResult<CertDetails> | null>(null)
 
   useEffect(() => {
-    const fetch = async () => {
-      try {
-        const result = await getCertDetails(name)
-        setData(result)
-      } catch {
-        setData(null)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetch()
+    let cancelled = false
+    getCertDetails(name).then(r => { if (!cancelled) setResult(r) })
+    return () => { cancelled = true }
   }, [name])
 
-  if (loading || !data) return null
+  if (!result) return null
 
+  if (!result.ok) {
+    return (
+      <div className="flex flex-col gap-3 rounded-xl px-4 py-3 border border-border bg-card-2">
+        <div className="flex items-center gap-2">
+          <Icon name="lock" size={16} />
+          <span className="text-[13px] font-semibold text-fg">SSL Certificate</span>
+        </div>
+        <PanelState kind={result.kind} message={result.message} />
+      </div>
+    )
+  }
+
+  const data = result.data
   const expiryColor = getExpiryColor(data.daysUntilExpiry)
   const issuerField = extractIssuerField(data.issuer)
   const serialTrunc = data.serial.substring(0, 12)

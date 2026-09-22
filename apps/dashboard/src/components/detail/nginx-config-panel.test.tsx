@@ -25,19 +25,20 @@ describe('NginxConfigPanel', () => {
   })
 
   it('does not render when status is unconfigured', async () => {
-    vi.mocked(getNginxDrift).mockResolvedValue({ status: 'unconfigured' })
+    vi.mocked(getNginxDrift).mockResolvedValue({ ok: true, data: { status: 'unconfigured' } })
     const { container } = render(<NginxConfigPanel name="myapp" />)
     await waitFor(() => {
       expect(container.firstChild).toBeNull()
     })
   })
 
-  it('returns null when fetch returns null (unreachable)', async () => {
-    vi.mocked(getNginxDrift).mockResolvedValue(null)
+  it('shows an unreachable state on a 503, never "Not managed"', async () => {
+    vi.mocked(getNginxDrift).mockResolvedValue({ ok: false, kind: 'unreachable', message: "Couldn't reach the server" })
     render(<NginxConfigPanel name="myapp" />)
     await waitFor(() => {
-      expect(screen.getByText('Unreachable')).toBeTruthy()
+      expect(screen.getByText("Couldn't reach the server")).toBeTruthy()
     })
+    expect(screen.queryByText('Not managed')).toBeNull()
   })
 
   it('shows loading state initially', () => {
@@ -55,7 +56,7 @@ describe('NginxConfigPanel', () => {
       serverLines: 10,
       diff: [],
     }
-    vi.mocked(getNginxDrift).mockResolvedValue(drift)
+    vi.mocked(getNginxDrift).mockResolvedValue({ ok: true, data: drift })
     render(<NginxConfigPanel name="myapp" />)
     await waitFor(() => {
       const badge = screen.getByTestId('badge')
@@ -73,7 +74,7 @@ describe('NginxConfigPanel', () => {
       serverLines: 10,
       diff: [],
     }
-    vi.mocked(getNginxDrift).mockResolvedValue(drift)
+    vi.mocked(getNginxDrift).mockResolvedValue({ ok: true, data: drift })
     render(<NginxConfigPanel name="myapp" />)
     await waitFor(() => {
       expect(screen.getByText('Vhost config is aligned')).toBeTruthy()
@@ -89,7 +90,7 @@ describe('NginxConfigPanel', () => {
       serverLines: 12,
       diff: ['- old line', '+ new line'],
     }
-    vi.mocked(getNginxDrift).mockResolvedValue(drift)
+    vi.mocked(getNginxDrift).mockResolvedValue({ ok: true, data: drift })
     render(<NginxConfigPanel name="myapp" />)
     await waitFor(() => {
       const badge = screen.getByTestId('badge')
@@ -107,7 +108,7 @@ describe('NginxConfigPanel', () => {
       serverLines: 12,
       diff: ['- old line', '+ new line'],
     }
-    vi.mocked(getNginxDrift).mockResolvedValue(drift)
+    vi.mocked(getNginxDrift).mockResolvedValue({ ok: true, data: drift })
     render(<NginxConfigPanel name="myapp" />)
     await waitFor(() => {
       expect(screen.getByText('Show diff')).toBeTruthy()
@@ -123,7 +124,7 @@ describe('NginxConfigPanel', () => {
       serverLines: 12,
       diff: ['- old line', '+ new line'],
     }
-    vi.mocked(getNginxDrift).mockResolvedValue(drift)
+    vi.mocked(getNginxDrift).mockResolvedValue({ ok: true, data: drift })
     const user = userEvent.setup()
     render(<NginxConfigPanel name="myapp" />)
     await waitFor(() => screen.getByText('Show diff'))
@@ -139,7 +140,7 @@ describe('NginxConfigPanel', () => {
       status: 'missing-local',
       localPath: '/repo/nginx.conf',
     }
-    vi.mocked(getNginxDrift).mockResolvedValue(drift)
+    vi.mocked(getNginxDrift).mockResolvedValue({ ok: true, data: drift })
     render(<NginxConfigPanel name="myapp" />)
     await waitFor(() => {
       const badge = screen.getByTestId('badge')
@@ -153,7 +154,7 @@ describe('NginxConfigPanel', () => {
       status: 'missing-local',
       localPath: '/repo/nginx.conf',
     }
-    vi.mocked(getNginxDrift).mockResolvedValue(drift)
+    vi.mocked(getNginxDrift).mockResolvedValue({ ok: true, data: drift })
     render(<NginxConfigPanel name="myapp" />)
     await waitFor(() => {
       expect(screen.getByText('Local config file not found')).toBeTruthy()
@@ -166,7 +167,7 @@ describe('NginxConfigPanel', () => {
       localPath: '/repo/nginx.conf',
       serverPath: '/etc/nginx/sites-available/myapp',
     }
-    vi.mocked(getNginxDrift).mockResolvedValue(drift)
+    vi.mocked(getNginxDrift).mockResolvedValue({ ok: true, data: drift })
     render(<NginxConfigPanel name="myapp" />)
     await waitFor(() => {
       const badge = screen.getByTestId('badge')
@@ -181,7 +182,7 @@ describe('NginxConfigPanel', () => {
       localPath: '/repo/nginx.conf',
       serverPath: '/etc/nginx/sites-available/myapp',
     }
-    vi.mocked(getNginxDrift).mockResolvedValue(drift)
+    vi.mocked(getNginxDrift).mockResolvedValue({ ok: true, data: drift })
     render(<NginxConfigPanel name="myapp" />)
     await waitFor(() => {
       expect(screen.getByText('Server config file not found')).toBeTruthy()
@@ -197,7 +198,7 @@ describe('NginxConfigPanel', () => {
       serverLines: 10,
       diff: [],
     }
-    vi.mocked(getNginxDrift).mockResolvedValue(drift)
+    vi.mocked(getNginxDrift).mockResolvedValue({ ok: true, data: drift })
     const user = userEvent.setup()
     render(<NginxConfigPanel name="myapp" />)
     await waitFor(() => screen.getByText('Aligned'))
@@ -215,7 +216,7 @@ describe('NginxConfigPanel', () => {
       serverLines: 10,
       diff: [],
     }
-    vi.mocked(getNginxDrift).mockResolvedValue(drift)
+    vi.mocked(getNginxDrift).mockResolvedValue({ ok: true, data: drift })
     render(<NginxConfigPanel name="myapp" />)
     await waitFor(() => {
       expect(screen.getByText('Nginx Config')).toBeTruthy()

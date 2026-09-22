@@ -112,11 +112,10 @@ export async function getScaleAdvice(name: string): Promise<ScaleAdvice | null> 
   return body.advice
 }
 
-export async function getCertDetails(name: string): Promise<CertDetails | null> {
-  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/cert-details`, { cache: 'no-store', headers: authHeaders() })
-  if (res.status === 404 || res.status === 503) return null
-  if (!res.ok) return null
-  return res.json() as Promise<CertDetails>
+export async function getCertDetails(name: string): Promise<FetchResult<CertDetails>> {
+  return fetchResult<CertDetails>(
+    fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/cert-details`, { cache: 'no-store', headers: authHeaders() }),
+  )
 }
 
 export async function getProjectCost(name: string): Promise<ProjectCost | null> {
@@ -126,15 +125,14 @@ export async function getProjectCost(name: string): Promise<ProjectCost | null> 
   return res.json() as Promise<ProjectCost>
 }
 
-export async function getResponseTimes(name: string): Promise<ResponseTimes> {
-  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/response-times`, { cache: 'no-store', headers: authHeaders() })
-  if (!res.ok) return { available: false }
-  return res.json() as Promise<ResponseTimes>
+export async function getResponseTimes(name: string): Promise<FetchResult<ResponseTimes>> {
+  return fetchResult<ResponseTimes>(
+    fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/response-times`, { cache: 'no-store', headers: authHeaders() }),
+  )
 }
 
-export async function getNginxDrift(name: string): Promise<NginxDrift | null> {
-  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/nginx-drift`, { cache: 'no-store', headers: authHeaders() })
-  if (res.status === 503) return null
-  if (!res.ok) return null
-  return res.json() as Promise<NginxDrift>
+export async function getNginxDrift(name: string): Promise<FetchResult<NginxDrift>> {
+  return fetchResult<NginxDrift>(
+    fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/nginx-drift`, { cache: 'no-store', headers: authHeaders() }),
+  )
 }
