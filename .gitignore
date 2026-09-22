@@ -51,3 +51,5 @@ Thumbs.db
 
 
 design-*
+# ui-deep-dive screenshots and guard logs — can contain production log output
+.ui-audit/
