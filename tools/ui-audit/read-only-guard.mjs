@@ -42,3 +42,15 @@ export async function newGuardedContext(browser, { logFile, ...contextOptions } 
   const blocked = await installReadOnlyGuard(context, { logFile })
   return { context, blocked }
 }
+
+// Call once per page before interacting. Fires a POST at a route that doesn't
+// exist and throws unless the guard caught it, so a script that somehow built
+// an unguarded context fails before touching anything real.
+export async function assertGuardActive(page, blocked) {
+  const before = blocked.length
+  await page.evaluate(() => fetch('/api/__ui-audit-guard-canary', { method: 'POST' }).catch(() => {}))
+  await page.waitForTimeout(200)
+  if (!blocked.slice(before).some((b) => b.url.includes('__ui-audit-guard-canary'))) {
+    throw new Error('read-only guard is NOT active on this page; stopping before any interaction')
+  }
+}
