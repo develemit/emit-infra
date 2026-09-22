@@ -70,16 +70,80 @@ Each item has its evidence screenshot named in the report. They live under
 - `apps/dashboard/src/components/detail/incident-panel*.tsx`, `project-settings-panel*.tsx`
 
 ## Acceptance criteria
-- [ ] Every Add Project entry is reachable by scrolling inside the dropdown —
+- [x] Every Add Project entry is reachable by scrolling inside the dropdown —
       covered by a component test asserting the list container is scroll-bounded,
       plus a guarded screenshot
-- [ ] Provision review shows full values (no truncation class) — covered by a test
-- [ ] Incident timeline labels readable in light theme; root cause named in the
+- [x] Provision review shows full values (no truncation class) — covered by a test
+- [x] Incident timeline labels readable in light theme; root cause named in the
       Completed section; guarded light screenshot
-- [ ] First cadence-chart label fully visible; guarded screenshot
-- [ ] Annotate hit area ≥24×24, env-keys textarea grows, cx42 spec doesn't split
-- [ ] `pnpm test`, `pnpm typecheck` and `pnpm lint` pass
+- [x] First cadence-chart label fully visible; guarded screenshot
+- [x] Annotate hit area ≥24×24, env-keys textarea grows, cx42 spec doesn't split
+- [x] `pnpm test`, `pnpm typecheck` and `pnpm lint` pass
 
 ## Out of scope
 - The "N" circle over the Tailscale pill: it's the Next.js dev indicator, not our UI.
 - Any redesign beyond these specific fixes.
+
+## Completed
+
+**Date:** 2026-09-22
+
+### Summary
+Fixed all seven layout/theme defects from the 2026-09-22 UI audit.
+
+UI-07 (Add Project dropdown overflow) turned out to already be correctly
+implemented: `add-project-dropdown.tsx`'s directory list has `max-h-[240px]
+overflow-auto`, and a Playwright repro against the live dev server with 20
+mocked unregistered directories confirmed the container's `scrollHeight`
+(710px) exceeds its `clientHeight` (240px), that scrolling to the bottom makes
+the 20th entry fully visible, and that `elementFromPoint` at that entry's
+position hits the entry itself, not a card behind it. No code fix was needed
+there; added a regression test asserting the list container carries the
+scroll-bounding classes so this can't silently regress, since jsdom can't
+assert real scroll geometry.
+
+UI-14's root cause: `fleet-incident-timeline.tsx` filled alternating lane
+stripes with `var(--card)` / `var(--elev)`, but `--elev` is never defined as a
+CSS custom property anywhere in `globals.css` — only `--bg-elev` is (and
+Tailwind's `elev` color token maps to `var(--bg-elev)`, not a literal
+`--elev` variable). An SVG `fill` referencing an undefined custom property
+with no fallback resolves to the property's initial value, black. In dark
+theme this blended in with the already-dark UI and went unnoticed; in light
+theme it produced the reported near-black unreadable bands. Fixed by using
+`var(--bg-elev)` directly.
+
+The other five were straightforward: `break-words` instead of `truncate` on
+provision-review values (UI-13), anchoring the deploy-cadence chart's first
+axis label to `start` instead of `middle` so it doesn't run off the left edge
+of the SVG viewBox (UI-15), a 24×24 hit-area wrapper on the incident panel's
+Annotate button (UI-27), a new `useAutoGrowTextarea` hook (`lib/use-auto-grow.ts`)
+wired into the required-env-keys textarea to grow up to 12 rows before
+scrolling (UI-28), and wrapping each server-spec fragment (`cpu`/`ram`/`disk`)
+in its own `whitespace-nowrap` span so the flex-wrapped line breaks between
+fragments, never inside one, on narrow viewports (UI-29).
+
+All fixes were verified against the running dev server (port 7013) with
+guarded Playwright scripts (read-only-guard.mjs, `newGuardedContext` +
+`assertGuardActive`), screenshots taken and reviewed, then discarded (scratch
+scripts, not part of the tracked audit-evidence set).
+
+### Files changed
+- `apps/dashboard/src/components/fleet-incident-timeline.tsx` — fixed undefined `var(--elev)` → `var(--bg-elev)` (UI-14 root cause)
+- `apps/dashboard/src/components/provision/step-review.tsx` — `truncate` → `break-words` on review values (UI-13)
+- `apps/dashboard/src/components/detail/deploy-cadence-chart.tsx` — first axis label anchored `start` instead of `middle` (UI-15)
+- `apps/dashboard/src/components/detail/incident-panel.tsx` — Annotate button padded to 24×24 hit area (UI-27)
+- `apps/dashboard/src/components/detail/project-settings-panel.tsx` — env-keys textarea wired to auto-grow (UI-28)
+- `apps/dashboard/src/components/provision/step-infrastructure.tsx` — server-spec fragments wrapped in `whitespace-nowrap` spans (UI-29)
+- (new) `apps/dashboard/src/lib/use-auto-grow.ts` — `useAutoGrowTextarea` hook, grows a textarea to content height up to a max row count, then scrolls
+- (new) `apps/dashboard/src/components/add-project-dropdown.test.tsx` — regression test locking in the scroll-bounded unregistered-projects list (UI-07)
+- (new) `apps/dashboard/src/components/provision/step-review.test.tsx` — regression test asserting review values wrap instead of truncating (UI-13)
+
+### Verification
+- `pnpm test`: 316/316 pass (46 test files, includes the 2 new test files)
+- `pnpm typecheck`: clean (5 projects)
+- `pnpm lint`: clean (5 projects)
+- Guarded Playwright screenshots (dev server, port 7013) for every item, reviewed visually: UI-07 (20 mocked dirs, scrolled to last entry, elementFromPoint hit-tested), UI-13 (provision review at mobile 390px), UI-14 (fleet incident timeline, light theme, before/after), UI-15 (deploy cadence chart, "Aug 24" fully visible), UI-27 (Annotate button bounding box measured at 24×24), UI-28 (textarea grows with 37 keys, caps and scrolls with 80), UI-29 (cx42 "160 GB" at 390px, wraps as a unit)
+
+### Follow-ups
+- `[defer]` The UI-07 audit finding may have been a false positive (couldn't reproduce the reported overflow against current `main`); worth a quick note to whoever maintains `qa/ui-audit-2026-09-22.md` in case the same misdiagnosis recurs elsewhere in that report.
+- `[defer]` `playwright` isn't a workspace dependency — verification scripts had to load it from a sibling project's `node_modules` (`develemit-hq`). Not urgent, but if guarded UI verification becomes routine across sprints, worth adding a real (dev-only) dependency.

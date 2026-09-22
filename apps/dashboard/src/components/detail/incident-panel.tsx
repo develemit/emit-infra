@@ -132,7 +132,7 @@ export function IncidentPanel({ name }: Props) {
                 </span>
                 <button
                   onClick={() => setExpanded(expanded === incident.startedAt ? null : incident.startedAt)}
-                  className="text-subtle hover:text-fg transition-colors"
+                  className="flex items-center justify-center w-6 h-6 text-subtle hover:text-fg transition-colors"
                   title="Annotate"
                 >
                   <Icon name="file" size={13} />

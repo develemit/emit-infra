@@ -43,7 +43,7 @@ export function FleetIncidentTimeline({ data, days }: Props) {
             y={i * LANE_H}
             width={totalW}
             height={LANE_H}
-            fill={i % 2 === 0 ? 'var(--card)' : 'var(--elev)'}
+            fill={i % 2 === 0 ? 'var(--card)' : 'var(--bg-elev)'}
           />
         ))}
 

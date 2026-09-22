@@ -69,9 +69,9 @@ export function DeployCadenceChart({ days }: Props) {
                 )}
                 {idx % 7 === 0 && (
                   <text
-                    x={x + barWidth / 2}
+                    x={idx === 0 ? x : x + barWidth / 2}
                     y={H + 14}
-                    textAnchor="middle"
+                    textAnchor={idx === 0 ? 'start' : 'middle'}
                     fontSize="10"
                     fill="var(--fg)"
                     fontFamily="monospace"

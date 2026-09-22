@@ -18,7 +18,7 @@ function KV({ k, v }: { k: string; v: string }) {
   return (
     <div className="flex items-start justify-between gap-4 py-2.5 border-b border-border last:border-b-0">
       <span className="text-[13px] text-muted">{k}</span>
-      <span className="text-[13px] font-mono text-fg text-right max-w-[240px] truncate">{v}</span>
+      <span className="text-[13px] font-mono text-fg text-right max-w-[240px] break-words">{v}</span>
     </div>
   )
 }

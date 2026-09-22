@@ -5,6 +5,7 @@ import { updateProjectConfig, type ProjectSummary } from '@/lib/api-projects'
 import { getSshKeys } from '@/lib/api-containers'
 import { AlertRulesSection } from './alert-rules-section'
 import { useSettingsSection, type SectionState } from '@/lib/use-settings-section'
+import { useAutoGrowTextarea } from '@/lib/use-auto-grow'
 
 interface Props {
   project: ProjectSummary
@@ -62,6 +63,7 @@ export function ProjectSettingsPanel({ project }: Props) {
 
   const [domainError, setDomainError] = useState<string | null>(null)
   const [envKeysError, setEnvKeysError] = useState<string | null>(null)
+  const envKeysRef = useAutoGrowTextarea(envKeys, 12)
 
   useEffect(() => {
     if (open) getSshKeys().then(setSshKeys).catch(() => {})
@@ -183,6 +185,7 @@ export function ProjectSettingsPanel({ project }: Props) {
             <p className="text-[11px] font-semibold text-subtle uppercase tracking-wide mb-3">Access</p>
             <Field label="Required env keys (comma-separated)">
               <textarea
+                ref={envKeysRef}
                 className="rounded-lg border border-border bg-card-2 px-2 py-1.5 text-[12px] font-mono text-fg focus:outline-none focus:ring-1 focus:ring-accent resize-none"
                 rows={3}
                 value={envKeys}

@@ -95,7 +95,11 @@ export function StepInfrastructure({ values, onChange, onNext, onBack }: Props) 
                   {selected && <span className="rounded-full" style={{ width: 7, height: 7, background: 'var(--accent)' }} />}
                 </span>
                 <span className="font-mono font-semibold text-[13.5px] text-fg" style={{ minWidth: 40 }}>{t.id}</span>
-                <span className="font-mono text-[12px] text-subtle">{t.cpu} · {t.ram} · {t.disk}</span>
+                <span className="font-mono text-[12px] text-subtle">
+                  <span className="whitespace-nowrap">{t.cpu}</span>{' · '}
+                  <span className="whitespace-nowrap">{t.ram}</span>{' · '}
+                  <span className="whitespace-nowrap">{t.disk}</span>
+                </span>
                 <span className="flex-1" />
                 <span className="font-mono text-[12px] text-muted">{t.price}/mo</span>
               </label>
