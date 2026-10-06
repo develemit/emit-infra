@@ -27,6 +27,7 @@ import {
 } from './cert-probe.js'
 import { stepHealth, initialHealthState, type HealthState, type ProbeResult } from './http-health.js'
 import { handleHealthEvents, seedHealthMaps } from './health-notify.js'
+import { pingPulse, warnIfPulseUnconfigured } from './pulse.js'
 
 const metricLabels: Record<string, string> = {
   diskPct: 'disk', memPct: 'memory', certDays: 'cert days', backupAgeHours: 'backup age (h)',
@@ -85,6 +86,7 @@ export function formatAlertNotification(fired: FiredAlert[]): PushPayload {
 }
 
 const POLL_MS = 60_000
+const HEARTBEAT_SLUG = 'emit-infra-monitor'
 let sshHealth = new Map<string, HealthState>()
 let httpHealth = new Map<string, HealthState>()
 const httpCircuit = new Map<string, { failures: number; skipUntil: number }>()
@@ -197,7 +199,7 @@ export async function poll(): Promise<void> {
   const projects = await discoverProjects().catch(() => [])
   const now = Date.now()
 
-  await Promise.allSettled(
+  const results = await Promise.allSettled(
     projects.map(async ({ config }) => {
       const host = config.serverIp ?? config.domain
       if (isReservedTestDomain(host)) return
@@ -229,9 +231,14 @@ export async function poll(): Promise<void> {
       }
     }),
   )
+
+  // An empty project list is a monitor fault, not a healthy cycle.
+  const completed = results.some(r => r.status === 'fulfilled')
+  void pingPulse(HEARTBEAT_SLUG, { fail: !completed })
 }
 
 export function startStatusMonitor(): void {
+  warnIfPulseUnconfigured()
   // Delay first poll by 10 s to let the server finish booting.
   setTimeout(() => {
     void (async () => {

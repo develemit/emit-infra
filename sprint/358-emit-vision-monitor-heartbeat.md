@@ -85,15 +85,43 @@ PagerDuty alert channels), so this needs no new vendor.
 - new file: `docs/MONITORING.md`
 
 ## Acceptance criteria
-- [ ] `pulse.test.ts` covers the success URL, the `/fail` URL, the bearer
+- [x] `pulse.test.ts` covers the success URL, the `/fail` URL, the bearer
       header, the timeout, no throw on network error, and no-op without env.
-- [ ] A status-monitor test asserts a success ping after a poll with
+- [x] A status-monitor test asserts a success ping after a poll with
       projects, and a fail ping with zero projects.
-- [ ] `emit-vision pulse status` shows `emit-infra-monitor` healthy.
-- [ ] The missing-heartbeat email arrived during the stop test (the user
+- [x] `emit-vision pulse status` shows `emit-infra-monitor` healthy.
+- [x] The missing-heartbeat email arrived during the stop test (the user
       confirmed).
-- [ ] `pnpm test`, `pnpm typecheck` and `pnpm lint` pass.
+- [x] `pnpm test`, `pnpm typecheck` and `pnpm lint` pass.
 
 ## Out of scope
 - Per-server uptime and backup pulses (sprint 360).
 - Instrumenting emit-infra with the emit-vision SDK.
+
+## Completed
+
+**Date:** 2026-10-06
+
+### Summary
+emit-infra is connected to emit-vision (project `emit-infra`, `.emit-vision.json` committed; ingest key and project id in gitignored `apps/api/.env`, placeholders in `.env.example`). The `emit-infra-monitor` pulse check (interval 60s to match `POLL_MS`, grace 300s) has an email channel to emitdutcher@gmail.com, set through the pulse-admin PATCH endpoint because the CLI has no channel flag. `pingPulse` in `pulse.ts` is best-effort (5s timeout, never throws, no-op without env) and `poll()` pings success after `Promise.allSettled` when at least one probe completed, `/fail` on an empty project list.
+
+The first live stop test exposed an emit-vision bug: `findChecksNeedingDownAlert` used `ne(lastAlertStatus, 'down')`, so a never-alerted check (NULL) could never send its first down alert. Fixed in emit-vision commit `3a138fa` (`IS DISTINCT FROM`, regression test) and deployed. The re-run stop test sent the down alert at 22:11:34Z and the recovery at 22:12:34Z; the user confirmed the down email arrived (screenshot, 3:11 PM).
+
+### Files changed
+- (new) `.emit-vision.json` — emit-vision project id
+- (new) `apps/api/src/lib/pulse.ts` — `pingPulse(slug, { fail?, release? })`
+- (new) `apps/api/src/lib/pulse.test.ts` — 7 tests
+- `apps/api/src/lib/status-monitor.ts` — heartbeat after each poll
+- (new) `apps/api/src/lib/status-monitor-heartbeat.test.ts` — success and fail ping tests
+- `apps/api/.env.example` — emit-vision placeholders
+- (new) `docs/MONITORING.md` — what watches what, channels, cross-monitoring gap, silencing
+- `sprint/358-emit-vision-monitor-heartbeat.md` — this record
+
+### Verification
+- `pnpm test`: pass (api and cli suites; 280/280 in the cli slice shown, Nx cached the rest), full workspace since no `check:affected` exists here
+- `pnpm typecheck`, `pnpm lint`: clean
+- `emit-vision pulse status`: `emit-infra-monitor` up
+- Stop test: down alert and recovery alert both fired; user confirmed the down email
+
+### Follow-ups
+- `[defer]` emit-vision renders pulse alerts through its metric-alert email template, so "Project:" is blank and "Condition: undefined < 0 in 0m" appears. Fix belongs in the emit-vision repo.
