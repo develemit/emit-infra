@@ -120,12 +120,6 @@ all:
       #   - service: "api"
       #     command: "python manage.py warm_cache"
 
-      # ── PostgreSQL backup configuration ──────────────────────────────────
-      # R2 bucket name for postgres automated backups (optional)
-      # When defined and non-empty, enables the postgres-backup role
-      # postgres_backup_bucket: "emit-vision-backups"
-      # postgres_backup_schedule: "0 2 * * *"  # Daily at 2 AM UTC
-
       # ── Zero-downtime deploy configuration (optional) ────────────────────
       # Enable zero-downtime deploy strategy (alternative to standard restart)
       # When true, starts containers on a standby port and health-checks before

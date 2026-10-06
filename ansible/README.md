@@ -14,7 +14,6 @@ This directory contains Ansible playbooks and roles for provisioning and deployi
   - `deploy-user` — Non-login deploy user with SSH key and Docker access (blue-green mode)
   - `nginx` — nginx, certbot SSL/TLS, site config templating
   - `app-deploy` — Application setup: copy compose files, health checks, deploy script
-  - `postgres-backup` — Optional automated PostgreSQL backups to R2 (Cloudflare)
 
 - **`inventory/`** — Host definitions and variables
   - `emit-vision.example.yml` — Reference example showing all blue-green variables
@@ -89,9 +88,6 @@ ssh deploy@<server-ip> /opt/emit-vision/blue-green-deploy.sh
 | `copy_env` | bool | `false` | — | Whether to copy the `.env` file during provisioning |
 | `compose_dest` | string | `docker-compose.yml` | — | Filename in app directory for the default compose file |
 | `post_deploy_exec` | list | `[]` | — | Commands to run after deploy (e.g., migrations, cache warming) |
-| **PostgreSQL Backups (Optional)** |
-| `postgres_backup_bucket` | string | — | — | R2 bucket name for automated backups (triggers postgres-backup role if set) |
-| `postgres_backup_schedule` | string | `0 2 * * *` | — | Cron schedule for backups (default: daily at 2 AM UTC) |
 | **Deploy Strategy (Optional)** |
 | `zero_downtime` | bool | `false` | — | Use zero-downtime deploy (app-deploy role): start standby container, health-check, nginx swap |
 | `nginx_api_port` | int | — | — | If set, create an `api.{{ domain }}` nginx server block (automatic for blue-green) |
@@ -113,7 +109,7 @@ See `ansible/inventory/emit-vision.example.yml` for a fully commented example wi
 - Host definition with connection details
 - All blue-green variables with inline documentation
 - Environment and application configuration examples
-- Optional features (backups, zero-downtime deploy)
+- Optional features (zero-downtime deploy)
 
 Copy and customize this file for your project:
 ```bash

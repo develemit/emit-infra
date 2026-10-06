@@ -9,5 +9,3 @@
 
   roles:
     - app-deploy
-    - role: postgres-backup
-      when: postgres_backup_bucket is defined and postgres_backup_bucket | length > 0

@@ -84,15 +84,15 @@ Rules and gotchas for this work:
   and their local env files. Commit in those repos, not here.
 
 ## Acceptance criteria
-- [ ] `BACKUP-INVENTORY.md` has a before and after row for every DB-holding
+- [x] `BACKUP-INVENTORY.md` has a before and after row for every DB-holding
       project, with evidence: an `aws s3 ls` line and the status-file
       contents.
-- [ ] Every DB project has an `ok` status file younger than 26h and a dump in
+- [x] Every DB project has an `ok` status file younger than 26h and a dump in
       R2.
-- [ ] The tastease sidecar change keeps its existing `failed` branch. Each
+- [x] The tastease sidecar change keeps its existing `failed` branch. Each
       changed repo's own test or check suite passes. Name the command run in
       the inventory doc.
-- [ ] If the Ansible role is deleted, `ansible-playbook --syntax-check
+- [x] If the Ansible role is deleted, `ansible-playbook --syntax-check
       ansible/playbooks/provision.yml` still passes, and `pnpm test` passes
       here.
 
@@ -100,3 +100,65 @@ Rules and gotchas for this work:
 - Restore drills (sprint 361).
 - Encryption, bucket lock and token narrowing (sprint 364).
 - Hetzner server backups (sprint 363).
+
+
+## Completed
+
+**Date:** 2026-10-06
+
+### Summary
+The earlier run did the read-only inventory and stopped at task 2: emit-billing
+and emit-social had **no backups at all**. The user approved the mutations
+("Approve 359"), and this run finished the sprint. All seven fleet databases now
+dump at least daily to R2, keep at least 7 days offsite, and write
+`/opt/<name>/.backup-status.json` with `lastRun`/`status`/`key`/`bytes`. Each
+was verified after deploy with a fresh R2 object and an `ok` status file under 1h old.
+Before and after rows with evidence are in `docs/BACKUP-INVENTORY.md`.
+
+I created four new buckets: `emit-billing-backups`, `emit-social-backups`,
+`develemail-backups` and `tastease-backups`. Each has a bucket-scoped R2 token,
+stored at `~/.emit-infra/<name>/r2-backup-token.env` (martialops pattern) and
+added to that repo's local `.env.prod` as `BACKUP_S3_*`. emit-billing and
+emit-social got the diner-decider-style `postgres-backup-s3` sidecar.
+develemail and tastease switched their sidecars to that image (it ships `aws`),
+added the upload, and kept the local volume as a 7-day fast-restore cache.
+tastease's `failed` branch is kept. diner-decider gained `key`/`bytes`, and
+martialops gained the status file. emit-vision's `pg-backup.sh` gained the
+status file and `pipefail`, and its retention went from 7 to 168 objects (hourly
+dumps, so 7 days). Its script is now in deploy `extraFiles`. It had been
+hand-copied, so earlier edits never shipped.
+
+Before each deploy, the postgres service's compose config hash was compared
+with the running container. It was unchanged everywhere except tastease, which
+already restarts Postgres on every deploy. emit-billing got a read-only
+`pg_dump` dry run before its first deploy. emit-social's deploy also shipped
+16 unpushed sprint commits with three additive migrations, so a one-off
+pre-deploy dump went to `emit-social-backups/pre-deploy/` first. The Ansible
+`postgres-backup` role is deleted. The decision and the remaining CLI
+`postgres.backupBucket` plumbing are recorded in the inventory doc. Rated
+Difficulty 5; executed on Opus.
+
+### Files changed
+- (new) `docs/BACKUP-INVENTORY.md`: before/after inventory, evidence, per-repo check commands, role decision
+- `ansible/roles/postgres-backup/` (deleted): unused role
+- `ansible/playbooks/provision.yml`, `ansible/playbooks/deploy.yml`: role entries removed
+- `ansible/README.md`, `ansible/inventory/emit-vision.example.yml`: role rows and vars removed
+- `apps/dashboard/src/components/detail/cron-panel.tsx`: caption no longer cites the deleted role
+- Other repos (committed and deployed there): emit-billing `b7f6bb0`, emit-social `37158f8`, develemail `15a3300`, tastease `f6a2c41`, diner-decider `77e5128` (+`3eb5a38` deploy-history record), martialops `ba1b054`, emit-vision `b517244`
+- Local only (gitignored): `BACKUP_S3_*` in `.env.prod` of emit-billing, emit-social, develemail, tastease
+
+### Verification
+- Status files on all 7 servers: `ok`, age 0.02–0.58h, `key` and `bytes` present
+- `aws s3 ls` shows a fresh dump per project (lines in the inventory doc)
+- Each repo's `ci.prePush` suite passed as part of its deploy (listed per repo in the inventory doc)
+- `ansible-playbook --syntax-check` on `provision.yml` and `deploy.yml`: pass
+- `pnpm test` (full; `ansible/` is outside the Nx graph): 1374/1374 pass across 4 projects
+- emit-vision `pg-backup.sh` failure path, run locally against an unreachable DB: writes `{"status":"failed","key":"","bytes":0}`
+
+### Follow-ups
+- `[defer]` emit-social's `CREDENTIALS_KEY` isn't in `.env.prod`. Sprint 116 (now deployed) logs a warning, and Bluesky connect returns 503 until it's set (`openssl rand -base64 32`).
+- `[defer]` tastease restarts Postgres on every deploy: `env_file: .env` on the `postgres` service puts the per-deploy `BUILD_NUMBER` into its config hash. Use an explicit `environment:` block instead.
+- `[defer]` Remove the now-inert `postgres.backupBucket` config: `setup.ts` mints a bucket and token for it, `deploy.ts` runs `checkBackupEnv` and passes `postgres_backup_bucket`, and the dashboard provision/data pages and alert-rules default reference it.
+- `[defer]` emit-vision's ClickHouse backup writes no status of its own. The project-level status file reflects Postgres only.
+- `[defer]` martialops' pre-push e2e fails when its local dev Postgres (`docker/docker-compose.yml`) isn't running. It's a local environment trap for detached deploys.
+- `[defer]` The sidecar script body is copy-pasted across five repos. A shared, versioned backup image or script would stop drift (consider for sprint 364).
