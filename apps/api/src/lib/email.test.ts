@@ -40,4 +40,27 @@ describe('sendEmail', () => {
     send.mockRejectedValue(new Error('boom'))
     expect(await sendEmail(input)).toEqual({ ok: false, error: 'boom' })
   })
+
+  describe('retryable classification', () => {
+    beforeEach(() => {
+      vi.stubEnv('DEVELEMAIL_API_KEY', 'k')
+      vi.stubEnv('DEVELEMAIL_BASE_URL', 'https://mail.example')
+      vi.stubEnv('ALERT_EMAIL_FROM', 'alerts@example.com')
+    })
+
+    it.each(['HTTP 429 Too Many Requests', 'idempotency key is currently being processed', 'recipient cooldown active'])('flags %s', async (msg) => {
+      send.mockRejectedValue(new Error(msg))
+      expect(await sendEmail(input)).toEqual({ ok: false, error: msg, retryable: true })
+    })
+
+    it('flags duplicate responses', async () => {
+      send.mockResolvedValue({ id: '1', status: 'queued', duplicate: true })
+      expect(await sendEmail(input)).toEqual({ ok: false, error: 'duplicate', retryable: true })
+    })
+
+    it('does not flag other errors', async () => {
+      send.mockRejectedValue(new Error('boom'))
+      expect(await sendEmail(input)).toEqual({ ok: false, error: 'boom' })
+    })
+  })
 })

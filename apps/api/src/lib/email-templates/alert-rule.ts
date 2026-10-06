@@ -92,5 +92,5 @@ export function renderAlertRuleEmail(i: AlertRuleEmailInput): RenderedEmail {
     footerNote: 'Sent because alert rules fired. Each rule has a 6h cooldown before it can fire again.',
     sentAtMs: i.nowMs,
   })
-  return { subject: subjectFor(i), html, text }
+  return { subject: subjectFor(i), html, text, tone }
 }

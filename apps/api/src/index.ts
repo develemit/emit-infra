@@ -34,6 +34,7 @@ import { startStatusMonitor } from './lib/status-monitor.js'
 import { startDigestScheduler } from './lib/digest-scheduler.js'
 import { registerAuth } from './lib/auth.js'
 import { formatFatalError } from './lib/fatal.js'
+import { getOutbox } from './lib/email-outbox.js'
 
 const app = Fastify({ logger: process.env['NODE_ENV'] === 'development' ? { level: 'warn' } : true })
 
@@ -100,5 +101,6 @@ if (!hasSecret && !isDev) {
   app.log.warn('API_SECRET not set — binding to localhost only; destructive endpoints would otherwise be open to the network')
 }
 await app.listen({ port, host })
+await getOutbox().start()
 startStatusMonitor()
 startDigestScheduler()

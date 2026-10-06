@@ -8,7 +8,9 @@
  */
 
 import { sendToAll, type PushPayload } from './push.js'
-import { sendEmail, type EmailResult } from './email.js'
+import type { EmailResult } from './email.js'
+import { getOutbox, type QueuedResult } from './email-outbox.js'
+import type { Tone } from './email-templates/layout.js'
 import { renderLayout } from './email-templates/layout.js'
 import { dashboardUrl } from './email-templates/format.js'
 import type { RenderedEmail } from './email-templates/types.js'
@@ -21,10 +23,12 @@ export interface NotifyPayload extends PushPayload {
 
 export interface NotifyResult {
   push: { sent: number; pruned: number; error?: string }
-  email: EmailResult | { ok: false; error: 'skipped' }
+  email: EmailResult | QueuedResult | { ok: false; error: 'skipped' }
 }
 
 const TONE_BY_SEVERITY = { alert: 'warning', info: 'info' } as const
+
+const toneOf = (p: NotifyPayload): Tone => p.email?.tone ?? TONE_BY_SEVERITY[p.severity]
 
 function buildEmail(p: NotifyPayload): RenderedEmail {
   if (p.email) return p.email
@@ -53,7 +57,7 @@ export async function notify(payload: NotifyPayload): Promise<NotifyResult> {
       error: err instanceof Error ? err.message : String(err),
     })),
     wantsEmail
-      ? sendEmail(buildEmail(payload)).catch(
+      ? getOutbox().enqueue(buildEmail(payload), toneOf(payload)).catch(
           (err: unknown): EmailResult => ({ ok: false, error: err instanceof Error ? err.message : String(err) }),
         )
       : Promise.resolve({ ok: false, error: 'skipped' } as const),

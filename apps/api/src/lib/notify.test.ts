@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const { sendToAll, sendEmail } = vi.hoisted(() => ({ sendToAll: vi.fn(), sendEmail: vi.fn() }))
 vi.mock('./push.js', () => ({ sendToAll }))
-vi.mock('./email.js', () => ({ sendEmail }))
+vi.mock('./email-outbox.js', () => ({ getOutbox: () => ({ enqueue: sendEmail }) }))
 
 import { notify } from './notify.js'
 
@@ -31,7 +31,7 @@ describe('notify', () => {
   it('info with a structured email sends it verbatim, and strips notify-only fields from the push', async () => {
     const email = { subject: 'S', html: '<p>H</p>', text: 'T' }
     await notify({ ...base, severity: 'info', email })
-    expect(sendEmail).toHaveBeenCalledWith(email)
+    expect(sendEmail).toHaveBeenCalledWith(email, 'info')
     expect(sendToAll).toHaveBeenCalledWith(base)
   })
 

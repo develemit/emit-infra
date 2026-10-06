@@ -37,5 +37,5 @@ export function renderDeployFailedEmail(i: DeployFailedEmailInput): RenderedEmai
     footerNote: 'Sent because a deploy failed. Deploy history is in .deploy-history.jsonl in the project directory.',
     sentAtMs: i.nowMs,
   })
-  return { subject: `[emit-infra] 🔴 ${i.project} deploy #${i.buildNumber} failed`, html, text }
+  return { subject: `[emit-infra] 🔴 ${i.project} deploy #${i.buildNumber} failed`, html, text, tone: 'critical' }
 }

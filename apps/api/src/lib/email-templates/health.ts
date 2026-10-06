@@ -82,6 +82,6 @@ export function renderHealthEmail(i: HealthEmailInput): RenderedEmail {
       : `Sent because ${i.project} is down. Next reminder in ${formatDuration(REMINDER_INTERVAL_MS)} if still down.`,
     sentAtMs: i.nowMs,
   })
-  return { subject: subjectFor(i), html, text }
+  return { subject: subjectFor(i), html, text, tone }
 }
 

@@ -65,5 +65,5 @@ export function renderDigestEmail(i: DigestEmailInput): RenderedEmail {
     footerNote: 'Sent weekly. Amber and red values are outside healthy ranges.',
     sentAtMs: i.nowMs,
   })
-  return { subject: `[emit-infra] 📊 Weekly fleet digest — ${plural(i.projects.length, 'project')}, ${plural(incidents, 'incident')}`, html, text }
+  return { subject: `[emit-infra] 📊 Weekly fleet digest — ${plural(i.projects.length, 'project')}, ${plural(incidents, 'incident')}`, html, text, tone: incidents > 0 ? 'warning' : 'info' }
 }
