@@ -76,10 +76,14 @@ run_cmd() {
 acquire_slot() {
   local tag="$1" timeout="${2:-900}"
   [[ -x "$GATE" ]] || return 0
+  # Already inside gated-run.sh's suite slot — queuing for a second one would
+  # just burn a slot (or the timeout) waiting on ourselves.
+  [[ "$tag" == "suite" && -n "${RESOURCE_GATE_SUITE_HELD:-}" ]] && return 0
   # suite gets the budgeted slot count; other tags (e2e) keep the gate default.
   local slot_args=()
   [[ "$tag" == "suite" ]] && slot_args=(--slots "$SUITE_SLOTS")
   if SLOT=$(GATE_OWNER_PID=$$ "$GATE" acquire "$tag" ${slot_args[@]+"${slot_args[@]}"} --timeout "$timeout"); then
+    [[ "$tag" == "suite" ]] && export RESOURCE_GATE_SUITE_HELD=1
     return 0
   fi
   SLOT=""
