@@ -2,6 +2,9 @@
   "name": "@emit-infra/api",
   "version": "0.0.1",
   "type": "module",
+  "scripts": {
+    "email:preview": "tsx scripts/email-preview.ts"
+  },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "latest",
     "@anthropic-ai/sdk": "^0.100.0",

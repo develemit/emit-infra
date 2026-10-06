@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod/v4'
 import { getPublicKey, addSubscription, listSubscriptions, removeSubscription } from '../lib/push.js'
 import { notify } from '../lib/notify.js'
+import { renderSample, SAMPLE_KINDS, type SampleKind } from '../lib/email-templates/fixtures.js'
 
 const SubscriptionBody = z.object({
   endpoint: z.url(),
@@ -53,12 +54,19 @@ export async function pushRoutes(app: FastifyInstance) {
   })
 
   // Manual test endpoint — fires through notify(), so it also sends an email.
+  // `?sample=health|alert-rule|deploy|digest` sends that kind's fixture email.
   app.post('/push/notify', async (req, reply) => {
+    const sample = (req.query as { sample?: string }).sample
+    if (sample !== undefined) {
+      if (!SAMPLE_KINDS.includes(sample as SampleKind)) return reply.status(400).send({ error: `sample must be one of ${SAMPLE_KINDS.join(', ')}` })
+      const email = renderSample(sample as SampleKind)
+      const result = await notify({ severity: 'info', email, title: email.subject, body: `Sample ${sample} email`, tag: `sample:${sample}` })
+      return { ok: true, ...result.push, email: result.email }
+    }
     const parsed = NotifyBody.safeParse(req.body)
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.message })
     const result = await notify({
-      severity: 'info',
-      email: true,
+      severity: 'alert',
       title: parsed.data.title,
       body: parsed.data.body,
       ...(parsed.data.url !== undefined && { url: parsed.data.url }),

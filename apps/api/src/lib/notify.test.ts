@@ -28,10 +28,20 @@ describe('notify', () => {
     expect(r.email).toEqual({ ok: false, error: 'skipped' })
   })
 
-  it('info with email:true also emails, and strips notify-only fields from the push', async () => {
-    await notify({ ...base, severity: 'info', email: true })
-    expect(sendEmail).toHaveBeenCalledOnce()
+  it('info with a structured email sends it verbatim, and strips notify-only fields from the push', async () => {
+    const email = { subject: 'S', html: '<p>H</p>', text: 'T' }
+    await notify({ ...base, severity: 'info', email })
+    expect(sendEmail).toHaveBeenCalledWith(email)
     expect(sendToAll).toHaveBeenCalledWith(base)
+  })
+
+  it('falls back to renderLayout when no structured email is given', async () => {
+    await notify({ ...base, severity: 'alert' })
+    const arg = sendEmail.mock.calls[0]![0]
+    expect(arg.subject).toBe('[emit-infra] Cert expiring')
+    expect(arg.html).toContain('<!doctype html>')
+    expect(arg.html).toContain('#d97706')
+    expect(arg.text).toContain('WARNING: Cert expiring')
   })
 
   it('resolves the url against the dashboard origin in the email', async () => {

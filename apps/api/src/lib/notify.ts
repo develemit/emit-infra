@@ -9,11 +9,14 @@
 
 import { sendToAll, type PushPayload } from './push.js'
 import { sendEmail, type EmailResult } from './email.js'
+import { renderLayout } from './email-templates/layout.js'
+import { dashboardUrl } from './email-templates/format.js'
+import type { RenderedEmail } from './email-templates/types.js'
 
 export interface NotifyPayload extends PushPayload {
   severity: 'info' | 'alert'
-  email?: boolean
-  emailHtml?: string
+  /** Pre-rendered email; sent even for `info` severity. */
+  email?: RenderedEmail
 }
 
 export interface NotifyResult {
@@ -21,35 +24,27 @@ export interface NotifyResult {
   email: EmailResult | { ok: false; error: 'skipped' }
 }
 
-const DEFAULT_DASHBOARD_ORIGIN = 'http://localhost:7013'
+const TONE_BY_SEVERITY = { alert: 'warning', info: 'info' } as const
 
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-}
-
-function resolveUrl(url: string): string {
-  const origin = process.env['DASHBOARD_ORIGIN'] ?? DEFAULT_DASHBOARD_ORIGIN
-  try {
-    return new URL(url, origin).toString()
-  } catch {
-    return url
-  }
-}
-
-function buildEmail(p: NotifyPayload): { subject: string; html: string; text: string } {
-  const link = p.url ? resolveUrl(p.url) : undefined
-  const html =
-    p.emailHtml ??
-    `<h2>${escapeHtml(p.title)}</h2><p>${escapeHtml(p.body)}</p>` +
-      (link ? `<p><a href="${escapeHtml(link)}">${escapeHtml(link)}</a></p>` : '')
-  const text = `${p.title}\n\n${p.body}${link ? `\n\n${link}` : ''}`
+function buildEmail(p: NotifyPayload): RenderedEmail {
+  if (p.email) return p.email
+  const link = p.url ? dashboardUrl(p.url) : undefined
+  const { html, text } = renderLayout({
+    tone: TONE_BY_SEVERITY[p.severity],
+    preheader: p.body,
+    headline: p.title,
+    summary: p.body,
+    facts: [],
+    actions: link ? { buttons: [{ label: 'Open in dashboard', url: link }] } : {},
+    footerNote: `Sent by emit-infra (${p.severity}).`,
+  })
   return { subject: `[emit-infra] ${p.title}`, html, text }
 }
 
 export async function notify(payload: NotifyPayload): Promise<NotifyResult> {
   const { severity, email, ...rest } = payload
   const pushPayload: PushPayload = { title: rest.title, body: rest.body, ...(rest.url !== undefined && { url: rest.url }), ...(rest.tag !== undefined && { tag: rest.tag }) }
-  const wantsEmail = severity === 'alert' || email === true
+  const wantsEmail = severity === 'alert' || email !== undefined
 
   const [push, mail] = await Promise.all([
     sendToAll(pushPayload).catch((err: unknown) => ({
