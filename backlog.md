@@ -299,6 +299,7 @@ fleet-clean criterion was amended to expect exactly these two.
 - (sprint 356.1, 2026-10-06) Dashboard origin should still become shared config (carried over from 356; now lives in `email-templates/format.ts`).
 - (sprint 356.2, 2026-10-06) Combined email HTML was not viewed in a mail client, only confirmed delivered.
 - (sprint 356.2, 2026-10-06) The outbox is single-recipient/global; per-project routing is out of scope.
+- (sprint 358, 2026-10-06) **[emit-vision]** Pulse alerts render through emit-vision's metric-alert email template, so "Project:" is blank and "Condition: undefined < 0 in 0m" appears (seen 2026-10-06 on emit-infra-monitor). Fix belongs in the emit-vision repo.
 
 ## ✅ Converted to Sprints
 - ~~(tastease deploy post-mortem, 2026-08-27) **Dedupe pnpm install across images.** One deploy ran 3 near-identical full `pnpm install`s sequentially (api 423s, web 973s, marketing 798s = 2194s of a 2395s build phase) because all three Dockerfiles install from the same lockfile independently. A shared deps stage (buildx bake common target, or one deps image the three build FROM) runs it once. Biggest structural win for the slow path. **⚠ Same prerequisite as the lockfile-keyed item below** — a shared deps stage runs one install for every image, so a missing `supportedArchitectures` breaks all of them at once. Put the setting in `pnpm-workspace.yaml` and gate the rollout on an amd64 load-check of every image with native deps.~~ → dropped: sprint 338 measured warm cache absorbs most of it (2026-09-22)
