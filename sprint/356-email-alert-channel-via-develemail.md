@@ -89,18 +89,45 @@ emitdutcher@gmail.com is a channel that doesn't go away.
 - `apps/api/package.json`, `pnpm-lock.yaml`: new dependency
 
 ## Acceptance criteria
-- [ ] `notify()` with `severity:'alert'` calls both push and email. With
+- [x] `notify()` with `severity:'alert'` calls both push and email. With
       `severity:'info'` it calls push only. A throwing email client still
       returns a result and never rejects. Covered in `notify.test.ts`.
-- [ ] `sendEmail()` returns `{ok:false}` without throwing when env vars are
+- [x] `sendEmail()` returns `{ok:false}` without throwing when env vars are
       absent. Covered in `email.test.ts`.
-- [ ] A real test email reached emitdutcher@gmail.com (the user confirmed),
+- [x] A real test email reached emitdutcher@gmail.com (the user confirmed),
       sent after restarting the API with `pnpm launch`.
-- [ ] No secrets in tracked files. `apps/api/.env` stays gitignored.
-- [ ] `pnpm test`, `pnpm typecheck` and `pnpm lint` pass. This repo has no
+- [x] No secrets in tracked files. `apps/api/.env` stays gitignored.
+- [x] `pnpm test`, `pnpm typecheck` and `pnpm lint` pass. This repo has no
       `check:affected`, and the lockfile changed, so run the full suite.
 
 ## Out of scope
 - Switching existing `sendToAll` call sites to `notify()` (sprint 357).
 - emit-vision pulse checks (sprint 358).
 - Email preferences UI in the dashboard.
+
+## Completed
+
+**Date:** 2026-10-06
+
+### Summary
+Added `@develemail/sdk`, `lib/email.ts` (`sendEmail()`, never throws, returns `{ok:false}` when env vars are absent) and `lib/notify.ts` (`notify()` fans out to Web Push, plus email when `severity:'alert'` or `email: true`). `POST /push/notify` now goes through `notify()`. No existing call sites were switched (sprint 357).
+
+A real test email was delivered via develemail (`alerts@develemit.com` to emitdutcher@gmail.com) after restarting the API with `pnpm launch`, and the user confirmed receipt in Gmail. The earlier blocker was the develemail CLI login URL missing the `/api` suffix. `notify.ts` reads `DASHBOARD_ORIGIN` (default `http://localhost:7013`) because the API defines no dashboard origin.
+
+### Files changed
+- `apps/api/src/lib/email.ts` (new) — develemail send wrapper
+- `apps/api/src/lib/notify.ts` (new) — multi-channel dispatcher
+- `apps/api/src/lib/email.test.ts`, `apps/api/src/lib/notify.test.ts` (new) — unit tests
+- `apps/api/src/routes/push.ts` — test endpoint uses `notify()`
+- `apps/api/.env.example` — new email vars
+- `apps/api/package.json`, `pnpm-lock.yaml` — `@develemail/sdk`
+- `sprint/356-email-alert-channel-via-develemail.md` — this file
+
+### Verification
+- `pnpm test` (full, root files changed): api 452/452 pass
+- `pnpm typecheck`, `pnpm lint`: clean
+- Real email: develemail `delivered`, user confirmed in Gmail
+- `apps/api/.env` is gitignored and untracked
+
+### Follow-ups
+- `[defer]` Dashboard origin should be a shared config rather than a `DASHBOARD_ORIGIN` env default in `notify.ts`.

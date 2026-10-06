@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod/v4'
-import { getPublicKey, addSubscription, listSubscriptions, removeSubscription, sendToAll } from '../lib/push.js'
+import { getPublicKey, addSubscription, listSubscriptions, removeSubscription } from '../lib/push.js'
+import { notify } from '../lib/notify.js'
 
 const SubscriptionBody = z.object({
   endpoint: z.url(),
@@ -51,16 +52,18 @@ export async function pushRoutes(app: FastifyInstance) {
     return { ok: removed }
   })
 
-  // Manual test endpoint — fire a push to all registered devices.
+  // Manual test endpoint — fires through notify(), so it also sends an email.
   app.post('/push/notify', async (req, reply) => {
     const parsed = NotifyBody.safeParse(req.body)
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.message })
-    const result = await sendToAll({
+    const result = await notify({
+      severity: 'info',
+      email: true,
       title: parsed.data.title,
       body: parsed.data.body,
       ...(parsed.data.url !== undefined && { url: parsed.data.url }),
       ...(parsed.data.tag !== undefined && { tag: parsed.data.tag }),
     })
-    return { ok: true, ...result }
+    return { ok: true, ...result.push, email: result.email }
   })
 }
