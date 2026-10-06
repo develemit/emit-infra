@@ -24,8 +24,21 @@ expensive failure there is to find out about late.
   Emailing every deploy is noise.
 - `apps/api/src/routes/deploy.ts:126` (deploy failed) → `alert`.
 - `apps/api/src/lib/digest-scheduler.ts:99`: weekly digest → `info` with
-  `email: true`. Pass a real HTML `emailHtml` built from `buildDigest()`
-  (`apps/api/src/lib/weekly-digest.ts`), not just `summaryLine`.
+  `email: true`, using the `digest.ts` renderer from sprint 356.1.
+
+**Every alert email goes through a sprint 356.1 renderer**
+(`apps/api/src/lib/email-templates/`: `health`, `alert-rule`, `deploy`,
+`digest`). Pass the result as the structured `email` field on
+`notify()`. This sprint's job at each call site is to **gather the data**
+the renderer needs:
+- server IP and domain from the project config;
+- recent incidents from `.incidents.jsonl`;
+- 24h metric history plus `computeLinearTrend` for disk/mem;
+- deploy sha, branch, build number, duration and error;
+- cert name and certbot error;
+- backup lastRun and status.
+Don't hand-build HTML anywhere. Data gathering must be best-effort: if
+history can't be read, the email still sends with the facts it has.
 - `apps/api/src/routes/push.ts:58`: test endpoint, already moved in 356.
 
 Alert rules (`apps/api/src/lib/alert-rules.ts`):
@@ -55,9 +68,10 @@ Backup status probe:
 1. Replace each `sendToAll` call site with `notify()` and the severity listed
    above. Keep the existing `tag`/`url` values and the existing
    `.catch()`/logging behaviour.
-2. Build digest HTML from `buildDigest()` output: a per-project table plus the
-   summary line. Keep it in `weekly-digest.ts`, or a sibling
-   `weekly-digest-email.ts` if that file would pass 300 lines.
+2. At each call site, gather the renderer's input data (see Context) and
+   pass the rendered `email` to `notify()`. Shared lookups (incidents in the
+   last 7 days, the last 24h of metrics) go in one helper,
+   `apps/api/src/lib/email-context.ts`, not duplicated across call sites.
 3. Add the backup defaults and the `backupFailed` metric to
    `alert-rules.ts`. Extend `AlertMetrics`. Add a label to the
    `status-monitor.ts` metric-label map (≈line 28).
@@ -75,8 +89,8 @@ Backup status probe:
   `digest-scheduler.ts`, `weekly-digest.ts`
 - `apps/api/src/routes/deploy.ts`
 - `apps/api/src/lib/alert-rules.ts` (+ `alert-rules.test.ts`)
-- possibly new: `apps/api/src/lib/probe-parse.ts`,
-  `weekly-digest-email.ts`
+- new: `apps/api/src/lib/email-context.ts` (+ test)
+- possibly new: `apps/api/src/lib/probe-parse.ts`
 
 ## Acceptance criteria
 - [ ] `grep -rn sendToAll apps/api/src --include='*.ts' | grep -v test` shows
@@ -89,8 +103,12 @@ Backup status probe:
 - [ ] `health-notify` and deploy tests (existing or new) assert the severity
       passed to `notify()` for down, up and deploy-failed versus
       deploy-complete.
-- [ ] A weekly digest test asserts that `emailHtml` contains each project
-      name.
+- [ ] `email-context.test.ts` covers incidents and metric-history lookups,
+      including the unreadable/missing-file case returning empty rather
+      than throwing.
+- [ ] Call-site tests assert that `notify()` receives a structured `email`
+      from the matching renderer (health, alert-rule, deploy-failed, digest)
+      and that the weekly digest email contains each project name.
 - [ ] A live down→up email pair was received (the user confirmed).
 - [ ] `pnpm test`, `pnpm typecheck` and `pnpm lint` pass.
 
