@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { renderHealthEmail } from './health.js'
 import { TONE_COLOR } from './layout.js'
-import { healthDown, healthRecovered } from './fixtures.js'
+import { healthDown, healthRecovered, healthTimeout } from './fixtures.js'
 
 describe('renderHealthEmail', () => {
   it('down: subject, facts, incidents and actions', () => {
@@ -30,5 +30,19 @@ describe('renderHealthEmail', () => {
     expect(r.subject).toBe('[emit-infra] 🟢 tastease recovered after 14m')
     expect(r.html).toContain(TONE_COLOR.recovered)
     expect(r.text).toContain('Total downtime: 14m')
+  })
+
+  it('includes What to do steps matched to the cause', () => {
+    const r502 = renderHealthEmail(healthDown)
+    expect(r502.text).toContain('docker compose ps')
+    expect(r502.text).toContain('ssh root@203.0.113.10')
+    expect(r502.firstStep).toBeTruthy()
+    expect(renderHealthEmail(healthTimeout).text).toContain('overloaded or unreachable')
+  })
+
+  it('recovery says no action is needed', () => {
+    const r = renderHealthEmail(healthRecovered)
+    expect(r.text).toContain('No action needed')
+    expect(r.firstStep).toBeUndefined()
   })
 })

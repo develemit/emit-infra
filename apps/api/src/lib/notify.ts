@@ -28,6 +28,17 @@ export interface NotifyResult {
 
 const TONE_BY_SEVERITY = { alert: 'warning', info: 'info' } as const
 
+const PUSH_BODY_MAX = 200
+
+const clip = (text: string, max: number): string => (text.length <= max ? text : `${text.slice(0, Math.max(0, max - 1)).trimEnd()}…`)
+
+/** Shortens the body, not the step: the step is what makes the notification actionable. */
+export function withFirstStep(body: string, firstStep?: string): string {
+  if (!firstStep) return body
+  const step = clip(firstStep, PUSH_BODY_MAX - 40)
+  return `${clip(body, PUSH_BODY_MAX - step.length - 3)} → ${step}`
+}
+
 const toneOf = (p: NotifyPayload): Tone => p.email?.tone ?? TONE_BY_SEVERITY[p.severity]
 
 function buildEmail(p: NotifyPayload): RenderedEmail {
@@ -47,7 +58,7 @@ function buildEmail(p: NotifyPayload): RenderedEmail {
 
 export async function notify(payload: NotifyPayload): Promise<NotifyResult> {
   const { severity, email, ...rest } = payload
-  const pushPayload: PushPayload = { title: rest.title, body: rest.body, ...(rest.url !== undefined && { url: rest.url }), ...(rest.tag !== undefined && { tag: rest.tag }) }
+  const pushPayload: PushPayload = { title: rest.title, body: withFirstStep(rest.body, email?.firstStep), ...(rest.url !== undefined && { url: rest.url }), ...(rest.tag !== undefined && { tag: rest.tag }) }
   const wantsEmail = severity === 'alert' || email !== undefined
 
   const [push, mail] = await Promise.all([

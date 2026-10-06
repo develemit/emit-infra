@@ -77,4 +77,16 @@ describe('escapeHtml', () => {
   it('escapes the five dangerous characters', () => {
     expect(escapeHtml(`&<>"'`)).toBe('&amp;&lt;&gt;&quot;&#39;')
   })
+
+  it('renders a steps section with numbered steps, commands and an urgency badge', () => {
+    const steps = [{ text: 'Check it', command: 'ssh root@1.2.3.4 \'df -h\'' }, { text: 'Fix it', link: 'docs/x.md' }]
+    const { html, text } = renderLayout({ ...base, sections: [{ title: 'What to do', kind: 'steps', urgency: 'now', steps }] })
+    expect(html).toContain('<ol')
+    expect(html).toContain('DO NOW')
+    expect(html).toContain('<code')
+    expect(text).toContain('[DO NOW]')
+    expect(text).toContain('1. Check it')
+    expect(text).toContain("$ ssh root@1.2.3.4 'df -h'")
+    expect(text).toContain('2. Fix it')
+  })
 })

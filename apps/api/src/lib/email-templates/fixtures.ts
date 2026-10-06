@@ -63,14 +63,37 @@ export const digest: DigestEmailInput = {
   ],
 }
 
-export type SampleKind = 'health' | 'alert-rule' | 'deploy' | 'digest'
-export const SAMPLE_KINDS: SampleKind[] = ['health', 'alert-rule', 'deploy', 'digest']
+export const healthTimeout: HealthEmailInput = (({ status, ...rest }) => (void status, rest))(healthDown)
 
-export function renderSample(kind: SampleKind): RenderedEmail {
-  switch (kind) {
-    case 'health': return renderHealthEmail(healthDown)
-    case 'alert-rule': return renderAlertRuleEmail(alertRule)
-    case 'deploy': return renderDeployFailedEmail(deployFailed)
-    case 'digest': return renderDigestEmail(digest)
-  }
+export const deployFailedHealth: DeployFailedEmailInput = {
+  ...deployFailed,
+  error: 'blue-green switch complete\nhealth check failed: https://martialops.example.com/health returned 503 after 5 attempts',
 }
+
+export const digestHealthy: DigestEmailInput = {
+  summaryLine: '0 incidents, 7 deploys, all projects healthy',
+  nowMs: NOW,
+  projects: [
+    { project: 'tastease', status: 'up', incidents: 0, deploys: 4, diskPct: 52, diskDeltaPct: 1, certDays: 60, backupAgeHours: 9 },
+    { project: 'martialops', status: 'up', incidents: 0, deploys: 3, diskPct: 44, diskDeltaPct: 0, certDays: 55, backupAgeHours: 20 },
+  ],
+}
+
+export type SampleKind =
+  | 'health' | 'health-timeout' | 'health-recovered' | 'alert-rule'
+  | 'deploy' | 'deploy-health' | 'digest' | 'digest-healthy'
+
+const SAMPLES: Record<SampleKind, () => RenderedEmail> = {
+  health: () => renderHealthEmail(healthDown),
+  'health-timeout': () => renderHealthEmail(healthTimeout),
+  'health-recovered': () => renderHealthEmail(healthRecovered),
+  'alert-rule': () => renderAlertRuleEmail(alertRule),
+  deploy: () => renderDeployFailedEmail(deployFailed),
+  'deploy-health': () => renderDeployFailedEmail(deployFailedHealth),
+  digest: () => renderDigestEmail(digest),
+  'digest-healthy': () => renderDigestEmail(digestHealthy),
+}
+
+export const SAMPLE_KINDS = Object.keys(SAMPLES) as SampleKind[]
+
+export const renderSample = (kind: SampleKind): RenderedEmail => SAMPLES[kind]()

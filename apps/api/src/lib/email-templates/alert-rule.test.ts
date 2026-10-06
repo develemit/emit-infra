@@ -22,4 +22,12 @@ describe('renderAlertRuleEmail', () => {
     const r = renderAlertRuleEmail({ ...alertRule, rules: [alertRule.rules[0]!] })
     expect(r.subject).toBe('[emit-infra] 🟠 diner-decider disk usage at 91%')
   })
+
+  it('adds a What to do section per rule with real commands', () => {
+    const r = renderAlertRuleEmail(alertRule)
+    for (const s of ['WHAT TO DO: DISK USAGE', 'WHAT TO DO: CERTIFICATE DAYS LEFT', 'WHAT TO DO: BACKUP AGE', 'ssh root@203.0.113.20', 'certbot renew --dry-run', '.backup-status.json']) {
+      expect(r.text).toContain(s)
+    }
+    expect(r.firstStep).toContain('See what is using space')
+  })
 })

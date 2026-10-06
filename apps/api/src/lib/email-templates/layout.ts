@@ -1,5 +1,6 @@
 import { escapeHtml as e } from './escape.js'
 import { formatTime } from './format.js'
+import { renderStepsHtml, renderStepsText, type StepsSection } from './what-to-do.js'
 
 export type Tone = 'critical' | 'warning' | 'recovered' | 'info'
 export type Tint = 'red' | 'amber' | 'green'
@@ -9,9 +10,11 @@ export type Section =
   | { title: string; kind: 'list'; rows: Array<[string, string]> }
   | { title: string; kind: 'table'; head: string[]; rows: Cell[][] }
   | { title: string; kind: 'pre'; text: string }
+  | StepsSection
 
 export interface LayoutInput {
   tone: Tone
+  toneLabel?: string
   preheader: string
   headline: string
   summary: string
@@ -47,6 +50,7 @@ function renderCell(c: Cell, tag: 'td' | 'th'): string {
 }
 
 function renderSection(s: Section): string {
+  if (s.kind === 'steps') return renderStepsHtml(s)
   const title = `<h3 style="margin:24px 0 8px;font-size:14px;color:#111827;">${e(s.title)}</h3>`
   if (s.kind === 'pre') {
     return `${title}<pre style="margin:0;padding:12px;background:#f3f4f6;border-radius:6px;font-family:${MONO};font-size:12px;white-space:pre-wrap;word-break:break-word;color:#111827;">${e(truncateLines(s.text))}</pre>`
@@ -84,12 +88,13 @@ function renderActions(a: LayoutInput['actions'], color: string): string {
 }
 
 function renderText(i: LayoutInput, sentAt: string): string {
-  const out = [`${TONE_LABEL[i.tone]}: ${i.headline}`, '', i.summary, '']
+  const out = [`${i.toneLabel ?? TONE_LABEL[i.tone]}: ${i.headline}`, '', i.summary, '']
   for (const [k, v] of i.facts) out.push(`${k}: ${v}`)
   for (const s of i.sections ?? []) {
     out.push('', s.title.toUpperCase())
     if (s.kind === 'list') for (const [k, v] of s.rows) out.push(`${k}: ${v}`)
     else if (s.kind === 'pre') out.push(truncateLines(s.text))
+    else if (s.kind === 'steps') out.push(...renderStepsText(s))
     else {
       out.push(s.head.join(' | '))
       for (const r of s.rows) out.push(r.map(cellText).join(' | '))
@@ -114,7 +119,7 @@ export function renderLayout(i: LayoutInput): { html: string; text: string } {
     `<span style="display:none;max-height:0;overflow:hidden;opacity:0;">${e(i.preheader)}</span>` +
     `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f3f4f6;"><tr><td align="center" style="padding:24px 12px;">` +
     `<table role="presentation" width="600" cellspacing="0" cellpadding="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:8px;overflow:hidden;">` +
-    `<tr><td style="background:${color};padding:10px 24px;color:#ffffff;font-size:12px;font-weight:700;letter-spacing:1px;">${TONE_LABEL[i.tone]}</td></tr>` +
+    `<tr><td style="background:${color};padding:10px 24px;color:#ffffff;font-size:12px;font-weight:700;letter-spacing:1px;">${e(i.toneLabel ?? TONE_LABEL[i.tone])}</td></tr>` +
     `<tr><td style="padding:24px;">` +
     `<h1 style="margin:0 0 8px;font-size:22px;line-height:1.3;color:#111827;">${e(i.headline)}</h1>` +
     `<p style="margin:0 0 20px;font-size:14px;line-height:1.5;color:#374151;">${e(i.summary)}</p>` +

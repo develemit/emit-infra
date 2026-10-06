@@ -1,4 +1,6 @@
 import { causeText, formatDuration, REMINDER_INTERVAL_MS } from '../http-health.js'
+import { remediate } from '../remediation/index.js'
+import { firstStepOf, renderWhatToDo } from './what-to-do.js'
 import { renderLayout, type Section, type Tone } from './layout.js'
 import { dashboardUrl, formatTime } from './format.js'
 import type { RenderedEmail } from './types.js'
@@ -66,13 +68,18 @@ export function renderHealthEmail(i: HealthEmailInput): RenderedEmail {
   if (i.lastGoodMs !== undefined) facts.push(['Last good check', formatTime(i.lastGoodMs, i.nowMs)])
 
   const incidents = incidentSection(i)
+  const rem = remediate({
+    kind: 'health', project: i.project, serverIp: i.serverIp, check: i.check, status: i.status,
+    recovered, durationMs: i.durationMs,
+  })
+  const todo = renderWhatToDo(rem)
   const { html, text } = renderLayout({
     tone,
     preheader: recovered ? `Back up after ${duration}` : `${causeLine(i)} — down ${duration}`,
     headline,
     summary,
     facts,
-    ...(incidents && { sections: [incidents] }),
+    sections: [todo, ...(incidents ? [incidents] : [])],
     actions: {
       buttons: [{ label: 'Open in dashboard', url: dashboardUrl(`/projects/${encodeURIComponent(i.project)}`) }],
       run: recovered ? [`emit-infra status ${i.project}`] : [`emit-infra status ${i.project}`, '/triage-prod'],
@@ -82,6 +89,6 @@ export function renderHealthEmail(i: HealthEmailInput): RenderedEmail {
       : `Sent because ${i.project} is down. Next reminder in ${formatDuration(REMINDER_INTERVAL_MS)} if still down.`,
     sentAtMs: i.nowMs,
   })
-  return { subject: subjectFor(i), html, text, tone }
+  return { subject: subjectFor(i), html, text, tone, ...firstStepOf([rem]) }
 }
 

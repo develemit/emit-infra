@@ -54,7 +54,7 @@ export async function pushRoutes(app: FastifyInstance) {
   })
 
   // Manual test endpoint — fires through notify(), so it also sends an email.
-  // `?sample=health|alert-rule|deploy|digest` sends that kind's fixture email.
+  // `?sample=<kind>` (see SAMPLE_KINDS) sends that kind's fixture email.
   app.post('/push/notify', async (req, reply) => {
     const sample = (req.query as { sample?: string }).sample
     if (sample !== undefined) {

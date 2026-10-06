@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest'
+import { renderHealthEmail } from './health.js'
+import { healthDown } from './fixtures.js'
 import { renderCombinedEmail, type OutboxEmail } from './combined.js'
 
 const item = (subject: string, tone: OutboxEmail['tone'], name: string): OutboxEmail => ({
@@ -37,5 +39,12 @@ describe('renderCombinedEmail', () => {
   it('text contains every section', () => {
     const { text } = renderCombinedEmail(items)
     for (const n of ['a', 'b', 'c']) expect(text).toContain(`text-${n}`)
+  })
+
+  it('keeps each item\'s What to do steps', () => {
+    const health = renderHealthEmail(healthDown)
+    const r = renderCombinedEmail([{ ...health, tone: 'critical' }, item('[emit-infra] 🟠 x cert', 'warning', 'x')])
+    expect(r.html).toContain('docker compose ps')
+    expect(r.text).toContain('docker compose ps')
   })
 })

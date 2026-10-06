@@ -4,7 +4,7 @@ const { sendToAll, sendEmail } = vi.hoisted(() => ({ sendToAll: vi.fn(), sendEma
 vi.mock('./push.js', () => ({ sendToAll }))
 vi.mock('./email-outbox.js', () => ({ getOutbox: () => ({ enqueue: sendEmail }) }))
 
-import { notify } from './notify.js'
+import { notify, withFirstStep } from './notify.js'
 
 const base = { title: 'Cert expiring', body: 'in 5 days', url: '/health' }
 
@@ -57,5 +57,25 @@ describe('notify', () => {
     const r = await notify({ ...base, severity: 'alert' })
     expect(r.email).toEqual({ ok: false, error: 'mail down' })
     expect(r.push).toMatchObject({ sent: 0, error: 'push down' })
+  })
+})
+
+describe('withFirstStep', () => {
+  it('appends the step to the body', () => {
+    expect(withFirstStep('Disk at 91%', 'Prune old images')).toBe('Disk at 91% → Prune old images')
+  })
+  it('leaves the body alone without a step', () => {
+    expect(withFirstStep('Disk at 91%')).toBe('Disk at 91%')
+  })
+  it('shortens a long body but keeps the step intact', () => {
+    const out = withFirstStep('x'.repeat(400), 'Fix the error locally')
+    expect(out.length).toBeLessThanOrEqual(200)
+    expect(out.endsWith('→ Fix the error locally')).toBe(true)
+  })
+  it('is sent through to push', async () => {
+    sendToAll.mockResolvedValue({ sent: 1, pruned: 0 })
+    sendEmail.mockResolvedValue({ ok: true })
+    await notify({ severity: 'alert', title: 't', body: 'b', email: { subject: 's', html: '', text: '', firstStep: 'Do it' } })
+    expect(sendToAll).toHaveBeenLastCalledWith(expect.objectContaining({ body: 'b → Do it' }))
   })
 })

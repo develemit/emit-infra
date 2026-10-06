@@ -1,4 +1,6 @@
 import type { LinearTrend } from '../trend.js'
+import { remediate, type Finding, type Remediation } from '../remediation/index.js'
+import { firstStepOf, renderWhatToDo } from './what-to-do.js'
 import { renderLayout, type Section, type Tone } from './layout.js'
 import { dashboardUrl, formatTime, plural } from './format.js'
 import type { RenderedEmail } from './types.js'
@@ -62,6 +64,26 @@ function ruleSection(r: FiredRuleView, nowMs: number): Section {
   return { title: label(r.metric), kind: 'list', rows }
 }
 
+function findingOf(project: string, serverIp: string | undefined, r: FiredRuleView): Finding | undefined {
+  const base = { project, serverIp }
+  if (r.metric === 'diskPct') return { ...base, kind: 'disk', pct: r.value, projectedDaysUntilFull: r.trend?.projectedDaysUntilFull }
+  if (r.metric === 'memPct') return { ...base, kind: 'mem', pct: r.value }
+  if (r.metric === 'certDays') return { ...base, kind: 'cert', daysLeft: r.certDaysLeft ?? r.value, error: r.certError }
+  if (r.metric.startsWith('cert')) return { ...base, kind: 'cert', daysLeft: r.certDaysLeft, error: r.certError, failing: true }
+  if (r.metric === 'backupAgeHours') return { ...base, kind: 'backup', ageHours: r.value, status: r.backupStatus }
+  return undefined
+}
+
+function remediationOf(i: AlertRuleEmailInput, r: FiredRuleView): Remediation | undefined {
+  const finding = findingOf(i.project, i.serverIp, r)
+  return finding && remediate(finding)
+}
+
+function ruleSections(i: AlertRuleEmailInput, r: FiredRuleView): Section[] {
+  const rem = remediationOf(i, r)
+  return [ruleSection(r, i.nowMs), ...(rem && rem.steps.length > 0 ? [renderWhatToDo(rem, `What to do: ${label(r.metric)}`)] : [])]
+}
+
 function subjectFor(i: AlertRuleEmailInput): string {
   if (i.rules.length > 1) return `[emit-infra] 🟠 ${i.project} — ${i.rules.length} alerts firing`
   const r = i.rules[0]!
@@ -84,7 +106,7 @@ export function renderAlertRuleEmail(i: AlertRuleEmailInput): RenderedEmail {
     headline: `${i.project}: ${plural(i.rules.length, 'alert')} firing`,
     summary: `Triggered: ${names}.`,
     facts,
-    sections: i.rules.map((r) => ruleSection(r, i.nowMs)),
+    sections: i.rules.flatMap((r) => ruleSections(i, r)),
     actions: {
       buttons: [{ label: 'Open reliability page', url: dashboardUrl(`/projects/${encodeURIComponent(i.project)}/reliability`) }],
       run: [`emit-infra status ${i.project}`],
@@ -92,5 +114,6 @@ export function renderAlertRuleEmail(i: AlertRuleEmailInput): RenderedEmail {
     footerNote: 'Sent because alert rules fired. Each rule has a 6h cooldown before it can fire again.',
     sentAtMs: i.nowMs,
   })
-  return { subject: subjectFor(i), html, text, tone }
+  const rems = i.rules.flatMap((r) => remediationOf(i, r) ?? [])
+  return { subject: subjectFor(i), html, text, tone, ...firstStepOf(rems) }
 }
