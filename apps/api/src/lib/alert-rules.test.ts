@@ -126,6 +126,34 @@ describe('evaluateRules', () => {
     expect(fired.some(f => f.metric === 'certRenewalFailing')).toBe(false)
   })
 
+  it('backup-age default fires at 31h and not at 29h', () => {
+    const rules = resolveRules([])
+    expect(evaluateRules('proj', rules, { backupAgeHours: 31 }, {}, NOW).fired.map(f => f.metric)).toEqual(['backupAgeHours'])
+    expect(evaluateRules('proj', rules, { backupAgeHours: 29 }, {}, NOW).fired).toHaveLength(0)
+  })
+
+  it('a project backupAgeHours rule replaces the age default', () => {
+    const rules = resolveRules([{ metric: 'backupAgeHours', op: 'gt', threshold: 72, enabled: true }])
+    expect(rules.filter(r => r.metric === 'backupAgeHours').map(r => r.threshold)).toEqual([72])
+    expect(evaluateRules('proj', rules, { backupAgeHours: 40 }, {}, NOW).fired).toHaveLength(0)
+    expect(rules.some(r => r.metric === 'backupFailed')).toBe(true)
+  })
+
+  it('fires backupFailed with a 12h cooldown', () => {
+    const rules = resolveRules([])
+    const { fired, newState } = evaluateRules('proj', rules, { backupFailed: 1 }, {}, NOW)
+    expect(fired).toHaveLength(1)
+    expect(fired[0]).toMatchObject({ metric: 'backupFailed', op: 'gt', threshold: 0, value: 1 })
+    const again = evaluateRules('proj', rules, { backupFailed: 1 }, newState, NOW + 11 * 3600)
+    expect(again.fired).toHaveLength(0)
+    expect(evaluateRules('proj', rules, { backupFailed: 1 }, newState, NOW + 12 * 3600).fired).toHaveLength(1)
+  })
+
+  it('a missing status file (no backup metrics) fires nothing', () => {
+    const rules = resolveRules([])
+    expect(evaluateRules('proj', rules, { diskPct: 50, certDays: 90 }, {}, NOW).fired).toHaveLength(0)
+  })
+
   it('applies a rule-specific cooldown shorter than the default', () => {
     const rules = resolveRules([])
     const prevState: AlertCooldownState = {
@@ -147,9 +175,11 @@ describe('evaluateRules', () => {
 })
 
 describe('resolveRules', () => {
-  it('applies certDays, certStatus and certRenewalFailing defaults when no project rules exist', () => {
+  it('applies cert and backup defaults when no project rules exist', () => {
     const rules = resolveRules([])
     expect(rules.map(r => `${r.metric}:${r.op}:${r.threshold}`).sort()).toEqual([
+      'backupAgeHours:gt:30',
+      'backupFailed:gt:0',
       'certDays:lt:21',
       'certDays:lt:7',
       'certRenewalFailing:gt:0',
@@ -171,7 +201,7 @@ describe('resolveRules', () => {
   it("other metrics stay opt-in — a project's diskPct rule doesn't disturb cert defaults", () => {
     const ownRule: AlertRule = { metric: 'diskPct', op: 'gt', threshold: 90, enabled: true }
     const rules = resolveRules([ownRule])
-    expect(rules).toHaveLength(5) // 4 cert defaults + the project's own diskPct rule
+    expect(rules).toHaveLength(7) // 4 cert + 2 backup defaults + the project's own diskPct rule
     expect(rules.filter(r => r.metric === 'certDays')).toHaveLength(2)
   })
 

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { formatAlertNotification, enrichFiredAlert } from './status-monitor.js'
 import type { FiredAlert, AlertMetrics } from './alert-rules.js'
 
@@ -106,5 +106,29 @@ describe('enrichFiredAlert', () => {
   it('leaves non-cert alerts untouched', () => {
     const alert = fired({ metric: 'diskPct', op: 'gt', threshold: 80, value: 92 })
     expect(enrichFiredAlert(alert, {})).toBe(alert)
+  })
+})
+
+describe('poll — reserved documentation hosts', () => {
+  it('runs no probe and sends no notification for a reserved host', async () => {
+    vi.resetModules()
+    const sshExec = vi.fn()
+    const notify = vi.fn()
+    const handleHealthEvents = vi.fn()
+    vi.doMock('@emit-infra/core', () => ({ sshExec }))
+    vi.doMock('./notify.js', () => ({ notify }))
+    vi.doMock('./health-notify.js', () => ({ handleHealthEvents, seedHealthMaps: vi.fn() }))
+    vi.doMock('./discover-projects.js', () => ({
+      discoverProjects: async () => [{ config: { name: 'test-smoke', domain: '192.0.2.1', healthCheck: { url: 'http://192.0.2.1/' } } }],
+    }))
+    const { poll } = await import('./status-monitor.js')
+    await poll()
+    expect(sshExec).not.toHaveBeenCalled()
+    expect(handleHealthEvents).not.toHaveBeenCalled()
+    expect(notify).not.toHaveBeenCalled()
+    vi.doUnmock('@emit-infra/core')
+    vi.doUnmock('./notify.js')
+    vi.doUnmock('./health-notify.js')
+    vi.doUnmock('./discover-projects.js')
   })
 })

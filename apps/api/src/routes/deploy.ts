@@ -3,7 +3,8 @@ import { join } from 'node:path'
 import { appendFile } from 'node:fs/promises'
 import { z } from 'zod'
 import { findProject, SAFE_NAME_RE } from '../lib/project-helpers.js'
-import { sendToAll } from '../lib/push.js'
+import { notify } from '../lib/notify.js'
+import { renderDeployFailedEmail } from '../lib/email-templates/deploy.js'
 
 interface DeployState {
   status: 'running' | 'completed' | 'failed'
@@ -89,7 +90,8 @@ async function runDeploy(name: string, projectDir: string, state: DeployState, l
       log.warn({ err, project: name }, 'failed to write deploy history'),
     )
 
-    await sendToAll({
+    await notify({
+      severity: 'info',
       title: `${name}: deploy complete`,
       body: state.buildNumber ? `Build #${state.buildNumber} is live` : 'Deploy succeeded',
       tag: `deploy:${name}`,
@@ -123,9 +125,20 @@ async function runDeploy(name: string, projectDir: string, state: DeployState, l
       log.warn({ err: histErr, project: name }, 'failed to write deploy history'),
     )
 
-    await sendToAll({
+    const email = renderDeployFailedEmail({
+      project: name,
+      sha: state.sha ?? 'unknown',
+      branch: state.branch ?? 'unknown',
+      buildNumber: Number(state.buildNumber) || 0,
+      durationSec,
+      error: state.error,
+      nowMs: endMs,
+    })
+    await notify({
+      severity: 'alert',
       title: `${name}: deploy failed`,
       body: state.error,
+      email,
       tag: `deploy:${name}`,
       url: `/?p=${name}`,
     }).catch((pushErr) =>

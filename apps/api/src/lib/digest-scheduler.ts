@@ -1,7 +1,7 @@
 /**
  * Weekly digest scheduler.
  *
- * Checks hourly whether a push digest is due (>7 days since last send).
+ * Checks hourly whether a digest is due (>7 days since last send).
  * Persists last-sent timestamp to ~/.emit-infra/digest-state.json.
  */
 
@@ -10,8 +10,10 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { discoverProjects } from './discover-projects.js'
 import { readJsonl } from './jsonl.js'
-import { sendToAll } from './push.js'
-import { buildDigest } from './weekly-digest.js'
+import { notify } from './notify.js'
+import { readLastIncident } from './incidents.js'
+import { renderDigestEmail } from './email-templates/digest.js'
+import { buildDigest, digestEmailInput, type ProjectDigestData } from './weekly-digest.js'
 
 const EMIT_DIR = join(homedir(), '.emit-infra')
 const STATE_FILE = join(EMIT_DIR, 'digest-state.json')
@@ -50,6 +52,18 @@ async function writeState(state: DigestState): Promise<void> {
   await writeFile(STATE_FILE, JSON.stringify(state), { mode: 0o600 })
 }
 
+export async function dispatchDigest(projectData: ProjectDigestData[], nowMs = Date.now()): Promise<void> {
+  const digest = buildDigest(projectData)
+  await notify({
+    severity: 'info',
+    title: 'Weekly Fleet Digest',
+    body: digest.summaryLine,
+    url: '/health',
+    tag: 'weekly-digest',
+    email: renderDigestEmail(digestEmailInput(projectData, digest, nowMs)),
+  }).catch(() => {/* best-effort */})
+}
+
 export async function runDigestIfDue(): Promise<void> {
   const state = await readState()
   if (Date.now() - state.lastSentAt < SEVEN_DAYS_MS) return
@@ -84,8 +98,11 @@ export async function runDigestIfDue(): Promise<void> {
         const diskPctNow = metrics.length > 0 ? metrics[metrics.length - 1]!.disk : undefined
         const diskPctWeekAgo = metrics.length > 0 ? metrics[0]!.disk : undefined
 
+        const last = await readLastIncident(config.name, 'ssh')
+
         return {
           project: config.name,
+          status: last?.event ?? ('unknown' as const),
           incidents: pairIncidents(records),
           deploys,
           diskPctNow,
@@ -94,14 +111,7 @@ export async function runDigestIfDue(): Promise<void> {
       }),
     )
 
-    const digest = buildDigest(projectData)
-
-    await sendToAll({
-      title: 'Weekly Fleet Digest',
-      body: digest.summaryLine,
-      url: '/health',
-      tag: 'weekly-digest',
-    }).catch(() => {/* best-effort */})
+    await dispatchDigest(projectData)
 
     await writeState({ lastSentAt: Date.now() })
   } catch (err) {

@@ -14,11 +14,15 @@ import { join } from 'node:path'
 import { sshExec } from '@emit-infra/core'
 import { discoverProjects } from './discover-projects.js'
 import { sshKeyPath } from './project-helpers.js'
-import { sendToAll, type PushPayload } from './push.js'
+import type { PushPayload } from './push.js'
+import { notify } from './notify.js'
+import { buildAlertRuleEmail } from './fired-rule-email.js'
+import { backupProbeCmd, parseBackupSection } from './probe-parse.js'
 import { evaluateRules, resolveRules, type AlertMetrics, type AlertCooldownState, type FiredAlert } from './alert-rules.js'
+import { isReservedTestDomain } from './http-check-log.js'
 import { pruneAlertJsonl } from './prune-alerts.js'
 import {
-  CERT_PROBE_CMD, extractCertSection, extractCertbotSection, probeBlockEndIndex,
+  CERT_PROBE_CMD, extractCertSection, extractCertbotSection,
   parseCertLines, parseCertbotSection, soonestExpiring, classifyRenewalHealth,
 } from './cert-probe.js'
 import { stepHealth, initialHealthState, type HealthState, type ProbeResult } from './http-health.js'
@@ -26,6 +30,7 @@ import { handleHealthEvents, seedHealthMaps } from './health-notify.js'
 
 const metricLabels: Record<string, string> = {
   diskPct: 'disk', memPct: 'memory', certDays: 'cert days', backupAgeHours: 'backup age (h)',
+  backupFailed: 'backup failed',
 }
 
 /** certDays/certStatus/certRenewalFailing alerts get a human-readable detail
@@ -95,7 +100,7 @@ async function probeProject(
       `df -h / | tail -1 | awk '{print $5}' | tr -d '%'; ` +
         `free -m | awk 'NR==2{printf "%.0f\\n",$3/$2*100}'; ` +
         `${CERT_PROBE_CMD}; ` +
-        `grep -o '"lastRun":"[^"]*"' /opt/${name}/.backup-status.json 2>/dev/null | cut -d'"' -f4; echo ""`,
+        backupProbeCmd(name),
       key,
     )
     const lines = raw.split('\n').map(l => l.trim())
@@ -123,14 +128,7 @@ async function probeProject(
       metrics.certbotError = certbotStatus.errorLine ?? undefined
     }
 
-    const endIdx = probeBlockEndIndex(lines)
-    const backupLastRun = endIdx === -1 ? '' : (lines[endIdx + 1] ?? '')
-    if (backupLastRun) {
-      const lastRunMs = new Date(backupLastRun).getTime()
-      if (!isNaN(lastRunMs)) {
-        metrics.backupAgeHours = (Date.now() - lastRunMs) / 3600000
-      }
-    }
+    Object.assign(metrics, parseBackupSection(lines))
 
     return { state: 'up', metrics }
   } catch {
@@ -195,26 +193,27 @@ async function persistAlerts(name: string, fired: FiredAlert[], newState: AlertC
   }
 }
 
-async function poll(): Promise<void> {
+export async function poll(): Promise<void> {
   const projects = await discoverProjects().catch(() => [])
   const now = Date.now()
 
   await Promise.allSettled(
     projects.map(async ({ config }) => {
       const host = config.serverIp ?? config.domain
+      if (isReservedTestDomain(host)) return
       const key = sshKeyPath(config.sshKeyName)
       const { state: sshNext, metrics } = await probeProject(host, key, config.name)
 
       const sshResult: ProbeResult = { ok: sshNext === 'up' }
       const sshStep = stepHealth(sshHealth.get(config.name) ?? initialHealthState, sshResult, now)
       sshHealth.set(config.name, sshStep.state)
-      await handleHealthEvents('ssh', config.name, sshStep.events)
+      await handleHealthEvents('ssh', config.name, sshStep.events, { serverIp: config.serverIp, nowMs: now })
 
       if (config.healthCheck?.url) {
         const httpResult = await httpProbe(config.healthCheck.url)
         const httpStep = stepHealth(httpHealth.get(config.name) ?? initialHealthState, httpResult, now)
         httpHealth.set(config.name, httpStep.state)
-        await handleHealthEvents('http', config.name, httpStep.events)
+        await handleHealthEvents('http', config.name, httpStep.events, { serverIp: config.serverIp, url: config.healthCheck.url, nowMs: now })
       }
 
       if (metrics !== undefined) {
@@ -224,7 +223,8 @@ async function poll(): Promise<void> {
         const enrichedFired = fired.map(alert => enrichFiredAlert(alert, metrics))
         await persistAlerts(config.name, enrichedFired, newState)
         if (enrichedFired.length > 0) {
-          await sendToAll(formatAlertNotification(enrichedFired)).catch(() => {/* best-effort */})
+          const email = await buildAlertRuleEmail(config.name, config.serverIp, enrichedFired, metrics).catch(() => undefined)
+          await notify({ severity: 'alert', ...formatAlertNotification(enrichedFired), ...(email && { email }) }).catch(() => {/* best-effort */})
         }
       }
     }),

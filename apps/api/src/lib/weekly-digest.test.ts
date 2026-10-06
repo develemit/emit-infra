@@ -94,3 +94,19 @@ describe('buildDigest', () => {
     expect(result.diskDeltas[0]?.deltaPct).toBe(5)
   })
 })
+
+describe('digest email', () => {
+  it('contains every project name', async () => {
+    const { digestEmailInput } = await import('./weekly-digest.js')
+    const { renderDigestEmail } = await import('./email-templates/digest.js')
+    const projects = [
+      { project: 'alpha', status: 'up' as const, incidents: [], deploys: [{}], diskPctNow: 60, diskPctWeekAgo: 55 },
+      { project: 'beta', incidents: [{}], deploys: [], diskPctNow: undefined, diskPctWeekAgo: undefined },
+    ]
+    const email = renderDigestEmail(digestEmailInput(projects, buildDigest(projects), 1_800_000_000_000))
+    expect(email.html).toContain('alpha')
+    expect(email.html).toContain('beta')
+    expect(email.text).toContain('alpha')
+    expect(email.subject).toContain('2 projects')
+  })
+})

@@ -1,5 +1,8 @@
+import type { DigestEmailInput, DigestProjectRow } from './email-templates/digest.js'
+
 export interface ProjectDigestData {
   project: string
+  status?: DigestProjectRow['status']
   incidents: { falsePositive?: boolean }[]
   deploys: unknown[]
   diskPctNow: number | undefined
@@ -48,4 +51,19 @@ export function buildDigest(projects: ProjectDigestData[]): WeeklyDigest {
     diskDeltas,
     summaryLine: `This week: ${parts.join(', ')}`,
   }
+}
+
+export function digestEmailInput(projects: ProjectDigestData[], digest: WeeklyDigest, nowMs: number): DigestEmailInput {
+  const rows: DigestProjectRow[] = projects.map((p) => {
+    const delta = p.diskPctNow !== undefined && p.diskPctWeekAgo !== undefined ? Math.round(p.diskPctNow - p.diskPctWeekAgo) : undefined
+    return {
+      project: p.project,
+      status: p.status ?? 'unknown',
+      incidents: p.incidents.filter(i => !i.falsePositive).length,
+      deploys: p.deploys.length,
+      ...(p.diskPctNow !== undefined && { diskPct: p.diskPctNow }),
+      ...(delta !== undefined && { diskDeltaPct: delta }),
+    }
+  })
+  return { summaryLine: digest.summaryLine, projects: rows, nowMs }
 }

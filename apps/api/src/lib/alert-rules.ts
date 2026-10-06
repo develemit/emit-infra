@@ -8,9 +8,9 @@ export const AlertRuleSchema = z.object({
 })
 export type AlertRule = z.infer<typeof AlertRuleSchema>
 
-// 'certStatus' and 'certRenewalFailing' back built-in cert alerts. Neither is
-// user-configurable, so they live outside AlertRuleSchema's metric enum.
-type Metric = AlertRule['metric'] | 'certStatus' | 'certRenewalFailing'
+// 'certStatus', 'certRenewalFailing' and 'backupFailed' back built-in alerts.
+// None is user-configurable, so they live outside AlertRuleSchema's metric enum.
+type Metric = AlertRule['metric'] | 'certStatus' | 'certRenewalFailing' | 'backupFailed'
 
 interface EvaluatedRule {
   metric: Metric
@@ -38,6 +38,12 @@ export interface AlertMetrics {
   // certbot's own error line for the last failed run — contextual only,
   // never evaluated against a rule threshold.
   certbotError?: string | undefined
+  // 1 when .backup-status.json says "failed"; absent (not 0) otherwise, and
+  // absent when the project has no status file at all.
+  backupFailed?: number | undefined
+  // Contextual only (email detail), never evaluated against a threshold.
+  backupLastRunMs?: number | undefined
+  backupStatus?: string | undefined
 }
 
 export interface FiredAlert {
@@ -57,7 +63,7 @@ const DEFAULT_COOLDOWN_SEC = 6 * 3600
 
 // certbot renews at 30 days remaining. Under 21 means renewal has been
 // failing for over a week — daily reminder. Under 7 is urgent — every 6h.
-export const DEFAULT_CERT_RULES: EvaluatedRule[] = [
+export const DEFAULT_RULES: EvaluatedRule[] = [
   { metric: 'certDays', op: 'lt', threshold: 21, enabled: true, cooldownSec: 24 * 3600 },
   { metric: 'certDays', op: 'lt', threshold: 7, enabled: true, cooldownSec: 6 * 3600 },
   { metric: 'certStatus', op: 'gt', threshold: 0, enabled: true, cooldownSec: 24 * 3600 },
@@ -65,17 +71,21 @@ export const DEFAULT_CERT_RULES: EvaluatedRule[] = [
   // not 21 days before expiry) — but only once a cert is actually due, so a
   // stale failed-run result on a cert with weeks of slack stays silent.
   { metric: 'certRenewalFailing', op: 'gt', threshold: 0, enabled: true, cooldownSec: 24 * 3600 },
+  // A backup that silently stopped is the costliest failure to find late.
+  // Projects with no status file leave both metrics undefined and stay silent.
+  { metric: 'backupAgeHours', op: 'gt', threshold: 30, enabled: true, cooldownSec: 12 * 3600 },
+  { metric: 'backupFailed', op: 'gt', threshold: 0, enabled: true, cooldownSec: 12 * 3600 },
 ]
 
 /**
- * Merges a project's own alertRules with the built-in cert-expiry defaults.
- * A project's own certDays rule(s) replace the certDays defaults entirely;
- * every other metric (including the certStatus default) stays as-is —
- * everything besides certificates remains fully opt-in.
+ * Merges a project's own alertRules with the built-in defaults (certificate
+ * expiry and backups). A project's own certDays or backupAgeHours rule(s)
+ * replace that metric's defaults entirely; every other default stays as-is.
+ * Disk and memory remain fully opt-in.
  */
 export function resolveRules(projectRules: AlertRule[]): EvaluatedRule[] {
-  const overridesCertDays = projectRules.some(r => r.metric === 'certDays')
-  const defaults = DEFAULT_CERT_RULES.filter(r => r.metric !== 'certDays' || !overridesCertDays)
+  const overridden = new Set<string>(projectRules.map(r => r.metric))
+  const defaults = DEFAULT_RULES.filter(r => (r.metric !== 'certDays' && r.metric !== 'backupAgeHours') || !overridden.has(r.metric))
   return [...defaults, ...projectRules]
 }
 
