@@ -87,14 +87,14 @@ difference between a 1-hour outage and a 1-day outage.
   "failover runbook" from the future-work list.
 
 ## Acceptance criteria
-- [ ] The runbook covers all three scenarios with commands, not prose.
-- [ ] A rehearsal log section records the date, project used, step timings
+- [x] The runbook covers all three scenarios with commands, not prose.
+- [x] A rehearsal log section records the date, project used, step timings
       and the measured RTO.
-- [ ] The scratch server was destroyed. `hcloud server list` (or the
+- [x] The scratch server was destroyed. `hcloud server list` (or the
       Terraform state) shows no leftover.
-- [ ] Laptop-only state that isn't backed up is listed and was raised with
+- [x] Laptop-only state that isn't backed up is listed and was raised with
       the user.
-- [ ] Docs-only sprint: `pnpm lint` passes. No code-test criterion applies.
+- [x] Docs-only sprint: `pnpm lint` passes. No code-test criterion applies.
 
 ## Out of scope
 - High availability or DB replication.
@@ -113,3 +113,30 @@ Guardrails:
 - before deploying a sibling repo, run `git log origin/main..HEAD --oneline`. If it carries **other people's unpushed commits that include DB migrations**, skip it and report. Otherwise proceed, and list the extra commits in Completed;
 - Terraform: apply only plans that are in-place updates;
 - SSH changes: one server at a time, with a second session held open.
+
+## Completed
+
+**Date:** 2026-10-06
+
+### Summary
+Wrote `docs/DISASTER-RECOVERY.md` with three numbered, command-level scenarios (bad data, server lost, Mac lost), a per-project quick-reference table (IP, domain, DB container, DB/user, bucket, dump format; gathered read-only from each server) and a rehearsal log. Rehearsed on a scratch `cx23` created from a scratch Terraform workspace (hetzner-server module, local state, no DNS): Terraform apply, Ansible `common`+`docker`, fetch of martialops' newest R2 dump, and scenario 1's safety-dump / drop / restore sequence (31 tables). Measured machine RTO ~3.5 min. The scratch server and firewall were destroyed (`hcloud server list` / `firewall list` show no leftovers).
+
+Deviations: the rehearsal did not run nginx/certbot, `emit-infra deploy`, DNS or the ClickHouse restore (no real DNS by design, and deploying would ship real secrets to a throwaway box), so the realistic scenario-2 RTO is an estimate (1-2 h), stated as such in the doc. `emit-infra provision` was not used for the scratch run because it needs a project repo's terraform dir; the module was applied directly. Findings: `cx22` no longer exists on Hetzner (module default and README still say it), and none of the Mac-only state is backed up (Time Machine has no destination).
+
+### Files changed
+- (new) `docs/DISASTER-RECOVERY.md` — the runbook, quick reference and rehearsal log
+- `README.md` — link to the runbook
+- `docs/MONITORING.md` — link to the runbook
+- `docs/scaling.md` — "failover runbook" item replaced with a link; snapshot failover noted as still open
+
+### Verification
+- `pnpm lint`: 5/5 projects pass (cached)
+- Scratch rehearsal: terraform apply 16 s, ansible 157 s, restore rc=0 with 31 tables
+- Cleanup: `hcloud server list`, `firewall list`, `volume list` show no `dr-rehearsal` resources
+- Laptop-only state listed in the doc (all **not backed up**) and raised in this sprint's TLDR
+
+### Follow-ups
+- `[defer]` Terraform `hetzner-server` module default, README, and docs still say `cx22`, which Hetzner no longer offers; change to `cx23`.
+- `[defer]` Mac-only credentials (`~/.emit-infra/**`, SSH keys, `ci.envFile`s, CLI auth) have no backup; decide on an encrypted offsite copy.
+- `[defer]` Rehearse the rest of scenario 2 (nginx, certbot, deploy, DNS) against a scratch domain and replace the estimated RTO.
+- `[defer]` `emit-vision/infra/scripts/restore-drill.sh` is broken (see BACKUP-INVENTORY.md).

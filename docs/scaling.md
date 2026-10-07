@@ -94,7 +94,7 @@ real load on the Postgres connection pool and the API containers.
 **Actions:**
 - Add PgBouncer to Docker Compose stack
 - Upgrade to CX42 or CX52 depending on memory headroom
-- Add Cloudflare Health Check + Hetzner snapshot-based failover runbook
+- Add Cloudflare Health Check (the rebuild/restore runbook is [`DISASTER-RECOVERY.md`](DISASTER-RECOVERY.md); snapshot-based failover is still open)
 
 **Monthly cost per project: ~€25–45/month**
 

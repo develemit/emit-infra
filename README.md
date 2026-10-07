@@ -2,6 +2,8 @@
 
 Shared infrastructure platform for the emit project stack. Provides reusable Terraform modules, Ansible roles, GitHub Actions workflows, and a CLI for provisioning and deploying projects that use Hetzner, Cloudflare, Postgres, and Upstash Redis.
 
+> **Something broke?** [`docs/DISASTER-RECOVERY.md`](docs/DISASTER-RECOVERY.md): restore a DB, rebuild a lost server, recover from a lost Mac.
+
 ## Prerequisites
 
 - [Terraform](https://developer.hashicorp.com/terraform/install) >= 1.6

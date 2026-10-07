@@ -1,5 +1,7 @@
 # Monitoring
 
+When an alert is real, follow [`DISASTER-RECOVERY.md`](DISASTER-RECOVERY.md).
+
 ## What watches what
 
 | Watcher | Watches | Runs on |
