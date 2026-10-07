@@ -112,3 +112,6 @@ Guardrails:
 - before deploying a sibling repo, run `git log origin/main..HEAD --oneline`. If it carries **other people's unpushed commits that include DB migrations**, skip it and report. Otherwise proceed, and list the extra commits in Completed;
 - Terraform: apply only plans that are in-place updates;
 - SSH changes: one server at a time, with a second session held open.
+
+### Orchestrator note (from sprint 360, 2026-10-06)
+emit-vision's apt sources are broken (a `docker.asc` `Signed-By` conflict between two Docker repo entries), and `apt install` fails there. unattended-upgrades can't work on that server until it's fixed. As the first step on emit-vision, dedupe the Docker apt source entries so `apt-get update` is clean, and make the Ansible docker role idempotent about it so the conflict doesn't come back. This is covered by the approval above.
