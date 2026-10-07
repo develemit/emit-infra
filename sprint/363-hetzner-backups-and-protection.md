@@ -98,3 +98,6 @@ Guardrails:
 - before deploying a sibling repo, run `git log origin/main..HEAD --oneline`. If it carries **other people's unpushed commits that include DB migrations**, skip it and report. Otherwise proceed, and list the extra commits in Completed;
 - Terraform: apply only plans that are in-place updates;
 - SSH changes: one server at a time, with a second session held open.
+
+### Orchestrator note (from sprint 362, 2026-10-06)
+The module's `server_type` default is `cx22`, which Hetzner no longer offers (new servers are `cx23`). **Don't change the `server_type` default in this sprint.** A changed `server_type` on an existing `hcloud_server` is a resize or replace, not a flag flip. If any consumer's plan shows anything other than an in-place update of `backups`/`delete_protection`/`rebuild_protection`, stop for that repo and report. Leave the cx22→cx23 cleanup in the backlog.
