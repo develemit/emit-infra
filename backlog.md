@@ -314,6 +314,9 @@ fleet-clean criterion was amended to expect exactly these two.
 - (sprint 361, 2026-10-06) Show the last restore drill on the dashboard backup panel (`project-backups.ts`).
 - (sprint 361, 2026-10-06) No project sets `backup.verifyQueries`; add per-project row checks.
 - (sprint 361, 2026-10-06) `.dump` (custom-format) image major isn't read from the header (only plain SQL is); all current `.dump` files are PG16.
+- (sprint 362, 2026-10-06) Terraform `hetzner-server` default, README and docs still say `cx22` (no longer offered); change to `cx23` carefully — a server_type change on existing servers is a resize/replace, so consumers must pin their current type first.
+- (sprint 362, 2026-10-06) **[needs human decision]** Mac-only credentials (`~/.emit-infra/**`, SSH deploy keys, `ci.envFile`s, CLI auth) have no backup and Time Machine has no destination; decide on an encrypted offsite copy.
+- (sprint 362, 2026-10-06) Rehearse the rest of DR scenario 2 (nginx, certbot, deploy, DNS, ClickHouse) against a scratch domain and replace the estimated 1–2h RTO.
 
 ## ✅ Converted to Sprints
 - ~~(tastease deploy post-mortem, 2026-08-27) **Dedupe pnpm install across images.** One deploy ran 3 near-identical full `pnpm install`s sequentially (api 423s, web 973s, marketing 798s = 2194s of a 2395s build phase) because all three Dockerfiles install from the same lockfile independently. A shared deps stage (buildx bake common target, or one deps image the three build FROM) runs it once. Biggest structural win for the slow path. **⚠ Same prerequisite as the lockfile-keyed item below** — a shared deps stage runs one install for every image, so a missing `supportedArchitectures` breaks all of them at once. Put the setting in `pnpm-workspace.yaml` and gate the rollout on an amd64 load-check of every image with native deps.~~ → dropped: sprint 338 measured warm cache absorbs most of it (2026-09-22)
