@@ -309,6 +309,11 @@ fleet-clean criterion was amended to expect exactly these two.
 - (sprint 359, 2026-10-06) **[emit-vision]** ClickHouse backup writes no status of its own; the project-level status file reflects Postgres only.
 - (sprint 359, 2026-10-06) **[martialops]** pre-push e2e fails when its local dev Postgres isn't running — a local-env trap for detached deploys.
 - (sprint 359, 2026-10-06) Backup sidecar script body is copy-pasted across five repos; a shared versioned backup image/script would stop drift (consider with sprint 364).
+- (sprint 361, 2026-10-06) **[emit-vision]** `infra/scripts/restore-drill.sh` is broken for ClickHouse (no `--volumes-from`, asserts nonexistent `events` table, `sessions` assertion); fix in that repo.
+- (sprint 361, 2026-10-06) Fold ClickHouse into `emit-infra backup verify`, or schedule the manual ClickHouse restore check.
+- (sprint 361, 2026-10-06) Show the last restore drill on the dashboard backup panel (`project-backups.ts`).
+- (sprint 361, 2026-10-06) No project sets `backup.verifyQueries`; add per-project row checks.
+- (sprint 361, 2026-10-06) `.dump` (custom-format) image major isn't read from the header (only plain SQL is); all current `.dump` files are PG16.
 
 ## ✅ Converted to Sprints
 - ~~(tastease deploy post-mortem, 2026-08-27) **Dedupe pnpm install across images.** One deploy ran 3 near-identical full `pnpm install`s sequentially (api 423s, web 973s, marketing 798s = 2194s of a 2395s build phase) because all three Dockerfiles install from the same lockfile independently. A shared deps stage (buildx bake common target, or one deps image the three build FROM) runs it once. Biggest structural win for the slow path. **⚠ Same prerequisite as the lockfile-keyed item below** — a shared deps stage runs one install for every image, so a missing `supportedArchitectures` breaks all of them at once. Put the setting in `pnpm-workspace.yaml` and gate the rollout on an amd64 load-check of every image with native deps.~~ → dropped: sprint 338 measured warm cache absorbs most of it (2026-09-22)
