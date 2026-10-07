@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.emit.restore-drill</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/emitdutcher/projects/emit-infra/scripts/restore-drill.sh</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/Users/emitdutcher/.nvm/versions/node/v25.6.1/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Day</key>
+        <integer>1</integer>
+        <key>Hour</key>
+        <integer>4</integer>
+        <key>Minute</key>
+        <integer>23</integer>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>/Users/emitdutcher/.local/log/restore-drill.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/emitdutcher/.local/log/restore-drill.log</string>
+</dict>
+</plist>

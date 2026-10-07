@@ -82,16 +82,16 @@ with the attempted key and size. The new buckets each have a bucket-scoped R2 to
 (Item Read+Write), stored at `~/.emit-infra/<name>/r2-backup-token.env` (martialops pattern).
 The token is in the repo's local `ci.envFile` as `BACKUP_S3_*`.
 
-| Project | Commit | Mechanism / schedule | Destination | Offsite? | Format / retention | Status file | Fresh backup | Encrypted |
-|---|---|---|---|---|---|---|---|---|
-| **emit-billing** | `b7f6bb0` | new `backup` sidecar (`eeshugerman/postgres-backup-s3:16`), daily from container start | R2 `emit-billing-backups/db-backups/` | **yes** | `.sql.gz`, newest 7 | yes, full contract | `emit-billing_20261006_225103.sql.gz` 20388 B | no (364) |
-| **emit-social** | `37158f8` | new `backup` sidecar, same | R2 `emit-social-backups/db-backups/` | **yes** | `.sql.gz`, newest 7 | yes, full contract | `emit-social_20261006_225834.sql.gz` 22781 B | no (364) |
-| develemail | `15a3300` | `pgbackup` now on `postgres-backup-s3:16`, daily from container start | R2 `develemail-backups/db-backups/` + local volume cache | **yes** | `-Fc` `.dump`, newest 7 offsite / 7 days local | yes, full contract | `develemail-20261006_230758.dump` 595903 B | no (364) |
-| tastease | `f6a2c41` | `db-backup` now on `postgres-backup-s3:16`, daily | R2 `tastease-backups/db-backups/` + local volume cache | **yes** | `.sql.gz`, newest 7 offsite / 7 days local | yes, full contract (existing `failed` branch kept) | `tastease_20261006_230151.sql.gz` 244937 B | no (364) |
-| diner-decider | `77e5128` | unchanged loop, status now has `key`/`bytes` | R2 `diner-decider-photos/db-backups/` | yes | `.sql.gz`, newest 7 | yes, full contract | `diner-decider_20261006_230513.sql.gz` 18909213 B | no (364) |
-| martialops | `ba1b054` | unchanged loop + retries, now writes the status file (`/opt/martialops:/host-opt`) | R2 `martialops-backups/db-backups/` | yes | `.sql.gz`, newest 7 | yes, full contract | `martialops_20261006_232436.sql.gz` 13134 B | no (364) |
-| emit-vision (Postgres) | `b517244` | `pg-backup.sh`, hourly; status file and `pipefail` added | R2 `emit-vision-backups/pg/` | yes | `.sql.gz`, **168 kept = 7 days** | yes, full contract | `pg/pg-20261006-231118.sql.gz` 67080 B | no (364) |
-| emit-vision (ClickHouse) | — | unchanged | R2 `emit-vision-backups/full-*` | yes | native, 7 remote | shares the Postgres status file (one per project) | `full-20261006-055236/` | no (364) |
+| Project | Commit | Mechanism / schedule | Destination | Offsite? | Format / retention | Status file | Fresh backup | Encrypted | Last verified restore |
+|---|---|---|---|---|---|---|---|---|---|
+| **emit-billing** | `b7f6bb0` | new `backup` sidecar (`eeshugerman/postgres-backup-s3:16`), daily from container start | R2 `emit-billing-backups/db-backups/` | **yes** | `.sql.gz`, newest 7 | yes, full contract | `emit-billing_20261006_225103.sql.gz` 20388 B | no (364) | 2026-10-06 ✓ 15 tables |
+| **emit-social** | `37158f8` | new `backup` sidecar, same | R2 `emit-social-backups/db-backups/` | **yes** | `.sql.gz`, newest 7 | yes, full contract | `emit-social_20261006_225834.sql.gz` 22781 B | no (364) | 2026-10-06 ✓ 20 tables |
+| develemail | `15a3300` | `pgbackup` now on `postgres-backup-s3:16`, daily from container start | R2 `develemail-backups/db-backups/` + local volume cache | **yes** | `-Fc` `.dump`, newest 7 offsite / 7 days local | yes, full contract | `develemail-20261006_230758.dump` 595903 B | no (364) | 2026-10-06 ✓ 48 tables |
+| tastease | `f6a2c41` | `db-backup` now on `postgres-backup-s3:16`, daily | R2 `tastease-backups/db-backups/` + local volume cache | **yes** | `.sql.gz`, newest 7 offsite / 7 days local | yes, full contract (existing `failed` branch kept) | `tastease_20261006_230151.sql.gz` 244937 B | no (364) | 2026-10-06 ✓ 37 tables |
+| diner-decider | `77e5128` | unchanged loop, status now has `key`/`bytes` | R2 `diner-decider-photos/db-backups/` | yes | `.sql.gz`, newest 7 | yes, full contract | `diner-decider_20261006_230513.sql.gz` 18909213 B | no (364) | 2026-10-06 ✓ 25 tables |
+| martialops | `ba1b054` | unchanged loop + retries, now writes the status file (`/opt/martialops:/host-opt`) | R2 `martialops-backups/db-backups/` | yes | `.sql.gz`, newest 7 | yes, full contract | `martialops_20261006_232436.sql.gz` 13134 B | no (364) | 2026-10-06 ✓ 31 tables |
+| emit-vision (Postgres) | `b517244` | `pg-backup.sh`, hourly; status file and `pipefail` added | R2 `emit-vision-backups/pg/` | yes | `.sql.gz`, **168 kept = 7 days** | yes, full contract | `pg/pg-20261006-231118.sql.gz` 67080 B | no (364) | 2026-10-06 ✓ 52 tables |
+| emit-vision (ClickHouse) | — | unchanged | R2 `emit-vision-backups/full-*` | yes | native, 7 remote | shares the Postgres status file (one per project) | `full-20261006-055236/` | no (364) | 2026-10-06 ✓ manual, 5 tables (see below) |
 
 Evidence (`aws s3 ls`, timestamps in local PDT):
 
@@ -168,3 +168,44 @@ wrote no status file. Removed:
 still carry the `postgres.backupBucket` config field. `setup` mints a bucket and
 token for it, and `deploy` checks env and passes a var that nothing consumes now.
 It is filed as a follow-up.
+
+## Restore drills (sprint 361)
+
+`emit-infra backup verify [name|--all]` downloads the newest offsite dump on the Mac,
+restores it into a throwaway `postgres:<major>-alpine` container, checks that the
+user-table count is above 0, prints the 5 largest tables, runs any
+`backup.verifyQueries` from `.emit-infra.json`, and removes the container (also on
+Ctrl-C). Each run appends `{t,key,bytes,durationSec,tables,ok,error?}` to
+`~/.emit-infra/<name>/restore-drills.jsonl`. Dumps are restored with `docker exec -i`,
+so nothing is published on a host port.
+
+Credentials come from `~/.emit-infra/<name>/r2-backup-token.env`, else the project's
+`ci.envFile` (`BACKUP_S3_*`, or emit-vision's `R2_*`). Prefixes searched: `db-backups/`, then `pg/`.
+
+First full run, 2026-10-06 18:11 PDT: all 7 Postgres databases restored. Findings:
+
+- **Plain-SQL dumps need their roles.** `.sql.gz` dumps from the `postgres-backup-s3`
+  sidecars are not `--no-owner`, so `ON_ERROR_STOP` died on `role "diner" does not exist`
+  (and `emit_billing`, `emit-social`, `easy_living`). The command now creates each role
+  referenced by `OWNER TO` / `GRANT ... TO` before restoring. A real disaster restore
+  needs the same step (sprint 362 runbook).
+- **emit-vision's dump is from pg_dump 17.** It sets `transaction_timeout`, which
+  Postgres 16 rejects. The command reads the dump header and picks the image major
+  (override with `--pg-major`). The runbook must restore into Postgres ≥17.
+- **ClickHouse (emit-vision), manual:** `clickhouse-backup restore_remote full-20261006-055236`
+  into a throwaway `clickhouse-server:24.3.7` restored 5 tables (telemetry_events 8111 rows,
+  crawler_hits 6706, error_occurrences 6553, error_fingerprints 187, search_console_performance 0).
+  This needs `--volumes-from <clickhouse container>` on the `clickhouse-backup` container.
+- **Gap: `emit-vision/infra/scripts/restore-drill.sh` is broken.** It runs
+  `clickhouse-backup` without `--volumes-from` (restore dies with `force_drop_table: no such file`,
+  hidden by `2>/dev/null`), asserts a table named `events` (it's `telemetry_events`), and
+  fails on `sessions` having 0 rows. Its Postgres half passed. Not changed here (another repo).
+- **ClickHouse has no automated drill.** Only the manual check above.
+
+### Monthly job
+
+`com.emit.restore-drill` (`scripts/launchd/com.emit.restore-drill.plist`, installed to
+`~/Library/LaunchAgents/`) runs `scripts/restore-drill.sh` on the 1st at 04:23 local. A
+failing drill is reported by `POST /push/notify` on the local API (push + email via
+`notify()`); no new endpoint was needed. Set `API_SECRET` in the job's environment if the
+API is run with one. Install: `cp scripts/launchd/com.emit.restore-drill.plist ~/Library/LaunchAgents/ && launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.emit.restore-drill.plist`.

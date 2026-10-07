@@ -90,17 +90,17 @@ truncated dump is exactly the kind of thing only a real restore catches.
   installed)
 
 ## Acceptance criteria
-- [ ] `apps/cli/src/lib/backup-verify.test.ts` covers:
+- [x] `apps/cli/src/lib/backup-verify.test.ts` covers:
   - newest-key selection, including keys from other prefixes being ignored;
   - format detection;
   - command construction for both formats;
   - parsing of table and row output.
-- [ ] `backup-verify.test.ts` (command) covers that the container is removed
+- [x] `backup-verify.test.ts` (command) covers that the container is removed
       on success, on restore failure and on thrown error, with execa mocked.
-- [ ] Every DB project has a successful drill line in
+- [x] Every DB project has a successful drill line in
       `restore-drills.jsonl`, and the date is recorded in the inventory doc.
       Any failure is reported to the user with its error.
-- [ ] `pnpm build` was run so `apps/cli/dist` is current. `pnpm test`,
+- [x] `pnpm build` was run so `apps/cli/dist` is current. `pnpm test`,
       `pnpm typecheck` and `pnpm lint` pass.
 
 ## Out of scope
@@ -120,3 +120,40 @@ Guardrails:
 - before deploying a sibling repo, run `git log origin/main..HEAD --oneline`. If it carries **other people's unpushed commits that include DB migrations**, skip it and report. Otherwise proceed, and list the extra commits in Completed;
 - Terraform: apply only plans that are in-place updates;
 - SSH changes: one server at a time, with a second session held open.
+
+## Completed
+
+**Date:** 2026-10-06
+
+### Summary
+Added `emit-infra backup verify [name] [--all]`. It lists the newest dump in R2 (searching `db-backups/`, then `pg/`), downloads it on the Mac, restores it with `docker exec -i` into a throwaway `postgres:<major>-alpine` container (no host port published, so no `docker port` discovery was needed), checks table count > 0, prints the 5 largest tables, runs optional `backup.verifyQueries`, removes the container in `finally` plus a SIGINT handler, and appends a line to `~/.emit-infra/<name>/restore-drills.jsonl`.
+
+All 7 Postgres databases restore. Two real findings came out of the first run, both fixed in the command and documented in `docs/BACKUP-INVENTORY.md`: plain-SQL dumps reference app roles that must exist before restore (the command pre-creates them), and emit-vision's dump is from pg_dump 17 and won't load into Postgres 16 (the command reads the dump header to pick the image major). ClickHouse was restored manually (5 tables, telemetry_events 8111 rows); that needed `--volumes-from`, which emit-vision's own `restore-drill.sh` lacks, so that script is broken (also asserts a nonexistent `events` table). Not changed, since it lives in another repo.
+
+Monthly job: `com.emit.restore-drill` (1st of the month 04:23), installed and bootstrapped. It runs `scripts/restore-drill.sh`, which reports failures through the existing `POST /push/notify` on the local API. No new endpoint. A real failure-path notification was not fired, to avoid sending a test email.
+
+### Files changed
+- `packages/types/src/project-config.ts` — `backup.verifyQueries`
+- (new) `apps/cli/src/lib/backup-verify.ts` — pure listing, format, command, parsing, role and header helpers
+- (new) `apps/cli/src/lib/backup-creds.ts` — R2 credential resolution (token file, then `ci.envFile`)
+- (new) `apps/cli/src/lib/backup-drill-record.ts` — project discovery and JSONL record
+- (new) `apps/cli/src/commands/backup-verify.ts` — `runDrill` orchestration and cleanup
+- (new) `apps/cli/src/commands/backup-verify-cli.ts` — commander registration
+- `apps/cli/src/index.ts` — registers the command
+- (new) `apps/cli/src/lib/backup-verify.test.ts`, `apps/cli/src/commands/backup-verify.test.ts`
+- (new) `scripts/restore-drill.sh`, `scripts/launchd/com.emit.restore-drill.plist`
+- `docs/BACKUP-INVENTORY.md` — Last verified restore column, drill section, findings
+
+### Verification
+- `pnpm build` / `typecheck` / `lint`: clean (5 projects), `apps/cli/dist` rebuilt
+- `pnpm test` (full, root `scripts/` touched): 1397 tests pass (164 + 577 + 302 + 354)
+- `backup verify --all`: develemail, diner-decider, emit-billing, emit-social, emit-vision, martialops, tastease all `ok:true` in `restore-drills.jsonl`; test-smoke skipped (no credentials)
+- Manual ClickHouse restore: passed (see inventory)
+- `launchctl list`: `com.emit.restore-drill` loaded
+
+### Follow-ups
+- `[defer]` emit-vision's `infra/scripts/restore-drill.sh` is broken for ClickHouse (no `--volumes-from`, wrong table name `events`, `sessions` assertion); fix in that repo.
+- `[defer]` Fold `backup verify` for ClickHouse into the command, or schedule the manual check.
+- `[defer]` Optionally show the last drill on the dashboard backup panel (`project-backups.ts`); skipped as not a small change.
+- `[defer]` No project sets `backup.verifyQueries` yet; add per-project row checks.
+- `[defer]` `.dump` image major isn't read from the header (only plain SQL); all current `.dump` files are PG16.

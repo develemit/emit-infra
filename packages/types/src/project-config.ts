@@ -39,6 +39,12 @@ export const ProjectConfigSchema = z.object({
       backupRetainDays: z.number().int().min(1).default(7),
     })
     .optional(),
+  backup: z
+    .object({
+      /** Each SQL must return at least one row once `emit-infra backup verify` has restored the dump. */
+      verifyQueries: z.array(z.string().min(1)).default([]),
+    })
+    .optional(),
   nginx: z
     .object({
       wildcardCert: z.boolean().default(false),
