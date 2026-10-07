@@ -85,3 +85,16 @@ box.
 - Moving emit-vision under Terraform.
 - Terraform state locking (backlog it if it isn't there already).
 - Snapshot-based restore automation.
+
+### Approved by the user (2026-10-06, "approve all")
+The production actions this sprint describes are approved. Proceed without asking again, with these exceptions where you must still stop for the user:
+- confirming a real email arrived;
+- any step that needs the user's password manager;
+- any server **reboot**.
+
+Guardrails:
+- deploy sibling repos only through `~/projects/emit-infra/scripts/deploy-detached.sh --dir <repo>`;
+- skip a repo whose tree is dirty or that has an active sprint loop (record it as deferred);
+- before deploying a sibling repo, run `git log origin/main..HEAD --oneline`. If it carries **other people's unpushed commits that include DB migrations**, skip it and report. Otherwise proceed, and list the extra commits in Completed;
+- Terraform: apply only plans that are in-place updates;
+- SSH changes: one server at a time, with a second session held open.
