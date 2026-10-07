@@ -90,22 +90,52 @@ laptop" single point of failure.
 - `docs/MONITORING.md`
 
 ## Acceptance criteria
-- [ ] `fleet-pulse.test.sh` covers:
+- [x] `fleet-pulse.test.sh` covers:
   - health 200 → success URL;
   - health 5xx → `/fail`;
   - backup ok and fresh → success;
   - backup failed or stale → `/fail`;
   - no status file → no backup ping;
   - backup pinged at most hourly.
-- [ ] `configure.test.ts` covers that `--only fleet-pulse` passes the right
+- [x] `configure.test.ts` covers that `--only fleet-pulse` passes the right
       playbook and that an unknown playbook is rejected. `ansible.test.ts`
       covers the new playbook path.
-- [ ] Every fleet server shows healthy uptime and backup checks in emit-vision.
-- [ ] The kill-test email was received (the user confirmed).
-- [ ] Root `package.json` changed, so the **full suite** passes: `pnpm test`,
+- [x] Every fleet server shows healthy uptime and backup checks in emit-vision.
+- [x] The kill-test email was received (the user confirmed).
+- [x] Root `package.json` changed, so the **full suite** passes: `pnpm test`,
       `pnpm typecheck`, `pnpm lint` and `pnpm test:hooks`.
 
 ## Out of scope
 - Replacing the Mac monitor. It stays, for rich metrics, the dashboard and
   cert/disk rules.
 - Multi-region external probing.
+
+## Completed
+
+**Date:** 2026-10-06
+
+### Summary
+Added the `fleet-pulse` Ansible role (templated `/usr/local/bin/emit-fleet-pulse`, 0600 env file at `/etc/emit-fleet-pulse.env`, 5-minute cron, logrotate), a `fleet-pulse.yml` playbook, a widened `AnsiblePlaybook` type, and `emit-infra configure --only <playbook>` with an allowlist (currently `fleet-pulse`) so prod servers never get a full provision run. Uptime pulses go every 5 minutes; backup pulses at most hourly, and no status file means no ping.
+
+Rolled out to all 7 fleet servers; 14 pulse checks were created with an email channel and `emit-vision pulse status` showed all 15 checks `up`. The role installs curl only when missing because emit-vision's apt sources are broken (docker.asc Signed-By conflict). Kill test on tastease (`chmod -x` at 00:20:45Z) took the check `late`, then `down` at ~00:36Z, and the user confirmed the alert email arrived.
+
+### Files changed
+- (new) `ansible/roles/fleet-pulse/` — tasks, defaults, script and logrotate templates
+- (new) `ansible/playbooks/fleet-pulse.yml` — role-only playbook
+- (new) `scripts/lib/fleet-pulse.test.sh` — 9 checks
+- `packages/core/src/ansible.ts`, `ansible.test.ts`, `index.ts` — playbook union, test, export
+- `apps/cli/src/commands/configure.ts`, `configure.test.ts` — `--only` flag and tests
+- `package.json` — `test:hooks` runs the new shell test
+- `docs/MONITORING.md` — per-server pulses section and the partition limit
+- `sprint/360-fleet-uptime-and-backup-pulses.md` — this record
+
+### Verification
+- `pnpm test`: pass (nx cache hit; inputs unchanged since the last full run)
+- `pnpm typecheck`: clean; `pnpm lint`: clean
+- `pnpm test:hooks`: all pass, fleet-pulse 9/9
+- Full-suite scope because root `package.json` changed.
+- Rollout and kill test verified live in emit-vision; email receipt confirmed by the user.
+
+### Follow-ups
+- `[defer]` The kill-test alert email body is missing details ("Project:" blank, "Condition: undefined < 0 in 0m"). It is an emit-vision template bug, already backlogged and being fixed in that repo.
+- `[defer]` emit-vision's apt sources are broken (docker.asc Signed-By conflict); fix on the server.

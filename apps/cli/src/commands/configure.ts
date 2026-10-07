@@ -2,21 +2,39 @@ import { Command } from 'commander'
 import { join, resolve } from 'node:path'
 import { existsSync, readFileSync } from 'node:fs'
 import chalk from 'chalk'
-import { loadConfig, runAnsible, getTerraformOutput, type ProjectConfig } from '@emit-infra/core'
+import { loadConfig, runAnsible, getTerraformOutput, type AnsiblePlaybook, type ProjectConfig } from '@emit-infra/core'
 import { buildBlueGreenProvisionVars } from '../lib/blue-green-provision-vars.js'
+
+const ONLY_PLAYBOOKS = ['fleet-pulse'] as const
 
 export function registerConfigure(program: Command): void {
   program
     .command('configure [name]')
     .description('Run full Ansible provision playbook against the server')
     .option('--config <path>', 'Path to .emit-infra.json')
+    .option('--only <playbook>', `Run a single narrow playbook instead of full provision (${ONLY_PLAYBOOKS.join(', ')})`)
     .option('--inventory <path>', 'Path to Ansible inventory file (default: auto from terraform output)')
-    .action(async (_name: string | undefined, opts: { config?: string; inventory?: string }) => {
+    .action(async (_name: string | undefined, opts: { config?: string; inventory?: string; only?: string }) => {
+      if (opts.only !== undefined && !(ONLY_PLAYBOOKS as readonly string[]).includes(opts.only)) {
+        console.error(chalk.red(`Unknown playbook "${opts.only}" for --only. Allowed: ${ONLY_PLAYBOOKS.join(', ')}`))
+        process.exit(1)
+      }
       const config = loadConfig(opts.config)
 
       console.log(chalk.cyan(`Configuring server for ${chalk.bold(config.name)}...`))
 
       const inventory = opts.inventory ?? (await resolveInventoryPath(config.name, config))
+
+      if (opts.only) {
+        const only = opts.only as AnsiblePlaybook
+        await runAnsible(only, inventory, {
+          project_name: config.name,
+          domain: config.domain,
+          fleet_pulse_health_url: config.healthCheck?.url ?? `https://${config.domain}/`,
+        })
+        console.log(chalk.green(`\nDone. Ran the ${only} playbook for ${config.name}.`))
+        return
+      }
 
       const extraVars: Record<string, unknown> = {
         project_name: config.name,

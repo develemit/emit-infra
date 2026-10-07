@@ -270,3 +270,71 @@ describe('deploy inherits the inventory check through the shared import', () => 
     expect(deploySource).toMatch(/import\s*\{\s*resolveInventoryPath\s*\}\s*from\s*['"]\.\/configure\.js['"]/)
   })
 })
+
+describe('configure command — --only', () => {
+  let dir: string
+  let originalCwd: string
+
+  beforeEach(() => {
+    dir = realpathSync(mkdtempSync(join(tmpdir(), 'configure-only-')))
+    originalCwd = process.cwd()
+    process.chdir(dir)
+    vi.clearAllMocks()
+    vi.mocked(runAnsible).mockResolvedValue(undefined)
+  })
+
+  afterEach(() => {
+    process.chdir(originalCwd)
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  function run(...args: string[]) {
+    const program = new Command()
+    program.exitOverride()
+    registerConfigure(program)
+    return program.parseAsync(['node', 'cli', 'configure', '--inventory', join(dir, 'inv.ini'), ...args])
+  }
+
+  it('--only fleet-pulse runs the fleet-pulse playbook with the configured health URL', async () => {
+    vi.mocked(loadConfig).mockReturnValue({
+      ...baseConfig,
+      healthCheck: { url: 'https://martialops.com/api/health' },
+    } as ReturnType<typeof loadConfig>)
+
+    await run('--only', 'fleet-pulse')
+
+    expect(runAnsible).toHaveBeenCalledOnce()
+    expect(runAnsible).toHaveBeenCalledWith(
+      'fleet-pulse',
+      join(dir, 'inv.ini'),
+      expect.objectContaining({
+        project_name: 'martialops',
+        fleet_pulse_health_url: 'https://martialops.com/api/health',
+      }),
+    )
+  })
+
+  it('falls back to the domain root when the project has no healthCheck', async () => {
+    vi.mocked(loadConfig).mockReturnValue({ ...baseConfig } as ReturnType<typeof loadConfig>)
+
+    await run('--only', 'fleet-pulse')
+
+    const vars = vi.mocked(runAnsible).mock.calls[0]?.[2] as Record<string, unknown>
+    expect(vars.fleet_pulse_health_url).toBe('https://martialops.com/')
+  })
+
+  it('rejects an unknown playbook without running ansible', async () => {
+    vi.mocked(loadConfig).mockReturnValue({ ...baseConfig } as ReturnType<typeof loadConfig>)
+    const exit = vi.spyOn(process, 'exit').mockImplementation((() => {
+      throw new Error('exit')
+    }) as never)
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await expect(run('--only', 'provision')).rejects.toThrow('exit')
+
+    expect(runAnsible).not.toHaveBeenCalled()
+    expect(err.mock.calls.flat().join(' ')).toContain('Unknown playbook')
+    exit.mockRestore()
+    err.mockRestore()
+  })
+})

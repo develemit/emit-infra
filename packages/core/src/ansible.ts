@@ -4,8 +4,10 @@ import { join } from 'node:path'
 
 const ANSIBLE_DIR = new URL('../../../ansible', import.meta.url).pathname
 
+export type AnsiblePlaybook = 'provision' | 'deploy' | 'fleet-pulse'
+
 export async function runAnsible(
-  playbook: 'provision' | 'deploy',
+  playbook: AnsiblePlaybook,
   inventory: string,
   extraVars?: Record<string, unknown>,
   onLine?: (stream: 'stdout' | 'stderr', text: string) => void,

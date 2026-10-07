@@ -1,0 +1,8 @@
+---
+- name: Install per-server uptime and backup pulses
+  hosts: all
+  become: true
+  gather_facts: false
+
+  roles:
+    - fleet-pulse

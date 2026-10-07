@@ -2,7 +2,7 @@ export { ProjectConfigSchema, type ProjectConfig } from './config.js'
 export { loadConfig } from './load-config.js'
 export { createConfigFile, setConfigField } from './config-writer.js'
 export { runTerraform, getTerraformOutput } from './terraform.js'
-export { runAnsible } from './ansible.js'
+export { runAnsible, type AnsiblePlaybook } from './ansible.js'
 export { deployRecordInit, deployRecordDone, deployLaunchMode, gitField, type DeployContext, type DeployLaunch } from './deploy-records.js'
 export {
   classifyRunState,

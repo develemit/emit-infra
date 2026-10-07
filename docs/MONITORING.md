@@ -46,3 +46,21 @@ curl -X PATCH "https://api.emitvision.com/v1/projects/<projectId>/pulse-checks/<
 
 Re-enable with `{"enabled":true}` afterwards. The project id is in
 `.emit-vision.json`. `pnpm launch:stop` alone does not silence it.
+
+## Per-server pulses (sprint 360)
+
+Each prod server runs `/usr/local/bin/emit-fleet-pulse` from root cron every
+5 minutes (role `ansible/roles/fleet-pulse`), so alerting works while the Mac
+is asleep or gone.
+
+| Check slug | Interval / grace | Sent when |
+|---|---|---|
+| `<project>-uptime` | 300s / 600s | every run: success on a 2xx/3xx from the health URL, `/fail` otherwise |
+| `<project>-backup` | 86400s / 7200s | at most hourly, from `/opt/<project>/.backup-status.json`: success if `status` is `ok` and `lastRun` is under 26h old, `/fail` otherwise |
+
+- No status file means no backup ping, so the check goes missing and alerts. Projects without a DB get no backup check.
+- Health URL is `config.healthCheck.url`, falling back to `https://<domain>/` (nginx answering).
+- The ingest key lives in `/etc/emit-fleet-pulse.env` (0600), not the app `.env`, because deploys overwrite the app `.env`. It is read from `EMIT_VISION_INGEST_KEY` in the local environment when the playbook runs.
+- Logs: `/var/log/emit-fleet-pulse.log` (logrotate weekly, 4 kept).
+- Known limit: the server curls its own public URL, so this exercises nginx, TLS and the app but cannot detect an upstream network partition.
+- Roll out or update with `pnpm build && emit-infra configure --only fleet-pulse` from the project repo. Don't run full provision on prod.

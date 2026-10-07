@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# Managed by Ansible (fleet-pulse role). Pings emit-vision from this server so
+# monitoring does not depend on the Mac. Run by cron every 5 minutes.
+set -uo pipefail
+
+PROJECT="${PROJECT:-{{ project_name }}}"
+HEALTH_URL="${HEALTH_URL:-{{ fleet_pulse_health_url }}}"
+BACKUP_STATUS_FILE="${BACKUP_STATUS_FILE:-/opt/{{ project_name }}/.backup-status.json}"
+BACKUP_PING_STATE="${BACKUP_PING_STATE:-/var/lib/emit-fleet-pulse/backup-last-ping}"
+ENV_FILE="${ENV_FILE:-/etc/emit-fleet-pulse.env}"
+PULSE_BASE="${PULSE_BASE:-https://api.emitvision.com/v1/pulse}"
+BACKUP_MAX_AGE_SECONDS="${BACKUP_MAX_AGE_SECONDS:-93600}"
+BACKUP_PING_INTERVAL_SECONDS="${BACKUP_PING_INTERVAL_SECONDS:-3600}"
+
+# shellcheck disable=SC1090
+[[ -f "$ENV_FILE" ]] && . "$ENV_FILE"
+[[ -n "${EMIT_VISION_INGEST_KEY:-}" ]] || { echo "$(date -u +%FT%TZ) no EMIT_VISION_INGEST_KEY" >&2; exit 1; }
+
+ping_pulse() {
+  local slug="$1" suffix="${2:-}"
+  curl -fsS -m 10 -H "Authorization: Bearer $EMIT_VISION_INGEST_KEY" "$PULSE_BASE/$slug$suffix" >/dev/null \
+    || echo "$(date -u +%FT%TZ) ping failed: $slug$suffix" >&2
+}
+
+# 2xx/3xx from the public URL means nginx, TLS and the app all answered.
+check_uptime() {
+  local code
+  code=$(curl -s -o /dev/null -m 15 -w '%{http_code}' "$HEALTH_URL") || code=000
+  if [[ "$code" =~ ^[23][0-9][0-9]$ ]]; then
+    ping_pulse "$PROJECT-uptime"
+  else
+    echo "$(date -u +%FT%TZ) health $HEALTH_URL returned $code" >&2
+    ping_pulse "$PROJECT-uptime" /fail
+  fi
+}
+
+to_epoch() { date -u -d "$1" +%s 2>/dev/null || date -u -j -f '%Y-%m-%dT%H:%M:%SZ' "$1" +%s 2>/dev/null; }
+
+# No status file means no ping: the check goes missing and alerts.
+check_backup() {
+  [[ -f "$BACKUP_STATUS_FILE" ]] || return 0
+
+  local now last_ping
+  now=$(date -u +%s)
+  last_ping=$(cat "$BACKUP_PING_STATE" 2>/dev/null || echo 0)
+  (( now - last_ping >= BACKUP_PING_INTERVAL_SECONDS )) || return 0
+
+  local status last_run last_epoch
+  status=$(sed -n 's/.*"status"[[:space:]]*:[[:space:]]*"\([a-z]*\)".*/\1/p' "$BACKUP_STATUS_FILE")
+  last_run=$(sed -n 's/.*"lastRun"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$BACKUP_STATUS_FILE")
+  last_epoch=$(to_epoch "$last_run" || echo 0)
+
+  if [[ "$status" == "ok" ]] && (( now - last_epoch < BACKUP_MAX_AGE_SECONDS )); then
+    ping_pulse "$PROJECT-backup"
+  else
+    echo "$(date -u +%FT%TZ) backup status=$status lastRun=$last_run" >&2
+    ping_pulse "$PROJECT-backup" /fail
+  fi
+  mkdir -p "$(dirname "$BACKUP_PING_STATE")"
+  echo "$now" > "$BACKUP_PING_STATE"
+}
+
+check_uptime
+check_backup

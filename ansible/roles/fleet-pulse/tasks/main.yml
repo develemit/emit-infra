@@ -1,0 +1,49 @@
+---
+- name: Require the emit-vision ingest key
+  assert:
+    that: fleet_pulse_ingest_key | default('') | length > 0
+    fail_msg: "Set fleet_pulse_ingest_key (EMIT_VISION_INGEST_KEY of the emit-infra emit-vision project)"
+
+- name: Check for curl
+  command: which curl
+  register: fleet_pulse_curl
+  changed_when: false
+  failed_when: false
+
+- name: Install curl
+  apt:
+    name: curl
+    state: present
+  when: fleet_pulse_curl.rc != 0
+
+- name: Write fleet-pulse env file
+  copy:
+    dest: /etc/emit-fleet-pulse.env
+    content: "EMIT_VISION_INGEST_KEY={{ fleet_pulse_ingest_key }}\n"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+
+- name: Install emit-fleet-pulse script
+  template:
+    src: emit-fleet-pulse.sh.j2
+    dest: /usr/local/bin/emit-fleet-pulse
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Schedule emit-fleet-pulse every 5 minutes
+  cron:
+    name: emit-fleet-pulse
+    minute: "*/5"
+    user: root
+    job: "/usr/local/bin/emit-fleet-pulse >> /var/log/emit-fleet-pulse.log 2>&1"
+
+- name: Rotate emit-fleet-pulse log
+  template:
+    src: logrotate.j2
+    dest: /etc/logrotate.d/emit-fleet-pulse
+    owner: root
+    group: root
+    mode: "0644"

@@ -30,6 +30,13 @@ beforeEach(() => {
 })
 
 describe('runAnsible', () => {
+  it('resolves the fleet-pulse playbook path', async () => {
+    await runAnsible('fleet-pulse', '/inv/hosts')
+
+    const call = mockedExeca.mock.calls[0] as any
+    expect(call[1][0]).toMatch(/ansible\/playbooks\/fleet-pulse\.yml$/)
+  })
+
   it('passes playbook path and inventory as args', async () => {
     await runAnsible('deploy', '/inv/hosts')
 
