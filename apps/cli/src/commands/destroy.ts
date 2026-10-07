@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { createInterface } from 'node:readline'
 import chalk from 'chalk'
 import { loadConfig, runTerraform } from '@emit-infra/core'
+import { isProtectionError, protectionMessage } from './destroy-protection.js'
 
 export function registerDestroy(program: Command): void {
   program
@@ -27,7 +28,18 @@ export function registerDestroy(program: Command): void {
       }
 
       const tfDir = join(process.cwd(), 'terraform')
-      await runTerraform('destroy', ['-auto-approve'], tfDir)
+      const captured: string[] = []
+      try {
+        await runTerraform('destroy', ['-auto-approve'], tfDir, (stream, text) => {
+          captured.push(text)
+          ;(stream === 'stderr' ? process.stderr : process.stdout).write(text + '\n')
+        })
+      } catch (err) {
+        if (isProtectionError(captured.join('\n'))) {
+          throw new Error(protectionMessage(config.name))
+        }
+        throw err
+      }
       console.log(chalk.green(`Infrastructure for ${config.name} destroyed.`))
     })
 }

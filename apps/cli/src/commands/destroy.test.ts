@@ -72,7 +72,7 @@ describe('destroy command', () => {
     await program.parseAsync(['node', 'cli', 'destroy'])
 
     const tfDir = join(process.cwd(), 'terraform')
-    expect(runTerraform).toHaveBeenCalledWith('destroy', ['-auto-approve'], tfDir)
+    expect(runTerraform).toHaveBeenCalledWith('destroy', ['-auto-approve'], tfDir, expect.any(Function))
   })
 
   it('skips confirmation prompt and calls destroy with --yes flag', async () => {
@@ -84,6 +84,33 @@ describe('destroy command', () => {
 
     expect(createInterface).not.toHaveBeenCalled()
     const tfDir = join(process.cwd(), 'terraform')
-    expect(runTerraform).toHaveBeenCalledWith('destroy', ['-auto-approve'], tfDir)
+    expect(runTerraform).toHaveBeenCalledWith('destroy', ['-auto-approve'], tfDir, expect.any(Function))
+  })
+
+  it('turns a delete-protection failure into an actionable error', async () => {
+    vi.mocked(runTerraform).mockImplementation(async (_c, _a, _d, onLine) => {
+      onLine?.('stderr', 'Error: server is delete protected (protected)')
+      throw new Error('terraform exited with code 1')
+    })
+
+    const program = new Command()
+    program.exitOverride()
+    registerDestroy(program)
+
+    await expect(program.parseAsync(['node', 'cli', 'destroy', '--yes'])).rejects.toThrow(
+      /hcloud server disable-protection test-project delete rebuild/,
+    )
+  })
+
+  it('rethrows unrelated terraform failures unchanged', async () => {
+    vi.mocked(runTerraform).mockRejectedValue(new Error('terraform exited with code 1'))
+
+    const program = new Command()
+    program.exitOverride()
+    registerDestroy(program)
+
+    await expect(program.parseAsync(['node', 'cli', 'destroy', '--yes'])).rejects.toThrow(
+      'terraform exited with code 1',
+    )
   })
 })

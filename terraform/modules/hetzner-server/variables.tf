@@ -32,3 +32,21 @@ variable "labels" {
   type        = map(string)
   default     = {}
 }
+
+variable "backups" {
+  description = "Enable Hetzner automated daily server backups"
+  type        = bool
+  default     = true
+}
+
+variable "delete_protection" {
+  description = "Block server deletion (must equal rebuild_protection)"
+  type        = bool
+  default     = true
+}
+
+variable "rebuild_protection" {
+  description = "Block server rebuild (must equal delete_protection)"
+  type        = bool
+  default     = true
+}

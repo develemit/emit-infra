@@ -45,6 +45,10 @@ resource "hcloud_server" "main" {
 
   firewall_ids = [hcloud_firewall.main.id]
 
+  backups            = var.backups
+  delete_protection  = var.delete_protection
+  rebuild_protection = var.rebuild_protection
+
   public_net {
     ipv4_enabled = true
     ipv6_enabled = true
